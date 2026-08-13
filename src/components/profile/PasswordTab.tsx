@@ -3,7 +3,7 @@ import { Loader2 } from 'lucide-react';
 import { CommonInput } from '../ui/FormInputs';
 import { Alert } from '../ui/Alert';
 import { authService } from '../../api/services/authService';
-import { ConfirmationModal } from '../ui/ConfirmationModal'; // Adjust import path as needed
+import { ConfirmationModal } from '../ui/ConfirmationModal';
 
 const STRONG_PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
 
@@ -26,24 +26,29 @@ export const PasswordTab: React.FC = () => {
     setPassError(null);
     setPassSuccess(null);
 
-    if (!passwords.currentPassword) {
+    const trimmedCurrent = passwords.currentPassword.trim();
+    const trimmedNew = passwords.newPassword.trim();
+    const trimmedConfirm = passwords.confirmNewPassword.trim();
+
+    if (!trimmedCurrent) {
       setPassError('Current password is required.');
       return;
     }
 
-    if (!STRONG_PASSWORD_REGEX.test(passwords.newPassword)) {
+    if (!STRONG_PASSWORD_REGEX.test(trimmedNew)) {
       setPassError(
         'New password must be at least 8 characters long and contain at least 1 uppercase letter, 1 lowercase letter, 1 number, and 1 special character (@$!%*?&).'
       );
       return;
     }
 
-    if (passwords.newPassword === passwords.currentPassword) {
+    // Client-side direct equality check
+    if (trimmedNew === trimmedCurrent) {
       setPassError('New password must be different from current password.');
       return;
     }
 
-    if (passwords.newPassword !== passwords.confirmNewPassword) {
+    if (trimmedNew !== trimmedConfirm) {
       setPassError('New password and confirm password do not match.');
       return;
     }
@@ -79,6 +84,7 @@ export const PasswordTab: React.FC = () => {
     } catch (err: unknown) {
       if (typeof err === 'object' && err !== null && 'response' in err) {
         const apiError = err as { response?: { data?: { message?: string } } };
+        // Clear message returned directly from backend API
         setPassError(
           apiError.response?.data?.message || 'Failed to update password. Please check your current password.'
         );
@@ -137,7 +143,7 @@ export const PasswordTab: React.FC = () => {
               !passwords.newPassword ||
               !passwords.confirmNewPassword
             }
-            className="w-full px-5 py-2.5 bg-[#0071e3] hover:bg-[#0077ed] disabled:bg-gray-300 dark:disabled:bg-neutral-800 text-white disabled:text-gray-500 rounded-xl text-sm font-semibold transition-colors shadow-sm disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            className="w-full px-5 py-2.5 bg-[#0071e3] hover:bg-[#0077ed] disabled:bg-gray-300 dark:disabled:bg-neutral-800 text-white disabled:text-gray-500 rounded-xl text-sm font-semibold transition-colors shadow-sm disabled:cursor-not-allowed flex items-center justify-center gap-2 cursor-pointer"
           >
             {isChangingPassword ? (
               <>
