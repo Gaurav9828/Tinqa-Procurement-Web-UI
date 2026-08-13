@@ -22,6 +22,7 @@ import { useAuthStore } from '../../store/useAuthStore';
 import { authService } from '../../api/services/authService';
 import { APP_NAVIGATION } from '../../config/permissions.config';
 import type { UserRole } from '../../config/permissions.config';
+import { NotificationBell } from '../../components/notifications/NotificationBell';
 
 // Icon mapping dictionary
 const ICON_MAP: Record<string, LucideIcon> = {
@@ -88,6 +89,10 @@ export const AdminLayout: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-3">
+          {/* Notification Bell Icon */}
+          <NotificationBell />
+
+          {/* Theme Toggle Button */}
           <button
             onClick={toggleTheme}
             className="p-2.5 rounded-full hover:bg-black/5 dark:hover:bg-white/10 transition-colors text-gray-500 dark:text-gray-400 cursor-pointer"

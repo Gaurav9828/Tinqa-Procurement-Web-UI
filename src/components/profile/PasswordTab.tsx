@@ -3,6 +3,7 @@ import { Loader2 } from 'lucide-react';
 import { CommonInput } from '../ui/FormInputs';
 import { Alert } from '../ui/Alert';
 import { authService } from '../../api/services/authService';
+import { ConfirmationModal } from '../ui/ConfirmationModal'; // Adjust import path as needed
 
 const STRONG_PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
 
@@ -16,7 +17,11 @@ export const PasswordTab: React.FC = () => {
   const [passSuccess, setPassSuccess] = useState<string | null>(null);
   const [isChangingPassword, setIsChangingPassword] = useState<boolean>(false);
 
-  const handlePasswordSubmit = async (e: React.FormEvent) => {
+  // State to control confirmation modal
+  const [isConfirmOpen, setIsConfirmOpen] = useState<boolean>(false);
+
+  // Validate form before opening modal
+  const handlePreSubmitValidation = (e: React.FormEvent) => {
     e.preventDefault();
     setPassError(null);
     setPassSuccess(null);
@@ -43,6 +48,13 @@ export const PasswordTab: React.FC = () => {
       return;
     }
 
+    // Opens confirmation popup once validations pass
+    setIsConfirmOpen(true);
+  };
+
+  // Execution handler called when user clicks "Confirm" in the modal
+  const handleExecutePasswordChange = async () => {
+    setIsConfirmOpen(false);
     setIsChangingPassword(true);
 
     try {
@@ -82,7 +94,7 @@ export const PasswordTab: React.FC = () => {
 
   return (
     <div className="apple-card p-6 max-w-xl">
-      <form onSubmit={handlePasswordSubmit} className="space-y-6">
+      <form onSubmit={handlePreSubmitValidation} className="space-y-6">
         {/* Dismissible Feedback Alerts */}
         <Alert type="error" message={passError} onClose={() => setPassError(null)} />
         <Alert type="success" message={passSuccess} onClose={() => setPassSuccess(null)} />
@@ -137,6 +149,15 @@ export const PasswordTab: React.FC = () => {
           </button>
         </div>
       </form>
+
+      {/* Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={isConfirmOpen}
+        actionType="CHANGE_PASSWORD"
+        isSubmitting={isChangingPassword}
+        onClose={() => setIsConfirmOpen(false)}
+        onConfirm={handleExecutePasswordChange}
+      />
     </div>
   );
 };

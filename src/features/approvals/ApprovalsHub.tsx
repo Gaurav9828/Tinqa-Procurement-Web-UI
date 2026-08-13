@@ -10,7 +10,7 @@ import { ApprovalMetrics } from './components/ApprovalMetrics';
 import { ApprovalTable } from './components/ApprovalTable';
 import { ApprovalPreviewModal } from './components/ApprovalPreviewModal';
 import { RejectionModal } from './components/RejectionModal';
-import { ConfirmationModal } from './components/ConfirmationModal';
+import { ConfirmationModal } from '../../components/ui/ConfirmationModal';
 
 export const ApprovalsHub: React.FC = () => {
   // Data State
