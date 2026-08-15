@@ -43,3 +43,12 @@ export type Gender = 'MALE' | 'FEMALE' | 'OTHER';
 
 // This is now a mutable array that matches your specific type
 export const GENDERS: Gender[] = ['MALE', 'FEMALE', 'OTHER'];
+
+export interface ApiResponse<T> {
+  success: boolean;
+  message: string;
+  errorCode: string | null;
+  data: T;
+  timestamp: string;
+  path: string;
+}

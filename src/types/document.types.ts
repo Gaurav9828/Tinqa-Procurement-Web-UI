@@ -122,12 +122,3 @@ export interface DocumentResponseData {
   downloadUrl: string;
   createdAt: string;
 }
-
-export interface ApiResponse<T> {
-  success: boolean;
-  message: string;
-  errorCode: string;
-  data: T;
-  timestamp: string;
-  path: string;
-}

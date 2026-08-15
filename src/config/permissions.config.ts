@@ -15,7 +15,8 @@ export type FeatureKey =
   | 'MANAGE_COMPLAINTS'
   | 'VIEW_ANALYTICS'
   | 'MANAGE_EMPLOYEES'
-  | 'FINALIZE_EMPLOYEE_DELETE';
+  | 'FINALIZE_EMPLOYEE_DELETE'
+  | 'MANAGE_ITEMS';
 
 export const FEATURE_PERMISSIONS: Record<FeatureKey, UserRole[]> = {
   VIEW_PROFILE: ['ADMIN_L1', 'ADMIN_L2'],
@@ -33,6 +34,7 @@ export const FEATURE_PERMISSIONS: Record<FeatureKey, UserRole[]> = {
   VIEW_ANALYTICS: ['ADMIN_L1', 'ADMIN_L2'],
   MANAGE_EMPLOYEES: ['ADMIN_L1', 'ADMIN_L2'],
   FINALIZE_EMPLOYEE_DELETE: ['ADMIN_L2'],
+  MANAGE_ITEMS: ['ADMIN_L1', 'ADMIN_L2'],
 };
 
 export interface NavigationItem {
@@ -70,6 +72,13 @@ export const APP_NAVIGATION: NavigationItem[] = [
     label: 'Employee Management',
     path: '/employees',
     iconName: 'UserCheck',
+    allowedRoles: ['ADMIN_L1', 'ADMIN_L2'],
+  },
+  {
+    id: 'items',
+    label: 'Item Management',
+    path: '/item',
+    iconName: 'Boxes',
     allowedRoles: ['ADMIN_L1', 'ADMIN_L2'],
   },
   {

@@ -11,15 +11,6 @@ export const EmployeeConstants = {
 
 export type EmployeeStatus = (typeof EmployeeConstants)[keyof typeof EmployeeConstants];
 
-export interface ApiResponse<T> {
-  success: boolean;
-  message: string;
-  errorCode: string | null;
-  data: T;
-  timestamp: string;
-  path: string;
-}
-
 export interface EmployeeResponse {
   id: number;
   userId: number;

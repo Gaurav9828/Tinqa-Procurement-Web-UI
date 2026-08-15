@@ -14,7 +14,13 @@ import {
   Loader2,
   Folder,
   Settings,
-  HelpCircle
+  HelpCircle,
+  UserCheck,
+  Boxes,
+  Tag,
+  ShoppingBag,
+  FileText,
+  LayoutDashboard
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useThemeStore } from '../../store/useThemeStore';
@@ -24,7 +30,7 @@ import { APP_NAVIGATION } from '../../config/permissions.config';
 import type { UserRole } from '../../config/permissions.config';
 import { NotificationBell } from '../../components/notifications/NotificationBell';
 
-// Icon mapping dictionary
+// Comprehensive Icon mapping dictionary
 const ICON_MAP: Record<string, LucideIcon> = {
   CheckCircle2,
   Package,
@@ -35,6 +41,12 @@ const ICON_MAP: Record<string, LucideIcon> = {
   BarChart3,
   Folder,
   Settings,
+  UserCheck,
+  Boxes,
+  Tag,
+  ShoppingBag,
+  FileText,
+  LayoutDashboard,
 };
 
 export const AdminLayout: React.FC = () => {
@@ -151,7 +163,7 @@ export const AdminLayout: React.FC = () => {
                   key={item.path}
                   to={item.path}
                   className={({ isActive }) =>
-                    `flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-colors duration-150 ${
+                    `group flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-colors duration-150 ${
                       isActive
                         ? 'bg-[#0071e3] text-white shadow-sm font-semibold'
                         : 'text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-white/10 hover:text-black dark:hover:text-white'
@@ -160,7 +172,13 @@ export const AdminLayout: React.FC = () => {
                 >
                   {({ isActive }) => (
                     <>
-                      <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-white' : 'text-gray-500 dark:text-gray-400'}`} />
+                      <Icon 
+                        className={`w-4 h-4 shrink-0 transition-colors ${
+                          isActive 
+                            ? 'text-white' 
+                            : 'text-gray-400 dark:text-neutral-400 group-hover:text-black dark:group-hover:text-white'
+                        }`} 
+                      />
                       <span className={isActive ? 'text-white' : ''}>
                         {item.label}
                       </span>
