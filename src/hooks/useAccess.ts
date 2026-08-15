@@ -1,9 +1,9 @@
-import { useAuth } from '../context/AuthContext'; // Access your global auth state
+import { useAuthStore } from '../store/useAuthStore'
 import { FEATURE_PERMISSIONS, APP_NAVIGATION, } from '../config/permissions.config';
 import type { FeatureKey, UserRole, NavigationItem } from '../config/permissions.config';
 
 export const useAccess = () => {
-  const { user } = useAuth(); // Contains user.role from AuthResponse
+  const { user } = useAuthStore();
   const userRole = user?.role as UserRole | undefined;
 
   /**

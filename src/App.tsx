@@ -8,6 +8,7 @@ import { ProfilePage } from './pages/ProfilePage';
 import { GlobalErrorBoundary } from './components/ErrorBoundary';
 import { GlobalErrorPage } from './pages/ErrorPage';
 import { AuthProvider } from './context/AuthContext';
+import { EmployeeManagementPage } from './features/employee-management/pages/EmployeeManagementPage';
 
 /* Wrapper component to pass navigation handlers to ErrorPage */
 const ErrorPageRoute: React.FC = () => {
@@ -28,6 +29,7 @@ export const App: React.FC = () => {
             {/* Protected Admin Routes */}
               <Route path="/" element={<AdminLayout />}>
                 <Route path="/profile" element={<ProfilePage />} />
+                <Route path="/employees" element={<EmployeeManagementPage />} />
                 <Route index element={<Navigate to="/analytics" replace />} />
                 <Route path="approvals" element={<ApprovalsHub />} />
                 <Route path="orders" element={<div className="p-8 apple-card">Orders Module Container</div>} />

@@ -1,134 +1,262 @@
 import React from 'react';
-import { X, Clock, User, Building, Phone, Mail, Calendar } from 'lucide-react';
-import type { ProfileApprovalRequest } from '../types/approval.types';
-import { DetailCard } from './DetailCard';
+import {
+  X,
+  FileText,
+  UserCheck,
+  Check,
+  Clock,
+  HardDrive,
+  Tag,
+  Mail,
+  Phone,
+  Building,
+  Briefcase,
+  User,
+  Calendar,
+  Download,
+  Loader2,
+} from 'lucide-react';
+import type { UnifiedApprovalItem } from '../types/approval.types';
 
-interface PreviewModalProps {
-  request: ProfileApprovalRequest | null;
+export interface PreviewModalProps {
+  request: UnifiedApprovalItem | null;
   isOpen: boolean;
+  isDownloading?: boolean;
   onClose: () => void;
   onApprove: (requestId: number) => void;
   onReject: (requestId: number) => void;
+  onDownload?: (documentId: number, fileName: string) => void;
   formatTime: (isoString: string) => string;
 }
 
 export const ApprovalPreviewModal: React.FC<PreviewModalProps> = ({
   request,
   isOpen,
+  isDownloading = false,
   onClose,
   onApprove,
   onReject,
+  onDownload,
   formatTime,
 }) => {
   if (!isOpen || !request) return null;
 
-  const modifiedFieldsCount = [
-    request.displayName,
-    request.firstName,
-    request.middleName,
-    request.lastName,
-    request.department,
-    request.designation,
-    request.primaryPhone,
-    request.alternatePhone,
-    request.personalEmail,
-    request.dateOfBirth,
-    request.gender,
-  ].filter((val) => val !== null && val !== undefined && val !== '').length;
+  const targetId = request.approvalType === 'DOCUMENT' ? request.id : request.requestId;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-      <div className="apple-card w-full max-w-2xl bg-white dark:bg-neutral-900 shadow-2xl rounded-2xl overflow-hidden border border-black/10 dark:border-white/10 flex flex-col max-h-[90vh]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+      <div className="bg-white dark:bg-neutral-900 border border-black/10 dark:border-white/10 rounded-2xl w-full max-w-2xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
+        
         {/* Header */}
-        <div className="p-5 border-b border-black/10 dark:border-white/10 flex items-center justify-between bg-black/5 dark:bg-white/5">
-          <div>
-            <div className="flex items-center gap-2">
-              <h2 className="text-lg font-bold text-black dark:text-white">Profile Update Request</h2>
-              <span className="px-2.5 py-0.5 rounded-full text-xs font-mono font-semibold bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">
-                REQ-{request.requestId}
-              </span>
+        <div className="p-5 border-b border-black/10 dark:border-white/10 flex items-center justify-between bg-black/[0.02] dark:bg-white/[0.02]">
+          <div className="flex items-center gap-3">
+            <div className={`p-2 rounded-xl ${
+              request.approvalType === 'DOCUMENT' 
+                ? 'bg-blue-500/10 text-blue-500' 
+                : 'bg-purple-500/10 text-purple-500'
+            }`}>
+              {request.approvalType === 'DOCUMENT' ? (
+                <FileText className="w-5 h-5" />
+              ) : (
+                <UserCheck className="w-5 h-5" />
+              )}
             </div>
-            <p className="text-xs text-gray-500 dark:text-neutral-400 mt-0.5">
-              Target Employee Code: <span className="font-mono font-semibold text-black dark:text-white">{request.employeeCode}</span>
-            </p>
+            <div>
+              <h2 className="font-semibold text-lg text-black dark:text-white">
+                {request.approvalType === 'DOCUMENT' 
+                  ? 'Document Approval Details' 
+                  : 'Profile Update Details'}
+              </h2>
+              <p className="text-xs text-gray-500 dark:text-neutral-400 font-mono">
+                Ref ID: #{targetId}
+              </p>
+            </div>
           </div>
-
           <button
             onClick={onClose}
-            className="p-1.5 rounded-full hover:bg-black/10 dark:hover:bg-white/10 text-gray-500 hover:text-black dark:hover:text-white transition-colors"
-            aria-label="Close modal"
+            className="p-2 rounded-xl hover:bg-black/10 dark:hover:bg-white/10 text-gray-500 hover:text-black dark:hover:text-white transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Body */}
-        <div className="p-6 overflow-y-auto space-y-6">
-          <div className="grid grid-cols-3 gap-4 p-4 rounded-xl bg-gray-50 dark:bg-neutral-800/50 text-xs">
-            <div>
-              <span className="text-gray-400 block mb-1">Requested By</span>
-              <span className="font-semibold text-sm text-black dark:text-white">@{request.requestedByUsername}</span>
-            </div>
-            <div>
-              <span className="text-gray-400 block mb-1">Submitted</span>
-              <span className="font-semibold text-sm flex items-center gap-1 text-black dark:text-white">
-                <Clock className="w-3.5 h-3.5 text-gray-400" />
-                {formatTime(request.requestedAt)}
-              </span>
-            </div>
-            <div>
-              <span className="text-gray-400 block mb-1">Status</span>
-              <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
-                {request.status}
-              </span>
-            </div>
-          </div>
+        {/* Content Body */}
+        <div className="p-6 overflow-y-auto space-y-6 text-sm">
+          
+          {/* ================= DOCUMENT PREVIEW ================= */}
+          {request.approvalType === 'DOCUMENT' && (
+            <div className="space-y-4">
+              <div className="p-4 rounded-xl bg-black/5 dark:bg-white/5 space-y-3">
+                <div>
+                  <label className="text-xs text-gray-500 dark:text-neutral-400 font-medium uppercase">
+                    File Name
+                  </label>
+                  <p className="font-semibold text-base text-black dark:text-white break-all">
+                    {request.originalFileName}
+                  </p>
+                </div>
 
-          <div className="space-y-3">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-neutral-400">
-              Proposed Field Modifications ({modifiedFieldsCount})
-            </h3>
+                <div className="grid grid-cols-2 gap-4 text-xs">
+                  <div>
+                    <span className="text-gray-500 dark:text-neutral-400">File Size:</span>
+                    <p className="font-medium font-mono text-black dark:text-white mt-0.5">
+                      {(request.fileSize / 1024).toFixed(1)} KB
+                    </p>
+                  </div>
+                  <div>
+                    <span className="text-gray-500 dark:text-neutral-400">Content Type:</span>
+                    <p className="font-medium text-black dark:text-white mt-0.5">
+                      {request.contentType}
+                    </p>
+                  </div>
+                </div>
+              </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <DetailCard icon={<User className="w-4 h-4 text-blue-500" />} label="First Name" value={request.firstName} />
-              <DetailCard icon={<User className="w-4 h-4 text-blue-500" />} label="Middle Name" value={request.middleName} />
-              <DetailCard icon={<User className="w-4 h-4 text-blue-500" />} label="Last Name" value={request.lastName} />
-              <DetailCard icon={<User className="w-4 h-4 text-blue-500" />} label="Display Name" value={request.displayName} />
-              <DetailCard icon={<Building className="w-4 h-4 text-amber-500" />} label="Department" value={request.department} />
-              <DetailCard icon={<Building className="w-4 h-4 text-amber-500" />} label="Designation" value={request.designation} />
-              <DetailCard icon={<Phone className="w-4 h-4 text-emerald-500" />} label="Primary Phone" value={request.primaryPhone} />
-              <DetailCard icon={<Phone className="w-4 h-4 text-emerald-500" />} label="Alternate Phone" value={request.alternatePhone} />
-              <DetailCard icon={<Mail className="w-4 h-4 text-purple-500" />} label="Personal Email" value={request.personalEmail} />
-              <DetailCard icon={<Calendar className="w-4 h-4 text-rose-500" />} label="Date of Birth" value={request.dateOfBirth} />
-              <DetailCard icon={<User className="w-4 h-4 text-gray-500" />} label="Gender" value={request.gender} />
+              <div className="grid grid-cols-2 gap-4">
+                <div className="p-3.5 rounded-xl border border-black/10 dark:border-white/10 space-y-1">
+                  <div className="flex items-center gap-1.5 text-xs text-gray-500">
+                    <Tag className="w-3.5 h-3.5 text-blue-500" />
+                    <span>Category</span>
+                  </div>
+                  <p className="font-medium text-black dark:text-white">{request.category}</p>
+                </div>
+
+                <div className="p-3.5 rounded-xl border border-black/10 dark:border-white/10 space-y-1">
+                  <div className="flex items-center gap-1.5 text-xs text-gray-500">
+                    <HardDrive className="w-3.5 h-3.5 text-purple-500" />
+                    <span>Purpose</span>
+                  </div>
+                  <p className="font-medium text-black dark:text-white">{request.purpose}</p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 text-xs text-gray-500 pt-2">
+                <Clock className="w-4 h-4 text-gray-400" />
+                <span>Submitted at: {formatTime(request.createdAt)}</span>
+              </div>
+
+              {/* Download Action Trigger (View Only Callback) */}
+              <button
+                type="button"
+                onClick={() => onDownload?.(request.id, request.originalFileName)}
+                disabled={isDownloading}
+                className="mt-2 inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400 font-medium hover:bg-blue-500/20 transition-colors w-full justify-center text-xs cursor-pointer disabled:opacity-50"
+              >
+                {isDownloading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Downloading Document...
+                  </>
+                ) : (
+                  <>
+                    <Download className="w-4 h-4" />
+                    Download Document Attachment
+                  </>
+                )}
+              </button>
             </div>
-          </div>
+          )}
+
+          {/* ================= PROFILE PREVIEW ================= */}
+          {request.approvalType === 'PROFILE' && (
+            <div className="space-y-4">
+              <div className="p-4 rounded-xl bg-black/5 dark:bg-white/5 space-y-3">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <label className="text-xs text-gray-500 dark:text-neutral-400 font-medium uppercase">
+                      Requester Employee
+                    </label>
+                    <p className="font-semibold text-lg text-black dark:text-white">
+                      {request.displayName || `${request.firstName || ''} ${request.lastName || ''} ${request.employeeCode || ''}`.trim() || 'N/A'}
+                    </p>
+                  </div>
+                  <span className="font-mono text-xs px-2.5 py-1 rounded-md bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20">
+                    Emp Code: {request.employeeCode}
+                  </span>
+                </div>
+
+                <p className="text-xs text-gray-500">
+                  Requested by: <span className="font-medium text-black dark:text-white">@{request.requestedByUsername}</span>
+                </p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 text-xs">
+                <div className="p-3 rounded-xl border border-black/10 dark:border-white/10 flex items-center gap-2.5">
+                  <Mail className="w-4 h-4 text-blue-500 shrink-0" />
+                  <div className="truncate">
+                    <span className="text-gray-400 block text-[10px]">Email</span>
+                    <span className="font-medium truncate text-black dark:text-white">{request.personalEmail || 'N/A'}</span>
+                  </div>
+                </div>
+
+                <div className="p-3 rounded-xl border border-black/10 dark:border-white/10 flex items-center gap-2.5">
+                  <Phone className="w-4 h-4 text-emerald-500 shrink-0" />
+                  <div>
+                    <span className="text-gray-400 block text-[10px]">Phone</span>
+                    <span className="font-medium text-black dark:text-white">{request.primaryPhone || 'N/A'}</span>
+                  </div>
+                </div>
+
+                <div className="p-3 rounded-xl border border-black/10 dark:border-white/10 flex items-center gap-2.5">
+                  <Building className="w-4 h-4 text-amber-500 shrink-0" />
+                  <div>
+                    <span className="text-gray-400 block text-[10px]">Department</span>
+                    <span className="font-medium text-black dark:text-white">{request.department || 'N/A'}</span>
+                  </div>
+                </div>
+
+                <div className="p-3 rounded-xl border border-black/10 dark:border-white/10 flex items-center gap-2.5">
+                  <Briefcase className="w-4 h-4 text-purple-500 shrink-0" />
+                  <div>
+                    <span className="text-gray-400 block text-[10px]">Designation</span>
+                    <span className="font-medium text-black dark:text-white">{request.designation || 'N/A'}</span>
+                  </div>
+                </div>
+
+                <div className="p-3 rounded-xl border border-black/10 dark:border-white/10 flex items-center gap-2.5">
+                  <User className="w-4 h-4 text-rose-500 shrink-0" />
+                  <div>
+                    <span className="text-gray-400 block text-[10px]">Gender</span>
+                    <span className="font-medium text-black dark:text-white">{request.gender || 'N/A'}</span>
+                  </div>
+                </div>
+
+                <div className="p-3 rounded-xl border border-black/10 dark:border-white/10 flex items-center gap-2.5">
+                  <Calendar className="w-4 h-4 text-cyan-500 shrink-0" />
+                  <div>
+                    <span className="text-gray-400 block text-[10px]">Date of Birth</span>
+                    <span className="font-medium text-black dark:text-white">{request.dateOfBirth || 'N/A'}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 text-xs text-gray-500 pt-2">
+                <Clock className="w-4 h-4 text-gray-400" />
+                <span>Requested at: {formatTime(request.requestedAt)}</span>
+              </div>
+            </div>
+          )}
+
         </div>
 
-        {/* Footer */}
-        <div className="p-4 border-t border-black/10 dark:border-white/10 flex items-center justify-between bg-black/5 dark:bg-white/5">
+        {/* Action Footer */}
+        <div className="p-4 border-t border-black/10 dark:border-white/10 flex justify-end gap-3 bg-black/[0.02] dark:bg-white/[0.02]">
           <button
-            onClick={onClose}
-            className="px-4 py-2 text-sm font-medium text-gray-600 dark:text-neutral-400 hover:text-black dark:hover:text-white transition-colors"
+            onClick={() => onReject(targetId)}
+            className="px-4 py-2 rounded-xl bg-rose-500/10 text-rose-600 dark:text-rose-400 hover:bg-rose-500 hover:text-white font-medium text-xs transition-all cursor-pointer flex items-center gap-1.5"
           >
-            Close
+            <X className="w-4 h-4" />
+            Reject
           </button>
-
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => onReject(request.requestId)}
-              className="px-4 py-2 rounded-xl text-sm font-semibold bg-rose-500/10 text-rose-600 dark:text-rose-400 hover:bg-rose-500 hover:text-white transition-all flex items-center gap-1.5"
-            >
-              Reject Request
-            </button>
-            <button
-              onClick={() => onApprove(request.requestId)}
-              className="px-4 py-2 rounded-xl text-sm font-semibold bg-emerald-500 text-white hover:bg-emerald-600 transition-all flex items-center gap-1.5 shadow-sm"
-            >
-              Approve Changes
-            </button>
-          </div>
+          <button
+            onClick={() => onApprove(targetId)}
+            className="px-4 py-2 rounded-xl bg-emerald-500 text-white hover:bg-emerald-600 font-medium text-xs transition-all cursor-pointer flex items-center gap-1.5 shadow-sm"
+          >
+            <Check className="w-4 h-4" />
+            Approve
+          </button>
         </div>
+
       </div>
     </div>
   );

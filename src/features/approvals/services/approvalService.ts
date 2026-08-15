@@ -1,27 +1,64 @@
-import type { ApiResponseEnvelope, ProfileApprovalRequest } from '../types/approval.types';
 import { axiosClient } from '../../../api/axiosClient';
+import type { ApiResponseEnvelope, DocumentApprovalItem, ProfileApprovalRequest, ProcessApprovalPayload } from '../types/approval.types';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api';
 
-export interface ProcessApprovalPayload {
-  decision: 'APPROVE' | 'REJECT';
-  rejectionReason?: string;
-}
-
 export const approvalService = {
-  getProfileApprovals: async (): Promise<ProfileApprovalRequest[]> => {    
+  // Fetch Document Approvals
+  getPendingDocuments: async (): Promise<DocumentApprovalItem[]> => {
+    const response = await axiosClient.get<ApiResponseEnvelope<DocumentApprovalItem[]>>(
+      `${API_BASE_URL}/v1/documents?status=WAITING_FOR_APPROVAL`
+    );
+    return response.data.data || [];
+  },
+
+  getProfileApprovals: async (): Promise<ProfileApprovalRequest[]> => {
     const response = await axiosClient.get<ApiResponseEnvelope<ProfileApprovalRequest[]>>(`${API_BASE_URL}/admin/profile-approvals`);
     return response.data.data || [];
   },
 
-  processProfileApproval: async (
-    requestId: number,
-    payload: ProcessApprovalPayload
-  ): Promise<ProfileApprovalRequest> => {
-    const response = await axiosClient.put<ApiResponseEnvelope<ProfileApprovalRequest>>(
-      `${API_BASE_URL}/admin/profile-approvals/${requestId}`,
+  // Process Document
+  processDocumentApproval: async (id: number, payload: ProcessApprovalPayload) => {
+    const response = await axiosClient.put<ApiResponseEnvelope<any>>(
+      `${API_BASE_URL}/v1/documents/${id}/approval`,
       payload
     );
     return response.data.data;
+  },
+
+  // Process Profile
+  processProfileApproval: async (id: number, payload: ProcessApprovalPayload) => {
+    const response = await axiosClient.put<ApiResponseEnvelope<any>>(
+      `${API_BASE_URL}/admin/profile-approvals/${id}`,
+      payload
+    );
+    return response.data.data;
+  },
+
+  // inside approvalService.ts
+
+  downloadDocument: async (documentId: number, fileName: string): Promise<void> => {
+    const response = await axiosClient.get(
+      `${API_BASE_URL}/v1/documents/${documentId}/download`,
+      {
+        responseType: 'blob',
+      }
+    );
+
+    // Safely extract content-type header as string with fallback
+    const contentType = (response.headers['content-type'] as string) || 'application/octet-stream';
+
+    const blob = new Blob([response.data], { type: contentType });
+    const downloadUrl = window.URL.createObjectURL(blob);
+
+    const link = document.createElement('a');
+    link.href = downloadUrl;
+    link.setAttribute('download', fileName || `document-${documentId}`);
+    document.body.appendChild(link);
+    link.click();
+
+    // Cleanup
+    link.remove();
+    window.URL.revokeObjectURL(downloadUrl);
   },
 };

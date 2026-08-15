@@ -6,6 +6,7 @@ import { Validator } from '../../utils/validator';
 import type { ProfileFormState } from '../../hooks/useProfile';
 import { HasAccess } from '../../auth/HasAccess';
 import { ConfirmationModal } from '../ui/ConfirmationModal';
+import { DEPARTMENTS, DESIGNATIONS, GENDERS } from '../../types/common.types';
 
 interface ProfileTabProps {
     employeeData: ProfileFormState;
@@ -19,26 +20,6 @@ interface ProfileTabProps {
     isSubmitting?: boolean;
 }
 
-const DEPARTMENTS = [
-    'Procurement',
-    'Procurement Logistics',
-    'Inventory Management',
-    'Vendor Operations',
-    'Finance & Accounts',
-    'Legal & Compliance',
-    'IT & Infrastructure',
-];
-
-const DESIGNATIONS = [
-    'Administrator',
-    'Junior Procurement Specialist',
-    'Senior Procurement Manager',
-    'Logistics Coordinator',
-    'Operations Lead',
-    'Regional Director',
-];
-
-const GENDERS = ['MALE', 'FEMALE', 'OTHER'];
 
 export const ProfileTab: React.FC<ProfileTabProps> = ({
     employeeData,
@@ -216,7 +197,7 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({
                             Organizational & System Identity
                         </h3>
 
-                        <HasAccess roles="ADMIN_L1">
+                        <HasAccess roles='ADMIN_L1'>
                             <span className="text-xs font-semibold text-amber-500 flex items-center gap-1.5 uppercase tracking-wider">
                                 <Lock className="w-3.5 h-3.5" /> Requires Admin II Approval
                             </span>

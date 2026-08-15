@@ -1,9 +1,7 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState } from 'react';
 import { RefreshCw, AlertCircle } from 'lucide-react';
-import { approvalService } from './services/approvalService';
-import type { ProfileApprovalRequest } from './types/approval.types';
-import type { ProcessApprovalPayload } from './services/approvalService';
-import { useAuthStore } from '../../store/useAuthStore';
+import { useApprovals } from './hooks/useApprovals';
+import type { UnifiedApprovalItem } from './types/approval.types';
 
 // Sub-components
 import { ApprovalMetrics } from './components/ApprovalMetrics';
@@ -13,45 +11,22 @@ import { RejectionModal } from './components/RejectionModal';
 import { ConfirmationModal } from '../../components/ui/ConfirmationModal';
 
 export const ApprovalsHub: React.FC = () => {
-  // Data State
-  const [approvals, setApprovals] = useState<ProfileApprovalRequest[]>([]);
-  const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [error, setError] = useState<string | null>(null);
+  const { approvals, isLoading, error, isDownloading, refreshApprovals, processApproval, downloadDocument } = useApprovals();
 
   // Modal States
-  const [selectedRequest, setSelectedRequest] = useState<ProfileApprovalRequest | null>(null);
+  const [selectedRequest, setSelectedRequest] = useState<UnifiedApprovalItem | null>(null);
   const [isPreviewOpen, setIsPreviewOpen] = useState<boolean>(false);
 
   // Rejection Reason Modal State
   const [isRejectionModalOpen, setIsRejectionModalOpen] = useState<boolean>(false);
-  const [rejectionTargetId, setRejectionTargetId] = useState<number | null>(null);
+  const [rejectionTargetItem, setRejectionTargetItem] = useState<UnifiedApprovalItem | null>(null);
   const [pendingRejectionReason, setPendingRejectionReason] = useState<string>('');
 
   // Action Confirmation Modal State
   const [isConfirmOpen, setIsConfirmOpen] = useState<boolean>(false);
   const [confirmAction, setConfirmAction] = useState<'APPROVE' | 'REJECT' | null>(null);
-  const [confirmTargetId, setConfirmTargetId] = useState<number | null>(null);
+  const [confirmTargetItem, setConfirmTargetItem] = useState<UnifiedApprovalItem | null>(null);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
-
-  const { user } = useAuthStore();
-
-  const fetchApprovals = useCallback(async () => {
-    if (user?.role !== 'ADMIN_L2') return;
-    setIsLoading(true);
-    setError(null);
-    try {
-      const data = await approvalService.getProfileApprovals();
-      setApprovals(data);
-    } catch (err: any) {
-      setError(err.message || 'Failed to fetch pending profile approvals.');
-    } finally {
-      setIsLoading(false);
-    }
-  }, [user?.role]);
-
-  useEffect(() => {
-    fetchApprovals();
-  }, [fetchApprovals]);
 
   const formatTime = (isoString: string) => {
     if (!isoString) return 'N/A';
@@ -63,47 +38,44 @@ export const ApprovalsHub: React.FC = () => {
     }
   };
 
-  const handleInitiateApprove = (requestId: number) => {
+  const handleInitiateApprove = (item: UnifiedApprovalItem) => {
     setIsPreviewOpen(false);
-    setConfirmTargetId(requestId);
+    setConfirmTargetItem(item);
     setConfirmAction('APPROVE');
     setIsConfirmOpen(true);
   };
 
-  const handleInitiateReject = (requestId: number) => {
+  const handleInitiateReject = (item: UnifiedApprovalItem) => {
     setIsPreviewOpen(false);
-    setRejectionTargetId(requestId);
+    setRejectionTargetItem(item);
     setIsRejectionModalOpen(true);
   };
 
   const handleRejectionReasonSubmit = (reason: string) => {
     setPendingRejectionReason(reason);
     setIsRejectionModalOpen(false);
-    setConfirmTargetId(rejectionTargetId);
+    setConfirmTargetItem(rejectionTargetItem);
     setConfirmAction('REJECT');
     setIsConfirmOpen(true);
   };
 
   const handleExecuteAction = async () => {
-    if (!confirmTargetId || !confirmAction) return;
+    if (!confirmTargetItem || !confirmAction) return;
 
     setIsSubmitting(true);
     try {
-      const payload: ProcessApprovalPayload = {
+      await processApproval(confirmTargetItem, {
         decision: confirmAction,
-        rejectionReason: confirmAction === 'REJECT' ? pendingRejectionReason : 'Approved by Admin',
-      };
-
-      await approvalService.processProfileApproval(confirmTargetId, payload);
+        rejectionReason: confirmAction === 'REJECT' ? pendingRejectionReason : 'Approved by Admin L2',
+      });
 
       setIsConfirmOpen(false);
       setIsPreviewOpen(false);
       setPendingRejectionReason('');
-      setConfirmTargetId(null);
+      setConfirmTargetItem(null);
       setConfirmAction(null);
-      await fetchApprovals();
     } catch (err: any) {
-      alert(err.message || `Failed to ${confirmAction.toLowerCase()} request.`);
+      alert(err?.response?.data?.message || err.message || `Failed to ${confirmAction.toLowerCase()} request.`);
     } finally {
       setIsSubmitting(false);
     }
@@ -115,16 +87,16 @@ export const ApprovalsHub: React.FC = () => {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-black dark:text-white">
-            Pending Approvals
+            Approval Hub
           </h1>
           <p className="text-gray-500 dark:text-neutral-400 text-sm mt-1">
-            Review and action profile update requests submitted by users.
+            Review and action incoming requests across documents and user profile updates.
           </p>
         </div>
         <button
-          onClick={fetchApprovals}
+          onClick={refreshApprovals}
           disabled={isLoading}
-          className="px-4 py-2 rounded-xl bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 text-black dark:text-white transition-colors flex items-center gap-2 text-sm font-medium"
+          className="px-4 py-2 rounded-xl bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 text-black dark:text-white transition-colors flex items-center gap-2 text-sm font-medium cursor-pointer"
         >
           <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
           Refresh
@@ -142,7 +114,7 @@ export const ApprovalsHub: React.FC = () => {
         </div>
       )}
 
-      {/* Data Table */}
+      {/* Unified Data Table */}
       <ApprovalTable
         approvals={approvals}
         isLoading={isLoading}
@@ -150,27 +122,34 @@ export const ApprovalsHub: React.FC = () => {
           setSelectedRequest(item);
           setIsPreviewOpen(true);
         }}
-        onInitiateApprove={handleInitiateApprove}
-        onInitiateReject={handleInitiateReject}
+        onInitiateApprove={(id) => {
+          const item = approvals.find((a) => ('id' in a ? a.id === id : a.requestId === id));
+          if (item) handleInitiateApprove(item);
+        }}
+        onInitiateReject={(id) => {
+          const item = approvals.find((a) => ('id' in a ? a.id === id : a.requestId === id));
+          if (item) handleInitiateReject(item);
+        }}
         formatTime={formatTime}
       />
 
-      {/* Modals */}
       <ApprovalPreviewModal
         request={selectedRequest}
         isOpen={isPreviewOpen}
+        isDownloading={isDownloading}
         onClose={() => {
           setIsPreviewOpen(false);
           setSelectedRequest(null);
         }}
-        onApprove={handleInitiateApprove}
-        onReject={handleInitiateReject}
+        onApprove={() => selectedRequest && handleInitiateApprove(selectedRequest)}
+        onReject={() => selectedRequest && handleInitiateReject(selectedRequest)}
+        onDownload={(id, fileName) => downloadDocument(id, fileName)}
         formatTime={formatTime}
       />
 
       <RejectionModal
         isOpen={isRejectionModalOpen}
-        requestId={rejectionTargetId}
+        requestId={rejectionTargetItem ? ('id' in rejectionTargetItem ? rejectionTargetItem.id : rejectionTargetItem.requestId) : null}
         onClose={() => setIsRejectionModalOpen(false)}
         onSubmit={handleRejectionReasonSubmit}
       />
@@ -178,7 +157,7 @@ export const ApprovalsHub: React.FC = () => {
       <ConfirmationModal
         isOpen={isConfirmOpen}
         actionType={confirmAction}
-        requestId={confirmTargetId}
+        requestId={confirmTargetItem ? ('id' in confirmTargetItem ? confirmTargetItem.id : confirmTargetItem.requestId) : null}
         rejectionReason={pendingRejectionReason}
         isSubmitting={isSubmitting}
         onClose={() => setIsConfirmOpen(false)}

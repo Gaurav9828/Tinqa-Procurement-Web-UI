@@ -1,6 +1,5 @@
 export type UserRole = 'ADMIN_L1' | 'ADMIN_L2';
 
-// 1. Enum/Types of all feature keys across the application
 export type FeatureKey =
   | 'VIEW_PROFILE'
   | 'EDIT_PROFILE_DIRECT'
@@ -14,13 +13,14 @@ export type FeatureKey =
   | 'MANAGE_DEALERS'
   | 'MANAGE_PAYMENTS'
   | 'MANAGE_COMPLAINTS'
-  | 'VIEW_ANALYTICS';
+  | 'VIEW_ANALYTICS'
+  | 'MANAGE_EMPLOYEES'
+  | 'FINALIZE_EMPLOYEE_DELETE';
 
-// 2. Map features to allowed roles (Matrix)
 export const FEATURE_PERMISSIONS: Record<FeatureKey, UserRole[]> = {
   VIEW_PROFILE: ['ADMIN_L1', 'ADMIN_L2'],
   EDIT_PROFILE_DIRECT: ['ADMIN_L1', 'ADMIN_L2'],
-  APPROVE_PROFILE_CHANGES: ['ADMIN_L2'], // ADMIN_L2 only
+  APPROVE_PROFILE_CHANGES: ['ADMIN_L2'],
   VIEW_DOCUMENTS: ['ADMIN_L1', 'ADMIN_L2'],
   UPLOAD_DOCUMENTS: ['ADMIN_L1'],
   MANAGE_SYSTEM_SETTINGS: ['ADMIN_L2'],
@@ -31,19 +31,20 @@ export const FEATURE_PERMISSIONS: Record<FeatureKey, UserRole[]> = {
   MANAGE_PAYMENTS: ['ADMIN_L1', 'ADMIN_L2'],
   MANAGE_COMPLAINTS: ['ADMIN_L1', 'ADMIN_L2'],
   VIEW_ANALYTICS: ['ADMIN_L1', 'ADMIN_L2'],
+  MANAGE_EMPLOYEES: ['ADMIN_L1', 'ADMIN_L2'],
+  FINALIZE_EMPLOYEE_DELETE: ['ADMIN_L2'],
 };
 
-// 3. Central Navigation/Menu Configuration
 export interface NavigationItem {
   id: string;
   label: string;
   path: string;
-  iconName: string; // Identifier string to map Lucide icons in components
+  iconName: string;
   allowedRoles: UserRole[];
 }
 
 export const APP_NAVIGATION: NavigationItem[] = [
-{
+  {
     id: 'analytics',
     label: 'Analytics',
     path: '/analytics',
@@ -62,6 +63,13 @@ export const APP_NAVIGATION: NavigationItem[] = [
     label: 'Orders Management',
     path: '/orders',
     iconName: 'Package',
+    allowedRoles: ['ADMIN_L1', 'ADMIN_L2'],
+  },
+  {
+    id: 'employees',
+    label: 'Employee Management',
+    path: '/employees',
+    iconName: 'UserCheck',
     allowedRoles: ['ADMIN_L1', 'ADMIN_L2'],
   },
   {
@@ -104,6 +112,6 @@ export const APP_NAVIGATION: NavigationItem[] = [
     label: 'System Configuration',
     path: '/settings',
     iconName: 'Settings',
-    allowedRoles: ['ADMIN_L2'], // Restricted to ADMIN_L2
+    allowedRoles: ['ADMIN_L2'],
   },
 ];

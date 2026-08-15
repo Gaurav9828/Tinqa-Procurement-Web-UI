@@ -8,43 +8,48 @@ export interface ValidationRule {
 }
 
 export const Validator = {
-  /**
-   * Smartly checks whether any value (String, Array, Object, Map, Set, Number, Boolean) is non-empty/valid.
-   */
+
+  
   isValid: (value: any): boolean => {
     if (value === null || value === undefined) return false;
-
     if (typeof value === 'boolean') return value;
     if (typeof value === 'number') return !isNaN(value);
-
-    if (typeof value === 'string') {
-      return value.trim().length > 0;
-    }
-
-    if (Array.isArray(value)) {
-      return value.length > 0;
-    }
-
-    if (value instanceof Map || value instanceof Set) {
-      return value.size > 0;
-    }
-
-    if (typeof value === 'object') {
-      return Object.keys(value).length > 0;
-    }
-
+    if (typeof value === 'string') return value.trim().length > 0;
+    if (Array.isArray(value)) return value.length > 0;
+    if (value instanceof Map || value instanceof Set) return value.size > 0;
+    if (typeof value === 'object') return Object.keys(value).length > 0;
     return true;
   },
 
-  /* Specific Regex Rules */
   isEmail: (email: string): boolean => {
     if (!Validator.isValid(email)) return false;
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
   },
 
+  /**
+   * Validates international telephone numbers according to E.164 standards.
+   * - Optional leading +
+   * - Validates country code + national number (10 to 15 total digits)
+   * - Rejects truncated/short numbers like +9173986603
+   */
   isPhone: (phone: string): boolean => {
     if (!Validator.isValid(phone)) return false;
-    return /^\+?[0-9\s-]{10,15}$/.test(phone.trim());
+    const sanitized = phone.trim().replace(/[\s-()]/g, '');
+
+    // E.164 format check: 10 to 15 digits overall, optional leading +
+    if (!/^\+?[1-9]\d{9,14}$/.test(sanitized)) {
+      return false;
+    }
+
+    // Explicit Indian (+91 or 10-digit) mobile validation rule (starts with 6, 7, 8, 9 and has 10 digits)
+    if (sanitized.startsWith('+91')) {
+      const indianNumber = sanitized.slice(3);
+      return /^[6-9]\d{9}$/.test(indianNumber);
+    } else if (sanitized.length === 10 && !sanitized.startsWith('+')) {
+      return /^[6-9]\d{9}$/.test(sanitized);
+    }
+
+    return true;
   },
 
   isNumber: (val: any): boolean => {
@@ -57,9 +62,6 @@ export const Validator = {
     return /^[a-zA-Z0-9]+$/.test(val.trim());
   },
 
-  /**
-   * Universal Field Rule Evaluator: returns error string if invalid, or null if valid.
-   */
   validateField: (value: any, rule: ValidationRule): string | null => {
     const hasVal = Validator.isValid(value);
 
@@ -67,7 +69,7 @@ export const Validator = {
       return rule.customMessage || 'This field is required.';
     }
 
-    if (!hasVal) return null; // Non-required empty fields are valid
+    if (!hasVal) return null;
 
     const stringVal = String(value).trim();
 
@@ -76,7 +78,7 @@ export const Validator = {
     }
 
     if (rule.type === 'phone' && !Validator.isPhone(stringVal)) {
-      return rule.customMessage || 'Enter a valid 10+ digit phone number.';
+      return rule.customMessage || 'Enter a valid international phone number (e.g. +91 9876543210).';
     }
 
     if (rule.type === 'number' && !Validator.isNumber(value)) {
