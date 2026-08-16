@@ -14,40 +14,54 @@ export interface CreateCategoryRequest {
 
 export interface ItemResponse {
   id: number;
+  categoryId: number;
+  categoryName?: string;
   name: string;
   brand?: string;
   sku: string;
-  description?: string;
-  categoryId: number;
-  categoryName?: string;
   unitOfMeasure: string;
   mrp: number;
-  attributes?: Record<string, any>;
+  countryOfOrigin: string;
+  rawMaterialsUsed?: string;
+  warrantyMonths?: number;
+  termsAndCondition?: string;
+  description?: string;
+  attributes?: Record<string, string>;
   isActive: boolean;
-  createdAt: string;
-  updatedAt: string;
+  createdAt?: string;
+  updatedAt?: string;
+  createdBy?: number;
+  updatedBy?: number;
 }
 
 export interface CreateItemRequest {
+  categoryId: number;
   name: string;
   brand?: string;
   sku: string;
-  description?: string;
-  categoryId: number;
   unitOfMeasure: string;
   mrp: number;
-  attributes?: Record<string, any>;
+  countryOfOrigin: string;
+  rawMaterialsUsed?: string;
+  warrantyMonths?: number;
+  termsAndCondition?: string;
+  description?: string;
+  attributes?: Record<string, string>;
 }
 
 export interface UpdateItemRequest {
+  categoryId: number;
   name: string;
   brand?: string;
-  categoryId: number;
   unitOfMeasure: string;
   mrp: number;
+  countryOfOrigin: string;
+  rawMaterialsUsed?: string;
+  warrantyMonths?: number;
+  termsAndCondition?: string;
   description?: string;
-  attributes?: Record<string, any>;
-  isActive: boolean;
+  attributes?: Record<string, string>;
+  isActive?: boolean;
 }
 
 export interface PageableResponse<T> {

@@ -1,14 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
-    Package,
+    Boxes,
     RefreshCw,
     AlertTriangle,
     Power,
     CheckCircle,
     Edit3,
     PackageSearch,
+    Eye,
 } from 'lucide-react';
 import { Alert } from '../../../components/ui/Alert';
+import { Tooltip } from '../../../components/ui/Tooltip';
 import { useItemList } from '../hooks/useItemList';
 import { useItemActions } from '../hooks/useItemActions';
 import { itemApi } from '../api/itemApi';
@@ -23,18 +25,18 @@ import { ItemFilterBar } from '../components/ItemFilterBar';
 import { CategoryFormModal } from '../components/CategoryFormModal';
 import { ItemFormModal } from '../components/ItemFormModal';
 import { ItemStatusBadge } from '../components/ItemStatusBadge';
+import { ItemPreviewModal } from '../components/ItemPreviewModal';
+import { HeaderColumnFilter } from '../components/HeaderColumnFilter';
 
 export const ItemManagementPage: React.FC = () => {
     const {
         items,
-        totalPages,
         totalElements,
         isLoading,
         error,
         filters,
         updateSearch,
         updateCategoryFilter,
-        updatePage,
         refetch,
     } = useItemList();
 
@@ -53,8 +55,14 @@ export const ItemManagementPage: React.FC = () => {
     const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
     const [isItemModalOpen, setIsItemModalOpen] = useState(false);
     const [selectedItem, setSelectedItem] = useState<ItemResponse | null>(null);
+    const [previewItem, setPreviewItem] = useState<ItemResponse | null>(null);
     const [targetItemStatusToggle, setTargetItemStatusToggle] =
         useState<ItemResponse | null>(null);
+
+    // Column Header Specific Filters State
+    const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
+    const [selectedUoms, setSelectedUoms] = useState<string[]>([]);
+    const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
 
     const loadCategories = async () => {
         try {
@@ -70,6 +78,37 @@ export const ItemManagementPage: React.FC = () => {
     useEffect(() => {
         loadCategories();
     }, []);
+
+    // Unique options derived dynamically from fetched item set
+    const uomOptions = useMemo(() => {
+        return Array.from(new Set(items.map((i) => i.unitOfMeasure).filter(Boolean)));
+    }, [items]);
+
+    const categoryOptions = useMemo(() => {
+        return Array.from(
+            new Set(items.map((i) => i.categoryName || `Category #${i.categoryId}`).filter(Boolean))
+        );
+    }, [items]);
+
+    const statusOptions = ['Active', 'Inactive'];
+
+    // Client-side filtering across column header filters
+    const filteredItems = useMemo(() => {
+        return items.filter((item) => {
+            const catName = item.categoryName || `Category #${item.categoryId}`;
+            const matchesCat =
+                selectedCategories.length === 0 || selectedCategories.includes(catName);
+
+            const matchesUom =
+                selectedUoms.length === 0 || selectedUoms.includes(item.unitOfMeasure);
+
+            const itemStatus = item.isActive ? 'Active' : 'Inactive';
+            const matchesStatus =
+                selectedStatuses.length === 0 || selectedStatuses.includes(itemStatus);
+
+            return matchesCat && matchesUom && matchesStatus;
+        });
+    }, [items, selectedCategories, selectedUoms, selectedStatuses]);
 
     const handleCreateCategory = async (data: any) => {
         const success = await createCategory(data);
@@ -91,10 +130,6 @@ export const ItemManagementPage: React.FC = () => {
         setIsItemModalOpen(true);
     };
 
-    const handleCloseItemModal = () => {
-        setIsItemModalOpen(false);
-    };
-
     const handleItemSubmit = async (
         data: CreateItemRequest | UpdateItemRequest
     ) => {
@@ -107,8 +142,6 @@ export const ItemManagementPage: React.FC = () => {
     const handleConfirmStatusToggle = async () => {
         if (!targetItemStatusToggle) return;
         const nextStatus = !targetItemStatusToggle.isActive;
-
-        // Pass the item object and next status
         const ok = await toggleItemStatus(targetItemStatusToggle, nextStatus);
         if (ok) setTargetItemStatusToggle(null);
     };
@@ -119,7 +152,7 @@ export const ItemManagementPage: React.FC = () => {
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
                     <h1 className="text-2xl font-bold tracking-tight text-black dark:text-white flex items-center gap-2">
-                        <Package className="w-6 h-6 text-[#0071e3]" /> Item Catalog
+                        <Boxes className="w-6 h-6 text-[#0071e3]" /> Item Catalog
                     </h1>
                     <p className="text-sm text-gray-500 dark:text-neutral-400 mt-1">
                         Manage product items, MRP pricing details, and categories.
@@ -141,11 +174,7 @@ export const ItemManagementPage: React.FC = () => {
 
             {/* Page Alerts */}
             {actionSuccess && (
-                <Alert
-                    type="success"
-                    message={actionSuccess}
-                    onClose={clearMessages}
-                />
+                <Alert type="success" message={actionSuccess} onClose={clearMessages} />
             )}
             {!isItemModalOpen && actionError && (
                 <Alert type="error" message={actionError} onClose={clearMessages} />
@@ -170,12 +199,12 @@ export const ItemManagementPage: React.FC = () => {
                     <div className="inline-block w-6 h-6 border-2 border-[#0071e3] border-t-transparent rounded-full animate-spin mb-2" />
                     <p className="text-sm">Loading item catalog...</p>
                 </div>
-            ) : items.length === 0 ? (
+            ) : filteredItems.length === 0 ? (
                 <div className="apple-card p-12 text-center space-y-2">
                     <PackageSearch className="w-8 h-8 text-gray-400 mx-auto" />
                     <h3 className="text-sm font-semibold">No Items Found</h3>
                     <p className="text-xs text-gray-500">
-                        Try adjusting your search criteria or adding new items.
+                        Try adjusting your search criteria or header column filter options.
                     </p>
                 </div>
             ) : (
@@ -186,20 +215,41 @@ export const ItemManagementPage: React.FC = () => {
                                 <tr>
                                     <th className="p-4">Item Details</th>
                                     <th className="p-4">SKU</th>
-                                    <th className="p-4">Category</th>
-                                    <th className="p-4">UOM</th>
+                                    <th className="p-4">
+                                        <HeaderColumnFilter
+                                            title="Category"
+                                            options={categoryOptions}
+                                            selectedValues={selectedCategories}
+                                            onChange={setSelectedCategories}
+                                        />
+                                    </th>
+                                    <th className="p-4">
+                                        <HeaderColumnFilter
+                                            title="UOM"
+                                            options={uomOptions}
+                                            selectedValues={selectedUoms}
+                                            onChange={setSelectedUoms}
+                                        />
+                                    </th>
                                     <th className="p-4">MRP</th>
-                                    <th className="p-4">Status</th>
+                                    <th className="p-4">
+                                        <HeaderColumnFilter
+                                            title="Status"
+                                            options={statusOptions}
+                                            selectedValues={selectedStatuses}
+                                            onChange={setSelectedStatuses}
+                                        />
+                                    </th>
                                     <th className="p-4 text-right">Actions</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-black/5 dark:divide-white/5">
-                                {items.map((item) => (
+                                {filteredItems.map((item) => (
                                     <tr
                                         key={item.id}
                                         className="hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition-colors"
                                     >
-                                        <td className="p-4">
+                                        <td className="p-4 max-w-xs">
                                             <div>
                                                 <div className="flex items-center gap-2">
                                                     <span className="font-semibold text-sm text-black dark:text-white">
@@ -212,9 +262,13 @@ export const ItemManagementPage: React.FC = () => {
                                                     )}
                                                 </div>
                                                 {item.description && (
-                                                    <span className="text-[11px] text-gray-400 line-clamp-1 mt-0.5 block">
-                                                        {item.description}
-                                                    </span>
+                                                    <div className="mt-0.5">
+                                                        <Tooltip title={item.name} content={item.description}>
+                                                            <span className="text-[11px] text-gray-400 truncate max-w-[200px] block cursor-help">
+                                                                {item.description}
+                                                            </span>
+                                                        </Tooltip>
+                                                    </div>
                                                 )}
                                             </div>
                                         </td>
@@ -230,8 +284,8 @@ export const ItemManagementPage: React.FC = () => {
                                         <td className="p-4 font-semibold text-black dark:text-white">
                                             {item.mrp !== undefined && item.mrp !== null
                                                 ? `₹${Number(item.mrp).toLocaleString('en-IN', {
-                                                    minimumFractionDigits: 2,
-                                                })}`
+                                                      minimumFractionDigits: 2,
+                                                  })}`
                                                 : 'N/A'}
                                         </td>
                                         <td className="p-4">
@@ -239,20 +293,40 @@ export const ItemManagementPage: React.FC = () => {
                                         </td>
                                         <td className="p-4 text-right">
                                             <div className="flex items-center justify-end gap-1">
+                                                {/* Preview Button */}
                                                 <button
                                                     type="button"
-                                                    onClick={() => handleOpenEditItem(item)}
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setPreviewItem(item);
+                                                    }}
+                                                    className="p-2 hover:bg-black/5 dark:hover:bg-white/10 rounded-lg text-gray-500 hover:text-[#0071e3] transition-colors cursor-pointer"
+                                                    title="Preview Item Details"
+                                                >
+                                                    <Eye className="w-4 h-4" />
+                                                </button>
+
+                                                {/* Edit Button */}
+                                                <button
+                                                    type="button"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        handleOpenEditItem(item);
+                                                    }}
                                                     className="p-2 hover:bg-black/5 dark:hover:bg-white/10 rounded-lg text-gray-500 transition-colors cursor-pointer"
                                                     title="Edit Item"
                                                 >
                                                     <Edit3 className="w-4 h-4" />
                                                 </button>
 
-                                                {/* Inline Status Toggle Buttons */}
+                                                {/* Inactivate/Activate Button */}
                                                 {item.isActive ? (
                                                     <button
                                                         type="button"
-                                                        onClick={() => setTargetItemStatusToggle(item)}
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            setTargetItemStatusToggle(item);
+                                                        }}
                                                         className="p-2 hover:bg-amber-500/10 text-amber-600 rounded-lg transition-colors cursor-pointer"
                                                         title="Inactivate Item"
                                                     >
@@ -261,7 +335,10 @@ export const ItemManagementPage: React.FC = () => {
                                                 ) : (
                                                     <button
                                                         type="button"
-                                                        onClick={() => setTargetItemStatusToggle(item)}
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            setTargetItemStatusToggle(item);
+                                                        }}
                                                         className="p-2 hover:bg-emerald-500/10 text-emerald-600 rounded-lg transition-colors cursor-pointer"
                                                         title="Activate Item"
                                                     >
@@ -278,103 +355,35 @@ export const ItemManagementPage: React.FC = () => {
                 </div>
             )}
 
-            {/* Pagination */}
-            {totalPages > 1 && (
-                <div className="flex items-center justify-between pt-2 text-xs text-gray-500">
-                    <span>
-                        Page {(filters.page || 0) + 1} of {totalPages}
-                    </span>
-                    <div className="flex items-center gap-2">
-                        <button
-                            disabled={(filters.page || 0) === 0}
-                            onClick={() => updatePage((filters.page || 0) - 1)}
-                            className="px-3 py-1 bg-black/5 dark:bg-white/5 rounded-lg disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed"
-                        >
-                            Previous
-                        </button>
-                        <button
-                            disabled={(filters.page || 0) + 1 >= totalPages}
-                            onClick={() => updatePage((filters.page || 0) + 1)}
-                            className="px-3 py-1 bg-black/5 dark:bg-white/5 rounded-lg disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed"
-                        >
-                            Next
-                        </button>
-                    </div>
-                </div>
-            )}
-
-            {/* Category Creation Modal */}
-            <CategoryFormModal
-                isOpen={isCategoryModalOpen}
-                isSubmitting={isSubmitting}
-                onClose={() => setIsCategoryModalOpen(false)}
-                onSubmit={handleCreateCategory}
+            {/* Item Details Preview Modal */}
+            <ItemPreviewModal
+                isOpen={!!previewItem}
+                item={previewItem}
+                onClose={() => setPreviewItem(null)}
             />
 
-            {/* Item Form Modal */}
-            <ItemFormModal
-                isOpen={isItemModalOpen}
-                isSubmitting={isSubmitting}
-                apiError={actionError}
-                categories={categories}
-                items={items}
-                initialData={selectedItem}
-                onClose={handleCloseItemModal}
-                onSubmit={handleItemSubmit}
-            />
-
-            {/* Inactivation / Activation Confirmation Modal */}
+            {/* Confirmation Dialog for Item Status Toggle */}
             {targetItemStatusToggle && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-                    <div className="w-full max-w-sm bg-white dark:bg-neutral-900 shadow-2xl rounded-2xl border border-black/10 dark:border-white/10 p-6 space-y-4">
-                        <div
-                            className={`flex items-center gap-3 ${targetItemStatusToggle.isActive
-                                    ? 'text-amber-600'
-                                    : 'text-emerald-600'
-                                }`}
-                        >
-                            <div
-                                className={`p-2 rounded-xl ${targetItemStatusToggle.isActive
-                                        ? 'bg-amber-500/10'
-                                        : 'bg-emerald-500/10'
-                                    }`}
-                            >
-                                {targetItemStatusToggle.isActive ? (
-                                    <AlertTriangle className="w-6 h-6" />
-                                ) : (
-                                    <CheckCircle className="w-6 h-6" />
-                                )}
-                            </div>
-                            <h3 className="font-bold text-base text-black dark:text-white">
-                                {targetItemStatusToggle.isActive
-                                    ? 'Inactivate Item'
-                                    : 'Activate Item'}
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+                    <div className="w-full max-w-sm bg-white dark:bg-neutral-900 border border-black/10 dark:border-white/10 rounded-2xl p-6 shadow-2xl space-y-4">
+                        <div className="flex items-center gap-3 text-amber-500">
+                            <AlertTriangle className="w-6 h-6" />
+                            <h3 className="text-base font-bold text-black dark:text-white">
+                                {targetItemStatusToggle.isActive ? 'Inactivate' : 'Activate'} Item?
                             </h3>
                         </div>
-
-                        <p className="text-xs text-gray-500 dark:text-neutral-400">
-                            Are you sure you want to mark{' '}
+                        <p className="text-xs text-gray-500 leading-relaxed">
+                            Are you sure you want to {targetItemStatusToggle.isActive ? 'inactivate' : 'activate'}{' '}
                             <span className="font-semibold text-black dark:text-white">
                                 "{targetItemStatusToggle.name}"
-                            </span>{' '}
-                            ({targetItemStatusToggle.sku}) as{' '}
-                            <span
-                                className={`font-semibold ${targetItemStatusToggle.isActive
-                                        ? 'text-amber-600'
-                                        : 'text-emerald-600'
-                                    }`}
-                            >
-                                {targetItemStatusToggle.isActive ? 'Inactive' : 'Active'}
                             </span>
                             ?
                         </p>
-
-                        <div className="flex justify-end gap-3 pt-2">
+                        <div className="flex items-center justify-end gap-2 pt-2">
                             <button
                                 type="button"
                                 onClick={() => setTargetItemStatusToggle(null)}
-                                disabled={isSubmitting}
-                                className="px-4 py-2 text-xs font-medium text-gray-500 hover:text-black dark:hover:text-white cursor-pointer"
+                                className="px-3 py-1.5 rounded-xl border border-black/10 dark:border-white/10 text-xs font-semibold hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer"
                             >
                                 Cancel
                             </button>
@@ -382,25 +391,42 @@ export const ItemManagementPage: React.FC = () => {
                                 type="button"
                                 onClick={handleConfirmStatusToggle}
                                 disabled={isSubmitting}
-                                className={`px-4 py-2 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 disabled:opacity-50 cursor-pointer ${targetItemStatusToggle.isActive
+                                className={`px-4 py-2 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 disabled:opacity-50 cursor-pointer ${
+                                    targetItemStatusToggle.isActive
                                         ? 'bg-amber-600 hover:bg-amber-700'
                                         : 'bg-emerald-600 hover:bg-emerald-700'
-                                    }`}
+                                }`}
                             >
                                 {targetItemStatusToggle.isActive ? (
                                     <Power className="w-3.5 h-3.5" />
                                 ) : (
                                     <CheckCircle className="w-3.5 h-3.5" />
                                 )}
-                                Confirm{' '}
-                                {targetItemStatusToggle.isActive
-                                    ? 'Inactivation'
-                                    : 'Activation'}
+                                Confirm {targetItemStatusToggle.isActive ? 'Inactivation' : 'Activation'}
                             </button>
                         </div>
                     </div>
                 </div>
             )}
+
+            {/* Modals Container */}
+            <CategoryFormModal
+                isOpen={isCategoryModalOpen}
+                isSubmitting={isSubmitting}
+                onClose={() => setIsCategoryModalOpen(false)}
+                onSubmit={handleCreateCategory}
+            />
+
+            <ItemFormModal
+                isOpen={isItemModalOpen}
+                isSubmitting={isSubmitting}
+                apiError={actionError}
+                categories={categories}
+                items={items}
+                initialData={selectedItem}
+                onClose={() => setIsItemModalOpen(false)}
+                onSubmit={handleItemSubmit}
+            />
         </div>
     );
 };

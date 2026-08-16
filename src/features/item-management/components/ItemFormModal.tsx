@@ -1,21 +1,20 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { X, Save, AlertCircle, CheckCircle2, HelpCircle, ArrowLeft } from 'lucide-react';
-import { CommonInput } from '../../../components/ui/FormInputs';
-import { UnitOfMeasureInput } from './UnitOfMeasureInput';
+import React, { useState, useEffect } from 'react';
+import { X } from 'lucide-react';
 import type {
   CategoryResponse,
-  CreateItemRequest,
   ItemResponse,
+  CreateItemRequest,
   UpdateItemRequest,
 } from '../types/item.types';
+import { AttributeInputBuilder } from './AttributeInputBuilder';
 
 interface Props {
   isOpen: boolean;
   isSubmitting: boolean;
-  apiError?: string | null;
+  apiError: string | null;
   categories: CategoryResponse[];
-  items?: ItemResponse[];
-  initialData?: ItemResponse | null;
+  items: ItemResponse[];
+  initialData: ItemResponse | null;
   onClose: () => void;
   onSubmit: (data: CreateItemRequest | UpdateItemRequest) => Promise<boolean>;
 }
@@ -25,419 +24,311 @@ export const ItemFormModal: React.FC<Props> = ({
   isSubmitting,
   apiError,
   categories,
-  items = [],
+  items,
   initialData,
   onClose,
   onSubmit,
 }) => {
-  const [name, setName] = useState('');
-  const [brand, setBrand] = useState('');
-  const [sku, setSku] = useState('');
-  const [description, setDescription] = useState('');
-  const [categoryId, setCategoryId] = useState<number | ''>('');
-  const [unitOfMeasure, setUnitOfMeasure] = useState('PCS');
-  const [mrp, setMrp] = useState<string>('');
-  const [active, setActive] = useState(true);
-  const [errors, setErrors] = useState<string[]>([]);
-  const [isCustomBrand, setIsCustomBrand] = useState(false);
+  const [formData, setFormData] = useState({
+    categoryId: '',
+    name: '',
+    brand: '',
+    sku: '',
+    unitOfMeasure: 'PCS',
+    mrp: '',
+    countryOfOrigin: 'India',
+    rawMaterialsUsed: '',
+    warrantyMonths: '0',
+    termsAndCondition: '',
+    description: '',
+  });
 
-  // State to handle confirmation step before executing API call
-  const [isConfirming, setIsConfirming] = useState(false);
+  const [attributes, setAttributes] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (initialData) {
-      setName(initialData.name || '');
-      setBrand(initialData.brand || '');
-      setSku(initialData.sku || '');
-      setDescription(initialData.description || '');
-      setCategoryId(initialData.categoryId || '');
-      setUnitOfMeasure(initialData.unitOfMeasure || 'PCS');
-      setMrp(
-        initialData.mrp !== undefined && initialData.mrp !== null
-          ? String(initialData.mrp)
-          : ''
-      );
-      setActive(initialData.isActive ?? true);
-      setIsCustomBrand(false);
+      setFormData({
+        categoryId: String(initialData.categoryId),
+        name: initialData.name,
+        brand: initialData.brand || '',
+        sku: initialData.sku,
+        unitOfMeasure: initialData.unitOfMeasure,
+        mrp: String(initialData.mrp),
+        countryOfOrigin: initialData.countryOfOrigin || 'India',
+        rawMaterialsUsed: initialData.rawMaterialsUsed || '',
+        warrantyMonths: String(initialData.warrantyMonths ?? 0),
+        termsAndCondition: initialData.termsAndCondition || '',
+        description: initialData.description || '',
+      });
+      setAttributes(initialData.attributes || {});
     } else {
-      setName('');
-      setBrand('');
-      setSku('');
-      setDescription('');
-      setCategoryId(categories.length > 0 ? categories[0].id : '');
-      setUnitOfMeasure('PCS');
-      setMrp('');
-      setActive(true);
-      setIsCustomBrand(false);
+      setFormData({
+        categoryId: categories[0]?.id ? String(categories[0].id) : '',
+        name: '',
+        brand: '',
+        sku: '',
+        unitOfMeasure: 'PCS',
+        mrp: '',
+        countryOfOrigin: 'India',
+        rawMaterialsUsed: '',
+        warrantyMonths: '0',
+        termsAndCondition: '',
+        description: '',
+      });
+      setAttributes({});
     }
-    setErrors([]);
-    setIsConfirming(false);
-  }, [initialData, isOpen, categories]);
-
-  const matchingBrands = useMemo(() => {
-    if (!name.trim()) return [];
-    const normalizedName = name.trim().toLowerCase();
-
-    const brandSet = new Set<string>();
-    items.forEach((item) => {
-      if (item.name.trim().toLowerCase() === normalizedName && item.brand) {
-        brandSet.add(item.brand.trim());
-      }
-    });
-
-    return Array.from(brandSet);
-  }, [name, items]);
-
-  const selectedCategoryName = useMemo(() => {
-    const cat = categories.find((c) => c.id === Number(categoryId));
-    return cat ? cat.name : `Category #${categoryId}`;
-  }, [categories, categoryId]);
-
-  const isValid = useMemo(() => {
-    const hasName = name.trim().length > 0;
-    const hasCategory = categoryId !== '';
-    const hasSku = initialData ? true : sku.trim().length > 0;
-    const hasUom = unitOfMeasure.trim().length > 0;
-    const numericMrp = Number(mrp);
-    const hasValidMrp =
-      mrp.trim().length > 0 && !isNaN(numericMrp) && numericMrp > 0;
-
-    return hasName && hasCategory && hasSku && hasUom && hasValidMrp;
-  }, [name, categoryId, sku, unitOfMeasure, mrp, initialData]);
-
-  const isDirty = useMemo(() => {
-    if (!initialData) return true;
-
-    const initialMrp =
-      initialData.mrp !== undefined && initialData.mrp !== null
-        ? String(initialData.mrp)
-        : '';
-
-    return (
-      name.trim() !== (initialData.name || '') ||
-      brand.trim() !== (initialData.brand || '') ||
-      sku.trim() !== (initialData.sku || '') ||
-      description.trim() !== (initialData.description || '') ||
-      Number(categoryId) !== initialData.categoryId ||
-      unitOfMeasure.trim() !== (initialData.unitOfMeasure || 'PCS') ||
-      mrp !== initialMrp ||
-      active !== (initialData.isActive ?? true)
-    );
-  }, [
-    initialData,
-    name,
-    brand,
-    sku,
-    description,
-    categoryId,
-    unitOfMeasure,
-    mrp,
-    active,
-  ]);
+  }, [initialData, categories, isOpen]);
 
   if (!isOpen) return null;
 
-  // Form submission triggers confirmation step first
-  const handlePreSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setErrors([]);
 
-    if (!isValid || !isDirty) return;
-    setIsConfirming(true);
-  };
+    const basePayload = {
+      categoryId: Number(formData.categoryId),
+      name: formData.name.trim(),
+      brand: formData.brand.trim() || undefined,
+      unitOfMeasure: formData.unitOfMeasure.trim(),
+      mrp: Number(formData.mrp),
+      countryOfOrigin: formData.countryOfOrigin.trim(),
+      rawMaterialsUsed: formData.rawMaterialsUsed.trim() || undefined,
+      warrantyMonths: Number(formData.warrantyMonths),
+      termsAndCondition: formData.termsAndCondition.trim() || undefined,
+      description: formData.description.trim() || undefined,
+      attributes: Object.keys(attributes).length > 0 ? attributes : undefined,
+    };
 
-  // Confirmed submission executes the actual API call
-  const handleFinalSubmit = async () => {
-    const payload: CreateItemRequest | UpdateItemRequest = initialData
-      ? {
-          name: name.trim(),
-          brand: brand.trim() || undefined,
-          categoryId: Number(categoryId),
-          unitOfMeasure: unitOfMeasure.trim().toUpperCase(),
-          mrp: Number(mrp),
-          description: description.trim() || undefined,
-          isActive: active,
-        }
-      : {
-          name: name.trim(),
-          brand: brand.trim() || undefined,
-          sku: sku.trim(),
-          categoryId: Number(categoryId),
-          unitOfMeasure: unitOfMeasure.trim().toUpperCase(),
-          mrp: Number(mrp),
-          description: description.trim() || undefined,
-        };
+    const payload = initialData
+      ? { ...basePayload, isActive: initialData.isActive }
+      : { ...basePayload, sku: formData.sku.trim() };
 
-    const ok = await onSubmit(payload);
-    if (ok) {
-      onClose(); // Auto close modal after successful API call
-    } else {
-      setIsConfirming(false); // Return to editing form if API call fails
-    }
+    const success = await onSubmit(payload as any);
+    if (success) onClose();
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-      <div className="w-full max-w-lg bg-white dark:bg-neutral-900 shadow-2xl rounded-2xl overflow-hidden border border-black/10 dark:border-white/10 p-6 space-y-4 max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 overflow-y-auto animate-in fade-in duration-200">
+      <div className="w-full max-w-2xl bg-white dark:bg-neutral-900 shadow-2xl rounded-2xl border border-black/10 dark:border-white/10 my-8 overflow-hidden flex flex-col max-h-[90vh]">
         {/* Modal Header */}
-        <div className="flex items-center justify-between pb-2 border-b border-black/5 dark:border-white/5">
-          <h3 className="font-bold text-base text-black dark:text-white flex items-center gap-2">
-            {isConfirming ? (
-              <>
-                <HelpCircle className="w-5 h-5 text-[#0071e3]" /> Confirm Item Details
-              </>
-            ) : initialData ? (
-              'Edit Item'
-            ) : (
-              'Create New Item'
-            )}
-          </h3>
+        <div className="p-6 border-b border-black/10 dark:border-white/10 flex items-center justify-between">
+          <h2 className="text-lg font-bold text-black dark:text-white">
+            {initialData ? 'Edit Item' : 'Create New Item'}
+          </h2>
           <button
-            type="button"
             onClick={onClose}
-            disabled={isSubmitting}
-            className="p-1 text-gray-400 hover:text-black dark:hover:text-white disabled:opacity-50"
+            className="p-1.5 hover:bg-black/5 dark:hover:bg-white/10 rounded-lg text-gray-500 cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* API Error display */}
-        {apiError && (
-          <div className="p-3 bg-red-500/10 border border-red-500/20 text-red-600 rounded-xl text-xs flex items-center gap-2">
-            <AlertCircle className="w-4 h-4 shrink-0" />
-            <span>{apiError}</span>
-          </div>
-        )}
-
-        {/* Validation Errors display */}
-        {errors.length > 0 && (
-          <div className="p-3 bg-red-500/10 border border-red-500/20 text-red-600 rounded-xl text-xs space-y-1">
-            <div className="flex items-center gap-1.5 font-semibold">
-              <AlertCircle className="w-4 h-4 shrink-0" />
-              <span>Validation Errors:</span>
+        {/* Modal Body */}
+        <form onSubmit={handleSubmit} className="p-6 space-y-4 overflow-y-auto flex-1">
+          {apiError && (
+            <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-xs text-red-600 font-medium">
+              {apiError}
             </div>
-            <ul className="list-disc list-inside pl-1 space-y-0.5">
-              {errors.map((err, idx) => (
-                <li key={idx}>{err}</li>
-              ))}
-            </ul>
-          </div>
-        )}
+          )}
 
-        {/* STEP 2: Confirmation View */}
-        {isConfirming ? (
-          <div className="space-y-4 py-2">
-            <p className="text-xs text-gray-600 dark:text-neutral-400">
-              Please review the details below before submitting to the catalog:
-            </p>
-
-            <div className="bg-black/5 dark:bg-white/5 p-4 rounded-xl space-y-2 text-xs">
-              <div className="flex justify-between py-1 border-b border-black/5 dark:border-white/5">
-                <span className="text-gray-500">Item Name:</span>
-                <span className="font-semibold text-black dark:text-white">{name}</span>
-              </div>
-              <div className="flex justify-between py-1 border-b border-black/5 dark:border-white/5">
-                <span className="text-gray-500">Brand:</span>
-                <span className="font-semibold text-black dark:text-white">{brand || '—'}</span>
-              </div>
-              <div className="flex justify-between py-1 border-b border-black/5 dark:border-white/5">
-                <span className="text-gray-500">SKU:</span>
-                <span className="font-mono font-semibold text-[#0071e3]">{sku}</span>
-              </div>
-              <div className="flex justify-between py-1 border-b border-black/5 dark:border-white/5">
-                <span className="text-gray-500">Category:</span>
-                <span className="font-semibold text-black dark:text-white">{selectedCategoryName}</span>
-              </div>
-              <div className="flex justify-between py-1 border-b border-black/5 dark:border-white/5">
-                <span className="text-gray-500">MRP:</span>
-                <span className="font-semibold text-black dark:text-white">
-                  ₹{Number(mrp).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                </span>
-              </div>
-              <div className="flex justify-between py-1">
-                <span className="text-gray-500">Unit of Measure:</span>
-                <span className="font-semibold text-black dark:text-white">{unitOfMeasure.toUpperCase()}</span>
-              </div>
-            </div>
-
-            <div className="flex items-center justify-between pt-3 border-t border-black/10 dark:border-white/10">
-              <button
-                type="button"
-                onClick={() => setIsConfirming(false)}
-                disabled={isSubmitting}
-                className="px-4 py-2 text-xs font-medium text-gray-500 hover:text-black dark:hover:text-white flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-              >
-                <ArrowLeft className="w-3.5 h-3.5" /> Back to Edit
-              </button>
-              <button
-                type="button"
-                onClick={handleFinalSubmit}
-                disabled={isSubmitting}
-                className="px-4 py-2 bg-[#0071e3] hover:bg-[#0077ed] text-white rounded-xl text-xs font-semibold flex items-center gap-2 disabled:opacity-50 cursor-pointer transition-opacity"
-              >
-                {isSubmitting ? (
-                  <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                ) : (
-                  <CheckCircle2 className="w-3.5 h-3.5" />
-                )}
-                {initialData ? 'Confirm & Update' : 'Confirm & Save'}
-              </button>
-            </div>
-          </div>
-        ) : (
-          /* STEP 1: Form View */
-          <form onSubmit={handlePreSubmit} className="space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <CommonInput
-                label="Item Name"
-                name="name"
-                required
-                placeholder="e.g. ESP32 Board"
-                value={name}
-                onChange={(e) => {
-                  setErrors([]);
-                  setName(e.target.value);
-                }}
-              />
-
-              <CommonInput
-                label="SKU"
-                name="sku"
-                required={!initialData}
-                disabled={!!initialData}
-                placeholder="e.g. 1165429"
-                value={sku}
-                onChange={(e) => setSku(e.target.value)}
-              />
-            </div>
-
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {/* Category */}
             <div>
-              <div className="flex items-center justify-between mb-1">
-                <label className="block text-xs font-semibold text-gray-700 dark:text-neutral-300">
-                  Brand Name
-                </label>
-                {matchingBrands.length > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsCustomBrand(!isCustomBrand);
-                      setBrand('');
-                    }}
-                    className="text-[11px] text-[#0071e3] hover:underline font-medium cursor-pointer"
-                  >
-                    {isCustomBrand ? 'Select Existing Brand' : '+ Add New Brand'}
-                  </button>
-                )}
-              </div>
-
-              {matchingBrands.length > 0 && !isCustomBrand ? (
-                <select
-                  value={brand}
-                  onChange={(e) => setBrand(e.target.value)}
-                  className="w-full px-3 py-2 bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl text-xs focus:outline-none focus:border-[#0071e3] transition-colors appearance-none cursor-pointer text-black dark:text-white"
-                >
-                  <option value="">-- Select Existing Brand --</option>
-                  {matchingBrands.map((b) => (
-                    <option key={b} value={b}>
-                      {b}
-                    </option>
-                  ))}
-                </select>
-              ) : (
-                <CommonInput
-                  label=""
-                  name="brand"
-                  placeholder="e.g. Nvidia, Espressif..."
-                  value={brand}
-                  onChange={(e) => setBrand(e.target.value)}
-                />
-              )}
+              <label className="block text-xs font-semibold text-gray-600 dark:text-neutral-300 mb-1">
+                Category *
+              </label>
+              <select
+                required
+                value={formData.categoryId}
+                onChange={(e) => setFormData({ ...formData, categoryId: e.target.value })}
+                className="w-full px-3 py-2 text-xs bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0071e3]"
+              >
+                {categories.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-semibold text-gray-700 dark:text-neutral-300 mb-1">
-                  Category <span className="text-red-500">*</span>
-                </label>
-                <select
-                  value={categoryId}
-                  onChange={(e) => setCategoryId(Number(e.target.value))}
-                  className="w-full px-3 py-2 bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl text-xs focus:outline-none focus:border-[#0071e3] transition-colors appearance-none cursor-pointer text-black dark:text-white"
-                >
-                  <option value="" disabled>
-                    Select Category
-                  </option>
-                  {categories.map((cat) => (
-                    <option key={cat.id} value={cat.id}>
-                      {cat.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <CommonInput
-                label="MRP (₹)"
-                name="mrp"
-                type="number"
+            {/* SKU */}
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 dark:text-neutral-300 mb-1">
+                SKU *
+              </label>
+              <input
+                type="text"
                 required
-                placeholder="0.00"
-                value={mrp}
-                onChange={(e) => setMrp(e.target.value)}
+                disabled={!!initialData}
+                value={formData.sku}
+                onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
+                placeholder="e.g. ESP32-WROOM-32"
+                className="w-full px-3 py-2 text-xs bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0071e3] disabled:opacity-50"
               />
             </div>
 
-            <UnitOfMeasureInput
-              value={unitOfMeasure}
-              onChange={(selectedUnit) => setUnitOfMeasure(selectedUnit)}
-            />
-
-            {initialData && (
-              <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  id="activeStatus"
-                  checked={active}
-                  onChange={(e) => setActive(e.target.checked)}
-                  className="w-4 h-4 rounded text-[#0071e3] focus:ring-[#0071e3]"
-                />
-                <label
-                  htmlFor="activeStatus"
-                  className="text-xs font-semibold text-gray-700 dark:text-neutral-300 cursor-pointer"
-                >
-                  Active Status
-                </label>
-              </div>
-            )}
-
-            <CommonInput
-              label="Description"
-              name="description"
-              placeholder="Item specification details..."
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-            />
-
-            <div className="flex justify-end gap-3 pt-3 border-t border-black/10 dark:border-white/10">
-              <button
-                type="button"
-                onClick={onClose}
-                disabled={isSubmitting}
-                className="px-4 py-2 text-xs font-medium text-gray-500 hover:text-black dark:hover:text-white cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                disabled={isSubmitting || !isValid || !isDirty}
-                className="px-4 py-2 bg-[#0071e3] hover:bg-[#0077ed] text-white rounded-xl text-xs font-semibold flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-opacity"
-              >
-                <Save className="w-3.5 h-3.5" />
-                {initialData ? 'Proceed to Update' : 'Proceed to Create'}
-              </button>
+            {/* Name */}
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 dark:text-neutral-300 mb-1">
+                Item Name *
+              </label>
+              <input
+                type="text"
+                required
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                placeholder="e.g. ESP32 Microcontroller Board"
+                className="w-full px-3 py-2 text-xs bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0071e3]"
+              />
             </div>
-          </form>
-        )}
+
+            {/* Brand */}
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 dark:text-neutral-300 mb-1">
+                Brand
+              </label>
+              <input
+                type="text"
+                value={formData.brand}
+                onChange={(e) => setFormData({ ...formData, brand: e.target.value })}
+                placeholder="e.g. Espressif"
+                className="w-full px-3 py-2 text-xs bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0071e3]"
+              />
+            </div>
+
+            {/* Unit of Measure */}
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 dark:text-neutral-300 mb-1">
+                Unit of Measure *
+              </label>
+              <input
+                type="text"
+                required
+                value={formData.unitOfMeasure}
+                onChange={(e) => setFormData({ ...formData, unitOfMeasure: e.target.value })}
+                placeholder="e.g. PCS, KG, METERS"
+                className="w-full px-3 py-2 text-xs bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0071e3]"
+              />
+            </div>
+
+            {/* MRP */}
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 dark:text-neutral-300 mb-1">
+                MRP (₹) *
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                min="0.01"
+                required
+                value={formData.mrp}
+                onChange={(e) => setFormData({ ...formData, mrp: e.target.value })}
+                placeholder="499.00"
+                className="w-full px-3 py-2 text-xs bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0071e3]"
+              />
+            </div>
+
+            {/* Country of Origin */}
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 dark:text-neutral-300 mb-1">
+                Country of Origin *
+              </label>
+              <input
+                type="text"
+                required
+                value={formData.countryOfOrigin}
+                onChange={(e) => setFormData({ ...formData, countryOfOrigin: e.target.value })}
+                placeholder="e.g. India"
+                className="w-full px-3 py-2 text-xs bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0071e3]"
+              />
+            </div>
+
+            {/* Warranty Months */}
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 dark:text-neutral-300 mb-1">
+                Warranty (Months)
+              </label>
+              <input
+                type="number"
+                min="0"
+                max="999"
+                value={formData.warrantyMonths}
+                onChange={(e) => setFormData({ ...formData, warrantyMonths: e.target.value })}
+                className="w-full px-3 py-2 text-xs bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0071e3]"
+              />
+            </div>
+          </div>
+
+          {/* Raw Materials */}
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 dark:text-neutral-300 mb-1">
+              Raw Materials Used
+            </label>
+            <input
+              type="text"
+              value={formData.rawMaterialsUsed}
+              onChange={(e) => setFormData({ ...formData, rawMaterialsUsed: e.target.value })}
+              placeholder="e.g. FR-4 Glass Epoxy, Silicon Chip"
+              className="w-full px-3 py-2 text-xs bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0071e3]"
+            />
+          </div>
+
+          {/* Description */}
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 dark:text-neutral-300 mb-1">
+              Description
+            </label>
+            <textarea
+              rows={2}
+              value={formData.description}
+              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              placeholder="Detailed item summary..."
+              className="w-full px-3 py-2 text-xs bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0071e3]"
+            />
+          </div>
+
+          {/* Terms & Conditions */}
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 dark:text-neutral-300 mb-1">
+              Terms & Conditions
+            </label>
+            <textarea
+              rows={2}
+              value={formData.termsAndCondition}
+              onChange={(e) => setFormData({ ...formData, termsAndCondition: e.target.value })}
+              placeholder="Handling instructions, return policy terms..."
+              className="w-full px-3 py-2 text-xs bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0071e3]"
+            />
+          </div>
+
+          {/* Dynamic Attribute Builder */}
+          <AttributeInputBuilder
+            existingItems={items}
+            attributes={attributes}
+            onChange={setAttributes}
+          />
+
+          {/* Footer Submit */}
+          <div className="flex justify-end gap-3 pt-4 border-t border-black/10 dark:border-white/10">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 text-xs font-medium text-gray-500 hover:text-black dark:hover:text-white cursor-pointer"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="px-5 py-2 bg-[#0071e3] hover:bg-[#0077ed] text-white rounded-xl text-xs font-semibold disabled:opacity-50 cursor-pointer"
+            >
+              {isSubmitting
+                ? 'Saving...'
+                : initialData
+                ? 'Update Item'
+                : 'Create Item'}
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   );
