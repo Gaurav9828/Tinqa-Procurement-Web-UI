@@ -1,5 +1,5 @@
 export interface ValidationRule {
-  type?: 'text' | 'email' | 'phone' | 'number' | 'url' | 'alphanumeric';
+  type?: 'text' | 'email' | 'phone' | 'number' | 'url' | 'alphanumeric' | 'gstin' | 'pan' | 'pincode';
   required?: boolean;
   min?: number;
   max?: number;
@@ -8,8 +8,6 @@ export interface ValidationRule {
 }
 
 export const Validator = {
-
-  
   isValid: (value: any): boolean => {
     if (value === null || value === undefined) return false;
     if (typeof value === 'boolean') return value;
@@ -26,22 +24,14 @@ export const Validator = {
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
   },
 
-  /**
-   * Validates international telephone numbers according to E.164 standards.
-   * - Optional leading +
-   * - Validates country code + national number (10 to 15 total digits)
-   * - Rejects truncated/short numbers like +9173986603
-   */
   isPhone: (phone: string): boolean => {
     if (!Validator.isValid(phone)) return false;
     const sanitized = phone.trim().replace(/[\s-()]/g, '');
 
-    // E.164 format check: 10 to 15 digits overall, optional leading +
     if (!/^\+?[1-9]\d{9,14}$/.test(sanitized)) {
       return false;
     }
 
-    // Explicit Indian (+91 or 10-digit) mobile validation rule (starts with 6, 7, 8, 9 and has 10 digits)
     if (sanitized.startsWith('+91')) {
       const indianNumber = sanitized.slice(3);
       return /^[6-9]\d{9}$/.test(indianNumber);
@@ -60,6 +50,31 @@ export const Validator = {
   isAlphanumeric: (val: string): boolean => {
     if (!Validator.isValid(val)) return false;
     return /^[a-zA-Z0-9]+$/.test(val.trim());
+  },
+
+  isUrl: (val: string): boolean => {
+    if (!Validator.isValid(val)) return false;
+    try {
+      new URL(val.trim());
+      return true;
+    } catch {
+      return false;
+    }
+  },
+
+  isGstin: (gstin: string): boolean => {
+    if (!Validator.isValid(gstin)) return false;
+    return /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/.test(gstin.trim().toUpperCase());
+  },
+
+  isPan: (pan: string): boolean => {
+    if (!Validator.isValid(pan)) return false;
+    return /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(pan.trim().toUpperCase());
+  },
+
+  isPincode: (pincode: string): boolean => {
+    if (!Validator.isValid(pincode)) return false;
+    return /^[1-9][0-9]{5}$/.test(pincode.trim());
   },
 
   validateField: (value: any, rule: ValidationRule): string | null => {
@@ -85,11 +100,27 @@ export const Validator = {
       return rule.customMessage || 'Must be a valid number.';
     }
 
+    if (rule.type === 'url' && !Validator.isUrl(stringVal)) {
+      return rule.customMessage || 'Enter a valid URL.';
+    }
+
+    if (rule.type === 'gstin' && !Validator.isGstin(stringVal)) {
+      return rule.customMessage || 'Invalid GSTIN format (e.g., 22AAAAA0000A1Z5).';
+    }
+
+    if (rule.type === 'pan' && !Validator.isPan(stringVal)) {
+      return rule.customMessage || 'Invalid PAN format (e.g., ABCDE1234F).';
+    }
+
+    if (rule.type === 'pincode' && !Validator.isPincode(stringVal)) {
+      return rule.customMessage || 'Enter a valid 6-digit Indian Pincode.';
+    }
+
     if (rule.min !== undefined) {
       if (typeof value === 'number' && value < rule.min) {
         return rule.customMessage || `Minimum value is ${rule.min}.`;
       }
-      if (stringVal.length < rule.min) {
+      if (typeof value === 'string' && stringVal.length < rule.min) {
         return rule.customMessage || `Must be at least ${rule.min} characters.`;
       }
     }
@@ -98,7 +129,7 @@ export const Validator = {
       if (typeof value === 'number' && value > rule.max) {
         return rule.customMessage || `Maximum value is ${rule.max}.`;
       }
-      if (stringVal.length > rule.max) {
+      if (typeof value === 'string' && stringVal.length > rule.max) {
         return rule.customMessage || `Cannot exceed ${rule.max} characters.`;
       }
     }

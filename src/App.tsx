@@ -10,6 +10,7 @@ import { GlobalErrorPage } from './pages/ErrorPage';
 import { AuthProvider } from './context/AuthContext';
 import { EmployeeManagementPage } from './features/employee-management/pages/EmployeeManagementPage';
 import { ItemManagementPage } from './features/item-management/pages/ItemManagementPage';
+import { DealerManagementPage } from './features/dealer-management/pages/DealerManagementPage';
 
 /* Wrapper component to pass navigation handlers to ErrorPage */
 const ErrorPageRoute: React.FC = () => {
@@ -31,6 +32,7 @@ export const App: React.FC = () => {
               <Route path="/" element={<AdminLayout />}>
                 <Route path="/profile" element={<ProfilePage />} />
                 <Route path="/employees" element={<EmployeeManagementPage />} />
+                <Route path="/dealers" element={<DealerManagementPage />} />
                 <Route path="/item" element={<ItemManagementPage />} />
                 <Route index element={<Navigate to="/analytics" replace />} />
                 <Route path="approvals" element={<ApprovalsHub />} />

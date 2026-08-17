@@ -11,6 +11,11 @@ export type FeatureKey =
   | 'MANAGE_ORDERS'
   | 'MANAGE_AUCTIONS'
   | 'MANAGE_DEALERS'
+  | 'VIEW_DEALERS'
+  | 'CREATE_DEALER'
+  | 'EDIT_DEALER'
+  | 'DELETE_DEALER'
+  | 'MANAGE_DEALER_CATEGORIES'
   | 'MANAGE_PAYMENTS'
   | 'MANAGE_COMPLAINTS'
   | 'VIEW_ANALYTICS'
@@ -29,6 +34,11 @@ export const FEATURE_PERMISSIONS: Record<FeatureKey, UserRole[]> = {
   MANAGE_ORDERS: ['ADMIN_L1', 'ADMIN_L2'],
   MANAGE_AUCTIONS: ['ADMIN_L1', 'ADMIN_L2'],
   MANAGE_DEALERS: ['ADMIN_L1', 'ADMIN_L2'],
+  VIEW_DEALERS: ['ADMIN_L1', 'ADMIN_L2'],
+  CREATE_DEALER: ['ADMIN_L1', 'ADMIN_L2'],
+  EDIT_DEALER: ['ADMIN_L1', 'ADMIN_L2'],
+  DELETE_DEALER: ['ADMIN_L2'],
+  MANAGE_DEALER_CATEGORIES: ['ADMIN_L1', 'ADMIN_L2'],
   MANAGE_PAYMENTS: ['ADMIN_L1', 'ADMIN_L2'],
   MANAGE_COMPLAINTS: ['ADMIN_L1', 'ADMIN_L2'],
   VIEW_ANALYTICS: ['ADMIN_L1', 'ADMIN_L2'],
@@ -82,17 +92,17 @@ export const APP_NAVIGATION: NavigationItem[] = [
     allowedRoles: ['ADMIN_L1', 'ADMIN_L2'],
   },
   {
+    id: 'dealers',
+    label: 'Dealer Management',
+    path: '/dealers',
+    iconName: 'Users',
+    allowedRoles: ['ADMIN_L1', 'ADMIN_L2'],
+  },
+  {
     id: 'auctions',
     label: 'Auctions Control',
     path: '/auctions',
     iconName: 'Gavel',
-    allowedRoles: ['ADMIN_L1', 'ADMIN_L2'],
-  },
-  {
-    id: 'dealers',
-    label: 'Dealers & Labours',
-    path: '/dealers',
-    iconName: 'Users',
     allowedRoles: ['ADMIN_L1', 'ADMIN_L2'],
   },
   {

@@ -1,24 +1,24 @@
 import React from 'react';
 import { Search, Plus } from 'lucide-react';
-import type { CategoryResponse } from '../types/item.types';
+import type { CategoryResponse } from '../types/dealer.types';
 
-export interface ItemFilterBarProps {
+export interface DealerFilterBarProps {
   searchQuery: string;
   selectedCategoryId?: number;
   categories: CategoryResponse[];
   onSearchChange: (value: string) => void;
   onCategoryChange: (categoryId: number | undefined) => void;
-  onOpenCreateItemModal: () => void;
+  onOpenCreateDealerModal: () => void;
   onOpenCreateCategoryModal: () => void;
 }
 
-export const ItemFilterBar: React.FC<ItemFilterBarProps> = ({
+export const DealerFilterBar: React.FC<DealerFilterBarProps> = ({
   searchQuery,
   selectedCategoryId,
   categories,
   onSearchChange,
   onCategoryChange,
-  onOpenCreateItemModal,
+  onOpenCreateDealerModal,
   onOpenCreateCategoryModal,
 }) => (
   <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-2 bg-black/[0.02] dark:bg-white/[0.02] border border-black/10 dark:border-white/10 rounded-2xl">
@@ -29,7 +29,7 @@ export const ItemFilterBar: React.FC<ItemFilterBarProps> = ({
           type="text"
           value={searchQuery}
           onChange={(e) => onSearchChange(e.target.value)}
-          placeholder="Search items by name or code..."
+          placeholder="Search dealers by name, GSTIN, phone, city..."
           className="w-full pl-9 pr-4 py-2 bg-white dark:bg-neutral-900 border border-black/10 dark:border-white/10 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-[#0071e3] text-black dark:text-white"
         />
       </div>
@@ -58,10 +58,10 @@ export const ItemFilterBar: React.FC<ItemFilterBarProps> = ({
       </button>
       <button
         type="button"
-        onClick={onOpenCreateItemModal}
+        onClick={onOpenCreateDealerModal}
         className="px-4 py-2 bg-[#0071e3] hover:bg-[#0071e3]/90 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
       >
-        <Plus className="w-3.5 h-3.5" /> Add Item
+        <Plus className="w-3.5 h-3.5" /> Add Dealer
       </button>
     </div>
   </div>
