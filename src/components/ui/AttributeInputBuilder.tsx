@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { Plus, Trash2, Tag } from 'lucide-react';
-import type { ItemResponse } from '../types/item.types';
+import type { ItemResponse } from '../../features/item-management/types/item.types';
 
 interface Props {
   existingItems: ItemResponse[];

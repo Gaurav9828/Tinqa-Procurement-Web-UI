@@ -11,7 +11,6 @@ import {
   MapPin,
   Phone,
   Mail,
-  Building,
 } from 'lucide-react';
 import { Alert } from '../../../components/ui/Alert';
 import { Tooltip } from '../../../components/ui/Tooltip';

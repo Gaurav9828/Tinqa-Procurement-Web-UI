@@ -6,7 +6,7 @@ import type {
   CreateItemRequest,
   UpdateItemRequest,
 } from '../types/item.types';
-import { AttributeInputBuilder } from './AttributeInputBuilder';
+import { AttributeInputBuilder } from '../../../components/ui/AttributeInputBuilder';
 
 interface Props {
   isOpen: boolean;

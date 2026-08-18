@@ -11,6 +11,8 @@ import { AuthProvider } from './context/AuthContext';
 import { EmployeeManagementPage } from './features/employee-management/pages/EmployeeManagementPage';
 import { ItemManagementPage } from './features/item-management/pages/ItemManagementPage';
 import { DealerManagementPage } from './features/dealer-management/pages/DealerManagementPage';
+import { StockManagementPage } from './features/stock-management/pages/StockManagementPage';
+import { OrderManagementPage } from './features/order-management/pages/OrderManagementPage';
 
 /* Wrapper component to pass navigation handlers to ErrorPage */
 const ErrorPageRoute: React.FC = () => {
@@ -34,6 +36,8 @@ export const App: React.FC = () => {
                 <Route path="/employees" element={<EmployeeManagementPage />} />
                 <Route path="/dealers" element={<DealerManagementPage />} />
                 <Route path="/item" element={<ItemManagementPage />} />
+                <Route path='/stocks' element={<StockManagementPage />} />
+                <Route path='/orders' element={<OrderManagementPage />} />
                 <Route index element={<Navigate to="/analytics" replace />} />
                 <Route path="approvals" element={<ApprovalsHub />} />
                 <Route path="orders" element={<div className="p-8 apple-card">Orders Module Container</div>} />

@@ -3,10 +3,9 @@ import type {
   CreateEmployeeRequest,
   EmployeeFilterParams,
   EmployeeResponse,
-  PageableResponse,
   UpdateEmployeeRequest,
 } from '../types/employee.types';
-import type { ApiResponse } from '../../../types/common.types';
+import type { ApiResponse, PageableResponse } from '../../../types/common.types';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api';
 

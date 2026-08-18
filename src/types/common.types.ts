@@ -39,6 +39,32 @@ export const DESIGNATIONS: Designation[] = [
   'Regional Director',
 ];
 
+export type ApprovalStatus = 
+  | 'APPROVED'
+  | 'PENDING'
+  | 'REJECTED';
+
+export const APPROVL_STATUS: ApprovalStatus[] = [
+  'APPROVED',
+  'PENDING',
+  'REJECTED'
+];
+
+export type OrderStatus =
+  | 'PENDING'
+  | 'CONFIRMED'
+  | 'SHIPPED'
+  | 'DELIVERED'
+  | 'CANCELLED';
+
+export const ORDER_STATUS: OrderStatus[] = [
+  'PENDING',
+  'CONFIRMED',
+  'SHIPPED',
+  'DELIVERED',
+  'CANCELLED'
+];
+
 export type Gender = 'MALE' | 'FEMALE' | 'OTHER';
 
 // This is now a mutable array that matches your specific type
@@ -51,4 +77,34 @@ export interface ApiResponse<T> {
   data: T;
   timestamp: string;
   path: string;
+}
+
+// Standard Spring Boot Page structure
+export interface PageableResponse<T> {
+  content: T[];
+  pageable: {
+    pageNumber: number;
+    pageSize: number;
+    sort: {
+      empty: boolean;
+      sorted: boolean;
+      unsorted: boolean;
+    };
+    offset: number;
+    paged: boolean;
+    unpaged: boolean;
+  };
+  totalElements: number;
+  totalPages: number;
+  last: boolean;
+  size: number;
+  number: number;
+  sort: {
+    empty: boolean;
+    sorted: boolean;
+    unsorted: boolean;
+  };
+  numberOfElements: number;
+  first: boolean;
+  empty: boolean;
 }

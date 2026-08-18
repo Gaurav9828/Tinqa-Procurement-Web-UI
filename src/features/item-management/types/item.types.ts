@@ -64,20 +64,6 @@ export interface UpdateItemRequest {
   isActive?: boolean;
 }
 
-export interface PageableResponse<T> {
-  content: T[];
-  pageable: {
-    pageNumber: number;
-    pageSize: number;
-  };
-  totalPages: number;
-  totalElements: number;
-  last: boolean;
-  size: number;
-  number: number;
-  empty: boolean;
-}
-
 export interface ItemFilterParams {
   search?: string;
   categoryId?: number;

@@ -5,10 +5,9 @@ import type {
   CreateDealerRequest,
   DealerFilterParams,
   DealerResponse,
-  PageableResponse,
   UpdateDealerRequest,
 } from '../types/dealer.types';
-import type { ApiResponse } from '../../../types/common.types';
+import type { ApiResponse, PageableResponse } from '../../../types/common.types';
 
 const BASE_URL = '/v1/admin/dealers';
 
