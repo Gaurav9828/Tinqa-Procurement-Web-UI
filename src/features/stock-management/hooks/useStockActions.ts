@@ -4,8 +4,8 @@ import type {
   CreateStockFromOrderRequest,
   UpdateStockRequest,
   QuantityAdjustmentRequest,
-  ApprovalDecisionRequest,
 } from '../types/stock.types';
+import type { ProcessApprovalPayload } from '../../approvals/types/approval.types';
 
 export const useStockActions = (onSuccessCallback?: () => void) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -84,7 +84,7 @@ export const useStockActions = (onSuccessCallback?: () => void) => {
     }
   };
 
-  const processApproval = async (id: number, payload: ApprovalDecisionRequest): Promise<boolean> => {
+  const processApproval = async (id: number, payload: ProcessApprovalPayload): Promise<boolean> => {
     setIsSubmitting(true);
     clearMessages();
     try {

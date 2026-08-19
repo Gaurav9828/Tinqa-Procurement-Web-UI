@@ -1,9 +1,9 @@
 import React from 'react';
 import { Search, Plus } from 'lucide-react';
-import type { OrderStatus } from '../types/order.types';
-import { ORDER_STATUS } from '../types/order.types';
+
 
 import type { DealerResponse } from '../../dealer-management/types/dealer.types';
+import { ORDER_STATUS, type OrderStatus } from '../../../types/common.types';
 
 interface OrderFilterBarProps {
   searchQuery: string;

@@ -64,10 +64,8 @@ export const OrderManagementPage: React.FC<OrderManagementPageProps> = () => {
 
     const handleEditOrderSubmit = async (orderId: number, formData: any) => {
         if (updateOrder) {
-            const success = await updateOrder(orderId, formData);
-            if (success) {
-                setEditingOrder(null);
-            }
+            await updateOrder(orderId, formData);
+            setEditingOrder(null);
         }
     };
 

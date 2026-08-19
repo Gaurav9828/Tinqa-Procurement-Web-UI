@@ -14,11 +14,6 @@ export interface QuantityAdjustmentRequest {
   reason?: string;
 }
 
-export interface ApprovalDecisionRequest {
-  status: 'APPROVED' | 'REJECTED';
-  rejectionReason?: string;
-}
-
 export interface StockResponse {
   id: number;
   stockIdentityNumber: string;

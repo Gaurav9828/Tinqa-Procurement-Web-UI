@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { Eye, Pencil, RefreshCw, AlertTriangle, X } from 'lucide-react';
 import { OrderStatusBadge } from './OrderStatusBadge';
-import type { OrderResponse, OrderStatus, UpdateOrderStatusRequest } from '../types/order.types';
-import { ORDER_STATUS } from '../types/order.types';
+import type { OrderResponse, UpdateOrderStatusRequest } from '../types/order.types';
 import { useAuthStore } from '../../../store/useAuthStore';
+import { ORDER_STATUS, type OrderStatus } from '../../../types/common.types';
 
 interface OrderTableProps {
     orders: OrderResponse[];
@@ -98,57 +98,67 @@ export const OrderTable: React.FC<OrderTableProps> = ({
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-black/10 dark:divide-white/10">
-                        {orders.map((order) => (
-                            <tr key={order.id} className="hover:bg-black/[0.01] dark:hover:bg-white/[0.01]">
-                                <td className="p-3 font-mono font-medium text-black dark:text-white">{order.orderNumber}</td>
-                                <td className="p-3 font-medium text-black dark:text-white">{order.dealerName}</td>
-                                <td className="p-3 text-gray-600 dark:text-gray-300">{order.itemName}</td>
-                                <td className="p-3 text-gray-600 dark:text-gray-300">
-                                    {order.orderQuantity} {order.unitType}
-                                </td>
-                                <td className="p-3 font-semibold text-black dark:text-white">
-                                    ₹{order.totalPrice?.toLocaleString('en-IN')}
-                                </td>
-                                <td className="p-3">
-                                    <OrderStatusBadge status={order.orderStatus} />
-                                </td>
-                                <td className="p-3 text-gray-500">{order.orderDate}</td>
-                                <td className="p-3 text-right">
-                                    <div className="flex items-center justify-end gap-1.5">
-                                        <button
-                                            onClick={() => onPreview(order)}
-                                            className="p-1.5 hover:bg-black/5 dark:hover:bg-white/10 rounded-lg text-gray-500 hover:text-black dark:hover:text-white cursor-pointer"
-                                            title="View Details"
-                                        >
-                                            <Eye className="w-3.5 h-3.5" />
-                                        </button>
-                                        <button
-                                            onClick={() => onEdit(order)}
-                                            className="p-1.5 hover:bg-black/5 dark:hover:bg-white/10 rounded-lg text-gray-500 hover:text-black dark:hover:text-white cursor-pointer"
-                                            title="Edit Order"
-                                        >
-                                            <Pencil className="w-3.5 h-3.5" />
-                                        </button>
-                                        <select
-                                            value={order.orderStatus}
-                                            disabled={!isL2User && order.orderStatus === 'PENDING'}
-                                            onChange={(e) => handleSelectChange(order, e.target.value as OrderStatus)}
-                                            className={`px-2 py-1 bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-lg text-[11px] focus:outline-none ${
-                                                !isL2User && order.orderStatus === 'PENDING'
-                                                    ? 'text-gray-400 dark:text-neutral-500 cursor-not-allowed opacity-60'
-                                                    : 'text-black dark:text-white cursor-pointer'
-                                            }`}
-                                        >
-                                            {ORDER_STATUS.map((s) => (
-                                                <option key={s} value={s}>
-                                                    {s}
-                                                </option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                </td>
-                            </tr>
-                        ))}
+                        {orders.map((order) => {
+                            const isSelectDisabled = !isL2User && (order.orderStatus === 'PENDING' || order.orderStatus === 'DEALER_LEVEL_PENDING' || order.orderStatus === 'CANCELLED');
+
+                            return (
+                                <tr key={order.id} className="hover:bg-black/[0.01] dark:hover:bg-white/[0.01]">
+                                    <td className="p-3 font-mono font-medium text-black dark:text-white">{order.orderNumber}</td>
+                                    <td className="p-3 font-medium text-black dark:text-white">{order.dealerName}</td>
+                                    <td className="p-3 text-gray-600 dark:text-gray-300">{order.itemName}</td>
+                                    <td className="p-3 text-gray-600 dark:text-gray-300">
+                                        {order.orderQuantity} {order.unitType}
+                                    </td>
+                                    <td className="p-3 font-semibold text-black dark:text-white">
+                                        ₹{order.totalPrice?.toLocaleString('en-IN')}
+                                    </td>
+                                    <td className="p-3">
+                                        <OrderStatusBadge status={order.orderStatus} />
+                                    </td>
+                                    <td className="p-3 text-gray-500">{order.orderDate}</td>
+                                    <td className="p-3 text-right">
+                                        <div className="flex items-center justify-end gap-1.5">
+                                            <button
+                                                onClick={() => onPreview(order)}
+                                                className="p-1.5 hover:bg-black/5 dark:hover:bg-white/10 rounded-lg text-gray-500 hover:text-black dark:hover:text-white cursor-pointer"
+                                                title="View Details"
+                                            >
+                                                <Eye className="w-3.5 h-3.5" />
+                                            </button>
+                                            <button
+                                                disabled={isSelectDisabled}
+                                                onClick={() => !isSelectDisabled && onEdit(order)}
+                                                className={`p-1.5 rounded-lg text-gray-500 transition-colors ${
+                                                    isSelectDisabled
+                                                        ? 'cursor-not-allowed opacity-60 hover:bg-transparent hover:text-gray-500'
+                                                        : 'hover:bg-black/5 dark:hover:bg-white/10 hover:text-black dark:hover:text-white cursor-pointer'
+                                                }`}
+                                                title={isSelectDisabled ? 'Cannot edit cancelled order' : 'Edit Order'}
+                                            >
+                                                <Pencil className="w-3.5 h-3.5" />
+                                            </button>
+                                            <select
+                                                value={order.orderStatus}
+                                                disabled={isSelectDisabled}
+                                                onChange={(e) => handleSelectChange(order, e.target.value as OrderStatus)}
+                                                className={`px-2 py-1 bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-lg text-[11px] focus:outline-none ${
+                                                    isSelectDisabled
+                                                        ? 'text-gray-400 dark:text-neutral-500 cursor-not-allowed opacity-60'
+                                                        : 'text-black dark:text-white cursor-pointer'
+                                                }`}
+                                            >
+                                                {(!isL2User ? ORDER_STATUS.filter((status) => status !== 'PENDING' && status !== 'DEALER_LEVEL_PENDING') : 
+                                                    ORDER_STATUS).map((s) => (
+                                                    <option key={s} value={s}>
+                                                        {s}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                    </td>
+                                </tr>
+                            );
+                        })}
                     </tbody>
                 </table>
             </div>

@@ -76,7 +76,7 @@ export const APP_NAVIGATION: NavigationItem[] = [
     id: 'orders',
     label: 'Orders Management',
     path: '/orders',
-    iconName: 'Package',
+    iconName: 'ShoppingCart',
     allowedRoles: ['ADMIN_L1', 'ADMIN_L2'],
   },
   {

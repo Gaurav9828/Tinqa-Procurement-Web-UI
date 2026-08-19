@@ -5,6 +5,7 @@ import type {
   UpdateOrderRequest, 
   UpdateOrderStatusRequest 
 } from '../types/order.types';
+import type { ProcessApprovalPayload } from '../../approvals/types/approval.types';
 
 export const useOrderActions = (onSuccessCallback?: () => void) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -76,6 +77,26 @@ export const useOrderActions = (onSuccessCallback?: () => void) => {
     }
   };
 
+  const processAdminL2Approval = async (id: number, payload: ProcessApprovalPayload): Promise<boolean> => {
+    setIsSubmitting(true);
+    clearMessages();
+    try {
+      const res = await orderApi.processAdminL2Approval(id, payload);
+      if (res.success) {
+        setActionSuccess(`Order status updated to ${payload.decision}`);
+        if (onSuccessCallback) onSuccessCallback();
+        return true;
+      }
+      setActionError(res.message || 'Failed to update order status');
+      return false;
+    } catch (err: any) {
+      setActionError(err?.response?.data?.message || 'Error occurred while updating status.');
+      return false;
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   return {
     isSubmitting,
     actionError,
@@ -84,5 +105,6 @@ export const useOrderActions = (onSuccessCallback?: () => void) => {
     createOrder,
     updateOrder,
     updateOrderStatus,
+    processAdminL2Approval
   };
 };

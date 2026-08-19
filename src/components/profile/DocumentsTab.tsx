@@ -135,6 +135,36 @@ export const DocumentsTab: React.FC = () => {
     }
   };
 
+  const downloadAuthenticatedFile = async (url: string, fileName: string) => {
+    try {
+      // Replace 'api' with your configured axios/fetch instance that has your auth headers
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`, // Adjust based on your auth storage
+        },
+      });
+
+      if (!response.ok) throw new Error('Download failed');
+
+      const blob = await response.blob();
+      const blobUrl = window.URL.createObjectURL(blob);
+
+      const a = document.createElement('a');
+      a.href = blobUrl;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+
+      // Cleanup
+      a.remove();
+      window.URL.revokeObjectURL(blobUrl);
+    } catch (error) {
+      console.error('Download error:', error);
+      alert('Failed to download document. Please try again.');
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Alert Messaging */}
@@ -175,7 +205,7 @@ export const DocumentsTab: React.FC = () => {
       </div>
 
       {/* Uploaded Items List */}
-      <div className="apple-card divide-y divide-black/10 dark:divide-white/10 overflow-hidden min-h-[150px] relative">
+      <div className="apple-card divide-y divide-black/10 dark:divide-white/10 overflow-hidden min-h-auto relative">
         {isLoading ? (
           <div className="p-10 flex flex-col items-center justify-center space-y-2 text-gray-400">
             <Loader2 className="w-6 h-6 animate-spin text-[#0071e3]" />
@@ -223,17 +253,15 @@ export const DocumentsTab: React.FC = () => {
                     <Clock className="w-3.5 h-3.5" /> {doc.status?.replace(/_/g, ' ')}
                   </span>
                 )}
-
-                {doc.downloadUrl && (
-                  <a
-                    href={doc.downloadUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
+                {(doc.status === 'ACTIVE' || doc.status === 'APPROVED' || doc.status === 'VERIFIED') && doc.downloadUrl && (
+                  <button
+                    type="button"
+                    onClick={() => downloadAuthenticatedFile(doc.downloadUrl, doc.originalFileName)}
                     className="p-2 hover:bg-black/5 dark:hover:bg-white/10 rounded-lg text-gray-500 transition-colors"
-                    title="Download / Preview"
+                    title="Download Document"
                   >
                     <Download className="w-4 h-4" />
-                  </a>
+                  </button>
                 )}
 
                 {isL2User && (

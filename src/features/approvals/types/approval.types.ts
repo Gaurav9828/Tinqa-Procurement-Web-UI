@@ -1,3 +1,5 @@
+import type { ApprovalStatus, OrderStatus } from "../../../types/common.types";
+
 export interface ProfileApprovalRequest {
   requestId: number;
   employeeId: number;
@@ -19,14 +21,6 @@ export interface ProfileApprovalRequest {
   gender: string | null;
 }
 
-export interface ApiResponseEnvelope<T> {
-  success: boolean;
-  message: string;
-  data: T;
-  timestamp: string;
-  path: string;
-}
-
 export interface DocumentApprovalItem {
   id: number;
   originalFileName: string;
@@ -41,23 +35,46 @@ export interface DocumentApprovalItem {
   createdAt: string;
 }
 
-export interface ApiResponseEnvelope<T> {
-  success: boolean;
-  message: string;
-  errorCode: string | null;
-  data: T;
-  timestamp: string;
-  path: string;
+export interface StocksApprovalRequest {
+  id: number;
+  batchNumber: string;
+  orderNumber: string;
+  dealerName: string;
+  itemName: string;
+  totalOrderQuantity: number;
+  unitType: string;
+  unitPrice: number;
+  totalPrice: number;
+  approvalStatus?: ApprovalStatus;
+  createdBy: number;
+  createdAt: string;
 }
 
+export interface OrdersApprovalRequest {
+  id: number;
+  orderNumber: string;
+  dealerName: string;
+  itemName: string;
+  orderQuantity: number;
+  unitType: string;
+  totalPrice: number;
+  shipmentPrice: number;
+  orderDate: string;
+  approvalStatus?: ApprovalStatus;
+  createdBy: string;
+}
+
+
 export interface ProcessApprovalPayload {
-  decision: 'APPROVE' | 'REJECT';
+  decision: ApprovalStatus | OrderStatus;
   rejectionReason?: string;
 }
 
 export type UnifiedApprovalItem = 
-  | (DocumentApprovalItem & { approvalType: 'DOCUMENT' })
-  | (ProfileApprovalRequest & { approvalType: 'PROFILE' });
+  | (DocumentApprovalItem & { approvalType: 'DOCUMENT' } )
+  | (ProfileApprovalRequest & { approvalType: 'PROFILE' })
+  | (StocksApprovalRequest & { approvalType: 'STOCKS'})
+  | (OrdersApprovalRequest & { approvalType: 'ORDERS'});
 
 export interface PreviewModalProps {
   request: UnifiedApprovalItem | null;

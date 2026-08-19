@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { X, Info } from 'lucide-react';
+import { X, Info, AlertTriangle } from 'lucide-react';
 import type { OrderResponse } from '../types/order.types';
 import type { ItemResponse } from '../../item-management/types/item.types';
 import type { DealerResponse } from '../../dealer-management/types/dealer.types';
 import { HasAccess } from '../../../auth/HasAccess';
-import { CommonInput, CommonSelect } from '../../../components/ui/FormInputs'; // Adjust import path as needed
+import { CommonInput, CommonSelect } from '../../../components/ui/FormInputs';
 
 interface EditOrderModalProps {
   order: OrderResponse | null;
@@ -46,6 +46,7 @@ export const EditOrderModal: React.FC<EditOrderModalProps> = ({
   const [shipmentPrice, setShipmentPrice] = useState<number | ''>(0);
   const [expectedDelivery, setExpectedDelivery] = useState<string>('');
   const [isUnitDisabled, setIsUnitDisabled] = useState<boolean>(false);
+  const [isConfirmOpen, setIsConfirmOpen] = useState<boolean>(false);
 
   useEffect(() => {
     if (order) {
@@ -76,6 +77,16 @@ export const EditOrderModal: React.FC<EditOrderModalProps> = ({
 
   if (!isOpen || !order) return null;
 
+  // Check if any field differs from the original order values
+  const hasChanges =
+    selectedItemId !== (order.itemId || '') ||
+    selectedDealerId !== (order.dealerId || '') ||
+    quantity !== (order.orderQuantity || '') ||
+    unitPrice !== (order.unitPrice || '') ||
+    unitOfMeasure !== (order.unitType || 'PCS') ||
+    shipmentPrice !== (order.shipmentPrice || 0) ||
+    expectedDelivery !== (order.expectedDelivery || '');
+
   const itemMrp = selectedItem?.mrp || 0;
   const currentPrice = Number(unitPrice) || 0;
   const priceVariance = calculatePriceVariance(itemMrp, currentPrice);
@@ -87,8 +98,13 @@ export const EditOrderModal: React.FC<EditOrderModalProps> = ({
       })()
     : undefined;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleFormSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    setIsConfirmOpen(true);
+  };
+
+  const executeSubmit = () => {
+    setIsConfirmOpen(false);
     onSubmit(order.id, {
       itemId: Number(selectedItemId),
       dealerId: Number(selectedDealerId),
@@ -114,141 +130,180 @@ export const EditOrderModal: React.FC<EditOrderModalProps> = ({
   }));
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-      <div className="w-full max-w-lg bg-white dark:bg-neutral-900 border border-black/10 dark:border-white/10 rounded-2xl shadow-xl overflow-hidden">
-        {/* Header */}
-        <div className="flex items-center justify-between p-5 border-b border-black/10 dark:border-white/10">
-          <div>
-            <h2 className="text-lg font-bold text-black dark:text-white">
-              Edit Order ({order.orderNumber})
-            </h2>
-            <p className="text-xs text-gray-500 dark:text-neutral-400">
-              Update details for existing procurement request
-            </p>
-          </div>
-          <button
-            onClick={onClose}
-            className="p-1.5 rounded-lg text-gray-400 hover:text-black dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/10 transition-colors cursor-pointer"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        <HasAccess roles="ADMIN_L1">
-          <div className="mx-5 mt-5 p-3.5 bg-amber-500/10 border border-amber-500/20 rounded-xl flex items-start gap-3 text-xs text-amber-700 dark:text-amber-400">
-            <Info className="w-4 h-4 shrink-0 mt-0.5" />
-            <span>
-              <strong>Notice:</strong> Order modifications will require re-validation by higher authorization tier if pending review.
-            </span>
-          </div>
-        </HasAccess>
-
-        {/* Form Body */}
-        <form onSubmit={handleSubmit} className="p-5 space-y-4">
-          <CommonSelect
-            label="Select Item"
-            required
-            placeholder="-- Choose Item --"
-            value={selectedItemId}
-            options={itemOptions}
-            onChange={(e) => setSelectedItemId(Number(e.target.value))}
-          />
-
-          <CommonSelect
-            label="Select Dealer"
-            required
-            placeholder="-- Choose Dealer --"
-            value={selectedDealerId}
-            options={dealerOptions}
-            onChange={(e) => setSelectedDealerId(Number(e.target.value))}
-          />
-
-          <div className="grid grid-cols-2 gap-3">
-            <CommonInput
-              label="Quantity"
-              type="number"
-              min="1"
-              required
-              value={quantity}
-              onChange={(e) => setQuantity(Number(e.target.value))}
-            />
-
-            <CommonInput
-              label="Unit Type"
-              type="text"
-              required
-              disabled={isUnitDisabled}
-              value={unitOfMeasure}
-              onChange={(e) => setUnitOfMeasure(e.target.value.toUpperCase())}
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
+    <>
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+        <div className="w-full max-w-lg bg-white dark:bg-neutral-900 border border-black/10 dark:border-white/10 rounded-2xl shadow-xl overflow-hidden">
+          {/* Header */}
+          <div className="flex items-center justify-between p-5 border-b border-black/10 dark:border-white/10">
             <div>
+              <h2 className="text-lg font-bold text-black dark:text-white">
+                Edit Order ({order.orderNumber})
+              </h2>
+              <p className="text-xs text-gray-500 dark:text-neutral-400">
+                Update details for existing procurement request
+              </p>
+            </div>
+            <button
+              onClick={onClose}
+              className="p-1.5 rounded-lg text-gray-400 hover:text-black dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/10 transition-colors cursor-pointer"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+
+          <HasAccess roles="ADMIN_L1">
+            <div className="mx-5 mt-5 p-3.5 bg-amber-500/10 border border-amber-500/20 rounded-xl flex items-start gap-3 text-xs text-amber-700 dark:text-amber-400">
+              <Info className="w-4 h-4 shrink-0 mt-0.5" />
+              <span>
+                <strong>Notice:</strong> Order modifications will require re-validation by higher authorization tier if pending review.
+              </span>
+            </div>
+          </HasAccess>
+
+          {/* Form Body */}
+          <form onSubmit={handleFormSubmit} className="p-5 space-y-4">
+            <CommonSelect
+              label="Select Item"
+              required
+              placeholder="-- Choose Item --"
+              value={selectedItemId}
+              options={itemOptions}
+              onChange={(e) => setSelectedItemId(Number(e.target.value))}
+            />
+
+            <CommonSelect
+              label="Select Dealer"
+              required
+              placeholder="-- Choose Dealer --"
+              value={selectedDealerId}
+              options={dealerOptions}
+              onChange={(e) => setSelectedDealerId(Number(e.target.value))}
+            />
+
+            <div className="grid grid-cols-2 gap-3">
               <CommonInput
-                label="Unit Price (₹)"
+                label="Quantity"
                 type="number"
-                step="0.01"
+                min="1"
                 required
-                value={unitPrice}
-                onChange={(e) => setUnitPrice(Number(e.target.value))}
+                value={quantity}
+                onChange={(e) => setQuantity(Number(e.target.value))}
               />
 
-              {selectedItem && priceVariance && Number(priceVariance.percent) !== 0 && (
-                <div className="mt-1.5 text-[11px] flex items-center gap-1.5 font-mono">
-                  <span className="text-gray-500 dark:text-neutral-400">MRP: ₹{itemMrp.toFixed(2)}</span>
-                  <span
-                    className={`px-1.5 py-0.5 rounded-md font-semibold ${
-                      priceVariance.isIncrease
-                        ? 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20'
-                        : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
-                    }`}
-                  >
-                    {priceVariance.isIncrease ? `+${priceVariance.percent}%` : `-${priceVariance.percent}%`} vs MRP
-                  </span>
-                </div>
-              )}
+              <CommonInput
+                label="Unit Type"
+                type="text"
+                required
+                disabled={isUnitDisabled}
+                value={unitOfMeasure}
+                onChange={(e) => setUnitOfMeasure(e.target.value.toUpperCase())}
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <CommonInput
+                  label="Unit Price (₹)"
+                  type="number"
+                  step="0.01"
+                  required
+                  value={unitPrice}
+                  onChange={(e) => setUnitPrice(Number(e.target.value))}
+                />
+
+                {selectedItem && priceVariance && Number(priceVariance.percent) !== 0 && (
+                  <div className="mt-1.5 text-[11px] flex items-center gap-1.5 font-mono">
+                    <span className="text-gray-500 dark:text-neutral-400">MRP: ₹{itemMrp.toFixed(2)}</span>
+                    <span
+                      className={`px-1.5 py-0.5 rounded-md font-semibold ${
+                        priceVariance.isIncrease
+                          ? 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20'
+                          : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
+                      }`}
+                    >
+                      {priceVariance.isIncrease ? `+${priceVariance.percent}%` : `-${priceVariance.percent}%`} vs MRP
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              <CommonInput
+                label="Shipment Price (₹)"
+                type="number"
+                step="0.01"
+                min="0"
+                required
+                value={shipmentPrice}
+                onChange={(e) => setShipmentPrice(Number(e.target.value))}
+              />
             </div>
 
             <CommonInput
-              label="Shipment Price (₹)"
-              type="number"
-              step="0.01"
-              min="0"
-              required
-              value={shipmentPrice}
-              onChange={(e) => setShipmentPrice(Number(e.target.value))}
+              label="Expected Delivery Date"
+              type="date"
+              value={expectedDelivery}
+              min={minDeliveryDate}
+              disabled={!order.orderDate}
+              onChange={(e) => setExpectedDelivery(e.target.value)}
             />
-          </div>
 
-          <CommonInput
-            label="Expected Delivery Date"
-            type="date"
-            value={expectedDelivery}
-            min={minDeliveryDate}
-            disabled={!order.orderDate}
-            onChange={(e) => setExpectedDelivery(e.target.value)}
-          />
-
-          {/* Actions */}
-          <div className="flex items-center justify-end gap-3 pt-3 border-t border-black/10 dark:border-white/10">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 text-xs font-medium text-gray-600 dark:text-neutral-300 hover:bg-black/5 dark:hover:bg-white/10 rounded-xl transition-colors cursor-pointer"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="px-4 py-2 text-xs font-medium text-white bg-[#0071e3] hover:bg-[#0071e3]/90 rounded-xl transition-colors cursor-pointer disabled:opacity-50"
-            >
-              {isSubmitting ? 'Updating...' : 'Save Changes'}
-            </button>
-          </div>
-        </form>
+            {/* Actions */}
+            <div className="flex items-center justify-end gap-3 pt-3 border-t border-black/10 dark:border-white/10">
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-4 py-2 text-xs font-medium text-gray-600 dark:text-neutral-300 hover:bg-black/5 dark:hover:bg-white/10 rounded-xl transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={isSubmitting || !hasChanges}
+                className="px-4 py-2 text-xs font-medium text-white bg-[#0071e3] hover:bg-[#0071e3]/90 rounded-xl transition-colors cursor-pointer disabled:opacity-50"
+              >
+                {isSubmitting ? 'Updating...' : 'Save Changes'}
+              </button>
+            </div>
+          </form>
+        </div>
       </div>
-    </div>
+
+      {/* Confirmation Modal */}
+      {isConfirmOpen && (
+        <div className="fixed inset-0 z-65 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="w-full max-w-sm bg-white dark:bg-neutral-900 border border-black/10 dark:border-white/10 rounded-2xl shadow-2xl p-6 space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 bg-amber-500/10 text-amber-600 dark:text-amber-400 rounded-xl">
+                <AlertTriangle className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-black dark:text-white">Confirm Changes</h3>
+                <p className="text-xs text-gray-500 dark:text-neutral-400">Are you sure you want to update this order?</p>
+              </div>
+            </div>
+            <p className="text-xs text-gray-600 dark:text-neutral-300">
+              Saving these modifications will overwrite the existing order records and may trigger re-verification flows.
+            </p>
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setIsConfirmOpen(false)}
+                className="px-3.5 py-2 text-xs font-medium text-gray-600 dark:text-neutral-300 hover:bg-black/5 dark:hover:bg-white/10 rounded-xl transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={executeSubmit}
+                disabled={isSubmitting}
+                className="px-4 py-2 text-xs font-medium text-white bg-[#0071e3] hover:bg-[#0071e3]/90 rounded-xl transition-colors cursor-pointer disabled:opacity-50"
+              >
+                {isSubmitting ? 'Saving...' : 'Yes, Confirm'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 };

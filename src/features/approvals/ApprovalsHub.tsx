@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { RefreshCw, AlertCircle } from 'lucide-react';
+import { RefreshCw } from 'lucide-react';
 import { useApprovals } from './hooks/useApprovals';
 import type { UnifiedApprovalItem } from './types/approval.types';
 
@@ -9,9 +9,20 @@ import { ApprovalTable } from './components/ApprovalTable';
 import { ApprovalPreviewModal } from './components/ApprovalPreviewModal';
 import { RejectionModal } from './components/RejectionModal';
 import { ConfirmationModal } from '../../components/ui/ConfirmationModal';
+import { Alert } from '../../components/ui/Alert';
+import type { ApprovalItem, ApprovalStatus, OrderStatus } from '../../types/common.types';
 
 export const ApprovalsHub: React.FC = () => {
-  const { approvals, isLoading, error, isDownloading, refreshApprovals, processApproval, downloadDocument } = useApprovals();
+  const {
+    approvals,
+    actionSuccess,
+    clearMessages,
+    isLoading,
+    error,
+    isDownloading,
+    refreshApprovals,
+    processPendingApproval,
+    downloadDocument } = useApprovals();
 
   // Modal States
   const [selectedRequest, setSelectedRequest] = useState<UnifiedApprovalItem | null>(null);
@@ -19,43 +30,77 @@ export const ApprovalsHub: React.FC = () => {
 
   // Rejection Reason Modal State
   const [isRejectionModalOpen, setIsRejectionModalOpen] = useState<boolean>(false);
-  const [rejectionTargetItem, setRejectionTargetItem] = useState<UnifiedApprovalItem | null>(null);
+  const [rejectionTargetItem, setRejectionTargetItem] = useState<ApprovalItem | null>(null);
   const [pendingRejectionReason, setPendingRejectionReason] = useState<string>('');
 
   // Action Confirmation Modal State
   const [isConfirmOpen, setIsConfirmOpen] = useState<boolean>(false);
-  const [confirmAction, setConfirmAction] = useState<'APPROVE' | 'REJECT' | null>(null);
-  const [confirmTargetItem, setConfirmTargetItem] = useState<UnifiedApprovalItem | null>(null);
+  const [confirmAction, setConfirmAction] = useState<ApprovalStatus | OrderStatus | null>(null);
+  const [confirmTargetItem, setConfirmTargetItem] = useState<ApprovalItem | null>(null);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
   const formatTime = (isoString: string) => {
     if (!isoString) return 'N/A';
+
     try {
       const date = new Date(isoString);
-      return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+      const day = String(date.getDate()).padStart(2, '0');
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const year = String(date.getFullYear()).slice(-2);
+
+      const hours = String(date.getHours()).padStart(2, '0');
+      const minutes = String(date.getMinutes()).padStart(2, '0');
+
+      return `${day}/${month}/${year} ${hours}:${minutes}`;
     } catch {
       return isoString;
     }
   };
 
-  const handleInitiateApprove = (item: UnifiedApprovalItem) => {
+  const handleInitiateApprove = (item: ApprovalItem) => {
+    switch(item.approvalType){
+      case 'ORDERS': {
+        setConfirmAction('DEALER_LEVEL_PENDING');
+        break;
+      }
+      case 'DOCUMENT': {
+        setConfirmAction('ACTIVE');
+        break;
+      }
+      default: {
+        setConfirmAction('APPROVED')
+      }
+    }
     setIsPreviewOpen(false);
     setConfirmTargetItem(item);
-    setConfirmAction('APPROVE');
     setIsConfirmOpen(true);
   };
 
-  const handleInitiateReject = (item: UnifiedApprovalItem) => {
+  const handleInitiateReject = (item: ApprovalItem) => {
     setIsPreviewOpen(false);
     setRejectionTargetItem(item);
     setIsRejectionModalOpen(true);
   };
 
-  const handleRejectionReasonSubmit = (reason: string) => {
+  const handleRejectionReasonSubmit = (reason: string, approvalType?: string) => {
+    switch(approvalType){
+      case 'ORDERS': {
+        setConfirmAction('CANCELLED');
+        break;
+      }
+      case 'DOCUMENT': {
+        setConfirmAction('REJECTED');
+        break;
+      }
+      default: {
+        setConfirmAction('REJECTED')
+      }
+    }
     setPendingRejectionReason(reason);
     setIsRejectionModalOpen(false);
     setConfirmTargetItem(rejectionTargetItem);
-    setConfirmAction('REJECT');
+    setConfirmAction(approvalType == 'ORDERS' ? 'CANCELLED' : 'REJECTED');
     setIsConfirmOpen(true);
   };
 
@@ -64,9 +109,9 @@ export const ApprovalsHub: React.FC = () => {
 
     setIsSubmitting(true);
     try {
-      await processApproval(confirmTargetItem, {
+      await processPendingApproval(confirmTargetItem, {
         decision: confirmAction,
-        rejectionReason: confirmAction === 'REJECT' ? pendingRejectionReason : 'Approved by Admin L2',
+        rejectionReason: confirmAction === 'REJECTED' || confirmAction == 'CANCELLED' ? pendingRejectionReason : 'Approved by Admin L2',
       });
 
       setIsConfirmOpen(false);
@@ -83,6 +128,14 @@ export const ApprovalsHub: React.FC = () => {
 
   return (
     <div className="space-y-6 p-6 max-w-7xl mx-auto">
+      {/* Page Alerts */}
+      {actionSuccess && (
+        <Alert type="success" message={actionSuccess} onClose={clearMessages} />
+      )}
+      {error && (
+        <Alert type="error" message={error} onClose={clearMessages} />
+      )}
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
@@ -104,15 +157,7 @@ export const ApprovalsHub: React.FC = () => {
       </div>
 
       {/* Metrics Section */}
-      <ApprovalMetrics pendingCount={approvals.length} />
-
-      {/* Error Banner */}
-      {error && (
-        <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-600 dark:text-rose-400 text-sm flex items-center gap-3">
-          <AlertCircle className="w-5 h-5 shrink-0" />
-          <span>{error}</span>
-        </div>
-      )}
+      <ApprovalMetrics approvals={approvals} />
 
       {/* Unified Data Table */}
       <ApprovalTable
@@ -122,12 +167,10 @@ export const ApprovalsHub: React.FC = () => {
           setSelectedRequest(item);
           setIsPreviewOpen(true);
         }}
-        onInitiateApprove={(id) => {
-          const item = approvals.find((a) => ('id' in a ? a.id === id : a.requestId === id));
+        onInitiateApprove={(item) => {
           if (item) handleInitiateApprove(item);
         }}
-        onInitiateReject={(id) => {
-          const item = approvals.find((a) => ('id' in a ? a.id === id : a.requestId === id));
+        onInitiateReject={(item) => {
           if (item) handleInitiateReject(item);
         }}
         formatTime={formatTime}
@@ -151,7 +194,7 @@ export const ApprovalsHub: React.FC = () => {
         isOpen={isRejectionModalOpen}
         requestId={rejectionTargetItem ? ('id' in rejectionTargetItem ? rejectionTargetItem.id : rejectionTargetItem.requestId) : null}
         onClose={() => setIsRejectionModalOpen(false)}
-        onSubmit={handleRejectionReasonSubmit}
+        onSubmit={(reason: string) => handleRejectionReasonSubmit(reason, rejectionTargetItem?.approvalType)}
       />
 
       <ConfirmationModal

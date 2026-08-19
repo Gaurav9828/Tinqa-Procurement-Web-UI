@@ -1,9 +1,9 @@
 import { axiosClient } from '../../../api/axiosClient';
-import type { ApiResponse } from '../../../types/common.types';
+import type { ApiResponse, OrderStatus } from '../../../types/common.types';
+import type { ProcessApprovalPayload } from '../../approvals/types/approval.types';
 import type {
     CreateOrderRequest,
     OrderResponse,
-    OrderStatus,
     UpdateOrderRequest,
     UpdateOrderStatusRequest,
 } from '../types/order.types';
@@ -53,6 +53,11 @@ export const orderApi = {
 
     updateOrder: async (id: number, payload: UpdateOrderRequest): Promise<ApiResponse<OrderResponse>> => {
         const response = await axiosClient.put(`/v1/orders/${id}`, payload);
+        return response.data;
+    },
+
+    processAdminL2Approval: async (id: number, payload: ProcessApprovalPayload): Promise<ApiResponse<OrderResponse>> => {
+        const response = await axiosClient.patch(`/v1/orders/${id}/approval`, payload);
         return response.data;
     },
 };

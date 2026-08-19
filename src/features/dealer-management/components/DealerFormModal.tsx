@@ -653,7 +653,7 @@ export const DealerFormModal: React.FC<DealerFormModalProps> = ({
           <button
             type="submit"
             form="dealer-form"
-            disabled={isSubmitting}
+            disabled={isSubmitting || !isValid}
             className="flex items-center gap-2 px-4 py-2 text-xs font-medium bg-[#0071e3] hover:bg-[#0071e3]/90 text-white rounded-xl shadow-sm transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Save className="w-4 h-4" />

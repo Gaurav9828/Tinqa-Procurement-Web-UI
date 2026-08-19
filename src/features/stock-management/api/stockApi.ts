@@ -1,7 +1,7 @@
 import { axiosClient } from '../../../api/axiosClient';
 import type { ApiResponse } from '../../../types/common.types';
+import type { ProcessApprovalPayload } from '../../approvals/types/approval.types';
 import type {
-  ApprovalDecisionRequest,
   CreateStockFromOrderRequest,
   UpdateStockRequest,
   QuantityAdjustmentRequest,
@@ -50,7 +50,7 @@ export const stockApi = {
 
   processAdminL2Approval: async (
     id: number,
-    payload: ApprovalDecisionRequest
+    payload: ProcessApprovalPayload
   ): Promise<ApiResponse<StockResponse>> => {
     const response = await axiosClient.post<ApiResponse<StockResponse>>(
       `${BASE_URL}/${id}/approval`,

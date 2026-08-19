@@ -1,12 +1,4 @@
-export type OrderStatus = 'PENDING' | 'CONFIRMED' | 'SHIPPED' | 'DELIVERED' | 'CANCELLED';
-
-export const ORDER_STATUS: OrderStatus[] = [
-  'PENDING',
-  'CONFIRMED',
-  'SHIPPED',
-  'DELIVERED',
-  'CANCELLED',
-];
+import type { OrderStatus } from "../../../types/common.types";
 
 export interface CreateOrderRequest {
   dealerId: number;

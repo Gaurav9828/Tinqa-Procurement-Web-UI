@@ -1,3 +1,5 @@
+import type { UnifiedApprovalItem } from "../features/approvals/types/approval.types";
+
   // In your abc.type.ts file
   export type Department = 
     | 'Procurement'
@@ -42,16 +44,19 @@
   export type ApprovalStatus = 
     | 'APPROVED'
     | 'PENDING'
-    | 'REJECTED';
+    | 'REJECTED'
+    | 'ACTIVE';
 
   export const APPROVL_STATUS: ApprovalStatus[] = [
     'APPROVED',
     'PENDING',
-    'REJECTED'
+    'REJECTED',
+    'ACTIVE'
   ];
 
   export type OrderStatus =
     | 'PENDING'
+    | 'DEALER_LEVEL_PENDING'
     | 'CONFIRMED'
     | 'SHIPPED'
     | 'DELIVERED'
@@ -59,6 +64,7 @@
 
   export const ORDER_STATUS: OrderStatus[] = [
     'PENDING',
+    'DEALER_LEVEL_PENDING',
     'CONFIRMED',
     'SHIPPED',
     'DELIVERED',
@@ -108,3 +114,5 @@
     first: boolean;
     empty: boolean;
   }
+
+  export type ApprovalItem = UnifiedApprovalItem | Record<string, any>;

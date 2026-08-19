@@ -1,9 +1,10 @@
 import React from 'react';
-import { Loader2, CheckCircle2, AlertTriangle, KeyRound, Trash2, Send, RefreshCw, HelpCircle } from 'lucide-react';
+import { Loader2, CheckCircle2, AlertTriangle, KeyRound, Trash2, Send, RefreshCw, HelpCircle, Truck, PackageCheck, XCircle, Clock3 } from 'lucide-react';
+import type { ApprovalStatus, OrderStatus } from '../../types/common.types';
 
 export type ConfirmationActionType =
-  | 'APPROVE'
-  | 'REJECT'
+  | 'APPROVED'
+  | 'REJECTED'
   | 'CHANGE_PASSWORD'
   | 'DELETE'
   | 'SUBMIT'
@@ -13,7 +14,7 @@ export type ConfirmationActionType =
 
 interface ConfirmationModalProps {
   isOpen: boolean;
-  actionType: ConfirmationActionType;
+  actionType: ConfirmationActionType | ApprovalStatus | OrderStatus;
   requestId?: number | string | null;
   title?: string;
   description?: string;
@@ -24,14 +25,18 @@ interface ConfirmationModalProps {
 }
 
 // Configuration helper for dynamic visual elements & text
-const getModalConfig = (
-  actionType: ConfirmationActionType,
+export const getModalConfig = (
+  actionType: ConfirmationActionType | ApprovalStatus | OrderStatus,
   requestId?: number | string | null,
   customTitle?: string,
   customDescription?: string
 ) => {
   switch (actionType) {
-    case 'APPROVE':
+    // ============================================================
+    // APPROVAL ACTIONS
+    // ============================================================
+
+    case 'APPROVED':
       return {
         icon: <CheckCircle2 className="w-8 h-8 text-emerald-500" />,
         iconBg: 'bg-emerald-500/10',
@@ -40,12 +45,12 @@ const getModalConfig = (
           customDescription ||
           (requestId
             ? `Are you sure you want to approve request #${requestId}?`
-            : 'Are you sure you want to approve this action?'),
+            : 'Are you sure you want to approve this request?'),
         confirmBtnText: 'Yes, Approve',
         confirmBtnBg: 'bg-emerald-500 hover:bg-emerald-600',
       };
 
-    case 'REJECT':
+    case 'REJECTED':
       return {
         icon: <AlertTriangle className="w-8 h-8 text-rose-500" />,
         iconBg: 'bg-rose-500/10',
@@ -59,6 +64,24 @@ const getModalConfig = (
         confirmBtnBg: 'bg-rose-500 hover:bg-rose-600',
       };
 
+    case 'PENDING':
+      return {
+        icon: <Clock3 className="w-8 h-8 text-amber-500" />,
+        iconBg: 'bg-amber-500/10',
+        title: customTitle || 'Pending Approval',
+        description:
+          customDescription ||
+          (requestId
+            ? `Request #${requestId} is currently pending.`
+            : 'This request is currently pending approval.'),
+        confirmBtnText: 'Continue',
+        confirmBtnBg: 'bg-amber-500 hover:bg-amber-600',
+      };
+
+    // ============================================================
+    // PASSWORD
+    // ============================================================
+
     case 'CHANGE_PASSWORD':
       return {
         icon: <KeyRound className="w-8 h-8 text-[#0071e3]" />,
@@ -70,6 +93,10 @@ const getModalConfig = (
         confirmBtnText: 'Update Password',
         confirmBtnBg: 'bg-[#0071e3] hover:bg-[#0077ed]',
       };
+
+    // ============================================================
+    // DELETE
+    // ============================================================
 
     case 'DELETE':
       return {
@@ -85,25 +112,114 @@ const getModalConfig = (
         confirmBtnBg: 'bg-rose-500 hover:bg-rose-600',
       };
 
+    // ============================================================
+    // SUBMIT
+    // ============================================================
+
     case 'SUBMIT':
       return {
         icon: <Send className="w-8 h-8 text-[#0071e3]" />,
         iconBg: 'bg-blue-500/10',
         title: customTitle || 'Confirm Submission',
-        description: customDescription || 'Are you sure you want to submit this request for processing?',
+        description:
+          customDescription ||
+          'Are you sure you want to submit this request for processing?',
         confirmBtnText: 'Yes, Submit',
         confirmBtnBg: 'bg-[#0071e3] hover:bg-[#0077ed]',
       };
+
+    // ============================================================
+    // UPDATE
+    // ============================================================
 
     case 'UPDATE':
       return {
         icon: <RefreshCw className="w-8 h-8 text-amber-500" />,
         iconBg: 'bg-amber-500/10',
         title: customTitle || 'Confirm Update',
-        description: customDescription || 'Are you sure you want to save these changes?',
+        description:
+          customDescription || 'Are you sure you want to save these changes?',
         confirmBtnText: 'Save Changes',
         confirmBtnBg: 'bg-amber-500 hover:bg-amber-600',
       };
+
+    // ============================================================
+    // ORDER STATUS
+    // ============================================================
+
+    case 'DEALER_LEVEL_PENDING':
+      return {
+        icon: <Clock3 className="w-8 h-8 text-amber-500" />,
+        iconBg: 'bg-amber-500/10',
+        title: customTitle || 'Dealer Approval Pending',
+        description:
+          customDescription ||
+          (requestId
+            ? `Order #${requestId} is pending dealer-level approval.`
+            : 'This order is pending dealer-level approval.'),
+        confirmBtnText: 'Continue',
+        confirmBtnBg: 'bg-amber-500 hover:bg-amber-600',
+      };
+
+    case 'CONFIRMED':
+      return {
+        icon: <CheckCircle2 className="w-8 h-8 text-emerald-500" />,
+        iconBg: 'bg-emerald-500/10',
+        title: customTitle || 'Confirm Order',
+        description:
+          customDescription ||
+          (requestId
+            ? `Are you sure you want to confirm order #${requestId}?`
+            : 'Are you sure you want to confirm this order?'),
+        confirmBtnText: 'Yes, Confirm',
+        confirmBtnBg: 'bg-emerald-500 hover:bg-emerald-600',
+      };
+
+    case 'SHIPPED':
+      return {
+        icon: <Truck className="w-8 h-8 text-blue-500" />,
+        iconBg: 'bg-blue-500/10',
+        title: customTitle || 'Confirm Shipment',
+        description:
+          customDescription ||
+          (requestId
+            ? `Are you sure you want to mark order #${requestId} as shipped?`
+            : 'Are you sure you want to mark this order as shipped?'),
+        confirmBtnText: 'Yes, Ship',
+        confirmBtnBg: 'bg-blue-500 hover:bg-blue-600',
+      };
+
+    case 'DELIVERED':
+      return {
+        icon: <PackageCheck className="w-8 h-8 text-emerald-500" />,
+        iconBg: 'bg-emerald-500/10',
+        title: customTitle || 'Confirm Delivery',
+        description:
+          customDescription ||
+          (requestId
+            ? `Are you sure you want to mark order #${requestId} as delivered?`
+            : 'Are you sure you want to mark this order as delivered?'),
+        confirmBtnText: 'Yes, Delivered',
+        confirmBtnBg: 'bg-emerald-500 hover:bg-emerald-600',
+      };
+
+    case 'CANCELLED':
+      return {
+        icon: <XCircle className="w-8 h-8 text-rose-500" />,
+        iconBg: 'bg-rose-500/10',
+        title: customTitle || 'Cancel Order',
+        description:
+          customDescription ||
+          (requestId
+            ? `Are you sure you want to cancel order #${requestId}? This action cannot be undone.`
+            : 'Are you sure you want to cancel this order? This action cannot be undone.'),
+        confirmBtnText: 'Yes, Cancel',
+        confirmBtnBg: 'bg-rose-500 hover:bg-rose-600',
+      };
+
+    // ============================================================
+    // DEFAULT
+    // ============================================================
 
     case 'CONFIRM':
     default:
@@ -111,7 +227,9 @@ const getModalConfig = (
         icon: <HelpCircle className="w-8 h-8 text-gray-500" />,
         iconBg: 'bg-gray-500/10',
         title: customTitle || 'Please Confirm',
-        description: customDescription || 'Are you sure you want to proceed with this action?',
+        description:
+          customDescription ||
+          'Are you sure you want to proceed with this action?',
         confirmBtnText: 'Confirm',
         confirmBtnBg: 'bg-[#0071e3] hover:bg-[#0077ed]',
       };
@@ -150,7 +268,7 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
         </p>
 
         {/* Optional Rejection Reason Preview */}
-        {actionType === 'REJECT' && rejectionReason && (
+        {actionType === 'REJECTED' && rejectionReason && (
           <div className="p-3 bg-black/5 dark:bg-white/5 rounded-xl text-left border border-black/5 dark:border-white/5">
             <span className="text-[10px] uppercase font-bold text-gray-400 block mb-1">
               Recorded Reason

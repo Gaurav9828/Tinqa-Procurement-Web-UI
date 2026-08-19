@@ -6,23 +6,22 @@ import {
   X,
   FileText,
   UserCheck,
-  Tag,
   Clock,
-  HardDrive,
   CheckCircle2,
   HelpCircle,
+  ShoppingCart,
+  BoxIcon,
 } from 'lucide-react';
 import { Alert } from '../../../components/ui/Alert';
-import type { ProfileApprovalRequest, DocumentApprovalItem } from '../types/approval.types';
+import type { ApprovalItem } from '../../../types/common.types';
 
-export type ApprovalItem = DocumentApprovalItem | ProfileApprovalRequest | Record<string, any>;
 
 interface ApprovalTableProps<T extends ApprovalItem = ApprovalItem> {
   approvals: T[];
   isLoading: boolean;
   onPreview: (item: T) => void;
-  onInitiateApprove: (id: number) => void;
-  onInitiateReject: (id: number) => void;
+  onInitiateApprove: (item: ApprovalItem) => void;
+  onInitiateReject: (item: ApprovalItem) => void;
   formatTime: (isoString: string) => string;
 }
 
@@ -52,31 +51,43 @@ export const ApprovalTable = <T extends ApprovalItem>({
   };
 
   const getItemTitle = (item: T): { title: string; subtitle?: string } => {
-    if ('originalFileName' in item && item.originalFileName) {
+    if ('originalFileName' in item && item.originalFileName && item?.approvalType == 'DOCUMENT') {
       return {
         title: item.originalFileName,
         subtitle: item.fileSize ? `${(item.fileSize / 1024).toFixed(1)} KB` : undefined,
       };
     }
-    if ('employeeCode' in item && item.employeeCode) {
+    if ('employeeCode' in item && item.employeeCode && item?.approvalType == 'PROFILE') {
       return {
         title: `Emp Code: ${item.employeeCode}`,
         subtitle: item.requestedByUsername ? `@${item.requestedByUsername}` : undefined,
       };
     }
+    if ('batchNumber' in item && 'orderNumber' in item && item?.approvalType == 'STOCKS') {
+      return {
+        title: `Batch: ${item.batchNumber}`,
+        subtitle: `Dealer: ${item.dealerName ? item.dealerName : undefined}`,
+      }
+    }
+    if ('orderNumber' in item && item?.approvalType == 'ORDERS') {
+      return {
+        title: `Order: ${item.orderNumber}`,
+        subtitle: `Dealer: ${item.dealerName ? item.dealerName : undefined}`,
+      }
+    }
     return { title: `Request #${getItemId(item)}` };
   };
 
   const renderTypeBadge = (item: T) => {
-    if ('originalFileName' in item || 'category' in item) {
+    if (item?.approvalType == 'DOCUMENT') {
       return (
-        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-blue-500/10 text-white-600 dark:text-gray-400 border border-white-500/20">
           <FileText className="w-3.5 h-3.5" />
           Document
         </span>
       );
     }
-    if ('employeeCode' in item || 'displayName' in item) {
+    if (item?.approvalType == 'PROFILE') {
       return (
         <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20">
           <UserCheck className="w-3.5 h-3.5" />
@@ -84,6 +95,23 @@ export const ApprovalTable = <T extends ApprovalItem>({
         </span>
       );
     }
+    if (item?.approvalType == 'STOCKS') {
+      return (
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">
+          <BoxIcon className="w-3.5 h-3.5" />
+          Stock Approval
+        </span>
+      );
+    }
+    if (item?.approvalType == 'ORDERS') {
+      return (
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-blue-500/10 text-yellow-600 dark:text-yellow-400 border border-yellow-500/20">
+          <ShoppingCart className="w-3.5 h-3.5" />
+          Order Approval
+        </span>
+      );
+    }
+
     return (
       <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-gray-500/10 text-gray-600 dark:text-gray-400 border border-gray-500/20">
         <HelpCircle className="w-3.5 h-3.5" />
@@ -125,10 +153,9 @@ export const ApprovalTable = <T extends ApprovalItem>({
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="border-b border-black/10 dark:border-white/10 text-xs text-gray-500 dark:text-neutral-400 uppercase bg-black/5 dark:bg-white/5 font-semibold">
-                  <th className="py-3 px-4">Ref ID</th>
+                  <th className="py-3 px-4">Seq.</th>
                   <th className="py-3 px-4">Approval Type</th>
-                  <th className="py-3 px-4">Subject / Item Details</th>
-                  <th className="py-3 px-4">Category & Purpose</th>
+                  <th className="py-3 px-4">Details</th>
                   <th className="py-3 px-4">Submitted At</th>
                   <th className="py-3 px-4 text-right">Actions</th>
                 </tr>
@@ -145,18 +172,17 @@ export const ApprovalTable = <T extends ApprovalItem>({
                     </td>
                   </tr>
                 ) : (
-                  approvals.map((item) => {
-                    const id = getItemId(item);
+                  approvals.map((item, index) => {
                     const { title, subtitle } = getItemTitle(item);
                     const rawTime = getItemTime(item);
 
                     return (
                       <tr
-                        key={id}
+                        key={index}
                         className="hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition-colors text-black dark:text-white"
                       >
                         <td className="py-3.5 px-4 font-mono text-xs font-bold text-gray-700 dark:text-neutral-300">
-                          #{id}
+                          #{index + 1}
                         </td>
 
                         <td className="py-3.5 px-4">
@@ -168,31 +194,6 @@ export const ApprovalTable = <T extends ApprovalItem>({
                             <span className="font-semibold text-sm truncate max-w-xs">{title}</span>
                             {subtitle && (
                               <span className="text-xs text-gray-400 font-mono mt-0.5">{subtitle}</span>
-                            )}
-                          </div>
-                        </td>
-
-                        <td className="py-3.5 px-4 text-xs text-gray-500 dark:text-neutral-400">
-                          <div className="space-y-1">
-                            {'category' in item && item.category && (
-                              <div className="flex items-center gap-1">
-                                <Tag className="w-3 h-3 text-blue-500 shrink-0" />
-                                <span className="font-medium text-black dark:text-white">{item.category}</span>
-                              </div>
-                            )}
-                            {'purpose' in item && item.purpose && (
-                              <div className="flex items-center gap-1 text-gray-400 truncate max-w-[180px]">
-                                <HardDrive className="w-3 h-3 text-gray-400 shrink-0" />
-                                <span>{item.purpose}</span>
-                              </div>
-                            )}
-                            {'department' in item && item.department && (
-                              <span className="inline-block px-2 py-0.5 rounded bg-black/5 dark:bg-white/5 font-medium text-gray-700 dark:text-neutral-300">
-                                {item.department}
-                              </span>
-                            )}
-                            {!('category' in item) && !('purpose' in item) && !('department' in item) && (
-                              <span className="text-gray-400">N/A</span>
                             )}
                           </div>
                         </td>
@@ -214,14 +215,14 @@ export const ApprovalTable = <T extends ApprovalItem>({
                               <Eye className="w-4 h-4" />
                             </button>
                             <button
-                              onClick={() => onInitiateApprove(id)}
+                              onClick={() => onInitiateApprove(item)}
                               title="Approve Request"
                               className="p-2 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500 hover:text-white transition-all cursor-pointer"
                             >
                               <Check className="w-4 h-4" />
                             </button>
                             <button
-                              onClick={() => onInitiateReject(id)}
+                              onClick={() => onInitiateReject(item)}
                               title="Reject Request"
                               className="p-2 rounded-xl bg-rose-500/10 text-rose-600 dark:text-rose-400 hover:bg-rose-500 hover:text-white transition-all cursor-pointer"
                             >

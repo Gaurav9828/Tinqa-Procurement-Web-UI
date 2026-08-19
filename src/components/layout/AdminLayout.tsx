@@ -20,7 +20,8 @@ import {
   Tag,
   ShoppingBag,
   FileText,
-  LayoutDashboard
+  LayoutDashboard,
+  ShoppingCart
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useThemeStore } from '../../store/useThemeStore';
@@ -45,6 +46,7 @@ const ICON_MAP: Record<string, LucideIcon> = {
   Boxes,
   Tag,
   ShoppingBag,
+  ShoppingCart,
   FileText,
   LayoutDashboard,
 };
