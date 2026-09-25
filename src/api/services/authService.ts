@@ -1,7 +1,7 @@
 import { axiosClient } from '../axiosClient';
 import type { LoginRequest, AuthResponse, AdminProfile , ChangePasswordRequest, ChangePasswordResponse} from '../../types/auth';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:9090/api';
 
 export const authService = {
   login: async (payload: LoginRequest): Promise<AuthResponse> => {

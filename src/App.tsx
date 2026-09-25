@@ -13,6 +13,7 @@ import { ItemManagementPage } from './features/item-management/pages/ItemManagem
 import { DealerManagementPage } from './features/dealer-management/pages/DealerManagementPage';
 import { StockManagementPage } from './features/stock-management/pages/StockManagementPage';
 import { OrderManagementPage } from './features/order-management/pages/OrderManagementPage';
+import { ProductManagementPage } from './features/products-management/pages/ProductManagementPage';
 
 /* Wrapper component to pass navigation handlers to ErrorPage */
 const ErrorPageRoute: React.FC = () => {
@@ -38,6 +39,7 @@ export const App: React.FC = () => {
                 <Route path="/item" element={<ItemManagementPage />} />
                 <Route path='/stocks' element={<StockManagementPage />} />
                 <Route path='/orders' element={<OrderManagementPage />} />
+                <Route path='/products' element={<ProductManagementPage />} />
                 <Route index element={<Navigate to="/analytics" replace />} />
                 <Route path="approvals" element={<ApprovalsHub />} />
                 <Route path="orders" element={<div className="p-8 apple-card">Orders Module Container</div>} />

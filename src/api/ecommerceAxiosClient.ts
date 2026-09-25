@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:9090/api';
+const ECOMMERCE_API_BASE_URL = import.meta.env.VITE_ECOMMERCE_API_BASE_URL || 'http://localhost:9091/api';
 
 // Helper function to clear all stored authentication tokens
 const clearAuthSession = () => {
@@ -10,22 +10,22 @@ const clearAuthSession = () => {
   localStorage.clear();
 };
 
-export const axiosClient = axios.create({
-  baseURL: API_BASE_URL,
+export const ecommerceAxiosClient = axios.create({
+  baseURL: ECOMMERCE_API_BASE_URL,
   headers: {
     'Content-Type': 'application/json',
   },
 });
 
 // Request Interceptor: Token & Expiry Checking
-axiosClient.interceptors.request.use(
+ecommerceAxiosClient.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('token');
     const expiry = localStorage.getItem('tokenExpiry');
 
     if (token && expiry) {
       if (Date.now() >= Number(expiry)) {
-        console.warn('⚠️ [Axios Interceptor]: Client token expired. Clearing session.');
+        console.warn('⚠️ [Ecommerce Axios Interceptor]: Client token expired. Clearing session.');
         clearAuthSession();
         window.location.href = '/login?expired=true';
         return Promise.reject(new Error('Session expired'));
@@ -35,20 +35,20 @@ axiosClient.interceptors.request.use(
     return config;
   },
   (error) => {
-    console.error('🚨 [Axios Request Error]:', error);
+    console.error('🚨 [Ecommerce Axios Request Error]:', error);
     return Promise.reject(error);
   }
 );
 
 // Response Interceptor: Global Exception & Error Interception
-axiosClient.interceptors.response.use(
+ecommerceAxiosClient.interceptors.response.use(
   (response) => response,
   (error) => {
     const status = error.response?.status;
     const requestUrl = error.config?.url;
     const requestMethod = error.config?.method?.toUpperCase();
 
-    console.error(`🚨 [Axios Response Exception] ${requestMethod} ${requestUrl}:`, {
+    console.error(`🚨 [Ecommerce Axios Response Exception] ${requestMethod} ${requestUrl}:`, {
       status,
       statusText: error.response?.statusText,
       responseData: error.response?.data,

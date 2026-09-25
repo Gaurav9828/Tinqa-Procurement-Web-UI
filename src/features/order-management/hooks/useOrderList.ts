@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { orderApi } from '../api/orderApi';
-import type { OrderResponse, OrderStatus } from '../types/order.types';
+import type { OrderResponse } from '../types/order.types';
+import type { OrderStatus } from '../../../types/common.types';
 
 export const useOrderList = () => {
   const [orders, setOrders] = useState<OrderResponse[]>([]);

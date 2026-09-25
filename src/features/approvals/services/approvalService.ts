@@ -2,7 +2,7 @@ import { axiosClient } from '../../../api/axiosClient';
 import type { DocumentApprovalItem, ProfileApprovalRequest, ProcessApprovalPayload, StocksApprovalRequest, OrdersApprovalRequest } from '../types/approval.types';
 import type { ApiResponse } from '../../../types/common.types'
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:9090/api';
 
 export const approvalService = {
   // Fetch Document Approvals

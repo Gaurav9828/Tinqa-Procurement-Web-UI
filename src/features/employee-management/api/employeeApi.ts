@@ -7,7 +7,7 @@ import type {
 } from '../types/employee.types';
 import type { ApiResponse, PageableResponse } from '../../../types/common.types';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:9090/api';
 
 const BASE_URL = '/v1/admin/employees';
 

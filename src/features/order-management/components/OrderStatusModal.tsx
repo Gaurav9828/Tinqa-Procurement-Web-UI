@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { X } from 'lucide-react';
-import type { OrderResponse, OrderStatus, UpdateOrderStatusRequest } from '../types/order.types';
+import type { OrderResponse, UpdateOrderStatusRequest } from '../types/order.types';
 import { CommonInput, CommonSelect } from '../../../components/ui/FormInputs';
+import type { OrderStatus } from '../../../types/common.types';
 
 interface Props {
   isOpen: boolean;

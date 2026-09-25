@@ -2,10 +2,10 @@ import { axiosClient } from '../axiosClient';
 import type {
   DocumentUploadRequest,
   DocumentResponseData,
-  ApiResponse,
 } from '../../types/document.types';
+import type { ApiResponse } from '../../types/common.types';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:9090/api';
 
 export const documentService = {
   // Fetch documents uploaded for a specific user
