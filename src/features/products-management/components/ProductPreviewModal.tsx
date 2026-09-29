@@ -16,8 +16,8 @@ export const ProductPreviewModal: React.FC<ProductPreviewModalProps> = ({ produc
         <div className="flex items-center justify-between px-6 py-4 border-b border-black/10 dark:border-white/10">
           <div className="flex items-center gap-2">
             <h2 className="font-bold text-black dark:text-white text-sm">{product.title}</h2>
-            <span className={`px-2 py-0.5 text-[10px] font-semibold rounded-full border ${product.isEnabled ? 'bg-emerald-500/15 text-emerald-600 border-emerald-500/30' : 'bg-rose-500/15 text-rose-600 border-rose-500/30'}`}>
-              {product.isEnabled ? 'ENABLED' : 'DISABLED'}
+            <span className={`px-2 py-0.5 text-[10px] font-semibold rounded-full border ${product.enabled ? 'bg-emerald-500/15 text-emerald-600 border-emerald-500/30' : 'bg-rose-500/15 text-rose-600 border-rose-500/30'}`}>
+              {product.enabled ? 'ENABLED' : 'DISABLED'}
             </span>
           </div>
           <button onClick={onClose} className="p-1 hover:bg-black/5 dark:hover:bg-white/10 rounded-lg text-gray-500">

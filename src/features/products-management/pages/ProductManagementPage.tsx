@@ -16,7 +16,6 @@ export const ProductManagementPage: React.FC = () => {
         products,
         totalElements,
         isLoading,
-        error,
         search,
         statusFilter,
         updateSearch,
@@ -26,9 +25,6 @@ export const ProductManagementPage: React.FC = () => {
 
     const {
         isSubmitting,
-        actionError,
-        actionSuccess,
-        clearMessages,
         createProduct,
         updateProduct,
         updateProductStatus,
@@ -82,13 +78,6 @@ export const ProductManagementPage: React.FC = () => {
                     <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} /> Refresh
                 </button>
             </div>
-
-            {actionSuccess && (
-                <Alert type="success" message={actionSuccess} onClose={clearMessages} />
-            )}
-            {(error || actionError) && (
-                <Alert type="error" message={actionError || error} onClose={clearMessages} />
-            )}
 
             {/* Filter Bar */}
             <ProductFilterBar

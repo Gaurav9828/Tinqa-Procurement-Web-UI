@@ -14,6 +14,7 @@ import { DealerManagementPage } from './features/dealer-management/pages/DealerM
 import { StockManagementPage } from './features/stock-management/pages/StockManagementPage';
 import { OrderManagementPage } from './features/order-management/pages/OrderManagementPage';
 import { ProductManagementPage } from './features/products-management/pages/ProductManagementPage';
+import { GlobalAlertContainer } from './components/ui/GlobalAlertContainer';
 
 /* Wrapper component to pass navigation handlers to ErrorPage */
 const ErrorPageRoute: React.FC = () => {
@@ -25,6 +26,7 @@ export const App: React.FC = () => {
     <GlobalErrorBoundary>
       <AuthProvider>
         <BrowserRouter>
+          <GlobalAlertContainer />
           <Routes>
             {/* Public Routes */}
             <Route path="/login" element={<LoginPage />} />
