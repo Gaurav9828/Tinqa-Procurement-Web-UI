@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import { useNotify } from '../../../hooks/useNotify';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
     Boxes,
     RefreshCw,
@@ -9,7 +10,6 @@ import {
     PackageSearch,
     Eye,
 } from 'lucide-react';
-import { Alert } from '../../../components/ui/Alert';
 import { Tooltip } from '../../../components/ui/Tooltip';
 import { useItemList } from '../hooks/useItemList';
 import { useItemActions } from '../hooks/useItemActions';
@@ -33,7 +33,6 @@ export const ItemManagementPage: React.FC = () => {
         items,
         totalElements,
         isLoading,
-        error,
         filters,
         updateSearch,
         updateCategoryFilter,
@@ -42,9 +41,6 @@ export const ItemManagementPage: React.FC = () => {
 
     const {
         isSubmitting,
-        actionError,
-        actionSuccess,
-        clearMessages,
         createCategory,
         createItem,
         updateItem,
@@ -64,20 +60,22 @@ export const ItemManagementPage: React.FC = () => {
     const [selectedUoms, setSelectedUoms] = useState<string[]>([]);
     const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
 
-    const loadCategories = async () => {
+    const notify = useNotify();
+
+    const loadCategories = useCallback(async () => {
         try {
             const res = await itemApi.getAllCategories();
             if (res.success && res.data) {
                 setCategories(res.data);
             }
-        } catch {
-            // Handled silently
+        } catch (err: unknown) {
+            notify.error(err, 'Failed to load item categories.');
         }
-    };
+    }, [notify]);
 
     useEffect(() => {
         loadCategories();
-    }, []);
+    }, [loadCategories]);
 
     // Unique options derived dynamically from fetched item set
     const uomOptions = useMemo(() => {
@@ -119,13 +117,11 @@ export const ItemManagementPage: React.FC = () => {
     };
 
     const handleOpenCreateItem = () => {
-        clearMessages();
         setSelectedItem(null);
         setIsItemModalOpen(true);
     };
 
     const handleOpenEditItem = (item: ItemResponse) => {
-        clearMessages();
         setSelectedItem(item);
         setIsItemModalOpen(true);
     };
@@ -172,14 +168,6 @@ export const ItemManagementPage: React.FC = () => {
                 </div>
             </div>
 
-            {/* Page Alerts */}
-            {actionSuccess && (
-                <Alert type="success" message={actionSuccess} onClose={clearMessages} />
-            )}
-            {!isItemModalOpen && actionError && (
-                <Alert type="error" message={actionError} onClose={clearMessages} />
-            )}
-
             {/* Toolbar */}
             <ItemFilterBar
                 searchQuery={filters.search || ''}
@@ -192,9 +180,7 @@ export const ItemManagementPage: React.FC = () => {
             />
 
             {/* Item Table */}
-            {error ? (
-                <Alert type="error" message={error} />
-            ) : isLoading ? (
+            {isLoading ? (
                 <div className="apple-card p-12 text-center text-gray-500 dark:text-neutral-400">
                     <div className="inline-block w-6 h-6 border-2 border-[#0071e3] border-t-transparent rounded-full animate-spin mb-2" />
                     <p className="text-sm">Loading item catalog...</p>
@@ -420,7 +406,6 @@ export const ItemManagementPage: React.FC = () => {
             <ItemFormModal
                 isOpen={isItemModalOpen}
                 isSubmitting={isSubmitting}
-                apiError={actionError}
                 categories={categories}
                 items={items}
                 initialData={selectedItem}

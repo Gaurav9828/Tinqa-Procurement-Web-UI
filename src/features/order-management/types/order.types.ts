@@ -48,7 +48,8 @@ export interface UpdateOrderRequest {
   unitPrice?: number;
   shipmentPrice?: number;
   taxBreakup?: Record<string, any>;
-  expectedDelivery?: string;
+  // null clears a previously set date.
+  expectedDelivery?: string | null;
   orderDate?: string;
   additionalInfo?: Record<string, any>;
 }

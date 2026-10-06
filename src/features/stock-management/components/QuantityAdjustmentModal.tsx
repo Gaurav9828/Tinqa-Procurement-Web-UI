@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { X, Plus, Minus } from 'lucide-react';
 import { Validator } from '../../../utils/validator';
-import { Alert } from '../../../components/ui/Alert';
 import type { QuantityAdjustmentRequest } from '../types/stock.types';
 
 interface Props {
@@ -9,7 +8,6 @@ interface Props {
   type: 'ADD' | 'REDUCE';
   stockIdentity: string;
   isSubmitting: boolean;
-  error?: string | null;
   onClose: () => void;
   onRequestSubmit: (payload: QuantityAdjustmentRequest) => void;
 }
@@ -19,21 +17,12 @@ export const QuantityAdjustmentModal: React.FC<Props> = ({
   type,
   stockIdentity,
   isSubmitting,
-  error: externalError,
   onClose,
   onRequestSubmit,
 }) => {
   const [quantity, setQuantity] = useState('');
   const [reason, setReason] = useState('');
   const [touched, setTouched] = useState(false);
-  const [displayError, setDisplayError] = useState<string | null>(null);
-
-  // Sync external API error
-  useEffect(() => {
-    if (externalError) {
-      setDisplayError(externalError);
-    }
-  }, [externalError]);
 
   // Reset local state when modal opens/closes
   useEffect(() => {
@@ -41,7 +30,6 @@ export const QuantityAdjustmentModal: React.FC<Props> = ({
       setQuantity('');
       setReason('');
       setTouched(false);
-      setDisplayError(null);
     }
   }, [isOpen]);
 
@@ -63,7 +51,6 @@ export const QuantityAdjustmentModal: React.FC<Props> = ({
     setTouched(true);
     if (validationError) return;
 
-    setDisplayError(null);
     onRequestSubmit({
       quantity: Number(quantity),
       reason: reason.trim(),
@@ -84,14 +71,6 @@ export const QuantityAdjustmentModal: React.FC<Props> = ({
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Server / Form Error Alert */}
-          {displayError && (
-            <Alert
-              type="error"
-              message={displayError}
-              onClose={() => setDisplayError(null)}
-            />
-          )}
 
           <div>
             <label className="block text-xs font-medium mb-1 text-gray-700 dark:text-neutral-300">
@@ -101,7 +80,6 @@ export const QuantityAdjustmentModal: React.FC<Props> = ({
               type="number"
               value={quantity}
               onChange={(e) => {
-                setDisplayError(null);
                 setQuantity(e.target.value);
               }}
               placeholder="e.g. 25"
@@ -117,7 +95,6 @@ export const QuantityAdjustmentModal: React.FC<Props> = ({
               rows={3}
               value={reason}
               onChange={(e) => {
-                setDisplayError(null);
                 setReason(e.target.value);
               }}
               placeholder="Provide reason for stock quantity adjustment..."

@@ -1,18 +1,16 @@
+import { useNotify } from '../../../hooks/useNotify';
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { X, Save } from 'lucide-react';
 import { Validator, type ValidationRule } from '../../../utils/validator';
 import type { StockResponse, UpdateStockRequest } from '../types/stock.types';
-import { useDealerList } from '../../dealer-management/hooks/useDealerList';
-import { useItemList } from '../../item-management/hooks/useItemList';
+import { useDealerOptions, useItemOptions } from '../../../hooks/useLookupOptions';
 import { CommonInput, CommonSelect, CommonCheckbox } from '../../../components/ui/FormInputs';
-import { Alert } from '../../../components/ui/Alert';
 import { AttributeInputBuilder } from '../../../components/ui/AttributeInputBuilder';
 
 interface StockEditModalProps {
     isOpen: boolean;
     stock: StockResponse | null;
     isSubmitting: boolean;
-    error?: string | null;
     onClose: () => void;
     onRequestSubmit: (id: number, data: UpdateStockRequest) => Promise<void> | void;
 }
@@ -33,12 +31,12 @@ export const StockEditModal: React.FC<StockEditModalProps> = ({
     isOpen,
     stock,
     isSubmitting,
-    error: externalError,
     onClose,
     onRequestSubmit,
 }) => {
-    const { dealers } = useDealerList();
-    const { items } = useItemList();
+    // Only load (cached, full) option lists once the modal is actually opened.
+    const { options: dealers } = useDealerOptions(isOpen);
+    const { options: items } = useItemOptions(isOpen);
 
     const [formData, setFormData] = useState<FormState>({
         batchNumber: '',
@@ -53,13 +51,8 @@ export const StockEditModal: React.FC<StockEditModalProps> = ({
     });
 
     const [touched, setTouched] = useState<Record<string, boolean>>({});
-    const [submitError, setSubmitError] = useState<string | null>(null);
+    const notify = useNotify();
 
-    useEffect(() => {
-        if (externalError) {
-            setSubmitError(externalError);
-        }
-    }, [externalError]);
 
     useEffect(() => {
         if (isOpen && stock) {
@@ -75,7 +68,6 @@ export const StockEditModal: React.FC<StockEditModalProps> = ({
                 isActive: stock.isActive ?? true,
             });
             setTouched({});
-            setSubmitError(null);
         }
     }, [isOpen, stock]);
 
@@ -126,7 +118,6 @@ export const StockEditModal: React.FC<StockEditModalProps> = ({
     }, []);
 
     const handleChange = useCallback((field: keyof FormState, value: unknown) => {
-        setSubmitError(null);
         setFormData((prev) => ({ ...prev, [field]: value }));
     }, []);
 
@@ -137,11 +128,10 @@ export const StockEditModal: React.FC<StockEditModalProps> = ({
         if (!isValid) {
             const allTouched = Object.keys(validationErrors).reduce((acc, k) => ({ ...acc, [k]: true }), {});
             setTouched((prev) => ({ ...prev, ...allTouched }));
-            setSubmitError('Please fix highlighted validation errors before saving.');
+            notify.error('Please fix highlighted validation errors before saving.');
             return;
         }
 
-        setSubmitError(null);
         const payload: UpdateStockRequest = {
             batchNumber: formData.batchNumber.trim(),
             dealerId: Number(formData.dealerId),
@@ -156,8 +146,8 @@ export const StockEditModal: React.FC<StockEditModalProps> = ({
 
         try {
             await onRequestSubmit(stock.id, payload);
-        } catch (err: any) {
-            setSubmitError(err?.message || 'Server error occurred while updating stock entry.');
+        } catch (err: unknown) {
+            notify.error(err, 'Server error occurred while updating stock entry.');
         }
     };
 
@@ -181,13 +171,6 @@ export const StockEditModal: React.FC<StockEditModalProps> = ({
                 </div>
 
                 <form id="stock-edit-form" onSubmit={handleSubmit} className="p-6 space-y-4 overflow-y-auto flex-1 text-xs">
-                    {submitError && (
-                        <Alert
-                            type="error"
-                            message={submitError}
-                            onClose={() => setSubmitError(null)}
-                        />
-                    )}
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <CommonInput

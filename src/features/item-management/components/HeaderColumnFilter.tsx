@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Filter, Check, X } from 'lucide-react';
+import { Filter, Check } from 'lucide-react';
 
 interface Props {
   title: string;

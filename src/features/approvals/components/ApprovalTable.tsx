@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import {
   Loader2,
   Eye,
@@ -12,7 +11,6 @@ import {
   ShoppingCart,
   BoxIcon,
 } from 'lucide-react';
-import { Alert } from '../../../components/ui/Alert';
 import type { ApprovalItem } from '../../../types/common.types';
 
 
@@ -33,10 +31,6 @@ export const ApprovalTable = <T extends ApprovalItem>({
   onInitiateReject,
   formatTime,
 }: ApprovalTableProps<T>) => {
-  const [alertState, setAlertState] = useState<{
-    type: 'success' | 'error';
-    message: string;
-  } | null>(null);
 
   const getItemId = (item: T): number => {
     if ('id' in item && typeof item.id === 'number') return item.id;
@@ -122,14 +116,6 @@ export const ApprovalTable = <T extends ApprovalItem>({
 
   return (
     <div className="space-y-4">
-      {alertState && (
-        <Alert
-          type={alertState.type}
-          message={alertState.message}
-          onClose={() => setAlertState(null)}
-        />
-      )}
-
       <div className="bg-white dark:bg-neutral-900 rounded-2xl border border-black/10 dark:border-white/10 overflow-hidden shadow-sm">
         <div className="p-4 border-b border-black/10 dark:border-white/10 flex justify-between items-center bg-black/[0.02] dark:bg-white/[0.02]">
           <div className="flex items-center gap-2">

@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { UserCheck, RefreshCw } from 'lucide-react';
-import { Alert } from '../../../components/ui/Alert'; // Adjust import path as needed
 import { useEmployeeList } from '../hooks/useEmployeeList';
 import { useEmployeeActions } from '../hooks/useEmployeeActions';
 import { useEmployeeDetails } from '../hooks/useEmployeeDetails';
@@ -17,7 +16,6 @@ export const EmployeeManagementPage: React.FC = () => {
         totalPages,
         totalElements,
         isLoading,
-        error,
         filters,
         updateSearch,
         updateStatus,
@@ -27,10 +25,7 @@ export const EmployeeManagementPage: React.FC = () => {
 
     const {
         isSubmitting,
-        actionError,
-        actionSuccess,
         userRole,
-        clearMessages,
         createEmployee,
         updateEmployee,
         requestDeletion,
@@ -85,22 +80,6 @@ export const EmployeeManagementPage: React.FC = () => {
                 </div>
             </div>
 
-            {/* Notifications */}
-            {actionError && (
-                <Alert
-                    type="error"
-                    message={actionError}
-                    onClose={clearMessages}
-                />
-            )}
-            {actionSuccess && (
-                <Alert
-                    type="success"
-                    message={actionSuccess}
-                    onClose={clearMessages}
-                />
-            )}
-
             {/* Filter Toolbar */}
             <EmployeeFilterBar
                 searchQuery={filters.search || ''}
@@ -111,21 +90,14 @@ export const EmployeeManagementPage: React.FC = () => {
             />
 
             {/* Data Table */}
-            {error ? (
-                <Alert
-                    type="error"
-                    message={error}
-                />
-            ) : (
-                <EmployeeTable
-                    employees={employees}
-                    isLoading={isLoading}
-                    userRole={userRole}
-                    onView={(id) => fetchDetails(id)}
-                    onEdit={handleOpenEdit}
-                    onDelete={(emp) => setEmployeeToDelete(emp)}
-                />
-            )}
+            <EmployeeTable
+                employees={employees}
+                isLoading={isLoading}
+                userRole={userRole}
+                onView={(id) => fetchDetails(id)}
+                onEdit={handleOpenEdit}
+                onDelete={(emp) => setEmployeeToDelete(emp)}
+            />
 
             {/* Pagination Bar */}
             {totalPages > 1 && (

@@ -28,23 +28,22 @@ export interface NotificationsListResponse {
   timestamp: string;
   path: string;
 }
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:9090/api';
 
 export const notificationService = {
   // Get unread notification count
   getUnreadCount: async (): Promise<number> => {
-    const response = await axiosClient.get<UnreadCountResponse>(`${API_BASE_URL}/v1/notifications/unread-count`);
+    const response = await axiosClient.get<UnreadCountResponse>(`/v1/notifications/unread-count`);
     return response.data?.data?.unreadCount ?? 0;
   },
 
   // Get all notifications
   getAllNotifications: async (): Promise<NotificationItem[]> => {
-    const response = await axiosClient.get<NotificationsListResponse>(`${API_BASE_URL}/v1/notifications`);
+    const response = await axiosClient.get<NotificationsListResponse>(`/v1/notifications`);
     return response.data?.data ?? [];
   },
 
   // Mark notification as read
   markAsRead: async (notificationId: number): Promise<void> => {
-    await axiosClient.patch(`${API_BASE_URL}/v1/notifications/${notificationId}/read`);
+    await axiosClient.patch(`/v1/notifications/${notificationId}/read`);
   },
 };

@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { X, Save, AlertCircle } from 'lucide-react';
-import { Alert } from '../../../components/ui/Alert';
 import type { CreateCategoryRequest } from '../types/dealer.types';
 
 interface DealerCategoryFormModalProps {
@@ -8,7 +7,6 @@ interface DealerCategoryFormModalProps {
   onClose: () => void;
   onSubmit: (data: CreateCategoryRequest) => Promise<boolean>;
   isSubmitting: boolean;
-  actionError?: string | null;
 }
 
 export const DealerCategoryFormModal: React.FC<DealerCategoryFormModalProps> = ({
@@ -16,7 +14,6 @@ export const DealerCategoryFormModal: React.FC<DealerCategoryFormModalProps> = (
   onClose,
   onSubmit,
   isSubmitting,
-  actionError,
 }) => {
   const [name, setName] = useState('');
   const [code, setCode] = useState('');
@@ -72,7 +69,6 @@ export const DealerCategoryFormModal: React.FC<DealerCategoryFormModalProps> = (
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          {actionError && <Alert type="error" message={actionError} />}
 
           {!isValid && Object.keys(touched).length > 0 && (
             <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center gap-2 text-xs text-red-600 dark:text-red-400">

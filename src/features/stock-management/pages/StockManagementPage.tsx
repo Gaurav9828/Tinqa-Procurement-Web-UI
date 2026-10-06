@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { Package, RefreshCw } from 'lucide-react';
-import { Alert } from '../../../components/ui/Alert';
 import { useStockList } from '../hooks/useStockList';
 import { useStockActions } from '../hooks/useStockActions';
 import type {
@@ -24,7 +23,6 @@ export const StockManagementPage: React.FC = () => {
   const {
     stocks,
     isLoading,
-    error,
     search,
     approvalStatusFilter,
     updateSearch,
@@ -34,8 +32,6 @@ export const StockManagementPage: React.FC = () => {
 
   const {
     isSubmitting,
-    actionError,
-    actionSuccess,
     createStockFromOrder,
     updateStock, // <--- Make sure your useStockActions hook exposes updateStock
     adjustQuantity,
@@ -76,9 +72,6 @@ export const StockManagementPage: React.FC = () => {
 
   const [pendingApprovalPayload, setPendingApprovalPayload] = useState<ApprovalDecisionRequest | null>(null);
   const [isConfirmApprovalOpen, setIsConfirmApprovalOpen] = useState(false);
-
-  const isAnyModalActive =
-    isFormModalOpen || previewState.isOpen || editState.isOpen || adjustmentState.isOpen || approvalModalState.isOpen;
 
   // --- Handlers ---
 
@@ -167,9 +160,6 @@ export const StockManagementPage: React.FC = () => {
         </button>
       </div>
 
-      {error && <Alert type="error" message={error} />}
-      {!isAnyModalActive && actionError && <Alert type="error" message={actionError} />}
-      {actionSuccess && <Alert type="success" message={actionSuccess} />}
 
       <StockFilterBar
         searchQuery={search}
@@ -201,7 +191,6 @@ export const StockManagementPage: React.FC = () => {
         isOpen={editState.isOpen}
         stock={editState.stock}
         isSubmitting={isSubmitting}
-        error={editState.isOpen ? actionError : null}
         onClose={() => setEditState({ isOpen: false, stock: null })}
         onRequestSubmit={handleEditSubmitRequest}
       />
@@ -210,7 +199,6 @@ export const StockManagementPage: React.FC = () => {
       <StockFormModal
         isOpen={isFormModalOpen}
         isSubmitting={isSubmitting}
-        error={isFormModalOpen ? actionError : null}
         onClose={() => setIsFormModalOpen(false)}
         onRequestSubmit={handleFormSubmitRequest}
       />
@@ -221,7 +209,6 @@ export const StockManagementPage: React.FC = () => {
         type={adjustmentState.type}
         stockIdentity={adjustmentState.stock?.stockIdentityNumber || ''}
         isSubmitting={isSubmitting}
-        error={adjustmentState.isOpen ? actionError : null}
         onClose={() => setAdjustmentState({ isOpen: false, type: 'ADD', stock: null })}
         onRequestSubmit={handleAdjustmentSubmitRequest}
       />
@@ -231,7 +218,6 @@ export const StockManagementPage: React.FC = () => {
         isOpen={approvalModalState.isOpen}
         stock={approvalModalState.stock}
         isSubmitting={isSubmitting}
-        error={approvalModalState.isOpen ? actionError : null}
         onClose={() => setApprovalModalState({ isOpen: false, stock: null })}
         onRequestSubmit={handleApprovalSubmitRequest}
       />
@@ -267,7 +253,7 @@ export const StockManagementPage: React.FC = () => {
       <ActionConfirmationModal
         isOpen={isConfirmApprovalOpen}
         title="Confirm Approval Decision"
-        description={`Are you sure you want to mark stock entry ${approvalModalState.stock?.stockIdentityNumber} as ${pendingApprovalPayload?.status}?`}
+        description={`Are you sure you want to mark stock entry ${approvalModalState.stock?.stockIdentityNumber} as ${pendingApprovalPayload?.decision}?`}
         isSubmitting={isSubmitting}
         onClose={() => setIsConfirmApprovalOpen(false)}
         onConfirm={executeApprovalSubmit}

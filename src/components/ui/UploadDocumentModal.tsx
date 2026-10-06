@@ -60,9 +60,6 @@ export const UploadDocumentModal: React.FC<UploadDocumentModalProps> = ({
     DocumentPurpose.PROFILE_DOCUMENT
   );
 
-  // Auto-calculated reference ID for user session
-  const [generatedRefId] = useState<number>(() => Math.floor(100000 + Math.random() * 900000));
-
   if (!isOpen || !file) return null;
 
   const fileExtension = file.name.substring(file.name.lastIndexOf('.'));
@@ -89,7 +86,9 @@ export const UploadDocumentModal: React.FC<UploadDocumentModalProps> = ({
       ownerType: DocumentOwnerType.EMPLOYEE,
       ownerId: userId,
       referenceType: DocumentReferenceType.EMPLOYEE,
-      referenceId: generatedRefId,
+      // The document references the employee it belongs to. The backend must still
+      // derive uploader/owner from the JWT rather than trusting these fields.
+      referenceId: userId,
       category: DocumentCategory.ADMIN_DOCUMENT,
       purpose: selectedPurpose,
       type: derivedDocType,
@@ -175,8 +174,8 @@ export const UploadDocumentModal: React.FC<UploadDocumentModalProps> = ({
                 disabled
               />
               <CommonInput
-                label="Reference ID (Auto Generated)"
-                value={generatedRefId.toString()}
+                label="Reference ID (Employee)"
+                value={userId.toString()}
                 disabled
               />
               <CommonInput

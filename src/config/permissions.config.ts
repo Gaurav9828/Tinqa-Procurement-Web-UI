@@ -22,7 +22,9 @@ export type FeatureKey =
   | 'MANAGE_EMPLOYEES'
   | 'FINALIZE_EMPLOYEE_DELETE'
   | 'MANAGE_ITEMS'
-  | 'MANAGE_STOCKS';
+  | 'MANAGE_STOCKS'
+  | 'MANAGE_ORDER_TRACKING'
+  | 'MANAGE_SUPPORT_TICKETS';
 
 export const FEATURE_PERMISSIONS: Record<FeatureKey, UserRole[]> = {
   VIEW_PROFILE: ['ADMIN_L1', 'ADMIN_L2'],
@@ -46,7 +48,11 @@ export const FEATURE_PERMISSIONS: Record<FeatureKey, UserRole[]> = {
   MANAGE_EMPLOYEES: ['ADMIN_L1', 'ADMIN_L2'],
   FINALIZE_EMPLOYEE_DELETE: ['ADMIN_L2'],
   MANAGE_ITEMS: ['ADMIN_L1', 'ADMIN_L2'],
-  MANAGE_STOCKS: ['ADMIN_L1', 'ADMIN_L2']
+  MANAGE_STOCKS: ['ADMIN_L1', 'ADMIN_L2'],
+  // UX gating only; PATCH /orders/{orderNumber}/tracking is authorized by the Ecommerce BE.
+  MANAGE_ORDER_TRACKING: ['ADMIN_L1', 'ADMIN_L2'],
+  // UX gating only; /api/admin/support/** is authorized by the Ecommerce BE.
+  MANAGE_SUPPORT_TICKETS: ['ADMIN_L1', 'ADMIN_L2'],
 };
 
 export interface NavigationItem {
@@ -77,6 +83,20 @@ export const APP_NAVIGATION: NavigationItem[] = [
     label: 'Orders Management',
     path: '/orders',
     iconName: 'ShoppingCart',
+    allowedRoles: ['ADMIN_L1', 'ADMIN_L2'],
+  },
+  {
+    id: 'order-tracking',
+    label: 'Order Tracking',
+    path: '/order-tracking',
+    iconName: 'Truck',
+    allowedRoles: ['ADMIN_L1', 'ADMIN_L2'],
+  },
+  {
+    id: 'support-tickets',
+    label: 'Support Tickets',
+    path: '/support-tickets',
+    iconName: 'LifeBuoy',
     allowedRoles: ['ADMIN_L1', 'ADMIN_L2'],
   },
   {

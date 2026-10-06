@@ -85,6 +85,18 @@ import type { UnifiedApprovalItem } from "../features/approvals/types/approval.t
     path: string;
   }
 
+  /** Explicit page envelope (Ecommerce BE `PageResponse<T>`), as opposed to raw Spring `Page` JSON. */
+  export interface PageResponse<T> {
+    content: T[];
+    number: number;
+    size: number;
+    totalElements: number;
+    totalPages: number;
+    first: boolean;
+    last: boolean;
+    empty: boolean;
+  }
+
   // Standard Spring Boot Page structure
   export interface PageableResponse<T> {
     content: T[];

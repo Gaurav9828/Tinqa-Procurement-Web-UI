@@ -2,7 +2,6 @@ import React from 'react';
 import { EmployeeConstants } from '../types/employee.types';
 import type { EmployeeStatus } from '../types/employee.types';
 import { CheckCircle2, AlertOctagon, UserX, Clock, ShieldAlert } from 'lucide-react';
-import { HasAccess } from '../../../auth/HasAccess';
 
 interface Props {
     status: EmployeeStatus;

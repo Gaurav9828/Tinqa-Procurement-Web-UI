@@ -25,16 +25,17 @@ export const validateProductPayload = (payload: CreateProductRequest | UpdatePro
   }
 
   // 4. Numeric validation
-  if (payload.price === undefined || payload.price === null || Number(payload.price) < 0) {
-    return "Price must be a valid positive number.";
+  if (payload.price === undefined || payload.price === null || !Number.isFinite(Number(payload.price)) || Number(payload.price) < 0) {
+    return "Price must be a valid non-negative number.";
   }
   if (payload.discountPercentage !== undefined && payload.discountPercentage !== null) {
-    if (Number(payload.discountPercentage) < 0 || Number(payload.discountPercentage) > 100) {
+    const discount = Number(payload.discountPercentage);
+    if (!Number.isFinite(discount) || discount < 0 || discount > 100) {
       return "Discount percentage must be between 0 and 100.";
     }
   }
-  if (payload.stockQuantity === undefined || payload.stockQuantity === null || Number(payload.stockQuantity) < 0) {
-    return "Stock quantity cannot be negative.";
+  if (payload.stockQuantity === undefined || payload.stockQuantity === null || !Number.isInteger(Number(payload.stockQuantity)) || Number(payload.stockQuantity) < 0) {
+    return "Stock quantity must be a whole number and cannot be negative.";
   }
 
   // 5. Image Validation (Image 1 is mandatory, Image 2-5 are optional)
@@ -105,20 +106,49 @@ const sanitizeText = (input: string, maxLength: number, fieldName: string): stri
   return null;
 };
 
+// Strict https-only checks apply to production builds. During local development
+// (`npm run dev`) any simple string is accepted, e.g. "chair.png" or "http://localhost/x.jpg".
+export const STRICT_IMAGE_URLS = import.meta.env.PROD;
+
+// Optional host allowlist (production only), e.g. VITE_ALLOWED_IMAGE_HOSTS="cdn.tinqa.com,res.cloudinary.com".
+const ALLOWED_IMAGE_HOSTS = (import.meta.env.VITE_ALLOWED_IMAGE_HOSTS || '')
+  .split(',')
+  .map((host: string) => host.trim().toLowerCase())
+  .filter(Boolean);
+
 const validateImageString = (imageInput?: string, fieldName?: string): string | null => {
   if (!imageInput || imageInput.trim() === '') {
-    return null; 
+    return null;
   }
   const sanitized = imageInput.trim();
-  const lower = sanitized.toLowerCase();
-
-  // Guard against injection or dangerous script protocols inside the string path
-  if (lower.startsWith("javascript:") || lower.includes("data:") || lower.includes("<script")) {
-    return `Security violation: Invalid or malicious pattern detected in ${fieldName}`;
-  }
 
   if (sanitized.length > 500) {
     return `${fieldName} string length is too long (maximum 500 characters allowed).`;
+  }
+
+  if (!STRICT_IMAGE_URLS) {
+    // Development: plain strings are fine; only script-capable schemes are refused.
+    return /^\s*(javascript|data|vbscript):/i.test(sanitized)
+      ? `Security violation: Invalid or malicious pattern detected in ${fieldName}`
+      : null;
+  }
+
+  // Allowlist, not blocklist: only absolute https URLs are accepted. This rejects
+  // javascript:, data:, vbscript:, protocol-relative and obfuscated variants alike.
+  let url: URL;
+  try {
+    url = new URL(sanitized);
+  } catch {
+    return `${fieldName} must be a valid absolute URL (https://...).`;
+  }
+  if (url.protocol !== 'https:') {
+    return `${fieldName} must use a secure https:// URL.`;
+  }
+  if (url.username || url.password) {
+    return `${fieldName} must not contain embedded credentials.`;
+  }
+  if (ALLOWED_IMAGE_HOSTS.length && !ALLOWED_IMAGE_HOSTS.includes(url.hostname.toLowerCase())) {
+    return `${fieldName} must be hosted on an approved image domain.`;
   }
 
   return null;

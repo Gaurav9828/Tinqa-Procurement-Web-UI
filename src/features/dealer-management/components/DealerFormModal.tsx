@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { X, Save, AlertCircle } from 'lucide-react';
-import { Alert } from '../../../components/ui/Alert';
 import { Validator, type ValidationRule } from '../../../utils/validator';
 import type {
   CategoryResponse,
@@ -16,7 +15,6 @@ interface DealerFormModalProps {
   dealer?: DealerResponse | null;
   categories: CategoryResponse[];
   isSubmitting: boolean;
-  actionError?: string | null;
 }
 
 interface FormState {
@@ -76,7 +74,6 @@ export const DealerFormModal: React.FC<DealerFormModalProps> = ({
   dealer,
   categories,
   isSubmitting,
-  actionError,
 }) => {
   const [formData, setFormData] = useState<FormState>(INITIAL_FORM_STATE);
   const [touched, setTouched] = useState<Record<string, boolean>>({});
@@ -248,7 +245,6 @@ export const DealerFormModal: React.FC<DealerFormModalProps> = ({
 
         {/* Modal Form Content */}
         <form id="dealer-form" onSubmit={handleSubmit} className="p-6 space-y-6 overflow-y-auto flex-1">
-          {actionError && <Alert type="error" message={actionError} />}
 
           {!isValid && Object.keys(touched).length > 0 && (
             <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center gap-2 text-xs text-red-600 dark:text-red-400">

@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { authService } from '../api/services/authService';
+import { useNotify } from './useNotify';
 import type { AdminProfile } from '../types/auth';
 
 export interface ProfileFormState {
@@ -51,14 +52,12 @@ interface ApiResponseEnvelope<T> {
 export const useProfile = () => {
     const [isLoading, setIsLoading] = useState<boolean>(true);
     const [isUpdating, setIsUpdating] = useState<boolean>(false);
-    const [fetchError, setFetchError] = useState<string>('');
-    const [updateStatus, setUpdateStatus] = useState<string | null>(null);
-    const [updateError, setUpdateError] = useState<string | null>(null);
+    // The message itself goes to the global alert; this only drives the page's empty state.
+    const [loadFailed, setLoadFailed] = useState<boolean>(false);
+    const notify = useNotify();
 
     const [initialData, setInitialData] = useState<ProfileFormState>(EMPTY_FORM_STATE);
     const [employeeData, setEmployeeData] = useState<ProfileFormState>(EMPTY_FORM_STATE);
-    const clearUpdateStatus = () => setUpdateStatus(null);
-    const clearUpdateError = () => setUpdateError(null);
     // Ref guard prevents React 18 Strict Mode double-fetching
     const isFetched = useRef(false);
 
@@ -70,7 +69,7 @@ export const useProfile = () => {
 
         const fetchProfile = async () => {
             setIsLoading(true);
-            setFetchError('');
+            setLoadFailed(false);
             try {
                 const rawResponse = await authService.getProfile();
                 const envelope = rawResponse as ApiResponseEnvelope<AdminProfile> & AdminProfile;
@@ -101,14 +100,8 @@ export const useProfile = () => {
             } catch (err: unknown) {
                 if ((err as Error).name === 'CanceledError' || (err as Error).name === 'AbortError') return;
 
-                if (typeof err === 'object' && err !== null && 'response' in err) {
-                    const apiError = err as { response?: { data?: { message?: string } } };
-                    setFetchError(apiError.response?.data?.message || 'Failed to load profile details.');
-                } else if (err instanceof Error) {
-                    setFetchError(err.message);
-                } else {
-                    setFetchError('An unexpected error occurred while loading profile data.');
-                }
+                setLoadFailed(true);
+                notify.error(err, 'Failed to load profile details.');
             } finally {
                 setIsLoading(false);
             }
@@ -117,26 +110,24 @@ export const useProfile = () => {
         fetchProfile();
 
         return () => controller.abort();
-    }, []);
+    }, [notify]);
 
     // Compute modified fields only
     const dirtyFields = useMemo(() => {
         const payload: Partial<Record<string, string>> = {};
 
-        if (employeeData.display_name !== initialData.display_name) payload.displayName = employeeData.display_name;
-        if (employeeData.phone !== initialData.phone) payload.primaryPhone = employeeData.phone;
-        if (employeeData.alternate_phone !== initialData.alternate_phone) payload.alternatePhone = employeeData.alternate_phone;
-        if (employeeData.personal_email !== initialData.personal_email) payload.personalEmail = employeeData.personal_email;
+        if (employeeData.display_name !== initialData.display_name) payload.displayName = employeeData.display_name.trim();
+        if (employeeData.phone !== initialData.phone) payload.primaryPhone = employeeData.phone.trim();
+        if (employeeData.alternate_phone !== initialData.alternate_phone) payload.alternatePhone = employeeData.alternate_phone.trim();
+        if (employeeData.personal_email !== initialData.personal_email) payload.personalEmail = employeeData.personal_email.trim().toLowerCase();
         if (employeeData.date_of_birth !== initialData.date_of_birth) payload.dateOfBirth = employeeData.date_of_birth;
-        if (employeeData.first_name !== initialData.first_name) payload.firstName = employeeData.first_name;
-        if (employeeData.middle_name !== initialData.middle_name) payload.middleName = employeeData.middle_name;
-        if (employeeData.last_name !== initialData.last_name) payload.lastName = employeeData.last_name;
+        if (employeeData.first_name !== initialData.first_name) payload.firstName = employeeData.first_name.trim();
+        if (employeeData.middle_name !== initialData.middle_name) payload.middleName = employeeData.middle_name.trim();
+        if (employeeData.last_name !== initialData.last_name) payload.lastName = employeeData.last_name.trim();
         if (employeeData.department !== initialData.department) payload.department = employeeData.department;
         if (employeeData.designation !== initialData.designation) payload.designation = employeeData.designation;
         if (employeeData.gender !== initialData.gender) payload.gender = employeeData.gender;
-        if (employeeData.employment_type !== initialData.employment_type) payload.employmentType = employeeData.employment_type;
-        if (employeeData.joining_date !== initialData.joining_date) payload.joiningDate = employeeData.joining_date;
-        if (employeeData.status !== initialData.status) payload.status = employeeData.status;
+        // status, employmentType and joiningDate are HR-controlled and never sent from self-service.
 
         return payload;
     }, [employeeData, initialData]);
@@ -147,23 +138,13 @@ export const useProfile = () => {
         if (!hasChanges) return;
 
         setIsUpdating(true);
-        setUpdateStatus(null);
-        setUpdateError(null);
 
         try {
             const response = await authService.updateProfile(dirtyFields);
-            setUpdateStatus(response.message || 'Profile update submitted successfully!');
+            notify.success(response.message || 'Profile update submitted successfully!');
             setInitialData(employeeData);
-            setTimeout(() => setUpdateStatus(null), 4000);
         } catch (err: unknown) {
-            if (typeof err === 'object' && err !== null && 'response' in err) {
-                const apiError = err as { response?: { data?: { message?: string } } };
-                setUpdateError(apiError.response?.data?.message || 'Failed to update profile.');
-            } else if (err instanceof Error) {
-                setUpdateError(err.message);
-            } else {
-                setUpdateError('An unexpected error occurred while updating profile.');
-            }
+            notify.error(err, 'Failed to update profile.');
         } finally {
             setIsUpdating(false);
         }
@@ -172,14 +153,10 @@ export const useProfile = () => {
     return {
         isLoading,
         isUpdating,
-        fetchError,
-        updateStatus,
-        updateError,
+        loadFailed,
         employeeData,
         setEmployeeData,
         hasChanges,
         updateProfile,
-        clearUpdateStatus,
-        clearUpdateError
     };
 };

@@ -6,7 +6,7 @@ import { Alert } from './Alert';
 
 export const GlobalAlertContainer: React.FC = () => {
   const dispatch = useDispatch();
-  const { message, type, duration, isOpen } = useSelector((state: RootState) => state.alert);
+  const { id, message, type, duration, isOpen } = useSelector((state: RootState) => state.alert);
 
   if (!isOpen || !message) return null;
 
@@ -14,6 +14,7 @@ export const GlobalAlertContainer: React.FC = () => {
     <div className="fixed top-5 right-5 z-[9999] max-w-md w-full px-4 pointer-events-none">
       <div className="pointer-events-auto transition-all transform duration-300 ease-out">
         <Alert
+          key={id}
           type={type}
           message={message}
           duration={duration}

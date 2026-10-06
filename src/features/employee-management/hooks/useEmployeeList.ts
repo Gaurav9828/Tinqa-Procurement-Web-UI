@@ -1,6 +1,9 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { employeeApi } from '../api/employeeApi';
 import type { EmployeeFilterParams, EmployeeResponse } from '../types/employee.types';
+import { useDebouncedValue } from '../../../hooks/useDebouncedValue';
+import { useLatestRequest } from '../../../hooks/useLatestRequest';
+import { useNotify } from '../../../hooks/useNotify';
 
 export const useEmployeeList = (initialFilters: EmployeeFilterParams = {}) => {
   const [filters, setFilters] = useState<EmployeeFilterParams>({
@@ -16,48 +19,37 @@ export const useEmployeeList = (initialFilters: EmployeeFilterParams = {}) => {
   const [totalPages, setTotalPages] = useState<number>(0);
   const [totalElements, setTotalElements] = useState<number>(0);
   const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
 
-  // Keep track of the current active API request to prevent duplicate concurrent executions
-  const isFetchingRef = useRef(false);
+  // The input stays bound to `filters.search`; the API only sees the settled value.
+  const debouncedSearch = useDebouncedValue((filters.search || '').trim());
+  const notify = useNotify();
+  const beginRequest = useLatestRequest();
+  const { page, size, sort, status } = filters;
 
-  const executeFetch = async (currentFilters: EmployeeFilterParams) => {
-    if (isFetchingRef.current) return;
-    isFetchingRef.current = true;
+  const fetchEmployees = useCallback(async () => {
+    const isCurrent = beginRequest();
     setIsLoading(true);
-    setError(null);
 
     try {
-      const response = await employeeApi.getEmployees(currentFilters);
+      const response = await employeeApi.getEmployees({ page, size, sort, status, search: debouncedSearch });
+      if (!isCurrent()) return;
       if (response.success && response.data) {
         setEmployees(response.data.content);
         setTotalPages(response.data.totalPages);
         setTotalElements(response.data.totalElements);
       } else {
-        setError(response.message || 'Failed to fetch employee list.');
+        notify.error(response.message || 'Failed to fetch employee list.');
       }
     } catch (err: unknown) {
-      if (typeof err === 'object' && err !== null && 'response' in err) {
-        const apiError = err as { response?: { data?: { message?: string } } };
-        setError(apiError.response?.data?.message || 'Server error fetching employees.');
-      } else {
-        setError('An unexpected error occurred while fetching employee records.');
-      }
+      if (isCurrent()) notify.error(err, 'Server error fetching employees.');
     } finally {
-      setIsLoading(false);
-      isFetchingRef.current = false;
+      if (isCurrent()) setIsLoading(false);
     }
-  };
+  }, [notify, beginRequest, page, size, sort, status, debouncedSearch]);
 
-  // 1. Fetch strictly when filters change
   useEffect(() => {
-    executeFetch(filters);
-  }, [filters.page, filters.size, filters.sort, filters.search, filters.status]);
-
-  // 2. Stable manual refetch function for buttons / post-action triggers
-  const refetch = useCallback(() => {
-    executeFetch(filters);
-  }, [filters]);
+    fetchEmployees();
+  }, [fetchEmployees]);
 
   const updateSearch = (search: string) => setFilters((prev) => ({ ...prev, search, page: 0 }));
   const updateStatus = (status: EmployeeFilterParams['status']) =>
@@ -69,11 +61,10 @@ export const useEmployeeList = (initialFilters: EmployeeFilterParams = {}) => {
     totalPages,
     totalElements,
     isLoading,
-    error,
     filters,
     updateSearch,
     updateStatus,
     updatePage,
-    refetch,
+    refetch: fetchEmployees,
   };
 };

@@ -1,41 +1,28 @@
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect } from 'react';
+import { useLatestRequest } from '../../../hooks/useLatestRequest';
 import { approvalService } from '../services/approvalService';
 import type { ProcessApprovalPayload, UnifiedApprovalItem } from '../types/approval.types';
 
 import { useAuthStore } from '../../../store/useAuthStore';
-import { useStockActions } from '../../stock-management/hooks/useStockActions';
-import { useStockList } from '../../stock-management/hooks/useStockList';
-import { useOrderList } from '../../order-management/hooks/useOrderList';
-import { useOrderActions } from '../../order-management/hooks/useOrderActions';
+import { stockApi } from '../../stock-management/api/stockApi';
+import { orderApi } from '../../order-management/api/orderApi';
 import type { ApprovalItem } from '../../../types/common.types';
+import { useNotify } from '../../../hooks/useNotify';
 
 export const useApprovals = () => {
   const [approvals, setApprovals] = useState<UnifiedApprovalItem[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isDownloading, setIsDownloading] = useState<boolean>(false);
-  const [error, setError] = useState<string | null>(null);
-  const [actionSuccess, setActionSuccess] = useState<string | null>(null);
-
-  // Stock actions already provide isSubmitting, actionError, actionSuccess, and clearMessages
-  const { refetch: stockRefetch } = useStockList();
-  const { processApproval } = useStockActions(stockRefetch);
-  const { refetch: OrderRefetch } = useOrderList();
-  const { processAdminL2Approval } = useOrderActions(OrderRefetch);
 
   const { user } = useAuthStore();
-  const isFetchingRef = useRef<boolean>(false);
-
-  const clearMessages = () => {
-    setError(null);
-    setActionSuccess(null);
-  };
+  const beginRequest = useLatestRequest();
+  const notify = useNotify();
 
   const fetchAllApprovals = useCallback(async () => {
-    if (user?.role !== 'ADMIN_L2' || isFetchingRef.current) return;
+    if (user?.role !== 'ADMIN_L2') return;
 
-    isFetchingRef.current = true;
+    const isCurrent = beginRequest();
     setIsLoading(true);
-    setError(null);
 
     try {
       const [documentsResult, profilesResult, stocksResult, orderResult] = await Promise.allSettled([
@@ -44,6 +31,7 @@ export const useApprovals = () => {
         approvalService.getStocksApprovals(),
         approvalService.getOrdersApprovals()
       ]);
+      if (!isCurrent()) return;
 
       const mergedApprovals: UnifiedApprovalItem[] = [];
 
@@ -83,23 +71,22 @@ export const useApprovals = () => {
         );
       }
 
-      if (
-        documentsResult.status === 'rejected' &&
-        profilesResult.status === 'rejected' &&
-        stocksResult.status === 'rejected' &&
-        orderResult.status === 'rejected'
-      ) {
-        setError('Failed to load pending approvals.');
+      const failedQueues = [documentsResult, profilesResult, stocksResult, orderResult].filter(
+        (result) => result.status === 'rejected'
+      ).length;
+      if (failedQueues === 4) {
+        notify.error('Failed to load pending approvals.');
+      } else if (failedQueues > 0) {
+        notify.warning('Some approval queues could not be loaded. The list may be incomplete.');
       }
 
       setApprovals(mergedApprovals);
-    } catch (err: any) {
-      setError(err?.message || 'An unexpected error occurred.');
+    } catch (err: unknown) {
+      notify.error(err, 'An unexpected error occurred.');
     } finally {
-      setIsLoading(false);
-      isFetchingRef.current = false;
+      if (isCurrent()) setIsLoading(false);
     }
-  }, [user?.role]);
+  }, [user?.role, beginRequest, notify]);
 
   useEffect(() => {
     fetchAllApprovals();
@@ -110,49 +97,52 @@ export const useApprovals = () => {
     payload: ProcessApprovalPayload
   ): Promise<boolean> => {
     const targetId = 'id' in item ? item.id : item.requestId;
-    clearMessages();
+
+    if ((payload.decision === 'REJECTED' || payload.decision === 'CANCELLED') && !payload.rejectionReason?.trim()) {
+      notify.error('A rejection reason is required.');
+      return false;
+    }
 
     try {
       if (item.approvalType === 'DOCUMENT') {
-        const res = await approvalService.processDocumentApproval(targetId, payload as ProcessApprovalPayload);
+        const res = await approvalService.processDocumentApproval(targetId, payload);
         if (res.success) {
-          setActionSuccess('Document L2 approval status updated.');
+          notify.success(res.message || 'Document L2 approval status updated.');
         } else {
-          setError(res.message || 'Failed to process document approval.');
+          notify.error(res.message || 'Failed to process document approval.');
           return false;
         }
       } else if (item.approvalType === 'PROFILE') {
-        const res = await approvalService.processProfileApproval(targetId, payload as ProcessApprovalPayload);
+        const res = await approvalService.processProfileApproval(targetId, payload);
         if (res.success) {
-          setActionSuccess('Profile L2 approval status updated.');
+          notify.success(res.message || 'Profile L2 approval status updated.');
         } else {
-          setError(res.message || 'Failed to process Profile approval.');
+          notify.error(res.message || 'Failed to process Profile approval.');
           return false;
         }
 
       } else if (item.approvalType === 'STOCKS') {
-        const success = await processApproval(targetId, payload as ProcessApprovalPayload);
-        if (success) {
-          setActionSuccess('Stock L2 approval status updated.');
+        const res = await stockApi.processAdminL2Approval(targetId, payload);
+        if (res.success) {
+          notify.success(res.message || 'Stock L2 approval status updated.');
         } else {
-          setError('Failed to process stock approval.');
+          notify.error(res.message || 'Failed to process stock approval.');
           return false;
         }
       } else if (item.approvalType === 'ORDERS') {
-        const success = await processAdminL2Approval(targetId, payload as ProcessApprovalPayload);
-        if (success) {
-          setActionSuccess('Order L2 approval status updated.');
+        const res = await orderApi.processAdminL2Approval(targetId, payload);
+        if (res.success) {
+          notify.success(res.message || 'Order L2 approval status updated.');
         } else {
-          setError('Failed to process Order approval.');
+          notify.error(res.message || 'Failed to process Order approval.');
           return false;
         }
       }
 
       await fetchAllApprovals();
       return true;
-    } catch (err: any) {
-      const errMessage = err?.response?.data?.message || err?.message || 'An unexpected error occurred during approval processing.';
-      setError(errMessage);
+    } catch (err: unknown) {
+      notify.error(err, 'An unexpected error occurred during approval processing.');
       return false;
     }
   };
@@ -162,8 +152,8 @@ export const useApprovals = () => {
     try {
       setIsDownloading(true);
       await approvalService.downloadDocument(documentId, fileName);
-    } catch (err: any) {
-      setError(err?.response?.data?.message || err.message || 'Failed to download document.');
+    } catch (err: unknown) {
+      notify.error(err, 'Failed to download document.');
     } finally {
       setIsDownloading(false);
     }
@@ -173,9 +163,6 @@ export const useApprovals = () => {
     approvals,
     isLoading,
     isDownloading,
-    error,
-    actionSuccess,
-    clearMessages,
     refreshApprovals: fetchAllApprovals,
     processPendingApproval,
     downloadDocument,

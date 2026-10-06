@@ -1,13 +1,12 @@
+import { useNotify } from '../../../hooks/useNotify';
 import React, { useState, useEffect } from 'react';
 import { CheckCircle2, XCircle, X } from 'lucide-react';
-import { Alert } from '../../../components/ui/Alert';
 import type { ApprovalDecisionRequest, StockResponse } from '../types/stock.types';
 
 interface Props {
   isOpen: boolean;
   stock: StockResponse | null;
   isSubmitting: boolean;
-  error?: string | null;
   onClose: () => void;
   onRequestSubmit: (payload: ApprovalDecisionRequest) => void;
 }
@@ -16,27 +15,19 @@ export const StockApprovalModal: React.FC<Props> = ({
   isOpen,
   stock,
   isSubmitting,
-  error: externalError,
   onClose,
   onRequestSubmit,
 }) => {
   const [decision, setDecision] = useState<'APPROVED' | 'REJECTED'>('APPROVED');
   const [rejectionReason, setRejectionReason] = useState('');
-  const [displayError, setDisplayError] = useState<string | null>(null);
+  const notify = useNotify();
 
-  // Sync external API error
-  useEffect(() => {
-    if (externalError) {
-      setDisplayError(externalError);
-    }
-  }, [externalError]);
 
   // Reset state when modal visibility changes
   useEffect(() => {
     if (isOpen) {
       setDecision('APPROVED');
       setRejectionReason('');
-      setDisplayError(null);
     }
   }, [isOpen]);
 
@@ -45,13 +36,12 @@ export const StockApprovalModal: React.FC<Props> = ({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (decision === 'REJECTED' && !rejectionReason.trim()) {
-      setDisplayError('Please provide a reason for rejection.');
+      notify.error('Please provide a reason for rejection.');
       return;
     }
 
-    setDisplayError(null);
     onRequestSubmit({
-      status: decision,
+      decision,
       rejectionReason: decision === 'REJECTED' ? rejectionReason.trim() : undefined,
     });
   };
@@ -69,14 +59,6 @@ export const StockApprovalModal: React.FC<Props> = ({
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Server / Form Error Alert */}
-          {displayError && (
-            <Alert
-              type="error"
-              message={displayError}
-              onClose={() => setDisplayError(null)}
-            />
-          )}
 
           <p className="text-xs text-gray-500">
             Stock Identity: <span className="font-mono text-black dark:text-white font-semibold">{stock.stockIdentityNumber}</span>
@@ -86,7 +68,6 @@ export const StockApprovalModal: React.FC<Props> = ({
             <button
               type="button"
               onClick={() => {
-                setDisplayError(null);
                 setDecision('APPROVED');
               }}
               className={`flex-1 p-3 rounded-xl border flex items-center justify-center gap-2 text-xs font-semibold cursor-pointer ${
@@ -101,7 +82,6 @@ export const StockApprovalModal: React.FC<Props> = ({
             <button
               type="button"
               onClick={() => {
-                setDisplayError(null);
                 setDecision('REJECTED');
               }}
               className={`flex-1 p-3 rounded-xl border flex items-center justify-center gap-2 text-xs font-semibold cursor-pointer ${
@@ -124,7 +104,6 @@ export const StockApprovalModal: React.FC<Props> = ({
                 rows={3}
                 value={rejectionReason}
                 onChange={(e) => {
-                  setDisplayError(null);
                   setRejectionReason(e.target.value);
                 }}
                 placeholder="State rejection cause..."

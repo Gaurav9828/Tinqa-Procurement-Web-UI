@@ -1,107 +1,73 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { orderApi } from '../api/orderApi';
 import type { OrderResponse } from '../types/order.types';
 import type { OrderStatus } from '../../../types/common.types';
+import { useLatestRequest } from '../../../hooks/useLatestRequest';
+import { useNotify } from '../../../hooks/useNotify';
 
-export const useOrderList = () => {
+interface UseOrderListOptions {
+  /** Defer fetching (e.g. until a modal opens). */
+  enabled?: boolean;
+  initialStatus?: OrderStatus;
+}
+
+export const useOrderList = ({ enabled = true, initialStatus }: UseOrderListOptions = {}) => {
   const [orders, setOrders] = useState<OrderResponse[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [error, setError] = useState<string | null>(null);
 
   const [search, setSearch] = useState<string>('');
-  const [statusFilter, setStatusFilter] = useState<OrderStatus | undefined>();
+  const [statusFilter, setStatusFilter] = useState<OrderStatus | undefined>(initialStatus);
   const [dealerFilter, setDealerFilter] = useState<number | undefined>();
 
-  // Track active fetch requests to prevent race conditions & redundant calls
-  const isFetchingRef = useRef(false);
+  const notify = useNotify();
+
+  const beginRequest = useLatestRequest();
 
   const fetchOrders = useCallback(async () => {
-    // If already fetching, bypass execution
-    if (isFetchingRef.current) return;
-    isFetchingRef.current = true;
-
+    const isCurrent = beginRequest();
     setIsLoading(true);
-    setError(null);
     try {
-      let response;
-      if (dealerFilter) {
-        response = await orderApi.getOrdersByDealerId(dealerFilter);
-      } else if (statusFilter) {
-        response = await orderApi.getOrdersByStatus(statusFilter);
-      } else {
-        response = await orderApi.getAllOrders();
-      }
+      const response = dealerFilter
+        ? await orderApi.getOrdersByDealerId(dealerFilter)
+        : statusFilter
+          ? await orderApi.getOrdersByStatus(statusFilter)
+          : await orderApi.getAllOrders();
 
+      if (!isCurrent()) return;
       if (response.success && response.data) {
         setOrders(response.data);
       } else {
-        setError(response.message || 'Failed to fetch orders');
+        notify.error(response.message || 'Failed to fetch orders');
       }
-    } catch (err: any) {
-      setError(err?.response?.data?.message || 'Error fetching order catalog.');
+    } catch (err: unknown) {
+      if (isCurrent()) notify.error(err, 'Error fetching order catalog.');
     } finally {
-      setIsLoading(false);
-      isFetchingRef.current = false;
+      if (isCurrent()) setIsLoading(false);
     }
-  }, [dealerFilter, statusFilter]);
+  }, [notify, beginRequest, dealerFilter, statusFilter]);
 
   useEffect(() => {
-    let isMounted = true;
-
-    const executeFetch = async () => {
-      setIsLoading(true);
-      setError(null);
-      try {
-        let response;
-        if (dealerFilter) {
-          response = await orderApi.getOrdersByDealerId(dealerFilter);
-        } else if (statusFilter) {
-          response = await orderApi.getOrdersByStatus(statusFilter);
-        } else {
-          response = await orderApi.getAllOrders();
-        }
-
-        if (isMounted) {
-          if (response.success && response.data) {
-            setOrders(response.data);
-          } else {
-            setError(response.message || 'Failed to fetch orders');
-          }
-        }
-      } catch (err: any) {
-        if (isMounted) {
-          setError(err?.response?.data?.message || 'Error fetching order catalog.');
-        }
-      } finally {
-        if (isMounted) {
-          setIsLoading(false);
-        }
-      }
-    };
-
-    executeFetch();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [dealerFilter, statusFilter]);
+    if (enabled) fetchOrders();
+  }, [enabled, fetchOrders]);
 
   const filteredOrders = useMemo(() => {
-    if (!search.trim()) return orders;
     const query = search.toLowerCase().trim();
-    return orders.filter(
-      (order) =>
+    return orders.filter((order) => {
+      // The dealer endpoint ignores status, so apply it here when both filters are set.
+      if (dealerFilter && statusFilter && order.orderStatus !== statusFilter) return false;
+      if (!query) return true;
+      return (
         order.orderNumber.toLowerCase().includes(query) ||
-        (order.itemName && order.itemName.toLowerCase().includes(query)) ||
-        (order.dealerName && order.dealerName.toLowerCase().includes(query))
-    );
-  }, [orders, search]);
+        (order.itemName?.toLowerCase().includes(query) ?? false) ||
+        (order.dealerName?.toLowerCase().includes(query) ?? false)
+      );
+    });
+  }, [orders, search, dealerFilter, statusFilter]);
 
   return {
     orders: filteredOrders,
     totalElements: filteredOrders.length,
     isLoading,
-    error,
     search,
     statusFilter,
     dealerFilter,

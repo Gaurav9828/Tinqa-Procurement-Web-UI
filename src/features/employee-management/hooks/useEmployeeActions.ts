@@ -1,53 +1,48 @@
 import { useState } from 'react';
 import { useAuthStore } from '../../../store/useAuthStore';
 import { employeeApi } from '../api/employeeApi';
+import { useNotify } from '../../../hooks/useNotify';
 import type { CreateEmployeeRequest, UpdateEmployeeRequest } from '../types/employee.types';
 
 export const useEmployeeActions = (onSuccessCallback?: () => void) => {
     const { user } = useAuthStore();
     const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
-    const [actionError, setActionError] = useState<string | null>(null);
-    const [actionSuccess, setActionSuccess] = useState<string | null>(null);
+    const notify = useNotify();
 
-    const userRole = user?.role || 'ADMIN_L1';
+    const userRole = user?.role ?? '';
 
-    const clearMessages = () => {
-        setActionError(null);
-        setActionSuccess(null);
-    };
-
-    const createEmployee = async (data: CreateEmployeeRequest) => {
+    const createEmployee = async (data: CreateEmployeeRequest): Promise<boolean> => {
         setIsSubmitting(true);
         try {
             const res = await employeeApi.createEmployee(data);
             if (res.success) {
-                setActionSuccess('Employee created successfully');
-                onSuccessCallback?.(); // 👈 Refetch called ONLY after user action succeeds
+                notify.success(res.message || 'Employee created successfully');
+                onSuccessCallback?.();
                 return true;
             }
-        } catch (err) {
-            // handle error
+            notify.error(res.message || 'Failed to create employee');
+            return false;
+        } catch (err: unknown) {
+            notify.error(err, 'Error occurred while creating employee.');
+            return false;
         } finally {
             setIsSubmitting(false);
         }
-        return false;
     };
 
     const updateEmployee = async (id: number, payload: UpdateEmployeeRequest): Promise<boolean> => {
         setIsSubmitting(true);
-        clearMessages();
         try {
             const res = await employeeApi.updateEmployee(id, payload);
             if (res.success) {
-                setActionSuccess(res.message || 'Employee updated successfully');
+                notify.success(res.message || 'Employee updated successfully');
                 if (onSuccessCallback) onSuccessCallback();
                 return true;
             }
-            setActionError(res.message || 'Failed to update employee');
+            notify.error(res.message || 'Failed to update employee');
             return false;
         } catch (err: unknown) {
-            const apiErr = err as { response?: { data?: { message?: string } } };
-            setActionError(apiErr.response?.data?.message || 'Error occurred while updating employee.');
+            notify.error(err, 'Error occurred while updating employee.');
             return false;
         } finally {
             setIsSubmitting(false);
@@ -56,19 +51,17 @@ export const useEmployeeActions = (onSuccessCallback?: () => void) => {
 
     const requestDeletion = async (id: number): Promise<boolean> => {
         setIsSubmitting(true);
-        clearMessages();
         try {
             const res = await employeeApi.requestEmployeeDeletion(id);
             if (res.success) {
-                setActionSuccess('Employee marked as WAITING_FOR_DELETION.');
+                notify.success('Employee marked as WAITING_FOR_DELETION.');
                 if (onSuccessCallback) onSuccessCallback();
                 return true;
             }
-            setActionError(res.message || 'Failed to request deletion');
+            notify.error(res.message || 'Failed to request deletion');
             return false;
         } catch (err: unknown) {
-            const apiErr = err as { response?: { data?: { message?: string } } };
-            setActionError(apiErr.response?.data?.message || 'Error requesting employee deletion.');
+            notify.error(err, 'Error requesting employee deletion.');
             return false;
         } finally {
             setIsSubmitting(false);
@@ -77,23 +70,21 @@ export const useEmployeeActions = (onSuccessCallback?: () => void) => {
 
     const finalizeDelete = async (id: number): Promise<boolean> => {
         if (userRole !== 'ADMIN_L2') {
-            setActionError('Permission Denied: Only ADMIN_L2 can permanently delete employee records.');
+            notify.error('Permission Denied: Only ADMIN_L2 can permanently delete employee records.');
             return false;
         }
         setIsSubmitting(true);
-        clearMessages();
         try {
             const res = await employeeApi.finalizeDeleteEmployee(id);
             if (res.success) {
-                setActionSuccess('Employee permanently deleted.');
+                notify.success('Employee permanently deleted.');
                 if (onSuccessCallback) onSuccessCallback();
                 return true;
             }
-            setActionError(res.message || 'Failed to permanently delete employee');
+            notify.error(res.message || 'Failed to permanently delete employee');
             return false;
         } catch (err: unknown) {
-            const apiErr = err as { response?: { data?: { message?: string } } };
-            setActionError(apiErr.response?.data?.message || 'Error executing permanent deletion.');
+            notify.error(err, 'Error executing permanent deletion.');
             return false;
         } finally {
             setIsSubmitting(false);
@@ -102,10 +93,7 @@ export const useEmployeeActions = (onSuccessCallback?: () => void) => {
 
     return {
         isSubmitting,
-        actionError,
-        actionSuccess,
         userRole,
-        clearMessages,
         createEmployee,
         updateEmployee,
         requestDeletion,

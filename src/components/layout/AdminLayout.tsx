@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { Suspense, useEffect, useState, useMemo } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { 
   CheckCircle2, 
@@ -21,7 +21,9 @@ import {
   ShoppingBag,
   FileText,
   LayoutDashboard,
-  ShoppingCart
+  ShoppingCart,
+  Truck,
+  LifeBuoy
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useThemeStore } from '../../store/useThemeStore';
@@ -47,6 +49,8 @@ const ICON_MAP: Record<string, LucideIcon> = {
   Tag,
   ShoppingBag,
   ShoppingCart,
+  Truck,
+  LifeBuoy,
   FileText,
   LayoutDashboard,
 };
@@ -76,7 +80,8 @@ export const AdminLayout: React.FC = () => {
 
   // Filter navigation links based on user's current role
   const visibleNavItems = useMemo(() => {
-    const currentRole = (user?.role as UserRole) || 'ADMIN_L1';
+    const currentRole = user?.role as UserRole | undefined;
+    if (!currentRole) return [];
     return APP_NAVIGATION.filter((item) =>
       item.allowedRoles.includes(currentRole)
     );
@@ -193,7 +198,15 @@ export const AdminLayout: React.FC = () => {
         </aside>
 
         <main className="flex-1 min-w-0">
-          <Outlet />
+          <Suspense
+            fallback={
+              <div className="min-h-[300px] flex items-center justify-center text-gray-400">
+                <Loader2 className="w-6 h-6 animate-spin" />
+              </div>
+            }
+          >
+            <Outlet />
+          </Suspense>
         </main>
       </div>
     </div>

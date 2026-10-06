@@ -36,12 +36,12 @@ export const DealerPreviewModal: React.FC<DealerPreviewModalProps> = ({ isOpen, 
                         </div>
                         <div className="flex items-center gap-2">
                             <Phone className="w-4 h-4 text-[#0071e3]" />
-                            <span>{dealer.phone}</span>
+                            <span>{dealer.phoneNumber}</span>
                         </div>
                         <div className="flex items-start gap-2">
                             <MapPin className="w-4 h-4 text-[#0071e3] shrink-0 mt-0.5" />
                             <span>
-                                {[dealer.address, dealer.city, dealer.state, dealer.pincode].filter(Boolean).join(', ') || 'No address details'}
+                                {[dealer.street, dealer.landmark, dealer.city, dealer.state, dealer.pincode].filter(Boolean).join(', ') || 'No address details'}
                             </span>
                         </div>
                     </div>

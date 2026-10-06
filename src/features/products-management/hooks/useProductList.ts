@@ -1,8 +1,10 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { productApi } from '../api/productsApi'
 import type { ProductResponse } from '../types/product.types';
 import { useDispatch } from 'react-redux';
 import { showAlert } from '../../../store/alertSlice';
+import { useLatestRequest } from '../../../hooks/useLatestRequest';
+import { getApiErrorMessage } from '../../../utils/apiError';
 
 export const useProductList = () => {
   const [products, setProducts] = useState<ProductResponse[]>([]);
@@ -12,27 +14,25 @@ export const useProductList = () => {
   const [search, setSearch] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
 
-  const isFetchingRef = useRef(false);
+  const beginRequest = useLatestRequest();
 
   const fetchProducts = useCallback(async () => {
-    if (isFetchingRef.current) return;
-    isFetchingRef.current = true;
-
+    const isCurrent = beginRequest();
     setIsLoading(true);
     try {
       const response = await productApi.getAllProducts();
+      if (!isCurrent()) return;
       if (response.success && response.data) {
         setProducts(response.data);
       } else {
         dispatch(showAlert({ message: response.message || 'Failed to fetch products', type: 'error' }));
       }
-    } catch (err: any) {
-      dispatch(showAlert({ message: err?.response?.data?.message || 'Error fetching product catalog.', type: 'error' }));
+    } catch (err: unknown) {
+      if (isCurrent()) dispatch(showAlert({ message: getApiErrorMessage(err, 'Error fetching product catalog.'), type: 'error' }));
     } finally {
-      setIsLoading(false);
-      isFetchingRef.current = false;
+      if (isCurrent()) setIsLoading(false);
     }
-  }, []);
+  }, [beginRequest, dispatch]);
 
   useEffect(() => {
     fetchProducts();

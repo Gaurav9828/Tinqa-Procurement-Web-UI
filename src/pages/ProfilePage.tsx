@@ -12,9 +12,7 @@ export const ProfilePage: React.FC = () => {
   const {
     isLoading,
     isUpdating,
-    fetchError,
-    updateStatus,
-    updateError,
+    loadFailed,
     employeeData,
     setEmployeeData,
     hasChanges,
@@ -37,11 +35,11 @@ export const ProfilePage: React.FC = () => {
     );
   }
 
-  if (fetchError) {
+  if (loadFailed) {
     return (
       <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 text-sm flex items-center gap-3 my-4">
         <AlertCircle className="w-5 h-5 shrink-0" />
-        <span>{fetchError}</span>
+        <span>Profile details could not be loaded. Please refresh the page to try again.</span>
       </div>
     );
   }
@@ -133,8 +131,6 @@ export const ProfilePage: React.FC = () => {
           employeeData={employeeData}
           setEmployeeData={setEmployeeData}
           onSubmit={handleSaveClick}
-          updateStatus={updateStatus}
-          updateError={updateError}
           onValidationChange={setIsFormValid}
         />
       )}

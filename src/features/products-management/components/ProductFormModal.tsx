@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Plus, Trash2 } from 'lucide-react';
 import type { ProductResponse, CreateProductRequest, SpecificationDTO } from '../types/product.types';
+import { STRICT_IMAGE_URLS } from '../validator/productSecurityValidator';
 
 interface ProductFormModalProps {
   isOpen: boolean;
@@ -192,14 +193,14 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
           <div className="space-y-2">
             <label className="block font-semibold text-gray-700 dark:text-gray-300">Image URLs</label>
             <input
-              type="url"
+              type={STRICT_IMAGE_URLS ? 'url' : 'text'}
               value={formData.image1Url}
               onChange={(e) => setFormData({ ...formData, image1Url: e.target.value })}
               placeholder="Primary Image URL"
               className="w-full px-3 py-1.5 bg-black/[0.02] dark:bg-white/[0.02] border border-black/10 dark:border-white/10 rounded-xl mb-2 text-black dark:text-white"
             />
             <input
-              type="url"
+              type={STRICT_IMAGE_URLS ? 'url' : 'text'}
               value={formData.image2Url}
               onChange={(e) => setFormData({ ...formData, image2Url: e.target.value })}
               placeholder="Secondary Image URL (Optional)"
