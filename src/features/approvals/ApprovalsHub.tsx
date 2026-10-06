@@ -9,16 +9,12 @@ import { ApprovalTable } from './components/ApprovalTable';
 import { ApprovalPreviewModal } from './components/ApprovalPreviewModal';
 import { RejectionModal } from './components/RejectionModal';
 import { ConfirmationModal } from '../../components/ui/ConfirmationModal';
-import { Alert } from '../../components/ui/Alert';
 import type { ApprovalItem, ApprovalStatus, OrderStatus } from '../../types/common.types';
 
 export const ApprovalsHub: React.FC = () => {
   const {
     approvals,
-    actionSuccess,
-    clearMessages,
     isLoading,
-    error,
     isDownloading,
     refreshApprovals,
     processPendingApproval,
@@ -109,18 +105,18 @@ export const ApprovalsHub: React.FC = () => {
 
     setIsSubmitting(true);
     try {
-      await processPendingApproval(confirmTargetItem, {
+      // The hook reports success/failure through the global alert.
+      const ok = await processPendingApproval(confirmTargetItem, {
         decision: confirmAction,
-        rejectionReason: confirmAction === 'REJECTED' || confirmAction == 'CANCELLED' ? pendingRejectionReason : 'Approved by Admin L2',
+        rejectionReason: confirmAction === 'REJECTED' || confirmAction === 'CANCELLED' ? pendingRejectionReason : 'Approved by Admin L2',
       });
+      if (!ok) return; // keep the dialog open so the user can retry
 
       setIsConfirmOpen(false);
       setIsPreviewOpen(false);
       setPendingRejectionReason('');
       setConfirmTargetItem(null);
       setConfirmAction(null);
-    } catch (err: any) {
-      alert(err?.response?.data?.message || err.message || `Failed to ${confirmAction.toLowerCase()} request.`);
     } finally {
       setIsSubmitting(false);
     }
@@ -128,14 +124,6 @@ export const ApprovalsHub: React.FC = () => {
 
   return (
     <div className="space-y-6 p-6 max-w-7xl mx-auto">
-      {/* Page Alerts */}
-      {actionSuccess && (
-        <Alert type="success" message={actionSuccess} onClose={clearMessages} />
-      )}
-      {error && (
-        <Alert type="error" message={error} onClose={clearMessages} />
-      )}
-
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>

@@ -1,34 +1,58 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { KeyRound, CheckCircle2 } from 'lucide-react';
+import { KeyRound, CheckCircle2, Loader2 } from 'lucide-react';
 import { useAuthStore } from '../../store/useAuthStore';
+import { authService } from '../../api/services/authService';
+import { useNotify } from '../../hooks/useNotify';
+import { PASSWORD_MAX_LENGTH, PASSWORD_POLICY_MESSAGE, validatePasswordChange } from '../../utils/passwordPolicy';
+
+const inputClass =
+  'w-full px-4 py-2.5 rounded-xl border border-black/10 dark:border-white/10 bg-white dark:bg-[#1c1c1e] text-sm focus:outline-none focus:ring-2 focus:ring-[#0071e3] transition-all';
 
 export const ResetPasswordPage: React.FC = () => {
+  const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [error, setError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const updatePasswordRequirement = useAuthStore((state) => state.updatePasswordRequirement);
+  const logout = useAuthStore((state) => state.logout);
   const navigate = useNavigate();
+  const notify = useNotify();
 
   const handleReset = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (newPassword !== confirmPassword) {
-      setError('Passwords do not match');
-      return;
-    }
-    if (newPassword.length < 8) {
-      setError('Password must be at least 8 characters long');
+
+    const validationError = validatePasswordChange(currentPassword, newPassword, confirmPassword);
+    if (validationError) {
+      notify.error(validationError);
       return;
     }
 
+    setIsSubmitting(true);
     try {
-      // Optional: Call your backend API here to persist password change
-      // await authService.changePassword(newPassword);
+      const response = await authService.changePassword({
+        currentPassword,
+        newPassword,
+        confirmNewPassword: confirmPassword,
+      });
+
+      if (!response.success) {
+        notify.error(response.message || 'Failed to update password.');
+        return;
+      }
+
+      if (response.requiresLogin) {
+        logout();
+        navigate('/login', { replace: true });
+        return;
+      }
 
       updatePasswordRequirement(false);
       navigate('/analytics', { replace: true });
-    } catch (err: any) {
-      setError(err.message || 'Failed to update password.');
+    } catch (err: unknown) {
+      notify.error(err, 'Failed to update password.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -45,13 +69,22 @@ export const ResetPasswordPage: React.FC = () => {
           </p>
         </div>
 
-        {error && (
-          <div className="p-3.5 rounded-xl bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 text-xs font-medium">
-            {error}
-          </div>
-        )}
-
         <form onSubmit={handleReset} className="space-y-4">
+          <div>
+            <label className="block text-xs font-semibold text-gray-500 dark:text-neutral-400 uppercase tracking-wider mb-1.5">
+              Current (Default) Password
+            </label>
+            <input
+              type="password"
+              required
+              autoComplete="current-password"
+              maxLength={PASSWORD_MAX_LENGTH}
+              value={currentPassword}
+              onChange={(e) => setCurrentPassword(e.target.value)}
+              className={inputClass}
+            />
+          </div>
+
           <div>
             <label className="block text-xs font-semibold text-gray-500 dark:text-neutral-400 uppercase tracking-wider mb-1.5">
               New Password
@@ -59,10 +92,13 @@ export const ResetPasswordPage: React.FC = () => {
             <input
               type="password"
               required
+              autoComplete="new-password"
+              maxLength={PASSWORD_MAX_LENGTH}
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
-              className="w-full px-4 py-2.5 rounded-xl border border-black/10 dark:border-white/10 bg-white dark:bg-[#1c1c1e] text-sm focus:outline-none focus:ring-2 focus:ring-[#0071e3] transition-all"
+              className={inputClass}
             />
+            <p className="text-[11px] text-gray-500 dark:text-neutral-400 pt-1">{PASSWORD_POLICY_MESSAGE}</p>
           </div>
 
           <div>
@@ -72,17 +108,20 @@ export const ResetPasswordPage: React.FC = () => {
             <input
               type="password"
               required
+              autoComplete="new-password"
+              maxLength={PASSWORD_MAX_LENGTH}
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
-              className="w-full px-4 py-2.5 rounded-xl border border-black/10 dark:border-white/10 bg-white dark:bg-[#1c1c1e] text-sm focus:outline-none focus:ring-2 focus:ring-[#0071e3] transition-all"
+              className={inputClass}
             />
           </div>
 
           <button
             type="submit"
-            className="w-full py-2.5 bg-[#0071e3] hover:bg-[#0077ed] text-white rounded-xl text-sm font-semibold transition-colors duration-150 shadow-sm flex items-center justify-center gap-2 cursor-pointer"
+            disabled={isSubmitting}
+            className="w-full py-2.5 bg-[#0071e3] hover:bg-[#0077ed] text-white rounded-xl text-sm font-semibold transition-colors duration-150 shadow-sm flex items-center justify-center gap-2 cursor-pointer disabled:opacity-70"
           >
-            <CheckCircle2 className="w-4 h-4" />
+            {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
             <span>Update Password & Continue</span>
           </button>
         </form>

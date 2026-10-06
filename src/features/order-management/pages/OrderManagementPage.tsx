@@ -2,26 +2,19 @@ import React, { useState } from 'react';
 import { ShoppingCart, RefreshCw } from 'lucide-react';
 import { useOrderList } from '../hooks/useOrderList';
 import { useOrderActions } from '../hooks/useOrderActions';
-import { useDealerList } from '../../dealer-management/hooks/useDealerList';
-import { useItemList } from '../../item-management/hooks/useItemList';
+import { useDealerOptions, useItemOptions } from '../../../hooks/useLookupOptions';
 import { OrderFilterBar } from '../components/OrderFilterBar';
 import { OrderTable } from '../components/OrderTable';
 import { CreateOrderModal } from '../components/CreateOrderModal';
 import { EditOrderModal } from '../components/EditOrderModal';
 import { OrderPreviewModal } from '../components/OrderPreviewModal';
-import type { OrderResponse, UpdateOrderStatusRequest } from '../types/order.types';
-import { Alert } from '../../../components/ui/Alert';
+import type { CreateOrderRequest, OrderResponse, UpdateOrderRequest, UpdateOrderStatusRequest } from '../types/order.types';
 
-interface OrderManagementPageProps {
-    userRole?: 'ADMIN_L1' | 'ADMIN_L2' | string;
-}
-
-export const OrderManagementPage: React.FC<OrderManagementPageProps> = () => {
+export const OrderManagementPage: React.FC = () => {
     const {
         orders,
         totalElements,
         isLoading,
-        error,
         search,
         statusFilter,
         dealerFilter,
@@ -31,14 +24,12 @@ export const OrderManagementPage: React.FC<OrderManagementPageProps> = () => {
         refetch,
     } = useOrderList();
 
-    const { dealers } = useDealerList();
-    const { items } = useItemList();
+    // Full (cached) lists for the filter bar and modal dropdowns — not a single 10-row page.
+    const { options: dealers } = useDealerOptions();
+    const { options: items } = useItemOptions();
 
     const {
         isSubmitting,
-        actionError,
-        actionSuccess,
-        clearMessages,
         createOrder,
         updateOrder,
         updateOrderStatus,
@@ -55,18 +46,17 @@ export const OrderManagementPage: React.FC<OrderManagementPageProps> = () => {
         await updateOrderStatus(order.id, payload);
     };
 
-    const handleCreateOrderSubmit = async (formData: any) => {
+    const handleCreateOrderSubmit = async (formData: CreateOrderRequest) => {
         const success = await createOrder(formData);
         if (success) {
             setIsCreateModalOpen(false);
         }
     };
 
-    const handleEditOrderSubmit = async (orderId: number, formData: any) => {
-        if (updateOrder) {
-            await updateOrder(orderId, formData);
-            setEditingOrder(null);
-        }
+    const handleEditOrderSubmit = async (orderId: number, formData: UpdateOrderRequest) => {
+        const success = await updateOrder(orderId, formData);
+        // Keep the modal open on failure so the user can correct and retry.
+        if (success) setEditingOrder(null);
     };
 
 
@@ -90,13 +80,6 @@ export const OrderManagementPage: React.FC<OrderManagementPageProps> = () => {
                     <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} /> Refresh
                 </button>
             </div>
-
-            {actionSuccess && (
-                <Alert type="success" message={actionSuccess} onClose={clearMessages} />
-            )}
-            {(error || actionError) && (
-                <Alert type="error" message={actionError || error} onClose={clearMessages} />
-            )}
 
             {/* Search and Filters */}
             <OrderFilterBar

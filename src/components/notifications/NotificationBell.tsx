@@ -8,7 +8,6 @@ export const NotificationBell: React.FC = () => {
     unreadCount,
     notifications,
     isLoading,
-    error,
     fetchAllNotifications,
     markAsRead,
   } = useNotifications();
@@ -97,8 +96,6 @@ export const NotificationBell: React.FC = () => {
               <div className="flex items-center justify-center py-10 text-gray-400">
                 <Loader2 className="w-6 h-6 animate-spin" />
               </div>
-            ) : error ? (
-              <div className="py-8 text-center text-xs text-red-500">{error}</div>
             ) : notifications.length === 0 ? (
               <div className="py-10 text-center text-xs text-gray-400 dark:text-neutral-500">
                 No notifications found

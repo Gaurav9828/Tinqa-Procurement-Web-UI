@@ -1,12 +1,13 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { notificationService } from '../api/services/notificationService';
+import { useNotify } from './useNotify';
 import type { NotificationItem } from '../api/services/notificationService';
 
 export const useNotifications = () => {
   const [unreadCount, setUnreadCount] = useState<number>(0);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [error, setError] = useState<string | null>(null);
+  const notify = useNotify();
 
   // Ref to guarantee the initial unread count API call only runs ONCE
   const hasFetchedRef = useRef<boolean>(false);
@@ -16,8 +17,8 @@ export const useNotifications = () => {
     try {
       const count = await notificationService.getUnreadCount();
       setUnreadCount(count);
-    } catch (err) {
-      console.error('Failed to fetch unread notification count:', err);
+    } catch {
+      // Badge count is non-critical; keep the last known value.
     }
   }, []);
 
@@ -32,17 +33,15 @@ export const useNotifications = () => {
   // Fetch full list of notifications
   const fetchAllNotifications = useCallback(async () => {
     setIsLoading(true);
-    setError(null);
     try {
       const data = await notificationService.getAllNotifications();
       setNotifications(data);
-    } catch (err) {
-      setError('Failed to load notifications.');
-      console.error('Failed to fetch notifications:', err);
+    } catch (err: unknown) {
+      notify.error(err, 'Failed to load notifications.');
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [notify]);
 
   // Mark notification as read and update states reactively
   const markAsRead = useCallback(async (notificationId: number) => {
@@ -58,16 +57,15 @@ export const useNotifications = () => {
 
       // Decrement unread counter safely
       setUnreadCount((prev) => Math.max(0, prev - 1));
-    } catch (err) {
-      console.error('Failed to mark notification as read:', err);
+    } catch (err: unknown) {
+      notify.error(err, 'Failed to mark notification as read.');
     }
-  }, []);
+  }, [notify]);
 
   return {
     unreadCount,
     notifications,
     isLoading,
-    error,
     fetchUnreadCount,
     fetchAllNotifications,
     markAsRead,

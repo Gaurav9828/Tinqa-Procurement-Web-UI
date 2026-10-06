@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Info, X } from 'lucide-react';
 import type { ItemResponse } from '../../item-management/types/item.types';
 import type { DealerResponse } from '../../dealer-management/types/dealer.types';
+import type { CreateOrderRequest } from '../types/order.types';
+import { ORDER_LIMITS, todayLocalIsoDate } from '../validator/orderValidator';
 import { HasAccess } from '../../../auth/HasAccess';
 import { CommonInput, CommonSelect } from '../../../components/ui/FormInputs'; // Adjust import path as needed
 
@@ -11,7 +13,7 @@ interface CreateOrderModalProps {
   items: ItemResponse[];
   dealers: DealerResponse[];
   onClose: () => void;
-  onSubmit: (formData: any) => void;
+  onSubmit: (formData: CreateOrderRequest) => void;
 }
 
 const calculatePriceVariance = (
@@ -70,13 +72,13 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     onSubmit({
-      itemId: selectedItemId,
-      dealerId: selectedDealerId,
+      itemId: Number(selectedItemId),
+      dealerId: Number(selectedDealerId),
       orderQuantity: Number(quantity),
       unitPrice: Number(unitPrice),
-      unitType: unitOfMeasure,
+      unitType: unitOfMeasure.trim(),
       shipmentPrice: Number(shipmentPrice),
-      orderDate: new Date().toISOString().split('T')[0],
+      orderDate: todayLocalIsoDate(),
       taxBreakup: {},
       additionalInfo: {},
     });
@@ -143,6 +145,8 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
               label="Quantity"
               type="number"
               min="1"
+              max={ORDER_LIMITS.MAX_QUANTITY}
+              step="1"
               required
               placeholder="e.g. 50"
               value={quantity}
@@ -165,6 +169,8 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                 label="Unit Price (₹)"
                 type="number"
                 step="0.01"
+                min="0.01"
+                max={ORDER_LIMITS.MAX_UNIT_PRICE}
                 required
                 value={unitPrice}
                 onChange={(e) => setUnitPrice(Number(e.target.value))}
@@ -191,6 +197,7 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
               label="Shipment Price (₹)"
               type="number"
               step="0.01"
+              max={ORDER_LIMITS.MAX_SHIPMENT_PRICE}
               min="0"
               required
               placeholder="0.00"

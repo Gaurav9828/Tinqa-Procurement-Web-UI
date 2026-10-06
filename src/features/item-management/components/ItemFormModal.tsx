@@ -1,3 +1,4 @@
+import { useNotify } from '../../../hooks/useNotify';
 import React, { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 import type {
@@ -11,7 +12,6 @@ import { AttributeInputBuilder } from '../../../components/ui/AttributeInputBuil
 interface Props {
   isOpen: boolean;
   isSubmitting: boolean;
-  apiError: string | null;
   categories: CategoryResponse[];
   items: ItemResponse[];
   initialData: ItemResponse | null;
@@ -19,10 +19,30 @@ interface Props {
   onSubmit: (data: CreateItemRequest | UpdateItemRequest) => Promise<boolean>;
 }
 
+// Keep in sync with the backend item constraints.
+const validateItemPayload = (
+  payload: { categoryId: number; name: string; mrp: number; warrantyMonths: number; unitOfMeasure: string; countryOfOrigin: string },
+  sku?: string
+): string | null => {
+  if (!Number.isInteger(payload.categoryId) || payload.categoryId <= 0) return 'Please select a category.';
+  if (payload.name.length < 2 || payload.name.length > 150) return 'Item name must be 2-150 characters.';
+  if (sku !== undefined && !/^[A-Za-z0-9_-]{2,50}$/.test(sku)) {
+    return 'SKU must be 2-50 characters using letters, numbers, "-" or "_".';
+  }
+  if (!Number.isFinite(payload.mrp) || payload.mrp <= 0 || payload.mrp > 10_000_000) {
+    return 'MRP must be a positive amount.';
+  }
+  if (!Number.isInteger(payload.warrantyMonths) || payload.warrantyMonths < 0 || payload.warrantyMonths > 600) {
+    return 'Warranty must be a whole number of months between 0 and 600.';
+  }
+  if (!payload.unitOfMeasure) return 'Unit of measure is required.';
+  if (!payload.countryOfOrigin) return 'Country of origin is required.';
+  return null;
+};
+
 export const ItemFormModal: React.FC<Props> = ({
   isOpen,
   isSubmitting,
-  apiError,
   categories,
   items,
   initialData,
@@ -44,6 +64,7 @@ export const ItemFormModal: React.FC<Props> = ({
   });
 
   const [attributes, setAttributes] = useState<Record<string, string>>({});
+  const notify = useNotify();
 
   useEffect(() => {
     if (initialData) {
@@ -98,11 +119,17 @@ export const ItemFormModal: React.FC<Props> = ({
       attributes: Object.keys(attributes).length > 0 ? attributes : undefined,
     };
 
-    const payload = initialData
+    const error = validateItemPayload(basePayload, initialData ? undefined : formData.sku.trim());
+    if (error) {
+      notify.error(error);
+      return;
+    }
+
+    const payload: CreateItemRequest | UpdateItemRequest = initialData
       ? { ...basePayload, isActive: initialData.isActive }
       : { ...basePayload, sku: formData.sku.trim() };
 
-    const success = await onSubmit(payload as any);
+    const success = await onSubmit(payload);
     if (success) onClose();
   };
 
@@ -124,11 +151,6 @@ export const ItemFormModal: React.FC<Props> = ({
 
         {/* Modal Body */}
         <form onSubmit={handleSubmit} className="p-6 space-y-4 overflow-y-auto flex-1">
-          {apiError && (
-            <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-xs text-red-600 font-medium">
-              {apiError}
-            </div>
-          )}
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {/* Category */}

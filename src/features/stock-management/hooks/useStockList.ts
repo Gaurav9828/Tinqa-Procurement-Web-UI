@@ -2,50 +2,50 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { stockApi } from '../api/stockApi';
 import type { StockResponse } from '../types/stock.types';
 import type { ApprovalStatus } from '../../../types/common.types';
+import { useLatestRequest } from '../../../hooks/useLatestRequest';
+import { useNotify } from '../../../hooks/useNotify';
 
 export const useStockList = () => {
   const [stocks, setStocks] = useState<StockResponse[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [error, setError] = useState<string | null>(null);
 
   const [search, setSearch] = useState<string>('');
   const [approvalStatusFilter, setApprovalStatusFilter] = useState<ApprovalStatus | undefined>();
 
+  const notify = useNotify();
+
+  const beginRequest = useLatestRequest();
+
   const fetchStocks = useCallback(async () => {
+    const isCurrent = beginRequest();
     setIsLoading(true);
-    setError(null);
     try {
       const res = await stockApi.getAllStocks();
+      if (!isCurrent()) return;
       if (res.success && res.data) {
         setStocks(res.data);
       } else {
-        setError(res.message || 'Failed to fetch stock entries.');
+        notify.error(res.message || 'Failed to fetch stock entries.');
       }
-    } catch (err: any) {
-      setError(err?.response?.data?.message || 'Error occurred while loading stocks.');
+    } catch (err: unknown) {
+      if (isCurrent()) notify.error(err, 'Error occurred while loading stocks.');
     } finally {
-      setIsLoading(false);
+      if (isCurrent()) setIsLoading(false);
     }
-  }, []);
+  }, [notify, beginRequest]);
 
   useEffect(() => {
     fetchStocks();
   }, [fetchStocks]);
 
   const filteredStocks = useMemo(() => {
+    const query = search.toLowerCase().trim();
     return stocks.filter((stock) => {
-      const matchesSearch = search
-        ? stock.stockIdentityNumber?.toLowerCase().includes(search.toLowerCase()) ||
-          stock.batchNumber?.toLowerCase().includes(search.toLowerCase()) ||
-          stock.orderNumber?.toLowerCase().includes(search.toLowerCase()) ||
-          stock.itemName?.toLowerCase().includes(search.toLowerCase())
-        : true;
-
-      const matchesStatus = approvalStatusFilter
-        ? stock.approvalStatus === approvalStatusFilter
-        : true;
-
-      return matchesSearch && matchesStatus;
+      if (approvalStatusFilter && stock.approvalStatus !== approvalStatusFilter) return false;
+      if (!query) return true;
+      return [stock.stockIdentityNumber, stock.batchNumber, stock.orderNumber, stock.itemName].some(
+        (field) => field?.toLowerCase().includes(query)
+      );
     });
   }, [stocks, search, approvalStatusFilter]);
 
@@ -53,7 +53,6 @@ export const useStockList = () => {
     stocks: filteredStocks,
     totalElements: filteredStocks.length,
     isLoading,
-    error,
     search,
     approvalStatusFilter,
     updateSearch: setSearch,

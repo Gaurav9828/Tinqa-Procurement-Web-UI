@@ -53,3 +53,5 @@ export interface UpdateStockRequest {
   additionalInfo?: Record<string, any>;
   isActive: boolean;
 }
+
+export type { ProcessApprovalPayload as ApprovalDecisionRequest } from '../../approvals/types/approval.types';

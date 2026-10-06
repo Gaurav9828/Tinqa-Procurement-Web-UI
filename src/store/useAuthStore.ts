@@ -1,25 +1,29 @@
 import { create } from 'zustand';
 import type { AuthState, AuthResponse, UserProfile } from '../types/auth';
+import {
+  SESSION_STORAGE_KEYS,
+  clearSession,
+  getStoredUser,
+  getToken,
+  isSessionExpired,
+  resolveExpiry,
+  saveSession,
+  saveUser,
+} from '../auth/session';
 
-const getInitialAuth = (): { token: string | null; user: UserProfile | null } => {
-  const token = localStorage.getItem('token');
-  const expiry = localStorage.getItem('tokenExpiry');
-  const userStr = localStorage.getItem('user');
+const readSession = (clearIfInvalid = true): { token: string | null; user: UserProfile | null } => {
+  const token = getToken();
+  const user = getStoredUser();
 
-  if (token && expiry && Date.now() < Number(expiry) && userStr) {
-    try {
-      return { token, user: JSON.parse(userStr) };
-    } catch {
-      localStorage.clear();
-    }
-  } else {
-    localStorage.clear();
+  if (token && user && !isSessionExpired()) {
+    return { token, user };
   }
 
+  if (clearIfInvalid) clearSession();
   return { token: null, user: null };
 };
 
-const initial = getInitialAuth();
+const initial = readSession();
 
 export const useAuthStore = create<AuthState>((set) => ({
   user: initial.user,
@@ -27,8 +31,6 @@ export const useAuthStore = create<AuthState>((set) => ({
   isAuthenticated: !!initial.token,
 
   login: (data: AuthResponse) => {
-    const expiryTimestamp = Date.now() + data.expiresIn;
-
     const userProfile: UserProfile = {
       userId: data.userId,
       username: data.username,
@@ -38,9 +40,7 @@ export const useAuthStore = create<AuthState>((set) => ({
       isFirstLogin: data.isFirstLogin ?? false,
     };
 
-    localStorage.setItem('token', data.accessToken);
-    localStorage.setItem('tokenExpiry', expiryTimestamp.toString());
-    localStorage.setItem('user', JSON.stringify(userProfile));
+    saveSession(data.accessToken, resolveExpiry(data), userProfile);
 
     set({
       token: data.accessToken,
@@ -58,7 +58,7 @@ export const useAuthStore = create<AuthState>((set) => ({
         isFirstLogin,
       };
 
-      localStorage.setItem('user', JSON.stringify(updatedUser));
+      saveUser(updatedUser);
 
       return {
         ...state,
@@ -68,7 +68,17 @@ export const useAuthStore = create<AuthState>((set) => ({
   },
 
   logout: () => {
-    localStorage.clear();
+    clearSession();
     set({ token: null, user: null, isAuthenticated: false });
   },
 }));
+
+// Keep every open tab in sync: logging out (or in) in one tab applies to all.
+if (typeof window !== 'undefined') {
+  window.addEventListener('storage', (event) => {
+    if (event.key !== null && !Object.values(SESSION_STORAGE_KEYS).includes(event.key as never)) return;
+    // Read-only here: another tab may be mid-way through writing its session.
+    const next = readSession(false);
+    useAuthStore.setState({ token: next.token, user: next.user, isAuthenticated: !!next.token });
+  });
+}

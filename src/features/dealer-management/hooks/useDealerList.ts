@@ -1,6 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import { dealerApi } from '../api/dealerApi';
 import type { DealerResponse } from '../types/dealer.types';
+import { useDebouncedValue } from '../../../hooks/useDebouncedValue';
+import { useLatestRequest } from '../../../hooks/useLatestRequest';
+import { useNotify } from '../../../hooks/useNotify';
 
 export const useDealerList = () => {
     const [dealers, setDealers] = useState<DealerResponse[]>([]);
@@ -10,24 +13,30 @@ export const useDealerList = () => {
     const [search, setSearch] = useState('');
     const [categoryId, setCategoryId] = useState<number | undefined>();
     const [isLoading, setIsLoading] = useState(false);
-    const [error, setError] = useState<string | null>(null);
+
+    const debouncedSearch = useDebouncedValue(search.trim());
+    const notify = useNotify();
+    const beginRequest = useLatestRequest();
 
     const fetchDealers = useCallback(async () => {
+        const isCurrent = beginRequest();
         setIsLoading(true);
-        setError(null);
         try {
-            const res = await dealerApi.getAllDealers({search: search, categoryId: categoryId, page: page, size: 10});
+            const res = await dealerApi.getAllDealers({ search: debouncedSearch, categoryId, page, size: 10 });
+            if (!isCurrent()) return;
             if (res.data?.content) {
                 setDealers(res.data.content);
                 setTotalElements(res.data.totalElements);
                 setTotalPages(res.data.totalPages);
+            } else {
+                notify.error(res.message || 'Failed to load dealers');
             }
-        } catch (err: any) {
-            setError(err.message || 'Failed to load dealers');
+        } catch (err: unknown) {
+            if (isCurrent()) notify.error(err, 'Failed to load dealers');
         } finally {
-            setIsLoading(false);
+            if (isCurrent()) setIsLoading(false);
         }
-    }, [page, search, categoryId]);
+    }, [notify, beginRequest, page, debouncedSearch, categoryId]);
 
     useEffect(() => {
         fetchDealers();
@@ -38,7 +47,6 @@ export const useDealerList = () => {
         totalElements,
         totalPages,
         isLoading,
-        error,
         page,
         setPage,
         filters: { search, categoryId },

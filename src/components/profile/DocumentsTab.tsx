@@ -2,12 +2,12 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Upload, FileText, CheckCircle, Clock, Download, AlertCircle, Loader2, Trash2 } from 'lucide-react';
 import { useDocuments } from '../../hooks/useDocuments';
 import { useAuthStore } from '../../store/useAuthStore';
-import { Alert } from '../ui/Alert';
 import { UploadDocumentModal } from './../ui/UploadDocumentModal';
 import { ConfirmationModal } from '../ui/ConfirmationModal';
 import type { DocumentUploadRequest, DocumentResponseData } from '../../types/document.types';
+import { validateUploadFile } from '../../api/services/documentService';
+import { useNotify } from '../../hooks/useNotify';
 
-const ALLOWED_EXTENSIONS = ['png', 'jpg', 'jpeg', 'pdf', 'xls', 'xlsx'];
 const ALLOWED_ACCEPT =
   '.png,.jpg,.jpeg,.pdf,.xls,.xlsx,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 
@@ -39,9 +39,10 @@ const getUniqueFileName = (originalFileName: string, existingFileNames: string[]
 
 export const DocumentsTab: React.FC = () => {
   const { user } = useAuthStore();
-  const username = user?.username || 'user';
-  const userId = user?.userId || 1;
-  const userRole = user?.role || 'ADMIN_L1';
+  const username = user?.username || '';
+  // Never fall back to another user's id; without a session there is nothing to load.
+  const userId = user?.userId;
+  const userRole = user?.role;
 
   const isL2User = userRole === 'ADMIN_L2';
 
@@ -50,18 +51,15 @@ export const DocumentsTab: React.FC = () => {
     isLoading,
     isUploading,
     isDeleting,
-    error,
-    successMessage,
     fetchUserDocuments,
-    clearError,
-    clearSuccess,
+    downloadDocument,
     uploadDocument,
     deleteDocument,
   } = useDocuments();
 
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
-  const [validationError, setValidationError] = useState<string | null>(null);
+  const notify = useNotify();
 
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState<boolean>(false);
   const [documentToDelete, setDocumentToDelete] = useState<DocumentResponseData | null>(null);
@@ -75,18 +73,13 @@ export const DocumentsTab: React.FC = () => {
   }, [userId, fetchUserDocuments]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setValidationError(null);
-    clearError();
-    clearSuccess();
 
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
-      const extension = file.name.split('.').pop()?.toLowerCase();
+      const fileError = validateUploadFile(file);
 
-      if (!extension || !ALLOWED_EXTENSIONS.includes(extension)) {
-        setValidationError(
-          'Invalid file format! Allowed files: PNG, JPG, JPEG, PDF, and Excel (.xls, .xlsx).'
-        );
+      if (fileError) {
+        notify.error(fileError);
         if (fileInputRef.current) fileInputRef.current.value = '';
         return;
       }
@@ -135,49 +128,8 @@ export const DocumentsTab: React.FC = () => {
     }
   };
 
-  const downloadAuthenticatedFile = async (url: string, fileName: string) => {
-    try {
-      // Replace 'api' with your configured axios/fetch instance that has your auth headers
-      const response = await fetch(url, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`, // Adjust based on your auth storage
-        },
-      });
-
-      if (!response.ok) throw new Error('Download failed');
-
-      const blob = await response.blob();
-      const blobUrl = window.URL.createObjectURL(blob);
-
-      const a = document.createElement('a');
-      a.href = blobUrl;
-      a.download = fileName;
-      document.body.appendChild(a);
-      a.click();
-
-      // Cleanup
-      a.remove();
-      window.URL.revokeObjectURL(blobUrl);
-    } catch (error) {
-      console.error('Download error:', error);
-      alert('Failed to download document. Please try again.');
-    }
-  };
-
   return (
     <div className="space-y-6">
-      {/* Alert Messaging */}
-      <Alert
-        type="error"
-        message={validationError || error}
-        onClose={() => {
-          setValidationError(null);
-          clearError();
-        }}
-      />
-      <Alert type="success" message={successMessage} onClose={clearSuccess} />
-
       {/* Action Header */}
       <div className="apple-card p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
@@ -256,7 +208,7 @@ export const DocumentsTab: React.FC = () => {
                 {(doc.status === 'ACTIVE' || doc.status === 'APPROVED' || doc.status === 'VERIFIED') && doc.downloadUrl && (
                   <button
                     type="button"
-                    onClick={() => downloadAuthenticatedFile(doc.downloadUrl, doc.originalFileName)}
+                    onClick={() => downloadDocument(doc)}
                     className="p-2 hover:bg-black/5 dark:hover:bg-white/10 rounded-lg text-gray-500 transition-colors"
                     title="Download Document"
                   >
@@ -281,6 +233,7 @@ export const DocumentsTab: React.FC = () => {
       </div>
 
       {/* Confirmation Upload Popup Modal */}
+      {userId !== undefined && (
       <UploadDocumentModal
         isOpen={isModalOpen}
         file={selectedFile}
@@ -295,6 +248,7 @@ export const DocumentsTab: React.FC = () => {
         }}
         onConfirmUpload={handleConfirmUpload}
       />
+      )}
 
       {/* Confirmation Delete Modal */}
       <ConfirmationModal

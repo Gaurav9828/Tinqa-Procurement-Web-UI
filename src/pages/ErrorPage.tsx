@@ -1,14 +1,14 @@
 import React from 'react';
 import { WifiOff, AlertTriangle, LogIn, RefreshCw } from 'lucide-react';
+import { clearSession } from '../auth/session';
 
 export const GlobalErrorPage: React.FC = () => {
   const queryParams = new URLSearchParams(window.location.search);
   const errorType = queryParams.get('type');
 
   const handleNavigateToLogin = () => {
-    localStorage.clear();
-    sessionStorage.clear();
-    window.location.href = '/login';
+    clearSession();
+    window.location.assign('/login');
   };
 
   const handleRetry = () => {
@@ -31,7 +31,7 @@ export const GlobalErrorPage: React.FC = () => {
 
       <p className="text-sm text-neutral-400 max-w-md mb-8">
         {errorType === 'network'
-          ? 'Unable to reach the backend service. Your active session tokens have been cleared for safety.'
+          ? 'Unable to reach the backend service. Please check your connection and try again.'
           : 'An unexpected internal error occurred on the server. Please sign in again or contact system support.'}
       </p>
 

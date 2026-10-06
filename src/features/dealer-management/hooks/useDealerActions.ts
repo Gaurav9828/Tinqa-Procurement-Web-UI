@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { useNotify } from '../../../hooks/useNotify';
+import { invalidateDealerOptions } from '../../../hooks/useLookupOptions';
 import { dealerApi } from '../api/dealerApi';
 import type {
   CreateCategoryRequest,
@@ -9,24 +11,17 @@ import type {
 
 export const useDealerActions = (onSuccess?: () => void) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [actionError, setActionError] = useState<string | null>(null);
-  const [actionSuccess, setActionSuccess] = useState<string | null>(null);
-
-  const clearMessages = () => {
-    setActionError(null);
-    setActionSuccess(null);
-  };
+  const notify = useNotify();
 
   const createCategory = async (payload: CreateCategoryRequest): Promise<boolean> => {
     setIsSubmitting(true);
-    clearMessages();
     try {
       const res = await dealerApi.createCategory(payload);
-      setActionSuccess(res.message || 'Category created successfully');
+      notify.success(res.message || 'Category created successfully');
       if (onSuccess) onSuccess();
       return true;
-    } catch (err: any) {
-      setActionError(err.response?.data?.message || 'Failed to create category');
+    } catch (err: unknown) {
+      notify.error(err, 'Failed to create category');
       return false;
     } finally {
       setIsSubmitting(false);
@@ -35,14 +30,14 @@ export const useDealerActions = (onSuccess?: () => void) => {
 
   const createDealer = async (payload: CreateDealerRequest): Promise<boolean> => {
     setIsSubmitting(true);
-    clearMessages();
     try {
       const res = await dealerApi.createDealer(payload);
-      setActionSuccess(res.message || 'Dealer created successfully');
+      notify.success(res.message || 'Dealer created successfully');
+      invalidateDealerOptions();
       if (onSuccess) onSuccess();
       return true;
-    } catch (err: any) {
-      setActionError(err.response?.data?.message || 'Failed to create dealer');
+    } catch (err: unknown) {
+      notify.error(err, 'Failed to create dealer');
       return false;
     } finally {
       setIsSubmitting(false);
@@ -54,14 +49,14 @@ export const useDealerActions = (onSuccess?: () => void) => {
     payload: UpdateDealerRequest
   ): Promise<boolean> => {
     setIsSubmitting(true);
-    clearMessages();
     try {
       const res = await dealerApi.updateDealer(id, payload);
-      setActionSuccess(res.message || 'Dealer updated successfully');
+      notify.success(res.message || 'Dealer updated successfully');
+      invalidateDealerOptions();
       if (onSuccess) onSuccess();
       return true;
-    } catch (err: any) {
-      setActionError(err.response?.data?.message || 'Failed to update dealer');
+    } catch (err: unknown) {
+      notify.error(err, 'Failed to update dealer');
       return false;
     } finally {
       setIsSubmitting(false);
@@ -70,14 +65,14 @@ export const useDealerActions = (onSuccess?: () => void) => {
 
   const toggleDealerStatus = async (dealer: DealerResponse): Promise<boolean> => {
     setIsSubmitting(true);
-    clearMessages();
     try {
       const res = await dealerApi.toggleDealerStatus(dealer.id);
-      setActionSuccess(res.message || `Dealer status updated successfully`);
+      notify.success(res.message || `Dealer status updated successfully`);
+      invalidateDealerOptions();
       if (onSuccess) onSuccess();
       return true;
-    } catch (err: any) {
-      setActionError(err.response?.data?.message || 'Failed to update dealer status');
+    } catch (err: unknown) {
+      notify.error(err, 'Failed to update dealer status');
       return false;
     } finally {
       setIsSubmitting(false);
@@ -86,9 +81,6 @@ export const useDealerActions = (onSuccess?: () => void) => {
 
   return {
     isSubmitting,
-    actionError,
-    actionSuccess,
-    clearMessages,
     createCategory,
     createDealer,
     updateDealer,

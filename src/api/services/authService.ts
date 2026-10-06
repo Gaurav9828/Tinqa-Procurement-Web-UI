@@ -1,30 +1,30 @@
 import { axiosClient } from '../axiosClient';
 import type { LoginRequest, AuthResponse, AdminProfile , ChangePasswordRequest, ChangePasswordResponse} from '../../types/auth';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:9090/api';
-
 export const authService = {
   login: async (payload: LoginRequest): Promise<AuthResponse> => {
     const response = await axiosClient.post<AuthResponse>(
-      `${API_BASE_URL}/auth/admin/login`,
-      payload
+      `/auth/admin/login`,
+      payload,
+      { skipAuthRedirect: true }
     );
     return response.data;
   },
 
   logout: async (): Promise<void> => {
-    await axiosClient.post(`${API_BASE_URL}/auth/logout`);
+    await axiosClient.post(`/auth/logout`, undefined, { skipAuthRedirect: true });
   },
 
   getProfile: async (): Promise<AdminProfile> => {
-    const response = await axiosClient.get<AdminProfile>(`${API_BASE_URL}/v1/admin/profile`);
+    const response = await axiosClient.get<AdminProfile>(`/v1/admin/profile`);
     return response.data;
   },
 
   changePassword: async (data: ChangePasswordRequest): Promise<ChangePasswordResponse> => {
     const response = await axiosClient.post<ChangePasswordResponse>(
-      `${API_BASE_URL}/auth/change-password`,
-      data
+      `/auth/change-password`,
+      data,
+      { skipAuthRedirect: true }
     );
     return response.data;
   },

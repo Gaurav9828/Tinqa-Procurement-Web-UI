@@ -1,7 +1,6 @@
 import React, { useMemo, useEffect, useState } from 'react';
 import { Lock, Briefcase } from 'lucide-react';
 import { CommonInput, CommonSelect } from '../ui/FormInputs';
-import { Alert } from '../ui/Alert';
 import { Validator } from '../../utils/validator';
 import type { ProfileFormState } from '../../hooks/useProfile';
 import { HasAccess } from '../../auth/HasAccess';
@@ -12,10 +11,6 @@ interface ProfileTabProps {
     employeeData: ProfileFormState;
     setEmployeeData: React.Dispatch<React.SetStateAction<ProfileFormState>>;
     onSubmit: (e: React.FormEvent) => void;
-    updateStatus: string | null;
-    updateError: string | null;
-    onClearStatus?: () => void;
-    onClearError?: () => void;
     onValidationChange: (isValid: boolean) => void;
     isSubmitting?: boolean;
 }
@@ -25,10 +20,6 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({
     employeeData,
     setEmployeeData,
     onSubmit,
-    updateStatus,
-    updateError,
-    onClearStatus,
-    onClearError,
     onValidationChange,
     isSubmitting = false,
 }) => {
@@ -139,8 +130,6 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({
         <>
             <form id="profile-form" onSubmit={handlePreSubmit} className="space-y-6">
                 {/* Dismissible Feedback Alerts */}
-                <Alert type="success" message={updateStatus} onClose={onClearStatus} />
-                <Alert type="error" message={updateError} onClose={onClearError} />
 
                 {/* Section 1: Contact Details */}
                 <div className="apple-card p-6 space-y-5">

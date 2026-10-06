@@ -1,11 +1,11 @@
+import { useNotify } from '../../../hooks/useNotify';
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { X, Save, ChevronDown, Check, Eye } from 'lucide-react';
 import { Validator, type ValidationRule } from '../../../utils/validator';
 import type { CreateStockFromOrderRequest } from '../types/stock.types';
 import { useOrderList } from '../../order-management/hooks/useOrderList';
-import { useItemList } from '../../item-management/hooks/useItemList';
+import { useItemOptions } from '../../../hooks/useLookupOptions';
 import { CommonInput, CommonCheckbox } from '../../../components/ui/FormInputs';
-import { Alert } from '../../../components/ui/Alert';
 import { AttributeInputBuilder } from '../../../components/ui/AttributeInputBuilder'; // Adjust path if needed
 
 import type { OrderResponse } from '../../order-management/types/order.types';
@@ -14,7 +14,6 @@ import { OrderPreviewModal } from '../../order-management/components/OrderPrevie
 interface StockFormModalProps {
     isOpen: boolean;
     isSubmitting: boolean;
-    error?: string | null;
     initialOrderNumber?: string; // <--- Added prop for pre-selecting order ID
     onClose: () => void;
     onRequestSubmit: (data: CreateStockFromOrderRequest) => Promise<void> | void;
@@ -41,13 +40,14 @@ const DEFAULT_FORM: FormState = {
 export const StockFormModal: React.FC<StockFormModalProps> = ({
     isOpen,
     isSubmitting,
-    error: externalError,
     initialOrderNumber, // <--- Destructured prop
     onClose,
     onRequestSubmit,
 }) => {
-    const { orders, updateStatusFilter, isLoading } = useOrderList();
-    const { items } = useItemList();
+    // Only fetch once the modal is actually opened.
+    // Stock can only be created from delivered orders.
+    const { orders, isLoading } = useOrderList({ enabled: isOpen, initialStatus: 'DELIVERED' });
+    const { options: items } = useItemOptions(isOpen);
     
     const [formData, setFormData] = useState<FormState>({
         ...DEFAULT_FORM,
@@ -55,19 +55,13 @@ export const StockFormModal: React.FC<StockFormModalProps> = ({
     });
     
     const [touched, setTouched] = useState<Record<string, boolean>>({});
-    const [submitError, setSubmitError] = useState<string | null>(null);
+    const notify = useNotify();
 
     const [showOrderSuggestions, setShowOrderSuggestions] = useState<boolean>(false);
     const [selectedPreviewOrder, setSelectedPreviewOrder] = useState<OrderResponse | null>(null);
 
     const dropdownRef = useRef<HTMLDivElement>(null);
 
-    // Sync external server error from parent page/hook
-    useEffect(() => {
-        if (externalError) {
-            setSubmitError(externalError);
-        }
-    }, [externalError]);
 
     // Reset or initialize local state on modal close/open
     useEffect(() => {
@@ -77,7 +71,6 @@ export const StockFormModal: React.FC<StockFormModalProps> = ({
                 orderNumber: initialOrderNumber || '',
             });
             setTouched({});
-            setSubmitError(null);
         }
     }, [isOpen, initialOrderNumber]);
 
@@ -93,7 +86,6 @@ export const StockFormModal: React.FC<StockFormModalProps> = ({
     }, []);
 
     const matchingOrders = useMemo(() => {
-        updateStatusFilter('DELIVERED');
         if (!formData.orderNumber.trim()) return orders;
         const query = formData.orderNumber.toLowerCase().trim();
         return orders.filter(
@@ -173,12 +165,10 @@ export const StockFormModal: React.FC<StockFormModalProps> = ({
     }, []);
 
     const handleChange = useCallback((field: keyof FormState, value: unknown) => {
-        setSubmitError(null);
         setFormData((prev) => ({ ...prev, [field]: value }));
     }, []);
 
     const handleSelectOrder = (orderNum: string) => {
-        setSubmitError(null);
         const selected = orders.find((o) => o.orderNumber === orderNum);
         const orderMinDate = selected?.orderDate
             ? new Date(selected.orderDate).toISOString().split('T')[0]
@@ -198,11 +188,10 @@ export const StockFormModal: React.FC<StockFormModalProps> = ({
         if (!isValid) {
             const allTouched = Object.keys(validationErrors).reduce((acc, k) => ({ ...acc, [k]: true }), {});
             setTouched((prev) => ({ ...prev, ...allTouched }));
-            setSubmitError('Please fix highlighted validation errors before saving.');
+            notify.error('Please fix highlighted validation errors before saving.');
             return;
         }
 
-        setSubmitError(null);
         const payload: CreateStockFromOrderRequest = {
             orderNumber: formData.orderNumber.trim(),
             unitsPassedTest: formData.unitsPassedTest !== '' ? Number(formData.unitsPassedTest) : 0,
@@ -214,8 +203,8 @@ export const StockFormModal: React.FC<StockFormModalProps> = ({
 
         try {
             await onRequestSubmit(payload);
-        } catch (err: any) {
-            setSubmitError(err?.message || 'Server error occurred while creating stock entry.');
+        } catch (err: unknown) {
+            notify.error(err, 'Server error occurred while creating stock entry.');
         }
     };
 
@@ -239,13 +228,6 @@ export const StockFormModal: React.FC<StockFormModalProps> = ({
                     </div>
 
                     <form id="stock-form" onSubmit={handleSubmit} className="p-6 space-y-4 overflow-y-auto flex-1">
-                        {submitError && (
-                            <Alert
-                                type="error"
-                                message={submitError}
-                                onClose={() => setSubmitError(null)}
-                            />
-                        )}
 
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div className="sm:col-span-2 flex items-center gap-2">

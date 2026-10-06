@@ -9,7 +9,6 @@ import { EditProductModal } from '../components/EditProductModal';
 import { ProductPreviewModal } from '../components/ProductPreviewModal';
 import { ProductStatusModal } from '../components/ProductStatusModal';
 import type { ProductResponse, CreateProductRequest, UpdateProductRequest } from '../types/product.types';
-import { Alert } from '../../../components/ui/Alert';
 
 export const ProductManagementPage: React.FC = () => {
     const {

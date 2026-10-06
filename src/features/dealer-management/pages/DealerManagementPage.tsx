@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import { useNotify } from '../../../hooks/useNotify';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   Users,
   RefreshCw,
@@ -12,7 +13,6 @@ import {
   Phone,
   Mail,
 } from 'lucide-react';
-import { Alert } from '../../../components/ui/Alert';
 import { Tooltip } from '../../../components/ui/Tooltip';
 import { useDealerList } from '../hooks/useDealerList';
 import { useDealerActions } from '../hooks/useDealerActions';
@@ -36,7 +36,6 @@ export const DealerManagementPage: React.FC = () => {
     dealers,
     totalElements,
     isLoading,
-    error,
     filters,
     updateSearch,
     updateCategoryFilter,
@@ -45,9 +44,6 @@ export const DealerManagementPage: React.FC = () => {
 
   const {
     isSubmitting,
-    actionError,
-    actionSuccess,
-    clearMessages,
     createCategory,
     createDealer,
     updateDealer,
@@ -66,18 +62,20 @@ export const DealerManagementPage: React.FC = () => {
   const [selectedCities, setSelectedCities] = useState<string[]>([]);
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
 
-  const loadCategories = async () => {
+  const notify = useNotify();
+
+  const loadCategories = useCallback(async () => {
     try {
       const res = await dealerApi.getAllCategories();
       if (res.data) setCategories(res.data);
-    } catch {
-      // Silently handled
+    } catch (err: unknown) {
+      notify.error(err, 'Failed to load dealer categories.');
     }
-  };
+  }, [notify]);
 
   useEffect(() => {
     loadCategories();
-  }, []);
+  }, [loadCategories]);
 
   const cityOptions = useMemo(() => {
     return Array.from(
@@ -123,13 +121,11 @@ export const DealerManagementPage: React.FC = () => {
   };
 
   const handleOpenCreateDealer = () => {
-    clearMessages();
     setSelectedDealer(null);
     setIsDealerModalOpen(true);
   };
 
   const handleOpenEditDealer = (dealer: DealerResponse) => {
-    clearMessages();
     setSelectedDealer(dealer);
     setIsDealerModalOpen(true);
   };
@@ -174,13 +170,6 @@ export const DealerManagementPage: React.FC = () => {
         </div>
       </div>
 
-      {actionSuccess && (
-        <Alert type="success" message={actionSuccess} onClose={clearMessages} />
-      )}
-      {!isDealerModalOpen && !isCategoryModalOpen && actionError && (
-        <Alert type="error" message={actionError} onClose={clearMessages} />
-      )}
-
       <DealerFilterBar
         searchQuery={filters.search || ''}
         selectedCategoryId={filters.categoryId}
@@ -191,9 +180,7 @@ export const DealerManagementPage: React.FC = () => {
         onOpenCreateCategoryModal={() => setIsCategoryModalOpen(true)}
       />
 
-      {error ? (
-        <Alert type="error" message={error} />
-      ) : isLoading ? (
+      {isLoading ? (
         <div className="apple-card p-12 text-center text-gray-500 dark:text-neutral-400">
           <div className="inline-block w-6 h-6 border-2 border-[#0071e3] border-t-transparent rounded-full animate-spin mb-2" />
           <p className="text-sm">Loading dealer directory...</p>
@@ -352,7 +339,6 @@ export const DealerManagementPage: React.FC = () => {
         onClose={() => setIsCategoryModalOpen(false)}
         onSubmit={handleCreateCategory}
         isSubmitting={isSubmitting}
-        actionError={actionError}
       />
 
       <DealerFormModal
@@ -362,7 +348,6 @@ export const DealerManagementPage: React.FC = () => {
         dealer={selectedDealer}
         categories={categories}
         isSubmitting={isSubmitting}
-        actionError={actionError}
       />
 
       {/* Preview Dealer Modal */}

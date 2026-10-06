@@ -7,7 +7,6 @@ import type {
 } from '../types/employee.types';
 import type { ApiResponse, PageableResponse } from '../../../types/common.types';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:9090/api';
 
 const BASE_URL = '/v1/admin/employees';
 
@@ -15,7 +14,7 @@ export const employeeApi = {
   createEmployee: async (
     payload: CreateEmployeeRequest
   ): Promise<ApiResponse<EmployeeResponse>> => {
-    const response = await axiosClient.post<ApiResponse<EmployeeResponse>>(`${API_BASE_URL}${BASE_URL}`, payload);
+    const response = await axiosClient.post<ApiResponse<EmployeeResponse>>(`${BASE_URL}`, payload);
     return response.data;
   },
 
@@ -36,7 +35,7 @@ export const employeeApi = {
   },
 
   getEmployeeById: async (id: number): Promise<ApiResponse<EmployeeResponse>> => {
-    const response = await axiosClient.get<ApiResponse<EmployeeResponse>>(`${API_BASE_URL}${BASE_URL}/${id}`);
+    const response = await axiosClient.get<ApiResponse<EmployeeResponse>>(`${BASE_URL}/${id}`);
     return response.data;
   },
 
@@ -45,7 +44,7 @@ export const employeeApi = {
     payload: UpdateEmployeeRequest
   ): Promise<ApiResponse<EmployeeResponse>> => {
     const response = await axiosClient.put<ApiResponse<EmployeeResponse>>(
-      `${API_BASE_URL}${BASE_URL}/${id}`,
+      `${BASE_URL}/${id}`,
       payload
     );
     return response.data;
@@ -53,13 +52,13 @@ export const employeeApi = {
 
   requestEmployeeDeletion: async (id: number): Promise<ApiResponse<EmployeeResponse>> => {
     const response = await axiosClient.patch<ApiResponse<EmployeeResponse>>(
-      `${API_BASE_URL}${BASE_URL}/${id}/request-deletion`
+      `${BASE_URL}/${id}/request-deletion`
     );
     return response.data;
   },
 
   finalizeDeleteEmployee: async (id: number): Promise<ApiResponse<null>> => {
-    const response = await axiosClient.delete<ApiResponse<null>>(`${API_BASE_URL}${BASE_URL}/${id}`);
+    const response = await axiosClient.delete<ApiResponse<null>>(`${BASE_URL}/${id}`);
     return response.data;
   },
 };

@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Lock, Mail, ArrowRight, AlertCircle, Loader2, Clock } from 'lucide-react';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
+import { Lock, Mail, ArrowRight, Loader2 } from 'lucide-react';
 import { authService } from '../../api/services/authService';
 import { useAuthStore } from '../../store/useAuthStore';
+import { useNotify } from '../../hooks/useNotify';
 
 export const LoginPage: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams] = useSearchParams();
   const loginStore = useAuthStore((state) => state.login);
 
@@ -13,41 +15,37 @@ export const LoginPage: React.FC = () => {
     username: '',
     password: '',
   });
-  const [error, setError] = useState<string>('');
-  const [sessionExpired, setSessionExpired] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const notify = useNotify();
 
   useEffect(() => {
     if (searchParams.get('expired') === 'true') {
-      setSessionExpired(true);
+      notify.warning('Your session has expired. Please log in again to continue.');
     }
-  }, [searchParams]);
+  }, [searchParams, notify]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
-    setSessionExpired(false);
     setIsLoading(true);
+
+    const username = credentials.username.trim();
+    if (!username || !credentials.password) {
+      notify.error('Username and password are required.');
+      setIsLoading(false);
+      return;
+    }
 
     try {
       const response = await authService.login({
-        username: credentials.username,
+        username,
         password: credentials.password,
       });
 
       loginStore(response);
-      navigate('/analytics', { replace: true });
+      const from = (location.state as { from?: string } | null)?.from;
+      navigate(response.isFirstLogin ? '/reset-password' : from || '/analytics', { replace: true });
     } catch (err: unknown) {
-      if (typeof err === 'object' && err !== null && 'response' in err) {
-        const apiError = err as { response?: { data?: { message?: string } } };
-        setError(
-          apiError.response?.data?.message || 'Authentication failed. Please check your credentials.'
-        );
-      } else if (err instanceof Error) {
-        setError(err.message);
-      } else {
-        setError('Authentication failed. Please check your credentials.');
-      }
+      notify.error(err, 'Authentication failed. Please check your credentials.');
     } finally {
       setIsLoading(false);
     }
@@ -73,20 +71,8 @@ export const LoginPage: React.FC = () => {
 
         {/* Login Card */}
         <div className="apple-card p-8 shadow-md">
-          {sessionExpired && (
-            <div className="mb-5 p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 text-xs flex items-center gap-2">
-              <Clock className="w-4 h-4 shrink-0" />
-              <span>Your session has expired. Please log in again to continue.</span>
-            </div>
-          )}
 
           <form onSubmit={handleLogin} className="space-y-5">
-            {error && (
-              <div className="p-3.5 rounded-xl bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 text-xs flex items-center gap-2">
-                <AlertCircle className="w-4 h-4 shrink-0" />
-                <span>{error}</span>
-              </div>
-            )}
 
             {/* Username Field */}
             <div>
@@ -101,6 +87,8 @@ export const LoginPage: React.FC = () => {
                   type="text"
                   required
                   placeholder="admin"
+                  autoComplete="username"
+                  maxLength={64}
                   value={credentials.username}
                   onChange={(e) => setCredentials({ ...credentials, username: e.target.value })}
                   className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-black/10 dark:border-white/10 bg-white dark:bg-[#1c1c1e] text-sm focus:outline-none focus:ring-2 focus:ring-[#0071e3] transition-all cursor-text placeholder:text-gray-400"
@@ -121,6 +109,8 @@ export const LoginPage: React.FC = () => {
                   type="password"
                   required
                   placeholder="••••••••"
+                  autoComplete="current-password"
+                  maxLength={128}
                   value={credentials.password}
                   onChange={(e) => setCredentials({ ...credentials, password: e.target.value })}
                   className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-black/10 dark:border-white/10 bg-white dark:bg-[#1c1c1e] text-sm focus:outline-none focus:ring-2 focus:ring-[#0071e3] transition-all cursor-text placeholder:text-gray-400"

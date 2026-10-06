@@ -22,9 +22,10 @@ export class GlobalErrorBoundary extends Component<Props, State> {
   }
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    // Developer-friendly console trace
-    console.error('🔥 [Unhandled React Render Error]:', error);
-    console.error('📌 [Component Stack Trace]:', errorInfo.componentStack);
+    if (import.meta.env.DEV) {
+      console.error('[Unhandled React Render Error]:', error);
+      console.error('[Component Stack Trace]:', errorInfo.componentStack);
+    }
   }
 
   public render() {

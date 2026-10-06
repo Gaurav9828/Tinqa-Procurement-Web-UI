@@ -56,6 +56,12 @@ const InputWrapper: React.FC<InputWrapperProps> = ({
 };
 
 /* 1. Common Text / Password / Number Input */
+// Defaults so no free-text field is unbounded; callers can pass a tighter maxLength.
+// Keep these at or below the backend column sizes.
+const DEFAULT_TEXT_MAX_LENGTH = 255;
+const DEFAULT_TEXTAREA_MAX_LENGTH = 2000;
+const TEXT_LIKE_TYPES = new Set(['text', 'email', 'tel', 'password', 'search', 'url']);
+
 interface CommonInputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   label: string;
   error?: string;
@@ -69,9 +75,11 @@ export const CommonInput: React.FC<CommonInputProps> = ({
   readOnly,
   type = 'text',
   className = '',
+  maxLength,
   ...props
 }) => {
   const [showPassword, setShowPassword] = useState(false);
+  const effectiveMaxLength = maxLength ?? (TEXT_LIKE_TYPES.has(type) ? DEFAULT_TEXT_MAX_LENGTH : undefined);
   const isPassword = type === 'password';
   const effectiveType = isPassword ? (showPassword ? 'text' : 'password') : type;
   const isDisabledOrReadOnly = disabled || readOnly;
@@ -87,6 +95,7 @@ export const CommonInput: React.FC<CommonInputProps> = ({
       <div className="relative flex items-center">
         <input
           type={effectiveType}
+          maxLength={effectiveMaxLength}
           disabled={disabled}
           readOnly={readOnly}
           className={`w-full px-3.5 py-3 bg-transparent text-sm focus:outline-none rounded-xl ${
@@ -180,6 +189,7 @@ export const CommonTextArea: React.FC<CommonTextAreaProps> = ({
   readOnly,
   rows = 3,
   className = '',
+  maxLength = DEFAULT_TEXTAREA_MAX_LENGTH,
   ...props
 }) => {
   const isDisabledOrReadOnly = disabled || readOnly;
@@ -194,6 +204,7 @@ export const CommonTextArea: React.FC<CommonTextAreaProps> = ({
     >
       <textarea
         rows={rows}
+        maxLength={maxLength}
         disabled={disabled}
         readOnly={readOnly}
         className={`w-full px-3.5 py-3 bg-transparent text-sm focus:outline-none rounded-xl resize-y ${

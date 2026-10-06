@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Info, AlertTriangle } from 'lucide-react';
-import type { OrderResponse } from '../types/order.types';
+import type { OrderResponse, UpdateOrderRequest } from '../types/order.types';
+import { ORDER_LIMITS } from '../validator/orderValidator';
 import type { ItemResponse } from '../../item-management/types/item.types';
 import type { DealerResponse } from '../../dealer-management/types/dealer.types';
 import { HasAccess } from '../../../auth/HasAccess';
@@ -13,7 +14,7 @@ interface EditOrderModalProps {
   items: ItemResponse[];
   dealers: DealerResponse[];
   onClose: () => void;
-  onSubmit: (orderId: number, formData: any) => void;
+  onSubmit: (orderId: number, formData: UpdateOrderRequest) => void;
 }
 
 const calculatePriceVariance = (
@@ -110,7 +111,7 @@ export const EditOrderModal: React.FC<EditOrderModalProps> = ({
       dealerId: Number(selectedDealerId),
       orderQuantity: Number(quantity),
       unitPrice: Number(unitPrice),
-      unitType: unitOfMeasure,
+      unitType: unitOfMeasure.trim(),
       shipmentPrice: Number(shipmentPrice),
       orderDate: order.orderDate,
       expectedDelivery: expectedDelivery || null,
@@ -185,6 +186,8 @@ export const EditOrderModal: React.FC<EditOrderModalProps> = ({
                 label="Quantity"
                 type="number"
                 min="1"
+                max={ORDER_LIMITS.MAX_QUANTITY}
+                step="1"
                 required
                 value={quantity}
                 onChange={(e) => setQuantity(Number(e.target.value))}
@@ -206,6 +209,8 @@ export const EditOrderModal: React.FC<EditOrderModalProps> = ({
                   label="Unit Price (₹)"
                   type="number"
                   step="0.01"
+                  min="0.01"
+                  max={ORDER_LIMITS.MAX_UNIT_PRICE}
                   required
                   value={unitPrice}
                   onChange={(e) => setUnitPrice(Number(e.target.value))}
@@ -231,6 +236,7 @@ export const EditOrderModal: React.FC<EditOrderModalProps> = ({
                 label="Shipment Price (₹)"
                 type="number"
                 step="0.01"
+                max={ORDER_LIMITS.MAX_SHIPMENT_PRICE}
                 min="0"
                 required
                 value={shipmentPrice}
