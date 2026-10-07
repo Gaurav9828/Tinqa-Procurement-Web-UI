@@ -1,5 +1,5 @@
 import React from 'react';
-import { Search, X } from 'lucide-react';
+import { Clock, Search, X } from 'lucide-react';
 import type { AdminOrderSort, TrackingStatusOption } from '../types/orderTracking.types';
 import type { AdminOrderFilters } from '../hooks/useAdminOrders';
 import { ADMIN_ORDERS_SEARCH_MAX_LENGTH } from '../hooks/useAdminOrders';
@@ -22,6 +22,8 @@ interface Props {
   onFilterChange: <K extends keyof AdminOrderFilters>(key: K, value: AdminOrderFilters[K]) => void;
   onReset: () => void;
 }
+
+const WAITING_PRE_ORDER_STATUS = 'PRE_ORDER_PENDING';
 
 const controlClass =
   'px-3 py-2 text-xs rounded-xl border bg-white dark:bg-[#1c1c1e] focus:outline-none focus:ring-2 focus:ring-[#0071e3] cursor-pointer';
@@ -53,6 +55,21 @@ export const OrderTrackingFilterBar: React.FC<Props> = ({
         </div>
 
         <div className="grid grid-cols-2 sm:flex gap-3">
+          {/* Shortcut to the pre-order review queue (status=PRE_ORDER_PENDING). */}
+          <button
+            type="button"
+            aria-pressed={filters.status === WAITING_PRE_ORDER_STATUS}
+            onClick={() =>
+              onFilterChange('status', filters.status === WAITING_PRE_ORDER_STATUS ? '' : WAITING_PRE_ORDER_STATUS)
+            }
+            className={`col-span-2 sm:col-span-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs rounded-xl border font-medium whitespace-nowrap cursor-pointer transition-colors ${
+              filters.status === WAITING_PRE_ORDER_STATUS
+                ? 'bg-amber-500/10 border-amber-500/30 text-amber-700 dark:text-amber-400'
+                : 'border-black/10 dark:border-white/10 hover:bg-black/5 dark:hover:bg-white/10'
+            }`}
+          >
+            <Clock className="w-3.5 h-3.5" /> Waiting pre-orders
+          </button>
           <select
             aria-label="Filter by status"
             value={filters.status}

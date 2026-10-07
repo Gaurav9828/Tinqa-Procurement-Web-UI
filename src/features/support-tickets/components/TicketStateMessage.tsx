@@ -13,6 +13,11 @@ const CONTENT: Record<Variant, { icon: React.ElementType; title: string; body: s
     body: 'Your account is not allowed to view support tickets. Contact an Admin L2 if you need access.',
   },
   notFound: { icon: SearchX, title: 'Ticket not found', body: 'This ticket does not exist or the reference number is incorrect.' },
+  unsupported: {
+    icon: AlertTriangle,
+    title: 'Action not supported',
+    body: "The server doesn't support this request. Refresh the page; if it keeps happening, contact support.",
+  },
   conflict: { icon: AlertTriangle, title: 'Ticket changed', body: 'This ticket was updated elsewhere. Refresh to see its latest state.' },
   validation: { icon: AlertTriangle, title: 'Request rejected', body: 'The server rejected the request. Check the alert for details.' },
   rateLimited: { icon: AlertTriangle, title: 'Too many requests', body: 'Please wait a moment and try again.' },

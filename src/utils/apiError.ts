@@ -6,12 +6,20 @@ export interface ApiFieldError {
 }
 
 /**
+ * Shown for 405 METHOD_NOT_ALLOWED. The backend's message for it is framework text
+ * ("Request method 'GET' is not supported"), which is not meaningful to admins.
+ */
+export const METHOD_NOT_ALLOWED_MESSAGE =
+  "This action isn't supported by the server. Please refresh the page and try again; if it keeps happening, contact support.";
+
+/**
  * Extract a user-facing message from any thrown value.
  * The API client already normalises `error.message` to the backend's message,
  * so this mostly guards against non-axios errors.
  */
 export const getApiErrorMessage = (err: unknown, fallback = 'Something went wrong. Please try again.'): string => {
   if (axios.isAxiosError(err)) {
+    if (err.response?.status === 405) return METHOD_NOT_ALLOWED_MESSAGE;
     const data = err.response?.data as { message?: string } | undefined;
     return data?.message || err.message || fallback;
   }

@@ -44,8 +44,9 @@ export const STATUS_STAGE: Record<string, StagePhase> = {
 export const NEXT_STATUSES: Record<string, readonly string[]> = {
   ORDER_RECEIVED: ['ORDER_PENDING', 'CONFIRMED', 'CANCELLED'],
   ORDER_PENDING: ['CONFIRMED', 'CANCELLED'],
-  PRE_ORDER_RECEIVED: ['PRE_ORDER_PENDING', 'PRE_ORDER_CONFIRMED', 'CANCELLED'],
-  PRE_ORDER_PENDING: ['PRE_ORDER_CONFIRMED', 'CANCELLED'],
+  // PRE_ORDER_CONFIRMED is reached only via the dedicated approval (see APPROVAL_ONLY_STATUSES).
+  PRE_ORDER_RECEIVED: ['PRE_ORDER_PENDING', 'CANCELLED'],
+  PRE_ORDER_PENDING: ['CANCELLED'],
   CONFIRMED: ['PROCESSING', 'CANCELLED'],
   PRE_ORDER_CONFIRMED: ['PROCESSING', 'CANCELLED'],
   PROCESSING: ['PACKED', 'CANCELLED'],
@@ -70,9 +71,15 @@ export const START_STATUSES: readonly string[] = [
   'CONFIRMED',
   'PRE_ORDER_RECEIVED',
   'PRE_ORDER_PENDING',
-  'PRE_ORDER_CONFIRMED',
   'CANCELLED',
 ];
+
+/**
+ * Statuses never offered in the generic status form. PRE_ORDER_CONFIRMED means "stock checked
+ * and reserved" and must go through PATCH /admin/orders/{n}/pre-order/approve; the backend
+ * rejects it elsewhere (409 PRE_ORDER_APPROVAL_NOT_ALLOWED).
+ */
+export const APPROVAL_ONLY_STATUSES: ReadonlySet<string> = new Set(['PRE_ORDER_CONFIRMED']);
 
 /** Final statuses: nothing can follow them, in either mode. */
 export const LOCKED_STATUSES: ReadonlySet<string> = new Set(['CANCELLED', 'RETURN_COMPLETED']);
@@ -106,7 +113,15 @@ export const getAllowedStatuses = (mode: StatusUpdateMode, { currentStatus, prev
 
   const allowed = [...NEXT_STATUSES[currentStatus!]];
 
-  if (mode === 'manual' && previousStatus && previousStatus !== currentStatus && !allowed.includes(previousStatus)) {
+  // No "undo" around pre-order approval: undoing an approval would leave its reserved stock
+  // behind, and the backend only lets a waiting pre-order be approved or cancelled
+  // (409 PRE_ORDER_APPROVAL_REQUIRED otherwise).
+  if (
+    mode === 'manual' &&
+    currentStatus !== 'PRE_ORDER_PENDING' &&
+    !APPROVAL_ONLY_STATUSES.has(currentStatus!) &&
+    !APPROVAL_ONLY_STATUSES.has(previousStatus ?? '') &&
+    previousStatus && previousStatus !== currentStatus && !allowed.includes(previousStatus)) {
     const stage = getStage(currentStatus);
     const previousStage = getStage(previousStatus);
     if (stage && previousStage && CORRECTABLE_STAGES.has(stage) && CORRECTABLE_STAGES.has(previousStage) && !isLockedStatus(previousStatus)) {

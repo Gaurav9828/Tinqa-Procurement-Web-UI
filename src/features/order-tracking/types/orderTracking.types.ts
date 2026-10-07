@@ -26,6 +26,10 @@ export interface OrderItemSummary {
   price: number;
   quantity: number;
   totalPrice: number;
+  /** The line was ordered while out of stock and waits for stock + admin approval. */
+  preOrder?: boolean;
+  /** Current stock of the product — sent for pre-order lines on the admin detail only. */
+  availableStock?: number | null;
 }
 
 /** AdminCustomerSummaryDTO — null when the customer row no longer exists. */
@@ -83,6 +87,10 @@ export interface AdminOrderDetail extends AdminOrderSummary {
   notes: string | null;
   /** Full history, createdAt ascending. */
   tracking: OrderTrackingEntry[] | null;
+  /** Every pre-order product currently has enough stock for its total ordered quantity. */
+  preOrderReady?: boolean;
+  /** Server decision: status is PRE_ORDER_PENDING and stock is ready. Rechecked on approval. */
+  canApprovePreOrder?: boolean;
 }
 
 /** TrackingStatusOptionDTO */

@@ -1,5 +1,6 @@
 import axios, { type AxiosError, type AxiosInstance } from 'axios';
 import { clearSession, getToken, isSessionExpired, redirectToLogin } from '../auth/session';
+import { METHOD_NOT_ALLOWED_MESSAGE } from '../utils/apiError';
 
 declare module 'axios' {
   interface AxiosRequestConfig {
@@ -16,6 +17,7 @@ const STATUS_MESSAGES: Record<number, string> = {
   400: 'The request was invalid. Please check the entered values.',
   403: 'You do not have permission to perform this action.',
   404: 'The requested record was not found.',
+  405: METHOD_NOT_ALLOWED_MESSAGE,
   409: 'This record was modified by someone else. Please refresh and try again.',
   413: 'The uploaded file is too large.',
   422: 'Some fields are invalid. Please review and try again.',
@@ -23,6 +25,8 @@ const STATUS_MESSAGES: Record<number, string> = {
 };
 
 const describeError = (error: AxiosError): string => {
+  // The 405 body carries framework text, not a user-facing message.
+  if (error.response?.status === 405) return METHOD_NOT_ALLOWED_MESSAGE;
   const serverMessage = (error.response?.data as { message?: string } | undefined)?.message;
   if (serverMessage) return serverMessage;
   if (!error.response) return 'Unable to reach the server. Please check your connection and try again.';

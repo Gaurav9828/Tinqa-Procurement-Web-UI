@@ -8,6 +8,8 @@ import { CreateProductModal } from '../components/CreateProductModal';
 import { EditProductModal } from '../components/EditProductModal';
 import { ProductPreviewModal } from '../components/ProductPreviewModal';
 import { ProductStatusModal } from '../components/ProductStatusModal';
+import { StockAdjustModal } from '../components/StockAdjustModal';
+import type { StockAdjustMode } from '../utils/stockAdjustment';
 import type { ProductResponse, CreateProductRequest, UpdateProductRequest } from '../types/product.types';
 
 export const ProductManagementPage: React.FC = () => {
@@ -33,6 +35,7 @@ export const ProductManagementPage: React.FC = () => {
     const [editingProduct, setEditingProduct] = useState<ProductResponse | null>(null);
     const [previewProduct, setPreviewProduct] = useState<ProductResponse | null>(null);
     const [statusModalProduct, setStatusModalProduct] = useState<ProductResponse | null>(null);
+    const [stockTarget, setStockTarget] = useState<{ product: ProductResponse; mode: StockAdjustMode } | null>(null);
 
     const handleCreateProductSubmit = async (payload: CreateProductRequest) => {
         const success = await createProduct(payload);
@@ -93,6 +96,7 @@ export const ProductManagementPage: React.FC = () => {
                 isLoading={isLoading || isSubmitting}
                 onPreview={(product) => setPreviewProduct(product)}
                 onEdit={(product) => setEditingProduct(product)}
+                onAdjustStock={(product, mode) => setStockTarget({ product, mode })}
             />
 
             {/* Modals */}
@@ -114,6 +118,16 @@ export const ProductManagementPage: React.FC = () => {
                 product={previewProduct}
                 onClose={() => setPreviewProduct(null)}
             />
+
+            {stockTarget && (
+                <StockAdjustModal
+                    key={`${stockTarget.product.id}-${stockTarget.mode}`}
+                    product={stockTarget.product}
+                    initialMode={stockTarget.mode}
+                    updateProduct={updateProduct}
+                    onClose={() => setStockTarget(null)}
+                />
+            )}
 
             <ProductStatusModal
                 product={statusModalProduct}

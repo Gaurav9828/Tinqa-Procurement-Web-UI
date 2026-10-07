@@ -25,6 +25,11 @@ const CONTENT: Record<StateVariant, { icon: React.ElementType; title: string; bo
     title: 'Order not found',
     body: 'This order no longer exists or the order number is incorrect.',
   },
+  unsupported: {
+    icon: AlertTriangle,
+    title: 'Action not supported',
+    body: "The server doesn't support this request. Refresh the page; if it keeps happening, contact support.",
+  },
   conflict: {
     icon: AlertTriangle,
     title: 'Order changed',

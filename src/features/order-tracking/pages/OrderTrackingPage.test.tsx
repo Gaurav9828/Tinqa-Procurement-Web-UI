@@ -30,6 +30,7 @@ vi.mock('../api/orderTrackingApi', () => ({
     getTrackingStatuses: vi.fn(),
     updateTracking: vi.fn(),
     setOrderStatus: vi.fn(),
+    approvePreOrder: vi.fn(),
   },
 }));
 
@@ -871,5 +872,237 @@ describe('OrderTrackingPage', () => {
       expect(await screen.findByRole('heading', { name: 'Order not found' })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Back to orders' })).toBeInTheDocument();
     });
+  });
+});
+
+describe('405 METHOD_NOT_ALLOWED handling', () => {
+  const RAW = "Request method 'GET' is not supported";
+  const methodNotAllowed = () => axiosError(405, { success: false, message: RAW, errorCode: 'METHOD_NOT_ALLOWED' });
+  const FRIENDLY = /This action isn't supported by the server/;
+
+  it('order list: shows a friendly, non-retryable state instead of raw framework text', async () => {
+    api.listOrders.mockRejectedValue(methodNotAllowed());
+    renderPage();
+    expect(await screen.findByRole('heading', { name: 'Action not supported' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Retry' })).not.toBeInTheDocument();
+    expect(await screen.findByText(FRIENDLY)).toBeInTheDocument();
+    expect(screen.queryByText(RAW)).not.toBeInTheDocument();
+    expect(useAuthStore.getState().isAuthenticated).toBe(true);
+  });
+
+  it('order detail: shows the same state with a way back, no crash or blank page', async () => {
+    api.getOrder.mockRejectedValue(methodNotAllowed());
+    renderPage('/order-tracking/ORD-1001');
+    expect(await screen.findByRole('heading', { name: 'Action not supported' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Back to orders' })).toBeInTheDocument();
+    expect(screen.queryByText(RAW)).not.toBeInTheDocument();
+  });
+
+  it('tracking update (PATCH …/tracking): friendly alert, form kept, page intact', async () => {
+    api.updateTracking.mockRejectedValue(methodNotAllowed());
+    const { user } = renderPage();
+    const panel = await openOrder(user);
+    await user.selectOptions(within(panel).getByLabelText('Status'), 'OUT_FOR_DELIVERY');
+    await user.click(within(panel).getByRole('button', { name: 'Add tracking event' }));
+
+    expect(await screen.findByText(FRIENDLY)).toBeInTheDocument();
+    expect(screen.queryByText(RAW)).not.toBeInTheDocument();
+    expect(within(detailPage()).getByLabelText('Status')).toHaveValue('OUT_FOR_DELIVERY');
+    expect(within(detailPage()).getByRole('list', { name: 'Tracking history' })).toBeInTheDocument();
+    expect(api.getOrder).toHaveBeenCalledTimes(1); // no pointless reload
+  });
+
+  it('manual status update (PATCH …/status): friendly alert, nothing else sent', async () => {
+    api.setOrderStatus.mockRejectedValue(methodNotAllowed());
+    const { user } = renderPage();
+    const panel = await openOrder(user);
+    await chooseMode(user, panel, 'Manually update order status');
+    await user.selectOptions(within(panel).getByLabelText('Status'), 'OUT_FOR_DELIVERY');
+    await user.click(within(panel).getByRole('button', { name: 'Set order status' }));
+
+    expect(await screen.findByText(FRIENDLY)).toBeInTheDocument();
+    expect(api.setOrderStatus).toHaveBeenCalledTimes(1);
+    expect(api.updateTracking).not.toHaveBeenCalled();
+  });
+
+  it('status options (GET …/tracking-statuses): actions stay disabled with a retry', async () => {
+    api.getTrackingStatuses.mockRejectedValue(methodNotAllowed());
+    renderPage('/order-tracking/ORD-1001');
+    const panel = await screen.findByRole('region', { name: 'Order ORD-1001 details' });
+    expect(await within(panel).findByText('Status options could not be loaded.')).toBeInTheDocument();
+    expect(within(panel).getByRole('button', { name: 'Add tracking event' })).toBeDisabled();
+  });
+});
+
+describe('Pre-order review and approval', () => {
+  const PRE_STATUSES = [...STATUSES, { status: 'PRE_ORDER_PENDING', stage: 'PRE_ORDER_PENDING' }, { status: 'PRE_ORDER_CONFIRMED', stage: 'PRE_ORDER_CONFIRMED' }];
+
+  /** A waiting pre-order: 2 × Smart Plug requested (pre-order), 1 × LED Bulb in stock. */
+  const preOrder = (overrides: Partial<AdminOrderDetail> = {}, availableStock = 1): AdminOrderDetail => ({
+    ...DETAIL,
+    orderStatus: 'PRE_ORDER_PENDING',
+    preOrderReady: false,
+    canApprovePreOrder: false,
+    items: [
+      { productId: 11, title: 'Smart Plug', price: 999, quantity: 2, totalPrice: 1998, preOrder: true, availableStock },
+      { productId: 12, title: 'LED Bulb', price: 299, quantity: 1, totalPrice: 299, preOrder: false },
+    ],
+    tracking: [
+      entry(1, 'PRE_ORDER_RECEIVED', '2026-10-01T09:00:00'),
+      entry(2, 'PRE_ORDER_PENDING', '2026-10-01T10:00:00', { current: true }),
+    ],
+    ...overrides,
+  });
+  const ready = () => preOrder({ preOrderReady: true, canApprovePreOrder: true }, 5);
+  const approved = (): AdminOrderDetail =>
+    preOrder({
+      orderStatus: 'PRE_ORDER_CONFIRMED',
+      preOrderReady: true,
+      canApprovePreOrder: false,
+      tracking: [
+        entry(1, 'PRE_ORDER_RECEIVED', '2026-10-01T09:00:00'),
+        entry(2, 'PRE_ORDER_PENDING', '2026-10-01T10:00:00'),
+        entry(3, 'PRE_ORDER_CONFIRMED', '2026-10-03T10:00:00', { current: true, notes: 'Pre-order approved after stock availability check.' }),
+      ],
+    }, 3);
+
+  const card = () => screen.getByRole('region', { name: 'Pre-order review' });
+  const approveButton = () => within(card()).getByRole('button', { name: 'Approve pre-order' });
+
+  const openPreOrder = async (detail: AdminOrderDetail) => {
+    api.getTrackingStatuses.mockResolvedValue(ok(PRE_STATUSES));
+    api.getOrder.mockResolvedValue(ok(detail));
+    const ctx = renderPage('/order-tracking/ORD-1001');
+    await within(detailPage()).findByRole('region', { name: 'Pre-order review' });
+    await waitFor(() => expect(within(detailPage()).getByLabelText('Status')).toBeEnabled());
+    return ctx;
+  };
+
+  it('"Waiting pre-orders" filters the list by PRE_ORDER_PENDING (URL + request) and can be toggled off', async () => {
+    const { user } = renderPage('/order-tracking?page=2');
+    await screen.findByRole('table');
+    const toggle = screen.getByRole('button', { name: 'Waiting pre-orders' });
+    expect(toggle).toHaveAttribute('aria-pressed', 'false');
+
+    await user.click(toggle);
+    await waitFor(() => expect(lastListParams()).toMatchObject({ status: 'PRE_ORDER_PENDING', page: 0 }));
+    expect(currentUrl()).toBe('/order-tracking?status=PRE_ORDER_PENDING');
+    expect(toggle).toHaveAttribute('aria-pressed', 'true');
+
+    await user.click(toggle);
+    await waitFor(() => expect(lastListParams()).toMatchObject({ status: '' }));
+    expect(currentUrl()).toBe('/order-tracking');
+  });
+
+  it('shows requested vs. available stock, "Waiting for stock", and a disabled approval when not ready', async () => {
+    await openPreOrder(preOrder());
+    expect(within(card()).getByTestId('pre-order-readiness')).toHaveTextContent('Waiting for stock');
+    const rows = within(within(card()).getByRole('table', { name: 'Pre-order lines' })).getAllByRole('row').slice(1);
+    expect(rows).toHaveLength(1); // only pre-order lines
+    expect(rows[0]).toHaveTextContent('Smart Plug');
+    expect(rows[0].children[1]).toHaveTextContent('2'); // requested
+    expect(rows[0].children[2]).toHaveTextContent('1'); // available now
+    expect(rows[0]).toHaveAttribute('data-short', 'true');
+    expect(approveButton()).toBeDisabled();
+    expect(card()).toHaveTextContent('Approval becomes available once every pre-order product has enough stock');
+    // Customer / payment details are on the same page.
+    expect(detailPage()).toHaveTextContent('Asha Verma');
+    expect(detailPage()).toHaveTextContent('UPI · Paid');
+  });
+
+  it('never offers Pre-order Confirmed in the generic status form (approval is a dedicated action)', async () => {
+    const { user } = await openPreOrder(ready());
+    const options = () => within(within(detailPage()).getByLabelText('Status')).getAllByRole('option').slice(1).map((o) => o.getAttribute('value'));
+    expect(options()).toEqual(['CANCELLED']);
+    await user.click(within(detailPage()).getByRole('radio', { name: 'Manually update order status' }));
+    expect(options()).toEqual(['CANCELLED']);
+  });
+
+  it('approves through PATCH …/pre-order/approve after confirmation, then shows the server state', async () => {
+    api.approvePreOrder.mockResolvedValue(ok(approved(), 'Pre-order approved successfully'));
+    const { user } = await openPreOrder(ready());
+    expect(within(card()).getByTestId('pre-order-readiness')).toHaveTextContent('Stock ready');
+    api.getOrder.mockResolvedValue(ok(approved()));
+
+    await user.click(approveButton());
+    expect(screen.getByText('Approve this pre-order?')).toBeInTheDocument();
+    expect(api.approvePreOrder).not.toHaveBeenCalled();
+    await user.click(screen.getByRole('button', { name: 'Confirm' }));
+
+    expect(api.approvePreOrder).toHaveBeenCalledTimes(1);
+    expect(api.approvePreOrder).toHaveBeenCalledWith('ORD-1001');
+    expect(api.updateTracking).not.toHaveBeenCalled();
+    expect(api.setOrderStatus).not.toHaveBeenCalled();
+    expect(await screen.findByText('Pre-order approved successfully')).toBeInTheDocument();
+
+    await waitFor(() => expect(within(detailPage()).getByTestId('order-status')).toHaveTextContent('Pre Order Confirmed'));
+    expect(api.getOrder).toHaveBeenCalledTimes(2); // reloaded from the server
+    expect(within(card()).getByTestId('pre-order-readiness')).toHaveTextContent('Approved — stock reserved');
+    expect(within(card()).queryByRole('button', { name: 'Approve pre-order' })).not.toBeInTheDocument();
+    // Normal fulfilment continues through the usual status form.
+    const options = within(within(detailPage()).getByLabelText('Status')).getAllByRole('option').slice(1).map((o) => o.getAttribute('value'));
+    expect(options).toEqual(['PROCESSING', 'CANCELLED']);
+  });
+
+  it('on PRE_ORDER_STOCK_NOT_READY: clear message, reload, stays waiting, no success shown', async () => {
+    api.approvePreOrder.mockRejectedValue(
+      axiosError(409, { message: 'Pre-order items are still waiting for sufficient stock.', errorCode: 'PRE_ORDER_STOCK_NOT_READY' })
+    );
+    const { user } = await openPreOrder(ready());
+    api.getOrder.mockResolvedValue(ok(preOrder({}, 1))); // stock was taken meanwhile
+
+    await user.click(approveButton());
+    await user.click(screen.getByRole('button', { name: 'Confirm' }));
+
+    expect(await screen.findByText(/Not enough stock is available yet to approve this pre-order/)).toBeInTheDocument();
+    await waitFor(() => expect(api.getOrder).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(within(card()).getByTestId('pre-order-readiness')).toHaveTextContent('Waiting for stock'));
+    expect(within(detailPage()).getByTestId('order-status')).toHaveTextContent('Pre Order Pending');
+    expect(approveButton()).toBeDisabled();
+    expect(screen.queryByText('Pre-order approved successfully')).not.toBeInTheDocument();
+    expect(screen.queryByText('Approve this pre-order?')).not.toBeInTheDocument();
+  });
+
+  it('on 403: shows the permission message, keeps the page and session, and does not reload', async () => {
+    api.approvePreOrder.mockRejectedValue(axiosError(403, { message: 'You do not have permission to perform this action.' }));
+    const { user } = await openPreOrder(ready());
+    await user.click(approveButton());
+    await user.click(screen.getByRole('button', { name: 'Confirm' }));
+
+    expect(await screen.findByText('You do not have permission to perform this action.')).toBeInTheDocument();
+    expect(useAuthStore.getState().isAuthenticated).toBe(true);
+    expect(api.getOrder).toHaveBeenCalledTimes(1);
+    expect(within(detailPage()).getByTestId('order-status')).toHaveTextContent('Pre Order Pending');
+  });
+
+  it('on another 409 (e.g. already approved elsewhere): shows the server message and reloads the real state', async () => {
+    api.approvePreOrder.mockRejectedValue(axiosError(409, { message: 'Only waiting pre-orders can be approved.', errorCode: 'PRE_ORDER_APPROVAL_NOT_ALLOWED' }));
+    const { user } = await openPreOrder(ready());
+    api.getOrder.mockResolvedValue(ok(approved()));
+    await user.click(approveButton());
+    await user.click(screen.getByRole('button', { name: 'Confirm' }));
+
+    expect(await screen.findByText('Only waiting pre-orders can be approved.')).toBeInTheDocument();
+    await waitFor(() => expect(within(detailPage()).getByTestId('order-status')).toHaveTextContent('Pre Order Confirmed'));
+  });
+
+  it('on a network failure: shows an error and keeps the order waiting', async () => {
+    api.approvePreOrder.mockRejectedValue(networkError());
+    const { user } = await openPreOrder(ready());
+    await user.click(approveButton());
+    await user.click(screen.getByRole('button', { name: 'Confirm' }));
+    expect(await screen.findByText('Network Error')).toBeInTheDocument();
+    expect(approveButton()).toBeEnabled();
+  });
+
+  it('hides the approval action for a role that cannot manage order tracking (UX only)', async () => {
+    useAuthStore.setState({
+      user: { userId: 9, username: 'viewer', email: 'v@tinqa.com', role: 'VIEWER', authClient: 'web', isFirstLogin: false },
+    });
+    api.getTrackingStatuses.mockResolvedValue(ok(PRE_STATUSES));
+    api.getOrder.mockResolvedValue(ok(ready()));
+    renderPage('/order-tracking/ORD-1001');
+    const reviewCard = await within(detailPage()).findByRole('region', { name: 'Pre-order review' });
+    expect(within(reviewCard).queryByRole('button', { name: 'Approve pre-order' })).not.toBeInTheDocument();
   });
 });
