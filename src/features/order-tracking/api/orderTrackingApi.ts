@@ -51,6 +51,19 @@ export const orderTrackingApi = {
   },
 
   /**
+   * PATCH /api/admin/orders/{orderNumber}/pre-order/approve — no request body.
+   * The backend rechecks stock under lock, reserves it and moves the order to
+   * PRE_ORDER_CONFIRMED; returns the updated detail. 409 PRE_ORDER_STOCK_NOT_READY when stock
+   * is insufficient (the order stays PRE_ORDER_PENDING).
+   */
+  approvePreOrder: async (orderNumber: string): Promise<ApiResponse<AdminOrderDetail>> => {
+    const response = await ecommerceAxiosClient.patch<ApiResponse<AdminOrderDetail>>(
+      `${orderPath(ADMIN_BASE_URL, orderNumber)}/pre-order/approve`
+    );
+    return response.data;
+  },
+
+  /**
    * Option A — "Update tracking".
    * PATCH /api/orders/{orderNumber}/tracking with JSON `{ status, notes }`.
    * Appends one history event, marks it current and updates orderStatus.

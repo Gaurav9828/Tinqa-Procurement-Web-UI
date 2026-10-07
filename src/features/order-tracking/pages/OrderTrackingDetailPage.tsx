@@ -9,9 +9,11 @@ import { StatusUpdateForm } from '../components/StatusUpdateForm';
 import { TrackingStatusBadge } from '../components/TrackingStatusBadge';
 import { OrderTrackingStateMessage } from '../components/OrderTrackingStateMessage';
 import { StageProgress } from '../components/StageProgress';
+import { PreOrderReviewCard } from '../components/PreOrderReviewCard';
+import { usePreOrderApproval } from '../hooks/usePreOrderApproval';
 import { ShippingAddressLink } from '../components/ShippingAddressLink';
 import { getAllowedStatuses, type WorkflowContext } from '../utils/statusWorkflow';
-import { formatCurrency, formatDateTime, formatStatusLabel, formatUpdater, getCurrentEntry } from '../utils/orderTracking.utils';
+import { formatCurrency, formatDateTime, formatStatusLabel, formatUpdater, getCurrentEntry, hasPreOrderLines } from '../utils/orderTracking.utils';
 import type { StatusUpdateMode } from '../types/orderTracking.types';
 import { useAccess } from '../../../hooks/useAccess';
 import { ORDER_TRACKING_LIST_PATH, type OrderDetailLocationState } from '../utils/orderTrackingRoutes';
@@ -37,7 +39,10 @@ export const OrderTrackingDetailPage: React.FC = () => {
   const { orderNumber = '' } = useParams<{ orderNumber: string }>();
   const navigate = useNavigate();
   const location = useLocation();
-  const cameFromList = !!(location.state as OrderDetailLocationState | null)?.fromList;
+  const navState = location.state as OrderDetailLocationState | null;
+  // Opened from somewhere in the app (order list, support ticket…): Back returns there.
+  const canGoBackInHistory = !!navState?.fromList || !!navState?.backLabel;
+  const backLabel = navState?.backLabel ?? 'Back to orders';
 
   const detail = useAdminOrderDetail(orderNumber || null);
   const statusList = useTrackingStatuses();
@@ -51,7 +56,7 @@ export const OrderTrackingDetailPage: React.FC = () => {
   // Back to the exact list view (URL filters/page, then scroll is restored by the list).
   // Opened directly (new tab, bookmark)? There is no list entry to go back to, so open the list.
   const goBack = () => {
-    if (cameFromList) navigate(-1);
+    if (canGoBackInHistory) navigate(-1);
     else navigate(ORDER_TRACKING_LIST_PATH);
   };
 
@@ -74,6 +79,8 @@ export const OrderTrackingDetailPage: React.FC = () => {
   // After a change (or a 409 conflict) reload from the server — no optimistic audit values.
   const { refresh } = detail;
   const { isSubmitting, submit } = useStatusUpdate(isAllowed, { onSuccess: refresh, onConflict: refresh });
+  // Pre-orders are approved only through the dedicated endpoint; the result is reloaded from the server.
+  const { approve: approvePreOrder, isApproving } = usePreOrderApproval(orderNumber, refresh);
 
   // UX only: the backend authorizes every request from the bearer token.
   const { hasFeature } = useAccess();
@@ -91,7 +98,7 @@ export const OrderTrackingDetailPage: React.FC = () => {
             onClick={goBack}
             className="mt-0.5 flex items-center gap-1.5 px-3 py-1.5 bg-black/5 dark:bg-white/10 hover:bg-black/10 dark:hover:bg-white/20 text-black dark:text-white rounded-xl text-xs font-medium transition-colors cursor-pointer shrink-0"
           >
-            <ArrowLeft className="w-3.5 h-3.5" /> Back to orders
+            <ArrowLeft className="w-3.5 h-3.5" /> {backLabel}
           </button>
           <div className="min-w-0">
             <h1 className="font-mono text-xl font-bold text-black dark:text-white truncate flex items-center gap-2">
@@ -184,6 +191,9 @@ export const OrderTrackingDetailPage: React.FC = () => {
           </div>
 
           <div className="space-y-6 min-w-0 lg:sticky lg:top-20">
+            {(hasPreOrderLines(order) || order.orderStatus === 'PRE_ORDER_PENDING') && (
+              <PreOrderReviewCard order={order} canAct={canUpdate} isApproving={isApproving} onApprove={approvePreOrder} />
+            )}
             {canUpdate && (
               <Card title="Change Status">
                 <StatusUpdateForm

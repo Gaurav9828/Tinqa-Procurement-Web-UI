@@ -1,5 +1,5 @@
 import React from 'react';
-import { Eye, Pencil } from 'lucide-react';
+import { Eye, PackageMinus, PackagePlus, Pencil } from 'lucide-react';
 import { ProductStatusBadge } from './ProductStatusBadge';
 import type { ProductResponse } from '../types/product.types';
 
@@ -8,6 +8,7 @@ interface ProductTableProps {
   isLoading: boolean;
   onPreview: (product: ProductResponse) => void;
   onEdit: (product: ProductResponse) => void;
+  onAdjustStock: (product: ProductResponse, mode: 'add' | 'reduce') => void;
 }
 
 export const ProductTable: React.FC<ProductTableProps> = ({
@@ -15,6 +16,7 @@ export const ProductTable: React.FC<ProductTableProps> = ({
   isLoading,
   onPreview,
   onEdit,
+  onAdjustStock,
 }) => {
   return (
     <div className="overflow-x-auto border border-black/10 dark:border-white/10 rounded-2xl text-xs">
@@ -70,6 +72,23 @@ export const ProductTable: React.FC<ProductTableProps> = ({
                       title="Edit Product"
                     >
                       <Pencil className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      onClick={() => onAdjustStock(product, 'add')}
+                      className="p-1.5 hover:bg-emerald-500/10 rounded-lg text-gray-500 hover:text-emerald-600 dark:text-white cursor-pointer"
+                      title="Add stock"
+                      aria-label={`Add stock for ${product.title}`}
+                    >
+                      <PackagePlus className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      onClick={() => onAdjustStock(product, 'reduce')}
+                      disabled={!(product.stockQuantity > 0)}
+                      className="p-1.5 hover:bg-rose-500/10 rounded-lg text-gray-500 hover:text-rose-600 dark:text-white cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+                      title={product.stockQuantity > 0 ? 'Reduce stock' : 'No stock to reduce'}
+                      aria-label={`Reduce stock for ${product.title}`}
+                    >
+                      <PackageMinus className="w-3.5 h-3.5" />
                     </button>
                   </div>
                 </td>

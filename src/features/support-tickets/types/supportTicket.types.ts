@@ -22,6 +22,11 @@ export interface TicketSummary {
   issueType: TicketIssueType | string;
   productId?: number | null;
   productName?: string | null;
+  /**
+   * Order the ticket was raised about — a snapshot kept even if the order is later deleted.
+   * Null/absent for tickets not linked to an order (and legacy tickets).
+   */
+  orderNumber?: string | null;
   status: TicketStatus | string;
   /** The customer has not yet seen the latest support activity. */
   unreadByCustomer: boolean;
@@ -42,9 +47,29 @@ export interface TicketMessage {
   createdAt: string;
 }
 
+/** SupportTicketOrderDTO.Item */
+export interface TicketOrderItem {
+  productId: number;
+  title: string;
+  quantity: number;
+}
+
+/**
+ * SupportTicketOrderDTO — summary of the linked order (admin detail only). Not a tracking
+ * timeline: use the admin order detail page for history.
+ */
+export interface TicketOrderContext {
+  status: string;
+  total: number;
+  paymentStatus: string;
+  items: TicketOrderItem[];
+}
+
 /** SupportTicketDetailDTO */
 export interface TicketDetail extends TicketSummary {
   customerEmail?: string | null;
+  /** Present only while the linked order still exists; absent for deleted orders and legacy tickets. */
+  order?: TicketOrderContext | null;
   /** Oldest first. */
   messages?: TicketMessage[] | null;
   canReply: boolean;

@@ -5,7 +5,16 @@ import axios from 'axios';
  * The user-facing message still comes from the backend via `getApiErrorMessage`.
  * 401 never reaches a page: the shared API client ends the session and redirects.
  */
-export type ApiErrorKind = 'forbidden' | 'notFound' | 'conflict' | 'validation' | 'rateLimited' | 'server' | 'network' | 'unknown';
+export type ApiErrorKind =
+  | 'forbidden'
+  | 'notFound'
+  | 'unsupported'
+  | 'conflict'
+  | 'validation'
+  | 'rateLimited'
+  | 'server'
+  | 'network'
+  | 'unknown';
 
 export const getApiErrorKind = (err: unknown): ApiErrorKind => {
   if (!axios.isAxiosError(err)) return 'unknown';
@@ -13,6 +22,8 @@ export const getApiErrorKind = (err: unknown): ApiErrorKind => {
   const status = err.response.status;
   if (status === 403) return 'forbidden';
   if (status === 404) return 'notFound';
+  // 405 METHOD_NOT_ALLOWED: retrying the same request can never succeed.
+  if (status === 405) return 'unsupported';
   if (status === 409) return 'conflict';
   if (status === 429) return 'rateLimited';
   if (status === 400 || status === 422) return 'validation';

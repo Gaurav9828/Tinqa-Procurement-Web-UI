@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { ChevronRight, EyeOff, Package } from 'lucide-react';
+import { ChevronRight, EyeOff, Package, ShoppingBag } from 'lucide-react';
 import type { TicketSummary } from '../types/supportTicket.types';
 import { TicketStatusBadge } from './TicketStatusBadge';
 import { activityTime, formatDateTime, formatIssueType, ticketDetailPath } from '../utils/supportTicket.utils';
@@ -69,6 +69,11 @@ export const TicketList: React.FC<Props> = ({ tickets, isLoading = false, highli
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-gray-500 dark:text-neutral-400">
                 <span className="font-mono">{ticket.referenceNumber}</span>
                 <span>{formatIssueType(ticket.issueType)}</span>
+                {ticket.orderNumber && (
+                  <span className="inline-flex items-center gap-1" data-testid="ticket-order">
+                    <ShoppingBag className="w-3 h-3" /> Order #{ticket.orderNumber}
+                  </span>
+                )}
                 {ticket.productName && (
                   <span className="inline-flex items-center gap-1">
                     <Package className="w-3 h-3" /> {ticket.productName}

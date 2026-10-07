@@ -79,4 +79,20 @@ describe('status workflow rules', () => {
     // Inconsistent legacy history must never let "undo" reopen a closed state.
     expect(getAllowedStatuses('manual', ctx('CONFIRMED', 'RETURN_COMPLETED'))).not.toContain('RETURN_COMPLETED');
   });
+
+  it('never offers PRE_ORDER_CONFIRMED in the generic form — it is reached only via the approval endpoint', () => {
+    for (const status of [...Object.keys(NEXT_STATUSES), null, 'PENDING']) {
+      for (const mode of both) {
+        expect(getAllowedStatuses(mode, ctx(status, 'PRE_ORDER_PENDING'))).not.toContain('PRE_ORDER_CONFIRMED');
+      }
+    }
+  });
+
+  it('a waiting pre-order can only be cancelled from the generic form', () => {
+    for (const mode of both) expect(getAllowedStatuses(mode, ctx('PRE_ORDER_PENDING', 'PRE_ORDER_RECEIVED'))).toEqual(['CANCELLED']);
+  });
+
+  it('an approved pre-order continues to fulfilment and cannot be "undone" back to pending', () => {
+    expect(getAllowedStatuses('manual', ctx('PRE_ORDER_CONFIRMED', 'PRE_ORDER_PENDING'))).toEqual(['PROCESSING', 'CANCELLED']);
+  });
 });

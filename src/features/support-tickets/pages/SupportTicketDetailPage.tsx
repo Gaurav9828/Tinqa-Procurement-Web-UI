@@ -9,6 +9,8 @@ import { TicketStatusControls } from '../components/TicketStatusControls';
 import { TicketStatusBadge } from '../components/TicketStatusBadge';
 import { TicketStateMessage } from '../components/TicketStateMessage';
 import { ReplySuggestions } from '../components/ReplySuggestions';
+import { TicketOrderSection } from '../components/TicketOrderSection';
+import { useAccess } from '../../../hooks/useAccess';
 import { suggestReplies } from '../assistant/suggestReplies';
 import type { AdminSettableStatus } from '../types/supportTicket.types';
 import {
@@ -40,6 +42,10 @@ export const SupportTicketDetailPage: React.FC = () => {
   useEffect(() => {
     window.scrollTo(0, 0);
   }, [referenceNumber]);
+
+  // Only link to the order page if this role can open it (UX only; the backend still authorizes).
+  const { authorizedNavigation } = useAccess();
+  const canOpenOrder = authorizedNavigation().some((item) => item.id === 'order-tracking');
 
   // Reply draft lives here so a suggestion can be placed into the box for editing.
   const [draft, setDraft] = useState('');
@@ -166,6 +172,8 @@ export const SupportTicketDetailPage: React.FC = () => {
                 {ticket.closedAt && <Field label="Closed">{formatDateTime(ticket.closedAt)}</Field>}
               </dl>
             </div>
+
+            <TicketOrderSection orderNumber={ticket.orderNumber} order={ticket.order} canOpenOrder={canOpenOrder} />
 
             <div className="apple-card p-5 space-y-3">
               <h2 className="text-sm font-semibold text-black dark:text-white">Status</h2>

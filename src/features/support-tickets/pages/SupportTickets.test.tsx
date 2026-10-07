@@ -11,6 +11,9 @@ import { useAuthStore } from '../../../store/useAuthStore';
 import { SupportTicketsPage } from './SupportTicketsPage';
 import { SupportTicketDetailPage } from './SupportTicketDetailPage';
 import { supportTicketsApi } from '../api/supportTicketsApi';
+import { OrderTrackingDetailPage } from '../../order-tracking/pages/OrderTrackingDetailPage';
+import { orderTrackingApi } from '../../order-tracking/api/orderTrackingApi';
+import type { AdminOrderDetail } from '../../order-tracking/types/orderTracking.types';
 import type { ApiResponse, PageResponse } from '../../../types/common.types';
 import type { TicketDetail, TicketMessage, TicketSummary } from '../types/supportTicket.types';
 
@@ -19,6 +22,11 @@ vi.mock('../api/supportTicketsApi', () => ({
   supportTicketsApi: { listTickets: vi.fn(), getTicket: vi.fn(), reply: vi.fn(), updateStatus: vi.fn() },
 }));
 const api = vi.mocked(supportTicketsApi);
+// The real admin order page is mounted for the navigation test; only its API is mocked.
+vi.mock('../../order-tracking/api/orderTrackingApi', () => ({
+  orderTrackingApi: { getOrder: vi.fn(), getTrackingStatuses: vi.fn(), listOrders: vi.fn(), updateTracking: vi.fn(), setOrderStatus: vi.fn() },
+}));
+const orderApi = vi.mocked(orderTrackingApi);
 
 // ---------- fixtures ----------
 const ok = <T,>(data: T, message = 'OK'): ApiResponse<T> => ({ success: true, message, errorCode: null, data, timestamp: '', path: '' });
@@ -119,6 +127,7 @@ const renderAt = (entry = '/support-tickets') => {
         <Routes>
           <Route path="/support-tickets" element={<SupportTicketsPage />} />
           <Route path="/support-tickets/:referenceNumber" element={<SupportTicketDetailPage />} />
+          <Route path="/order-tracking/:orderNumber" element={<OrderTrackingDetailPage />} />
         </Routes>
         <LocationProbe />
       </MemoryRouter>
@@ -558,5 +567,113 @@ describe('Reply suggestions (local assistant)', () => {
     await user.click(within(suggestions()).getByRole('button', { name: /Suggested replies/ }));
     expect(within(suggestions()).queryByRole('button', { name: /^Send/ })).not.toBeInTheDocument();
     expect(localStorage.getItem('tinqa.supportTickets.suggestionsCollapsed')).toBe('1');
+  });
+});
+
+describe('Order-linked tickets', () => {
+  const ORDER_CONTEXT = {
+    status: 'OUT_FOR_DELIVERY',
+    total: 2297,
+    paymentStatus: 'PAID',
+    items: [
+      { productId: 11, title: 'Smart Plug', quantity: 2 },
+      { productId: 12, title: 'LED Bulb', quantity: 1 },
+    ],
+  };
+  const linkedOrder = () => screen.queryByRole('region', { name: 'Linked order' });
+
+  it('shows "Order #…" in the list only for tickets linked to an order', async () => {
+    api.listTickets.mockResolvedValue(page([{ ...TICKET, orderNumber: 'ORD-1001' }, { ...TICKET_2, orderNumber: null }]));
+    renderAt();
+    const list = await screen.findByRole('list', { name: 'Support tickets' });
+    const [linked, plain] = within(list).getAllByRole('listitem');
+    expect(within(linked).getByTestId('ticket-order')).toHaveTextContent('Order #ORD-1001');
+    expect(within(plain).queryByTestId('ticket-order')).not.toBeInTheDocument();
+    expect(plain).not.toHaveTextContent('Order #');
+    expect(plain).toHaveTextContent('Where is my order?'); // still renders normally
+  });
+
+  it('renders the linked order summary: number, status, total, payment and items', async () => {
+    await openDetail({ ...DETAIL, orderNumber: 'ORD-1001', order: ORDER_CONTEXT });
+    const card = linkedOrder()!;
+    expect(within(card).getByRole('link', { name: /Order #ORD-1001/ })).toBeInTheDocument();
+    expect(card).toHaveTextContent('Out For Delivery');
+    expect(card).toHaveTextContent('₹2,297.00');
+    expect(card).toHaveTextContent('Paid');
+    const items = within(within(card).getByRole('list', { name: 'Order items' })).getAllByRole('listitem');
+    expect(items.map((li) => li.textContent)).toEqual(['Smart Plug×2', 'LED Bulb×1']);
+  });
+
+  it('renders no order section for tickets without an order (null or absent fields)', async () => {
+    await openDetail({ ...DETAIL, orderNumber: null, order: null });
+    expect(linkedOrder()).not.toBeInTheDocument();
+  });
+
+  it('renders no order section for legacy tickets that omit the fields entirely', async () => {
+    const legacy = { ...DETAIL } as Partial<TicketDetail>;
+    delete legacy.orderNumber;
+    delete legacy.order;
+    await openDetail(legacy as TicketDetail);
+    expect(linkedOrder()).not.toBeInTheDocument();
+  });
+
+  it('for a deleted order keeps the number as plain text (no broken link) and says details are unavailable', async () => {
+    await openDetail({ ...DETAIL, orderNumber: 'ORD-GONE', order: null });
+    const card = linkedOrder()!;
+    expect(within(card).getByTestId('order-number-text')).toHaveTextContent('Order #ORD-GONE');
+    expect(within(card).queryByRole('link')).not.toBeInTheDocument();
+    expect(card).toHaveTextContent('Order details are no longer available');
+    expect(card).not.toHaveTextContent('₹'); // no misleading fallback values
+  });
+
+  it('opens the existing admin order detail page from the ticket, and Back returns to the ticket', async () => {
+    const order: AdminOrderDetail = {
+      id: 1,
+      orderNumber: 'ORD-1001',
+      orderStatus: 'OUT_FOR_DELIVERY',
+      paymentMethod: 'UPI',
+      paymentStatus: 'PAID',
+      totalAmount: 2297,
+      itemCount: 2,
+      createdAt: '2026-10-01T09:00:00',
+      updatedAt: '2026-10-03T09:00:00',
+      updatedBy: 'admin_l1',
+      customer: { id: 7, name: 'Asha Rao', email: 'asha@example.com' },
+      items: [],
+      currentTracking: null,
+      addressId: 5,
+      subtotal: 2297,
+      shippingFee: 0,
+      notes: null,
+      tracking: [],
+    };
+    orderApi.getOrder.mockResolvedValue(ok(order));
+    orderApi.getTrackingStatuses.mockResolvedValue(ok([]));
+    const { user } = await openDetail({ ...DETAIL, orderNumber: 'ORD-1001', order: ORDER_CONTEXT });
+
+    await user.click(within(linkedOrder()!).getByRole('link', { name: /Order #ORD-1001/ }));
+    expect(currentUrl()).toBe('/order-tracking/ORD-1001');
+    expect(await screen.findByRole('region', { name: 'Order ORD-1001 details' })).toBeInTheDocument();
+    expect(orderApi.getOrder).toHaveBeenCalledWith('ORD-1001'); // tracking comes from the order API, not the ticket
+
+    await user.click(screen.getByRole('button', { name: 'Back to ticket' }));
+    expect(currentUrl()).toBe('/support-tickets/TQ-Q-000007');
+    expect(await within(ticketPage()).findByRole('list', { name: 'Conversation' })).toBeInTheDocument();
+  });
+
+  it('URL-encodes order numbers in the link', async () => {
+    await openDetail({ ...DETAIL, orderNumber: 'ORD/2 #9', order: ORDER_CONTEXT });
+    expect(within(linkedOrder()!).getByRole('link', { name: /Order #ORD\/2 #9/ })).toHaveAttribute('href', '/order-tracking/ORD%2F2%20%239');
+  });
+
+  it('shows the number without a link when the role cannot open order tracking', async () => {
+    useAuthStore.setState({
+      user: { userId: 9, username: 'viewer', email: 'v@tinqa.com', role: 'VIEWER', authClient: 'web', isFirstLogin: false },
+    });
+    await openDetail({ ...DETAIL, orderNumber: 'ORD-1001', order: ORDER_CONTEXT });
+    const card = linkedOrder()!;
+    expect(within(card).queryByRole('link')).not.toBeInTheDocument();
+    expect(within(card).getByTestId('order-number-text')).toHaveTextContent('Order #ORD-1001');
+    expect(card).toHaveTextContent('₹2,297.00'); // summary still shown
   });
 });

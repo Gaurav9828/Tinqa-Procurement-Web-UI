@@ -69,4 +69,10 @@ describe('orderTrackingApi request shapes', () => {
       expect(serialized).not.toContain(field);
     }
   });
+
+  it('approves a pre-order with PATCH /admin/orders/{n}/pre-order/approve and no body', async () => {
+    await orderTrackingApi.approvePreOrder('ORD/1');
+    expect(client.patch).toHaveBeenCalledTimes(1);
+    expect(client.patch.mock.calls[0]).toEqual(['/admin/orders/ORD%2F1/pre-order/approve']);
+  });
 });
