@@ -74,6 +74,23 @@ export interface OrderShippingAddress {
   country: string | null;
 }
 
+/** OrderPaymentResponseDTO — one Razorpay attempt. The signature is never sent. */
+export interface OrderPaymentAttempt {
+  provider: string | null;
+  /** CREATED | ATTEMPTED | FAILED | PAID */
+  status: string;
+  /** Razorpay payment ID; null until the customer actually attempts payment. */
+  transactionId: string | null;
+  /** e.g. UPI / CARD — recorded once Razorpay reports how the customer paid. */
+  paymentInstrument: string | null;
+  /** Minor units (paise). Divide by 100 for rupees. */
+  amountPaise: number | null;
+  currency: string | null;
+  createdAt: string | null;
+  /** Set only on the PAID attempt. */
+  paidAt: string | null;
+}
+
 /** AdminOrderDetailDTO — GET /admin/orders/{orderNumber}. */
 export interface AdminOrderDetail extends AdminOrderSummary {
   addressId: number | null;
@@ -87,6 +104,8 @@ export interface AdminOrderDetail extends AdminOrderSummary {
   notes: string | null;
   /** Full history, createdAt ascending. */
   tracking: OrderTrackingEntry[] | null;
+  /** Razorpay attempts, oldest first. `undefined` on backends that predate this field. */
+  payments?: OrderPaymentAttempt[] | null;
   /** Every pre-order product currently has enough stock for its total ordered quantity. */
   preOrderReady?: boolean;
   /** Server decision: status is PRE_ORDER_PENDING and stock is ready. Rechecked on approval. */

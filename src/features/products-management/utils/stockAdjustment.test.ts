@@ -18,6 +18,9 @@ const PRODUCT: ProductResponse = {
   stockQuantity: 12,
   lastUpdateDescription: 'Price change',
   specifications: [{ specKey: 'Power', specValue: '9W' }],
+  warranties: [
+    { id: 4, title: '1 Year Warranty', description: 'd', generalTermsAndConditions: 't', isActive: true, createdAt: null, updatedAt: null },
+  ],
 };
 
 describe('calculateNewStock', () => {
@@ -76,5 +79,9 @@ describe('buildStockUpdatePayload', () => {
 
   it('keeps a disabled product disabled', () => {
     expect(buildStockUpdatePayload({ ...PRODUCT, enabled: false }, 1, 'x').enabled).toBe(false);
+  });
+
+  it('omits the warranties key so a stock change leaves warranties untouched', () => {
+    expect(buildStockUpdatePayload(PRODUCT, 13, 'x')).not.toHaveProperty('warranties');
   });
 });

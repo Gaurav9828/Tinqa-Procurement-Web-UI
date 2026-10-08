@@ -5,6 +5,8 @@ import type { ApiResponse } from '../types/common.types';
 interface ActionMessages {
   success: string;
   failure: string;
+  /** Called with the thrown error (after the alert), e.g. to show backend field errors inline. */
+  onError?: (err: unknown) => void;
 }
 
 /**
@@ -29,6 +31,7 @@ export const useApiAction = (onSuccess?: () => void) => {
         return false;
       } catch (err: unknown) {
         notify.error(err, messages.failure);
+        messages.onError?.(err);
         return false;
       } finally {
         setIsSubmitting(false);

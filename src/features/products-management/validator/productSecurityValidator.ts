@@ -1,4 +1,5 @@
 import type { CreateProductRequest, UpdateProductRequest } from '../types/product.types';
+import { validateWarrantyText, type WarrantyTextField } from '../utils/warrantyForm';
 
 export const validateProductPayload = (payload: CreateProductRequest | UpdateProductRequest): string => {
   if (!payload) {
@@ -73,6 +74,16 @@ export const validateProductPayload = (payload: CreateProductRequest | UpdatePro
       if (spec.specValue) {
         const valErr = sanitizeText(spec.specValue, 500, "Specification Value");
         if (valErr) return valErr;
+      }
+    }
+  }
+
+  // 8. Warranties (the form shows these inline first; this is the last line of defence)
+  if (payload.warranties) {
+    for (const [index, warranty] of payload.warranties.entries()) {
+      for (const field of ['title', 'description', 'generalTermsAndConditions'] as WarrantyTextField[]) {
+        const error = validateWarrantyText(warranty[field] ?? '', field);
+        if (error) return `Warranty ${index + 1}: ${error}`;
       }
     }
   }

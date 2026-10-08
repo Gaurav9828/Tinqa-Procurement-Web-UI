@@ -18,9 +18,11 @@ import type {
   AdminOrderDetail,
   AdminOrderSummary,
   OrderStatusUpdateResponse,
+  OrderPaymentAttempt,
   OrderTrackingEntry,
   TrackingStatusOption,
 } from '../types/orderTracking.types';
+import { formatDateTime } from '../utils/orderTracking.utils';
 
 // Only the network layer is mocked.
 vi.mock('../api/orderTrackingApi', () => ({
@@ -723,6 +725,122 @@ describe('OrderTrackingPage', () => {
     });
   });
 
+  describe('payment', () => {
+    const paymentSection = (panel: HTMLElement) => within(panel).getByRole('region', { name: 'Payment' });
+
+    it('shows the order payment status and method from the detail response', async () => {
+      api.getOrder.mockResolvedValue(ok({ ...DETAIL, paymentMethod: 'RAZORPAY', paymentStatus: 'PAID' }));
+      const { user } = renderPage();
+      const section = paymentSection(await openOrder(user));
+      expect(within(section).getByTestId('payment-status')).toHaveTextContent('Paid');
+      expect(within(section).getByTestId('payment-method')).toHaveTextContent('Razorpay');
+    });
+
+    it.each([
+      ['FAILED', 'Failed'],
+      ['REFUND_REQUESTED', 'Refund requested'],
+      ['REFUNDED', 'Refunded'],
+      ['CANCELLED', 'Cancelled'],
+      ['PENDING', 'Pending'],
+    ])('labels payment status %s as "%s"', async (paymentStatus, label) => {
+      api.getOrder.mockResolvedValue(ok({ ...DETAIL, paymentMethod: 'RAZORPAY', paymentStatus }));
+      const { user } = renderPage();
+      const section = paymentSection(await openOrder(user));
+      expect(within(section).getByTestId('payment-status')).toHaveTextContent(label);
+    });
+
+    it('says "Not recorded" instead of inventing values when status and method are missing', async () => {
+      api.getOrder.mockResolvedValue(ok({ ...DETAIL, paymentMethod: null, paymentStatus: null }));
+      const { user } = renderPage();
+      const section = paymentSection(await openOrder(user));
+      expect(within(section).getByTestId('payment-status')).toHaveTextContent('Not recorded');
+      expect(within(section).getByTestId('payment-method')).toHaveTextContent('Not recorded');
+      expect(section).not.toHaveTextContent('null');
+    });
+
+    const attempt = (overrides: Partial<OrderPaymentAttempt>): OrderPaymentAttempt => ({
+      provider: 'RAZORPAY',
+      status: 'CREATED',
+      transactionId: null,
+      paymentInstrument: null,
+      amountPaise: 229700,
+      currency: 'INR',
+      createdAt: '2026-10-06T10:00:00',
+      paidAt: null,
+      ...overrides,
+    });
+    const PAID_ATTEMPT = attempt({
+      status: 'PAID',
+      transactionId: 'pay_TEST123',
+      paymentInstrument: 'UPI',
+      createdAt: '2026-10-06T10:15:00',
+      paidAt: '2026-10-06T10:20:00',
+    });
+
+    it('shows the transaction ID, payment date and amount (paise → rupees) for a paid order', async () => {
+      api.getOrder.mockResolvedValue(ok({ ...DETAIL, paymentMethod: 'RAZORPAY', paymentStatus: 'PAID', payments: [PAID_ATTEMPT] }));
+      const { user } = renderPage();
+      const section = paymentSection(await openOrder(user));
+      expect(within(section).getByTestId('payment-transaction-id')).toHaveTextContent('pay_TEST123');
+      expect(within(section).getByTestId('payment-date')).toHaveTextContent(formatDateTime('2026-10-06T10:20:00'));
+      expect(within(section).getByTestId('payment-amount')).toHaveTextContent('₹2,297.00');
+      expect(within(section).getByTestId('payment-amount')).not.toHaveTextContent('2,29,700');
+      expect(within(section).getByTestId('payment-method')).toHaveTextContent('Razorpay · UPI');
+    });
+
+    it('lists every attempt of a failed-then-retried payment and uses the paid one for the summary', async () => {
+      const failed = attempt({ status: 'FAILED', transactionId: 'pay_FAILED1', createdAt: '2026-10-06T10:00:00' });
+      api.getOrder.mockResolvedValue(ok({ ...DETAIL, paymentStatus: 'PAID', payments: [failed, PAID_ATTEMPT] }));
+      const { user } = renderPage();
+      const section = paymentSection(await openOrder(user));
+      expect(within(section).getByTestId('payment-transaction-id')).toHaveTextContent('pay_TEST123');
+
+      const rows = within(within(section).getByRole('table', { name: 'Payment attempts' })).getAllByRole('row').slice(1);
+      expect(rows).toHaveLength(2);
+      expect(rows[0]).toHaveTextContent('Failed');
+      expect(rows[0]).toHaveTextContent('pay_FAILED1');
+      expect(rows[0]).toHaveTextContent('₹2,297.00');
+      expect(rows[1]).toHaveTextContent('Paid');
+      expect(rows[1]).toHaveTextContent('pay_TEST123');
+      expect(rows[1]).toHaveTextContent(formatDateTime('2026-10-06T10:20:00'));
+    });
+
+    it('shows "Not paid yet" when no attempt has succeeded, and dashes for missing IDs and dates', async () => {
+      api.getOrder.mockResolvedValue(ok({ ...DETAIL, paymentStatus: 'PENDING', payments: [attempt({ status: 'CREATED' })] }));
+      const { user } = renderPage();
+      const section = paymentSection(await openOrder(user));
+      expect(within(section).getByTestId('payment-transaction-id')).toHaveTextContent('Not paid yet');
+      expect(within(section).getByTestId('payment-date')).toHaveTextContent('Not paid yet');
+      const row = within(within(section).getByRole('table', { name: 'Payment attempts' })).getAllByRole('row')[1];
+      expect(row).toHaveTextContent('Created');
+      expect(row).not.toHaveTextContent('null');
+    });
+
+    it('says so when the order has no payment attempts', async () => {
+      api.getOrder.mockResolvedValue(ok({ ...DETAIL, paymentStatus: 'PENDING', payments: [] }));
+      const { user } = renderPage();
+      const section = paymentSection(await openOrder(user));
+      expect(within(section).getByText('No payment attempts recorded for this order.')).toBeInTheDocument();
+      expect(within(section).queryByRole('table')).not.toBeInTheDocument();
+    });
+
+    it('explains when the server does not send transaction details, rather than implying there were none', async () => {
+      // Older backend: AdminOrderDetailDTO without `payments`.
+      const { user } = renderPage();
+      const section = paymentSection(await openOrder(user));
+      expect(within(section).getByText("Transaction details aren't available from the server yet.")).toBeInTheDocument();
+      expect(within(section).queryByTestId('payment-transaction-id')).not.toBeInTheDocument();
+    });
+
+    it('is not rendered when the order fails to load', async () => {
+      api.getOrder.mockRejectedValue(axiosError(404, { message: 'Order not found', errorCode: 'ORDER_NOT_FOUND' }));
+      renderPage('/order-tracking/ORD-1001');
+      const panel = detailPage();
+      expect(await within(panel).findByRole('heading', { name: 'Order not found' })).toBeInTheDocument();
+      expect(within(panel).queryByRole('region', { name: 'Payment' })).not.toBeInTheDocument();
+    });
+  });
+
   describe('shipping address', () => {
     const ADDRESS = {
       recipientName: 'Asha Verma',
@@ -1007,7 +1125,9 @@ describe('Pre-order review and approval', () => {
     expect(card()).toHaveTextContent('Approval becomes available once every pre-order product has enough stock');
     // Customer / payment details are on the same page.
     expect(detailPage()).toHaveTextContent('Asha Verma');
-    expect(detailPage()).toHaveTextContent('UPI · Paid');
+    const payment = within(detailPage()).getByRole('region', { name: 'Payment' });
+    expect(payment).toHaveTextContent('UPI');
+    expect(payment).toHaveTextContent('Paid');
   });
 
   it('never offers Pre-order Confirmed in the generic status form (approval is a dedicated action)', async () => {

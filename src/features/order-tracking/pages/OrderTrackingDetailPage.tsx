@@ -12,8 +12,9 @@ import { StageProgress } from '../components/StageProgress';
 import { PreOrderReviewCard } from '../components/PreOrderReviewCard';
 import { usePreOrderApproval } from '../hooks/usePreOrderApproval';
 import { ShippingAddressLink } from '../components/ShippingAddressLink';
+import { PaymentDetailsCard } from '../components/PaymentDetailsCard';
 import { getAllowedStatuses, type WorkflowContext } from '../utils/statusWorkflow';
-import { formatCurrency, formatDateTime, formatStatusLabel, formatUpdater, getCurrentEntry, hasPreOrderLines } from '../utils/orderTracking.utils';
+import { formatCurrency, formatDateTime, formatUpdater, getCurrentEntry, hasPreOrderLines } from '../utils/orderTracking.utils';
 import type { StatusUpdateMode } from '../types/orderTracking.types';
 import { useAccess } from '../../../hooks/useAccess';
 import { ORDER_TRACKING_LIST_PATH, type OrderDetailLocationState } from '../utils/orderTrackingRoutes';
@@ -147,9 +148,6 @@ export const OrderTrackingDetailPage: React.FC = () => {
               <dl className="grid grid-cols-2 sm:grid-cols-3 gap-4">
                 <Field label="Customer">{order.customer?.name || '—'}</Field>
                 <Field label="Email">{order.customer?.email || '—'}</Field>
-                <Field label="Payment">
-                  {[order.paymentMethod, order.paymentStatus && formatStatusLabel(order.paymentStatus)].filter(Boolean).join(' · ') || '—'}
-                </Field>
                 <Field label="Subtotal">{formatCurrency(order.subtotal)}</Field>
                 <Field label="Shipping">{formatCurrency(order.shippingFee)}</Field>
                 <Field label="Total">{formatCurrency(order.totalAmount)}</Field>
@@ -163,6 +161,8 @@ export const OrderTrackingDetailPage: React.FC = () => {
                 </p>
               )}
             </Card>
+
+            <PaymentDetailsCard order={order} />
 
             {(order.items?.length ?? 0) > 0 && (
               <Card title={`Items (${order.itemCount})`}>
