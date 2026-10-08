@@ -1,12 +1,26 @@
 import React, { useState, useEffect } from 'react';
 import { X, Plus, Trash2, CheckCircle2 } from 'lucide-react';
 import type { ProductResponse, UpdateProductRequest, SpecificationDTO } from '../types/product.types';
+import { WarrantiesSection, type WarrantiesChange } from './WarrantiesSection';
+import { FormFieldErrors } from './FormFieldErrors';
+import {
+  describeWarrantyChanges,
+  dropWarrantyErrors,
+  summarizeWarranties,
+  toWarrantyFormItems,
+  toWarrantyRequests,
+  validateWarranties,
+  warrantiesChanged,
+  type WarrantyFormItem,
+} from '../utils/warrantyForm';
 
 interface EditProductModalProps {
   product: ProductResponse | null;
   onClose: () => void;
   onSubmit: (id: number, payload: UpdateProductRequest) => Promise<boolean>;
   isSubmitting: boolean;
+  /** Backend 400 field errors from the last save (e.g. `warranties[0].title`). */
+  serverFieldErrors?: Record<string, string>;
 }
 
 export const EditProductModal: React.FC<EditProductModalProps> = ({
@@ -14,6 +28,7 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
   onClose,
   onSubmit,
   isSubmitting,
+  serverFieldErrors,
 }) => {
   const [formData, setFormData] = useState<UpdateProductRequest>({
     title: '',
@@ -35,6 +50,16 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
   const [showPreviewModal, setShowPreviewModal] = useState(false);
   const [pendingPayload, setPendingPayload] = useState<UpdateProductRequest | null>(null);
 
+  // Warranties come from the admin list (GET /products, inactive included). Saved ones keep their id.
+  const [warranties, setWarranties] = useState<WarrantyFormItem[]>([]);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  // Show backend field errors from the latest save inline (state adjusted during render, not in an effect).
+  const [shownServerErrors, setShownServerErrors] = useState(serverFieldErrors);
+  if (serverFieldErrors !== shownServerErrors) {
+    setShownServerErrors(serverFieldErrors);
+    setFieldErrors(serverFieldErrors ?? {});
+  }
+
   useEffect(() => {
     if (product) {
       setFormData({
@@ -53,6 +78,8 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
         lastUpdateDescription: '',
         specifications: product.specifications ? product.specifications.map(s => ({ specKey: s.specKey, specValue: s.specValue })) : [],
       });
+      setWarranties(toWarrantyFormItems(product.warranties));
+      setFieldErrors({});
     }
   }, [product]);
 
@@ -105,6 +132,16 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
       });
     }
 
+    // Check warranties
+    const originalWarranties = product.warranties ?? [];
+    if (warrantiesChanged(originalWarranties, warranties)) {
+      changes.push({
+        label: 'Warranties',
+        oldVal: summarizeWarranties(originalWarranties),
+        newVal: describeWarrantyChanges(originalWarranties, warranties).join('\n') || summarizeWarranties(warranties),
+      });
+    }
+
     return changes;
   };
 
@@ -137,10 +174,21 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
     setFormData((prev) => ({ ...prev, specifications: updated }));
   };
 
+  const handleWarrantiesChange: WarrantiesChange = (items, edited) => {
+    setWarranties(items);
+    setFieldErrors((prev) => dropWarrantyErrors(prev, edited));
+  };
+
   const handleInitialSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!isFormValid) return;
-    setPendingPayload(formData);
+
+    const warrantyErrors = validateWarranties(warranties);
+    setFieldErrors(warrantyErrors);
+    if (Object.keys(warrantyErrors).length > 0) return;
+
+    // Always send the full list (saved ones with id, new ones without) so removals are applied.
+    setPendingPayload({ ...formData, warranties: toWarrantyRequests(warranties, true) });
     setShowPreviewModal(true);
   };
 
@@ -293,6 +341,10 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
               </div>
             </div>
 
+            <WarrantiesSection items={warranties} onChange={handleWarrantiesChange} errors={fieldErrors} disabled={isSubmitting} />
+
+            <FormFieldErrors errors={fieldErrors} />
+
             <div className="flex items-center gap-2 pt-2">
               <input
                 type="checkbox"
@@ -354,7 +406,7 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
                           <span className="block font-semibold text-[10px] opacity-75">Previous:</span> 
                           {String(field.oldVal)}
                         </div>
-                        <div className="bg-emerald-500/10 p-2 rounded text-emerald-600 dark:text-emerald-400 break-all">
+                        <div className="bg-emerald-500/10 p-2 rounded text-emerald-600 dark:text-emerald-400 break-all whitespace-pre-line">
                           <span className="block font-semibold text-[10px] opacity-75">New:</span> 
                           {String(field.newVal)}
                         </div>

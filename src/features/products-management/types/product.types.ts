@@ -3,6 +3,38 @@ export interface SpecificationDTO {
     specValue: string;
 }
 
+/** Backend limits (ProductRequestDTO.WarrantyDTO). */
+export const WARRANTY_LIMITS = {
+    title: 255,
+    description: 5000,
+    generalTermsAndConditions: 20000,
+} as const;
+
+/**
+ * One product-level warranty in POST/PUT /products. Omit `id` on create (the backend rejects it).
+ * On update an item with `id` updates that warranty, one without creates it, and any existing
+ * warranty missing from the list is deleted.
+ */
+export interface WarrantyRequest {
+    id?: number;
+    title: string;
+    description: string;
+    generalTermsAndConditions: string;
+    /** Defaults to true on the server when omitted. */
+    isActive?: boolean;
+}
+
+/** Warranty as returned by GET /products and the create/update responses (inactive ones included). */
+export interface WarrantyResponse {
+    id: number;
+    title: string;
+    description: string;
+    generalTermsAndConditions: string;
+    isActive: boolean;
+    createdAt: string | null;
+    updatedAt: string | null;
+}
+
 export interface CreateProductRequest {
     title: string;
     tagline?: string;
@@ -18,6 +50,11 @@ export interface CreateProductRequest {
     stockQuantity: number;
     lastUpdateDescription?: string;
     specifications?: SpecificationDTO[];
+    /**
+     * Update semantics: key omitted = warranties untouched, [] = delete all, otherwise the full list.
+     * Never include it unless the full current list is being sent.
+     */
+    warranties?: WarrantyRequest[];
 }
 
 export interface UpdateProductRequest extends Partial<CreateProductRequest> { }
@@ -55,6 +92,7 @@ export interface ProductResponseDto {
     userGuide?: { title: string; content: string[] | null }[] | null;
     /** Tolerated if a future backend version returns the write shape directly. */
     specifications?: SpecificationDTO[] | null;
+    warranties?: WarrantyResponse[] | null;
 }
 
 /** UI product model (normalised from ProductResponseDto by toProduct()). */
@@ -75,5 +113,7 @@ export interface ProductResponse {
     lastUpdateDescription: string | null;
     /** Write-shape specifications (including "Guide - …" user-guide rows), ready to send back on update. */
     specifications: SpecificationDTO[];
+    /** All warranties, including inactive ones (admin list). */
+    warranties: WarrantyResponse[];
     createdAt?: string | null;
 }

@@ -26,6 +26,8 @@ export const ProductManagementPage: React.FC = () => {
 
     const {
         isSubmitting,
+        fieldErrors,
+        clearFieldErrors,
         createProduct,
         updateProduct,
         updateProductStatus,
@@ -87,7 +89,10 @@ export const ProductManagementPage: React.FC = () => {
                 statusFilter={statusFilter}
                 onSearchChange={updateSearch}
                 onStatusFilterChange={updateStatusFilter}
-                onOpenCreateModal={() => setIsCreateModalOpen(true)}
+                onOpenCreateModal={() => {
+                    clearFieldErrors();
+                    setIsCreateModalOpen(true);
+                }}
             />
 
             {/* Products Table */}
@@ -95,7 +100,10 @@ export const ProductManagementPage: React.FC = () => {
                 products={products}
                 isLoading={isLoading || isSubmitting}
                 onPreview={(product) => setPreviewProduct(product)}
-                onEdit={(product) => setEditingProduct(product)}
+                onEdit={(product) => {
+                    clearFieldErrors();
+                    setEditingProduct(product);
+                }}
                 onAdjustStock={(product, mode) => setStockTarget({ product, mode })}
             />
 
@@ -105,6 +113,7 @@ export const ProductManagementPage: React.FC = () => {
                 isSubmitting={isSubmitting}
                 onClose={() => setIsCreateModalOpen(false)}
                 onSubmit={handleCreateProductSubmit}
+                serverFieldErrors={fieldErrors}
             />
 
             <EditProductModal
@@ -112,6 +121,7 @@ export const ProductManagementPage: React.FC = () => {
                 isSubmitting={isSubmitting}
                 onClose={() => setEditingProduct(null)}
                 onSubmit={handleEditProductSubmit}
+                serverFieldErrors={fieldErrors}
             />
 
             <ProductPreviewModal

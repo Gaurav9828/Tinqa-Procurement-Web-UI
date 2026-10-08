@@ -1,12 +1,17 @@
 import React, { useState } from 'react';
 import { X, Plus, Trash2, CheckCircle2 } from 'lucide-react';
 import type { CreateProductRequest, SpecificationDTO } from '../types/product.types';
+import { WarrantiesSection, type WarrantiesChange } from './WarrantiesSection';
+import { FormFieldErrors } from './FormFieldErrors';
+import { dropWarrantyErrors, toWarrantyRequests, validateWarranties, type WarrantyFormItem } from '../utils/warrantyForm';
 
 interface CreateProductModalProps {
     isOpen: boolean;
     isSubmitting: boolean;
     onClose: () => void;
     onSubmit: (payload: CreateProductRequest) => Promise<boolean>;
+    /** Backend 400 field errors from the last save (e.g. `warranties[0].title`). */
+    serverFieldErrors?: Record<string, string>;
 }
 
 export const CreateProductModal: React.FC<CreateProductModalProps> = ({
@@ -14,6 +19,7 @@ export const CreateProductModal: React.FC<CreateProductModalProps> = ({
     isSubmitting,
     onClose,
     onSubmit,
+    serverFieldErrors,
 }) => {
     const [title, setTitle] = useState('');
     const [tagline, setTagline] = useState('');
@@ -30,6 +36,16 @@ export const CreateProductModal: React.FC<CreateProductModalProps> = ({
     const [specifications, setSpecifications] = useState<SpecificationDTO[]>([
         { specKey: '', specValue: '' },
     ]);
+
+    // Warranties (product-level). Zero is allowed.
+    const [warranties, setWarranties] = useState<WarrantyFormItem[]>([]);
+    const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+    // Show backend field errors from the latest save inline (state adjusted during render, not in an effect).
+    const [shownServerErrors, setShownServerErrors] = useState(serverFieldErrors);
+    if (serverFieldErrors !== shownServerErrors) {
+        setShownServerErrors(serverFieldErrors);
+        setFieldErrors(serverFieldErrors ?? {});
+    }
 
     // Confirmation Preview State
     const [showPreviewModal, setShowPreviewModal] = useState(false);
@@ -77,9 +93,18 @@ export const CreateProductModal: React.FC<CreateProductModalProps> = ({
         setSpecifications(updated.length > 0 ? updated : [{ specKey: '', specValue: '' }]);
     };
 
+    const handleWarrantiesChange: WarrantiesChange = (items, edited) => {
+        setWarranties(items);
+        setFieldErrors((prev) => dropWarrantyErrors(prev, edited));
+    };
+
     const handleInitialSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         if (!isFormValid) return;
+
+        const warrantyErrors = validateWarranties(warranties);
+        setFieldErrors(warrantyErrors);
+        if (Object.keys(warrantyErrors).length > 0) return;
 
         // Filter out empty specifications if any
         const filteredSpecs = specifications.filter(
@@ -101,6 +126,8 @@ export const CreateProductModal: React.FC<CreateProductModalProps> = ({
             image4Url: imageUrls[3] || undefined,
             image5Url: imageUrls[4] || undefined,
             specifications: filteredSpecs.length > 0 ? filteredSpecs : undefined,
+            // New product: never send ids.
+            warranties: warranties.length > 0 ? toWarrantyRequests(warranties, false) : undefined,
         };
 
         setPendingPayload(payload);
@@ -121,9 +148,14 @@ export const CreateProductModal: React.FC<CreateProductModalProps> = ({
             setStockQuantity('');
             setImageUrls(['']);
             setSpecifications([{ specKey: '', specValue: '' }]);
+            setWarranties([]);
+            setFieldErrors({});
             setShowPreviewModal(false);
             setPendingPayload(null);
             onClose();
+        } else {
+            // Back to the form so any inline (field) errors are visible.
+            setShowPreviewModal(false);
         }
     };
 
@@ -297,6 +329,10 @@ export const CreateProductModal: React.FC<CreateProductModalProps> = ({
                             </button>
                         </div>
 
+                        <WarrantiesSection items={warranties} onChange={handleWarrantiesChange} errors={fieldErrors} disabled={isSubmitting} />
+
+                        <FormFieldErrors errors={fieldErrors} />
+
                         <div className="flex items-center gap-2 pt-2">
                             <input
                                 type="checkbox"
@@ -416,6 +452,21 @@ export const CreateProductModal: React.FC<CreateProductModalProps> = ({
                                             </div>
                                         ))}
                                     </div>
+                                </div>
+                            )}
+
+                            {/* Warranties Preview */}
+                            {pendingPayload.warranties && pendingPayload.warranties.length > 0 && (
+                                <div>
+                                    <span className="font-semibold text-gray-500 dark:text-gray-400 block mb-1">Warranties:</span>
+                                    <ul className="border border-black/10 dark:border-white/10 rounded-xl overflow-hidden" aria-label="Warranties preview">
+                                        {pendingPayload.warranties.map((warranty, i) => (
+                                            <li key={i} className="flex justify-between gap-2 px-3 py-1.5 border-b last:border-b-0 border-black/5 dark:border-white/5">
+                                                <span className="font-medium text-black dark:text-white">{warranty.title}</span>
+                                                <span className="text-gray-500 shrink-0">{warranty.isActive ? 'Active' : 'Inactive'}</span>
+                                            </li>
+                                        ))}
+                                    </ul>
                                 </div>
                             )}
                         </div>

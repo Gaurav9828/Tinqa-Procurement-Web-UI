@@ -37,5 +37,6 @@ export const toProduct = (dto: ProductResponseDto): ProductResponse => ({
   stockQuantity: dto.stockQuantity ?? 0,
   lastUpdateDescription: dto.lastUpdateDescription ?? dto.last_update_description ?? null,
   specifications: toSpecifications(dto),
+  warranties: Array.isArray(dto.warranties) ? dto.warranties : [],
   createdAt: dto.createdAt ?? null,
 });
