@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { ClipboardEdit, Loader2, Lock, MapPinned, RefreshCw, Send } from 'lucide-react';
+import { ClipboardEdit, CreditCard, Loader2, Lock, MapPinned, RefreshCw, Send } from 'lucide-react';
 import { CommonSelect, CommonTextArea } from '../../../components/ui/FormInputs';
 import { ConfirmationModal } from '../../../components/ui/ConfirmationModal';
 import type { StatusUpdateMode, TrackingStatusOption } from '../types/orderTracking.types';
@@ -9,7 +9,9 @@ import {
   STAGE_LABELS,
   getAllowedStatuses,
   getLockReason,
+  getPaymentBlockReason,
   getStage,
+  isConfirmBlockedByPayment,
   isCorrection,
   type WorkflowContext,
 } from '../utils/statusWorkflow';
@@ -85,6 +87,8 @@ export const StatusUpdateForm: React.FC<Props> = ({
   const noOptions = !statusesLoading && !statusesError && options.length === 0;
   const controlsDisabled = isSubmitting || statusesLoading || statusesError || noOptions;
   const correctionSelected = !!status && isCorrection(status, workflow);
+  // Confirming would be the next step, but the order isn't fully paid: explain why it's missing.
+  const paymentBlockReason = isConfirmBlockedByPayment(mode, workflow) ? getPaymentBlockReason(workflow.paymentStatus) : null;
 
   const send = async () => {
     const result = await onSubmit(mode, orderNumber, status, notes);
@@ -137,6 +141,16 @@ export const StatusUpdateForm: React.FC<Props> = ({
 
   return (
     <>
+      {paymentBlockReason && (
+        <p
+          role="note"
+          aria-label="Payment required"
+          className="flex items-start gap-1.5 p-3 mb-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-[11px] text-amber-700 dark:text-amber-400"
+        >
+          <CreditCard className="w-3.5 h-3.5 mt-px shrink-0" />
+          <span>{paymentBlockReason} Confirmed is not offered until then.</span>
+        </p>
+      )}
       <div role="radiogroup" aria-label="Update type" className="grid grid-cols-2 gap-1 p-1 rounded-xl bg-black/5 dark:bg-white/5 mb-3">
         {(Object.keys(MODES) as StatusUpdateMode[]).map((key) => {
           const { label, icon: Icon } = MODES[key];

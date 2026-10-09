@@ -1,105 +1,167 @@
-import { WARRANTY_LIMITS, type WarrantyRequest, type WarrantyResponse } from '../types/product.types';
+import {
+  emptyWarrantyForm,
+  formatWarrantyDuration,
+  formatWarrantyType,
+  toWarrantyRequests as toSharedWarrantyRequests,
+  validateWarrantyForms,
+  type WarrantyFormItem,
+} from '../../item-management/utils/itemWarranty';
+import type { WarrantyDurationUnit, WarrantyType } from '../../item-management/types/item.types';
+import { WARRANTY_TEXT_MAX, type WarrantyRequest, type WarrantyResponse } from '../types/product.types';
+import type { ComponentFormRow } from './componentForm';
 
-export type WarrantyTextField = keyof typeof WARRANTY_LIMITS;
-
-/** One warranty row in the product form. `uid` is a client-only React key; `id` exists only for saved warranties. */
-export interface WarrantyFormItem {
-  uid: string;
-  id?: number;
-  title: string;
-  description: string;
-  generalTermsAndConditions: string;
-  isActive: boolean;
-  /** Read-only, from the server. */
+/**
+ * Product-level warranty card: the same fields as item/component warranties (shared editor),
+ * plus read-only audit info and, for warranties copied from a selected item, where it came from.
+ */
+export interface ProductWarrantyFormItem extends WarrantyFormItem {
   updatedAt?: string | null;
+  updatedBy?: number | null;
+  /**
+   * Set while a warranty was copied from a component's item and not saved yet. Client-only: the
+   * backend stores it as a normal product warranty, so after saving the link no longer exists.
+   */
+  source?: { key: string; itemId: number; itemName: string };
 }
 
-export const WARRANTY_FIELD_LABELS: Record<WarrantyTextField, string> = {
-  title: 'Title',
-  description: 'Description',
-  generalTermsAndConditions: 'General Terms & Conditions',
-};
+export const emptyProductWarranty = (): ProductWarrantyFormItem => emptyWarrantyForm({ warrantyType: 'MANUFACTURER', durationUnit: 'MONTHS' });
 
-const WARRANTY_TEXT_FIELDS = Object.keys(WARRANTY_LIMITS) as WarrantyTextField[];
-
-let uidCounter = 0;
-const nextUid = () => `warranty-${++uidCounter}`;
-
-export const emptyWarranty = (): WarrantyFormItem => ({
-  uid: nextUid(),
-  title: '',
-  description: '',
-  generalTermsAndConditions: '',
-  isActive: true,
-});
-
-export const toWarrantyFormItems = (warranties: WarrantyResponse[] | null | undefined): WarrantyFormItem[] =>
+export const toProductWarrantyForms = (warranties: WarrantyResponse[] | null | undefined): ProductWarrantyFormItem[] =>
   (warranties ?? []).map((w) => ({
-    uid: nextUid(),
+    ...emptyProductWarranty(),
     id: w.id,
+    warrantyType: w.warrantyType ?? '',
     title: w.title ?? '',
-    description: w.description ?? '',
-    generalTermsAndConditions: w.generalTermsAndConditions ?? '',
+    durationValue: w.durationValue === null || w.durationValue === undefined ? '' : String(w.durationValue),
+    durationUnit: w.durationUnit ?? '',
+    provider: w.provider ?? '',
+    coverage: w.coverage ?? '',
+    exclusions: w.exclusions ?? '',
+    termsAndConditions: w.termsAndConditions ?? '',
     isActive: w.isActive !== false,
+    titleEdited: true,
     updatedAt: w.updatedAt ?? null,
+    updatedBy: w.updatedBy ?? null,
   }));
 
 /**
- * Request items in form order (one per form row, so backend errors like `warranties[1].title`
- * map back to the same row). Ids are sent only when `includeIds` (update) — never on create.
+ * Cards → request items, in card order (so backend errors like `warranties[1].durationUnit` map back
+ * to the same card). Blank optional text is omitted; `isActive` is always sent; ids only on update.
  */
-export const toWarrantyRequests = (items: WarrantyFormItem[], includeIds: boolean): WarrantyRequest[] =>
-  items.map((item) => ({
-    ...(includeIds && item.id !== undefined ? { id: item.id } : {}),
-    title: item.title.trim(),
-    description: item.description.trim(),
-    generalTermsAndConditions: item.generalTermsAndConditions.trim(),
-    isActive: Boolean(item.isActive),
+export const toProductWarrantyRequests = (items: ProductWarrantyFormItem[], includeIds: boolean): WarrantyRequest[] =>
+  toSharedWarrantyRequests(items, true).map(({ id, ...rest }) => ({
+    ...(includeIds && id !== undefined ? { id } : {}),
+    ...(rest as Omit<WarrantyRequest, 'id'>),
   }));
 
-/** Error key used both for client validation and backend field errors, e.g. `warranties[0].title`. */
-export const warrantyErrorKey = (index: number, field?: WarrantyTextField) =>
-  field ? `warranties[${index}].${field}` : `warranties[${index}]`;
+/** Same rules as the backend: required type/title/duration/unit, enums, integer > 0, max lengths, no HTML/scripts. */
+export const validateProductWarranties = (items: ProductWarrantyFormItem[]): Record<string, string> =>
+  validateWarrantyForms(items, { textMax: WARRANTY_TEXT_MAX, rejectScripts: true });
 
-/** Mirrors the backend's ProductSecurityValidator checks so a save is not rejected with a 400. */
-export const validateWarrantyText = (value: string, field: WarrantyTextField): string | null => {
-  const label = WARRANTY_FIELD_LABELS[field];
-  const trimmed = value.trim();
-  if (!trimmed) return `${label} is required.`;
-  const max = WARRANTY_LIMITS[field];
-  if (trimmed.length > max) return `${label} cannot exceed ${max.toLocaleString()} characters.`;
-  if (/<[a-z][\s\S]*>/i.test(trimmed)) return `${label} cannot contain HTML tags.`;
-  const lower = trimmed.toLowerCase();
-  if (lower.includes('javascript:') || lower.includes('onerror=') || lower.includes('onload=')) {
-    return `${label} contains a blocked script pattern ("javascript:", "onerror=" or "onload=").`;
-  }
-  return null;
-};
+// ---------- item warranties copied into product warranties ----------
 
-/** Inline errors keyed by `warranties[i].<field>`; empty when every row is valid. */
-export const validateWarranties = (items: WarrantyFormItem[]): Record<string, string> => {
-  const errors: Record<string, string> = {};
-  items.forEach((item, index) => {
-    WARRANTY_TEXT_FIELDS.forEach((field) => {
-      const error = validateWarrantyText(item[field], field);
-      if (error) errors[warrantyErrorKey(index, field)] = error;
+const sourceKey = (row: ComponentFormRow, sourceWarrantyId: number | null | undefined, index: number) =>
+  `${row.uid}:${row.itemId}:${sourceWarrantyId ?? `#${index}`}`;
+
+const PRODUCT_WARRANTY_TITLE_MAX = 255;
+
+/**
+ * Title of a product warranty copied from an item: the item's name (e.g. "Summit X Touch Panel").
+ * The card is read-only, so the title is filled in here and capped at the backend's 255 characters.
+ * Falls back to the item warranty's own title if the item has no name.
+ */
+export const itemWarrantyTitle = (warrantyTitle: string, itemName: string): string =>
+  (itemName.trim() || warrantyTitle.trim()).slice(0, PRODUCT_WARRANTY_TITLE_MAX);
+
+/** Product warranty card copied from one of the item's warranties. */
+const fromItemWarranty = (row: ComponentFormRow, w: ComponentFormRow['warranties'][number], key: string): ProductWarrantyFormItem => ({
+  ...emptyProductWarranty(),
+  warrantyType: w.warrantyType as WarrantyType,
+  title: itemWarrantyTitle(w.title, row.itemName),
+  durationValue: String(w.durationValue),
+  durationUnit: w.durationUnit as WarrantyDurationUnit,
+  provider: w.provider ?? '',
+  coverage: w.coverage ?? '',
+  exclusions: w.exclusions ?? '',
+  termsAndConditions: w.termsAndConditions ?? '',
+  isActive: true,
+  titleEdited: true,
+  source: { key, itemId: row.itemId as number, itemName: row.itemName },
+});
+
+/**
+ * Keeps the item-derived product warranties in step with the selected components: each component
+ * that copies to the product (new rows / changed items) contributes its item's active warranties;
+ * a removed or changed item takes its copies away. Admin edits to a copied card are kept, and
+ * copies the admin removed (`dismissed`) are not re-added. Returns the same array when nothing changed.
+ */
+export const syncItemWarranties = (
+  warranties: ProductWarrantyFormItem[],
+  rows: ComponentFormRow[],
+  dismissed: ReadonlySet<string> = new Set()
+): ProductWarrantyFormItem[] => {
+  const live = new Map<string, ProductWarrantyFormItem>();
+  for (const row of rows) {
+    if (!row.copiesToProduct || row.status !== 'ready' || row.itemId === null) continue;
+    row.warranties.forEach((w, i) => {
+      const key = sourceKey(row, w.sourceWarrantyId, i);
+      if (!dismissed.has(key)) live.set(key, fromItemWarranty(row, w, key));
     });
-  });
-  return errors;
+  }
+  const kept = warranties.filter((w) => !w.source || live.has(w.source.key));
+  const present = new Set(kept.flatMap((w) => (w.source ? [w.source.key] : [])));
+  const added = [...live].filter(([key]) => !present.has(key)).map(([, card]) => card);
+  if (added.length === 0 && kept.length === warranties.length) return warranties;
+  return [...kept, ...added];
 };
 
-const normalise = (w: { id?: number; title: string; description: string; generalTermsAndConditions: string; isActive?: boolean }) =>
-  JSON.stringify([w.id ?? null, w.title.trim(), w.description.trim(), w.generalTermsAndConditions.trim(), w.isActive !== false]);
+// ---------- edit review ----------
 
-export const warrantiesChanged = (original: WarrantyResponse[], items: WarrantyFormItem[]): boolean =>
+const normalise = (w: {
+  id?: number;
+  warrantyType: string;
+  title: string;
+  durationValue: number | string;
+  durationUnit: string;
+  provider?: string | null;
+  coverage?: string | null;
+  exclusions?: string | null;
+  termsAndConditions?: string | null;
+  isActive?: boolean;
+}) =>
+  JSON.stringify([
+    w.id ?? null,
+    w.warrantyType,
+    w.title.trim(),
+    String(w.durationValue).trim(),
+    w.durationUnit,
+    (w.provider ?? '').trim(),
+    (w.coverage ?? '').trim(),
+    (w.exclusions ?? '').trim(),
+    (w.termsAndConditions ?? '').trim(),
+    w.isActive !== false,
+  ]);
+
+export const warrantiesChanged = (original: WarrantyResponse[], items: ProductWarrantyFormItem[]): boolean =>
   original.length !== items.length || original.some((w, i) => normalise(w) !== normalise(items[i]));
 
-/** Short human summary for the edit review, e.g. "1 Year Warranty; 6 Month Extended (inactive)". */
-export const summarizeWarranties = (list: { title: string; isActive?: boolean }[]): string =>
-  list.length ? list.map((w) => `${w.title.trim() || '(untitled)'}${w.isActive === false ? ' (inactive)' : ''}`).join('; ') : 'None';
+/** "1 Year Manufacturer Warranty (Manufacturer · 12 Months); … (inactive)" */
+export const summarizeWarranties = (
+  list: { title: string; warrantyType: string; durationValue: number | string; durationUnit: string; isActive?: boolean }[]
+): string =>
+  list.length
+    ? list
+        .map(
+          (w) =>
+            `${w.title.trim() || '(untitled)'} (${formatWarrantyType(w.warrantyType)} · ${formatWarrantyDuration(Number(w.durationValue), w.durationUnit)})${
+              w.isActive === false ? ' (inactive)' : ''
+            }`
+        )
+        .join('; ')
+    : 'None';
 
 /** What saving will do to the existing warranties — shown on the edit review. */
-export const describeWarrantyChanges = (original: WarrantyResponse[], items: WarrantyFormItem[]): string[] => {
+export const describeWarrantyChanges = (original: WarrantyResponse[], items: ProductWarrantyFormItem[]): string[] => {
   const byId = new Map(original.map((w) => [w.id, w]));
   const keptIds = new Set(items.flatMap((item) => (item.id !== undefined ? [item.id] : [])));
   const lines: string[] = [];
@@ -107,27 +169,32 @@ export const describeWarrantyChanges = (original: WarrantyResponse[], items: War
     const before = item.id !== undefined ? byId.get(item.id) : undefined;
     const title = item.title.trim() || '(untitled)';
     if (!before) {
-      lines.push(`Add "${title}"${item.isActive ? '' : ' (inactive)'}`);
+      // Copied item warranties are titled with the item name, so describe them by type and duration.
+      lines.push(
+        item.source
+          ? `Add ${formatWarrantyType(item.warrantyType)} warranty (${formatWarrantyDuration(Number(item.durationValue), item.durationUnit)}) from ${item.source.itemName}`
+          : `Add "${title}"${item.isActive ? '' : ' (inactive)'}`
+      );
       return;
     }
     if (normalise(before) === normalise(item)) return;
     const parts: string[] = [];
     if (before.title.trim() !== item.title.trim()) parts.push(`rename "${before.title}" → "${title}"`);
-    if (before.description.trim() !== item.description.trim()) parts.push('description edited');
-    if (before.generalTermsAndConditions.trim() !== item.generalTermsAndConditions.trim()) parts.push('terms edited');
+    if (before.warrantyType !== item.warrantyType) parts.push(`type → ${formatWarrantyType(item.warrantyType)}`);
+    if (String(before.durationValue) !== item.durationValue.trim() || before.durationUnit !== item.durationUnit) {
+      parts.push(`duration → ${formatWarrantyDuration(Number(item.durationValue), item.durationUnit)}`);
+    }
+    if ((before.provider ?? '').trim() !== item.provider.trim()) parts.push(`provider → ${item.provider.trim() || 'none'}`);
+    if (
+      (before.coverage ?? '').trim() !== item.coverage.trim() ||
+      (before.exclusions ?? '').trim() !== item.exclusions.trim() ||
+      (before.termsAndConditions ?? '').trim() !== item.termsAndConditions.trim()
+    ) {
+      parts.push('details edited');
+    }
     if ((before.isActive !== false) !== item.isActive) parts.push(item.isActive ? 'reactivate' : 'deactivate');
     lines.push(`Update "${title}": ${parts.join(', ')}`);
   });
   original.filter((w) => !keptIds.has(w.id)).forEach((w) => lines.push(`Delete "${w.title}" permanently`));
   return lines;
 };
-
-/** Clears the error(s) for an edited field; 'all' drops every warranty error (row indexes shifted). */
-export const dropWarrantyErrors = (errors: Record<string, string>, edited: string | 'all'): Record<string, string> =>
-  Object.fromEntries(
-    Object.entries(errors).filter(([key]) => (edited === 'all' ? !key.startsWith('warranties') : key !== edited))
-  );
-
-/** Backend field errors that don't belong to a warranty row — shown at form level. */
-export const nonWarrantyErrors = (errors: Record<string, string>): [string, string][] =>
-  Object.entries(errors).filter(([key]) => !/^warranties\[\d+\]/.test(key));

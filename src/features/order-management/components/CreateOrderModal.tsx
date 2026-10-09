@@ -6,6 +6,7 @@ import type { CreateOrderRequest } from '../types/order.types';
 import { ORDER_LIMITS, todayLocalIsoDate } from '../validator/orderValidator';
 import { HasAccess } from '../../../auth/HasAccess';
 import { CommonInput, CommonSelect } from '../../../components/ui/FormInputs'; // Adjust import path as needed
+import { unitSelectOptions } from '../../../constants/unitsOfMeasure';
 
 interface CreateOrderModalProps {
   isOpen: boolean;
@@ -75,7 +76,8 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
       itemId: Number(selectedItemId),
       dealerId: Number(selectedDealerId),
       orderQuantity: Number(quantity),
-      unitPrice: Number(unitPrice),
+      // Always the item's MRP (the field is read-only), never a value typed into the form.
+      unitPrice: Number(selectedItem?.mrp ?? unitPrice),
       unitType: unitOfMeasure.trim(),
       shipmentPrice: Number(shipmentPrice),
       orderDate: todayLocalIsoDate(),
@@ -153,13 +155,16 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
               onChange={(e) => setQuantity(Number(e.target.value))}
             />
 
-            <CommonInput
+            <CommonSelect
               label="Unit Type"
-              type="text"
               required
+              // Follows the selected item's unit; chosen from the fixed list only when the item has none.
               disabled={isUnitDisabled}
+              placeholder="Select unit"
+              options={unitSelectOptions(unitOfMeasure)}
               value={unitOfMeasure}
-              onChange={(e) => setUnitOfMeasure(e.target.value.toUpperCase())}
+              onChange={(e) => setUnitOfMeasure(e.target.value)}
+              data-testid="order-unit-type"
             />
           </div>
 
@@ -172,9 +177,16 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                 min="0.01"
                 max={ORDER_LIMITS.MAX_UNIT_PRICE}
                 required
+                // Fixed to the selected item's MRP: not editable when creating an order.
+                disabled
+                placeholder={selectedItem ? undefined : 'Select an item'}
                 value={unitPrice}
-                onChange={(e) => setUnitPrice(Number(e.target.value))}
+                onChange={() => undefined}
+                data-testid="order-unit-price"
               />
+              <p className="mt-1 text-[11px] text-gray-400">
+                {selectedItem ? "Taken from the item's MRP." : 'Set from the item once you select one.'}
+              </p>
 
               {/* Price Variance Badge */}
               {selectedItem && priceVariance && Number(priceVariance.percent) !== 0 && (

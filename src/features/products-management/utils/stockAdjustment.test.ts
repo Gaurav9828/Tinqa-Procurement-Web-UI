@@ -19,7 +19,10 @@ const PRODUCT: ProductResponse = {
   lastUpdateDescription: 'Price change',
   specifications: [{ specKey: 'Power', specValue: '9W' }],
   warranties: [
-    { id: 4, title: '1 Year Warranty', description: 'd', generalTermsAndConditions: 't', isActive: true, createdAt: null, updatedAt: null },
+    { id: 4, warrantyType: 'MANUFACTURER', title: '1 Year Warranty', durationValue: 1, durationUnit: 'YEARS', isActive: true },
+  ],
+  components: [
+    { id: 8, itemId: 7, itemName: 'Motherboard', quantity: 1, warranties: [{ id: 80, warrantyType: 'MANUFACTURER', title: '1 Year', durationValue: 1, durationUnit: 'YEARS' }] },
   ],
 };
 
@@ -83,5 +86,6 @@ describe('buildStockUpdatePayload', () => {
 
   it('omits the warranties key so a stock change leaves warranties untouched', () => {
     expect(buildStockUpdatePayload(PRODUCT, 13, 'x')).not.toHaveProperty('warranties');
+    expect(buildStockUpdatePayload(PRODUCT, 13, 'x')).not.toHaveProperty('components');
   });
 });

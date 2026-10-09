@@ -4,8 +4,8 @@ import { X, Save, ChevronDown, Check, Eye } from 'lucide-react';
 import { Validator, type ValidationRule } from '../../../utils/validator';
 import type { CreateStockFromOrderRequest } from '../types/stock.types';
 import { useOrderList } from '../../order-management/hooks/useOrderList';
-import { useItemOptions } from '../../../hooks/useLookupOptions';
-import { CommonInput, CommonCheckbox } from '../../../components/ui/FormInputs';
+import { useItemOptions, useStockOptions } from '../../../hooks/useLookupOptions';
+import { CommonInput, CommonCheckbox, CommonSelect } from '../../../components/ui/FormInputs';
 import { AttributeInputBuilder } from '../../../components/ui/AttributeInputBuilder'; // Adjust path if needed
 
 import type { OrderResponse } from '../../order-management/types/order.types';
@@ -19,23 +19,34 @@ interface StockFormModalProps {
     onRequestSubmit: (data: CreateStockFromOrderRequest) => Promise<void> | void;
 }
 
+// Defected units and "Has Passed Quality Testing" are derived from the order quantity and the
+// units that passed, so they are not editable form state.
 interface FormState {
     orderNumber: string;
+    /** '' until the tester picks a value. */
     unitsPassedTest: string;
-    defectedUnits: string;
-    hasTested: boolean;
     dateOfArrival: string;
     additionalInfo: Record<string, string>;
 }
 
 const DEFAULT_FORM: FormState = {
     orderNumber: '',
-    unitsPassedTest: '0',
-    defectedUnits: '0',
-    hasTested: false,
+    unitsPassedTest: '',
     dateOfArrival: new Date().toISOString().split('T')[0],
     additionalInfo: {},
 };
+
+/** Above this order quantity a select gets unwieldy; a bounded number input is used instead. */
+const MAX_PASSED_OPTIONS = 5000;
+
+/** 0…quantity in whole units (a fractional quantity, e.g. 12.5 KG, is offered as the last option). */
+const passedTestOptions = (quantity: number): string[] => {
+    const whole = Array.from({ length: Math.floor(quantity) + 1 }, (_, i) => String(i));
+    return Number.isInteger(quantity) ? whole : [...whole, String(quantity)];
+};
+
+/** Avoids float noise like 2.9999999 when subtracting decimal quantities. */
+const roundUnits = (value: number) => Math.round(value * 1000) / 1000;
 
 export const StockFormModal: React.FC<StockFormModalProps> = ({
     isOpen,
@@ -48,6 +59,16 @@ export const StockFormModal: React.FC<StockFormModalProps> = ({
     // Stock can only be created from delivered orders.
     const { orders, isLoading } = useOrderList({ enabled: isOpen, initialStatus: 'DELIVERED' });
     const { options: items } = useItemOptions(isOpen);
+    // One order, one stock entry: orders that already have one are not offered (the backend enforces it too).
+    const { options: existingStocks } = useStockOptions(isOpen);
+    const stockByOrder = useMemo(
+        () => new Map(existingStocks.map((stock) => [stock.orderNumber.toLowerCase(), stock.stockIdentityNumber])),
+        [existingStocks]
+    );
+    const availableOrders = useMemo(
+        () => orders.filter((o) => !stockByOrder.has(o.orderNumber.toLowerCase())),
+        [orders, stockByOrder]
+    );
     
     const [formData, setFormData] = useState<FormState>({
         ...DEFAULT_FORM,
@@ -86,23 +107,32 @@ export const StockFormModal: React.FC<StockFormModalProps> = ({
     }, []);
 
     const matchingOrders = useMemo(() => {
-        if (!formData.orderNumber.trim()) return orders;
+        if (!formData.orderNumber.trim()) return availableOrders;
         const query = formData.orderNumber.toLowerCase().trim();
-        return orders.filter(
+        return availableOrders.filter(
             (o) =>
                 o.orderNumber.toLowerCase().includes(query) ||
                 (o.itemName && o.itemName.toLowerCase().includes(query)) ||
                 (o.dealerName && o.dealerName.toLowerCase().includes(query))
         );
-    }, [orders, formData.orderNumber]);
+    }, [availableOrders, formData.orderNumber]);
+
+    // A typed order number that already has stock is reported, never selected.
+    const existingStockForOrder = stockByOrder.get(formData.orderNumber.trim().toLowerCase()) ?? null;
 
     const selectedOrder = useMemo(() => {
-        return orders.find(
+        return availableOrders.find(
             (o) => o.orderNumber.toLowerCase() === formData.orderNumber.trim().toLowerCase()
         );
-    }, [orders, formData.orderNumber]);
+    }, [availableOrders, formData.orderNumber]);
 
     const isOrderSelected = Boolean(selectedOrder);
+
+    // Everything below follows from the order quantity and the units that passed.
+    const totalUnits = selectedOrder ? Number(selectedOrder.orderQuantity) || 0 : null;
+    const passedUnits = formData.unitsPassedTest === '' ? null : Number(formData.unitsPassedTest);
+    const defectedUnits = totalUnits !== null && passedUnits !== null ? roundUnits(totalUnits - passedUnits) : null;
+    const hasTested = totalUnits !== null && totalUnits > 0 && passedUnits === totalUnits;
 
     const minDateOfArrival = useMemo(() => {
         if (!selectedOrder?.orderDate) return undefined;
@@ -127,25 +157,23 @@ export const StockFormModal: React.FC<StockFormModalProps> = ({
             },
         };
 
-        if (formData.unitsPassedTest !== '') {
-            rules.unitsPassedTest = {
-                value: Number(formData.unitsPassedTest),
-                rule: { type: 'number', min: 0, customMessage: 'Passed units cannot be negative.' },
-            };
-        }
-
-        if (formData.defectedUnits !== '') {
-            rules.defectedUnits = {
-                value: Number(formData.defectedUnits),
-                rule: { type: 'number', min: 0, customMessage: 'Defected units cannot be negative.' },
-            };
-        }
-
         const errors: Record<string, string> = {};
         Object.entries(rules).forEach(([field, config]) => {
             const err = Validator.validateField(config.value, config.rule);
             if (err) errors[field] = err;
         });
+
+        if (existingStockForOrder) {
+            errors.orderNumber = `Order ${formData.orderNumber.trim()} already has stock entry ${existingStockForOrder}. An order can be used for only one stock entry.`;
+        }
+
+        if (totalUnits !== null) {
+            const passed = formData.unitsPassedTest === '' ? NaN : Number(formData.unitsPassedTest);
+            if (formData.unitsPassedTest === '') errors.unitsPassedTest = 'Select how many units passed the test.';
+            else if (!Number.isFinite(passed) || passed < 0 || passed > totalUnits) {
+                errors.unitsPassedTest = `Passed units must be between 0 and ${totalUnits} (order quantity).`;
+            }
+        }
 
         if (
             minDateOfArrival &&
@@ -156,7 +184,7 @@ export const StockFormModal: React.FC<StockFormModalProps> = ({
         }
 
         return errors;
-    }, [formData, minDateOfArrival]);
+    }, [formData, minDateOfArrival, totalUnits, existingStockForOrder]);
 
     const isValid = Object.keys(validationErrors).length === 0;
 
@@ -177,6 +205,8 @@ export const StockFormModal: React.FC<StockFormModalProps> = ({
         setFormData((prev) => ({
             ...prev,
             orderNumber: orderNum,
+            // A different order has a different quantity, so the tester picks again.
+            unitsPassedTest: prev.orderNumber === orderNum ? prev.unitsPassedTest : '',
             dateOfArrival:
                 orderMinDate && prev.dateOfArrival < orderMinDate ? orderMinDate : prev.dateOfArrival,
         }));
@@ -194,9 +224,9 @@ export const StockFormModal: React.FC<StockFormModalProps> = ({
 
         const payload: CreateStockFromOrderRequest = {
             orderNumber: formData.orderNumber.trim(),
-            unitsPassedTest: formData.unitsPassedTest !== '' ? Number(formData.unitsPassedTest) : 0,
-            defectedUnits: formData.defectedUnits !== '' ? Number(formData.defectedUnits) : 0,
-            hasTested: formData.hasTested,
+            unitsPassedTest: passedUnits ?? 0,
+            defectedUnits: defectedUnits ?? 0,
+            hasTested,
             dateOfArrival: formData.dateOfArrival,
             additionalInfo: formData.additionalInfo,
         };
@@ -239,11 +269,11 @@ export const StockFormModal: React.FC<StockFormModalProps> = ({
                                         onFocus={() => setShowOrderSuggestions(true)}
                                         onBlur={() => handleBlur('orderNumber')}
                                         onChange={(e) => {
-                                            handleChange('orderNumber', e.target.value);
+                                            setFormData((prev) => ({ ...prev, orderNumber: e.target.value, unitsPassedTest: '' }));
                                             setShowOrderSuggestions(true);
                                         }}
                                         placeholder="Search or select order..."
-                                        error={touched.orderNumber ? validationErrors.orderNumber : undefined}
+                                        error={touched.orderNumber || existingStockForOrder ? validationErrors.orderNumber : undefined}
                                     />
                                     <ChevronDown className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
 
@@ -276,7 +306,9 @@ export const StockFormModal: React.FC<StockFormModalProps> = ({
                                                     </button>
                                                 ))
                                             ) : (
-                                                <div className="p-3 text-center text-gray-400">No matching orders found</div>
+                                                <div className="p-3 text-center text-gray-400">
+                                                    No matching orders without a stock entry
+                                                </div>
                                             )}
                                         </div>
                                     )}
@@ -315,33 +347,62 @@ export const StockFormModal: React.FC<StockFormModalProps> = ({
                                 error={touched.dateOfArrival ? validationErrors.dateOfArrival : undefined}
                             />
 
-                            <CommonInput
-                                label="Units Passed Test"
-                                type="number"
-                                disabled={!isOrderSelected}
-                                value={formData.unitsPassedTest}
-                                onBlur={() => handleBlur('unitsPassedTest')}
-                                onChange={(e) => handleChange('unitsPassedTest', e.target.value)}
-                                error={touched.unitsPassedTest ? validationErrors.unitsPassedTest : undefined}
-                            />
+                            {totalUnits !== null && totalUnits > MAX_PASSED_OPTIONS ? (
+                                <CommonInput
+                                    label={`Units Passed Test (of ${totalUnits})`}
+                                    type="number"
+                                    required
+                                    min={0}
+                                    max={totalUnits}
+                                    value={formData.unitsPassedTest}
+                                    onBlur={() => handleBlur('unitsPassedTest')}
+                                    onChange={(e) => handleChange('unitsPassedTest', e.target.value)}
+                                    error={touched.unitsPassedTest ? validationErrors.unitsPassedTest : undefined}
+                                />
+                            ) : (
+                                <CommonSelect
+                                    label={totalUnits !== null ? `Units Passed Test (of ${totalUnits})` : 'Units Passed Test'}
+                                    required
+                                    disabled={!isOrderSelected}
+                                    placeholder={isOrderSelected ? 'Select passed units' : 'Select an order first'}
+                                    options={totalUnits !== null ? passedTestOptions(totalUnits) : []}
+                                    value={formData.unitsPassedTest}
+                                    onBlur={() => handleBlur('unitsPassedTest')}
+                                    onChange={(e) => {
+                                        handleChange('unitsPassedTest', e.target.value);
+                                        handleBlur('unitsPassedTest');
+                                    }}
+                                    error={touched.unitsPassedTest ? validationErrors.unitsPassedTest : undefined}
+                                    data-testid="units-passed-select"
+                                />
+                            )}
 
                             <CommonInput
                                 label="Defected Units"
                                 type="number"
+                                readOnly
                                 disabled={!isOrderSelected}
-                                value={formData.defectedUnits}
-                                onBlur={() => handleBlur('defectedUnits')}
-                                onChange={(e) => handleChange('defectedUnits', e.target.value)}
-                                error={touched.defectedUnits ? validationErrors.defectedUnits : undefined}
+                                value={defectedUnits === null ? '' : String(defectedUnits)}
+                                placeholder="Calculated"
+                                title="Order quantity − units passed test"
+                                data-testid="defected-units"
                             />
 
-                            <div className="pt-2 sm:col-span-2">
+                            <div className="pt-2 sm:col-span-2 space-y-1">
                                 <CommonCheckbox
                                     label="Has Passed Quality Testing"
-                                    disabled={!isOrderSelected}
-                                    checked={formData.hasTested}
-                                    onChange={(checked) => handleChange('hasTested', checked)}
+                                    // Set automatically: checked only when every unit passed.
+                                    disabled
+                                    checked={hasTested}
+                                    onChange={() => undefined}
                                 />
+                                <p className="text-[11px] text-gray-400 pl-6">
+                                    {passedUnits === null
+                                        ? 'Ticked automatically when every unit passes the test.'
+                                        : hasTested
+                                          ? 'All units passed the test.'
+                                          : `${defectedUnits} unit${defectedUnits === 1 ? '' : 's'} failed the test.`}
+                                </p>
                             </div>
 
                             {/* Additional Info Attribute Builder */}

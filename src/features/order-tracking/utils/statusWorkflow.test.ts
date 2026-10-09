@@ -5,10 +5,18 @@ import {
   STATUS_STAGE,
   getAllowedStatuses,
   getLockReason,
+  getPaymentBlockReason,
+  isConfirmBlockedByPayment,
   isCorrection,
+  isFullyPaid,
 } from './statusWorkflow';
 
-const ctx = (currentStatus: string | null, previousStatus: string | null = null) => ({ currentStatus, previousStatus });
+/** Paid by default: these tests are about the status table; the payment rule has its own block below. */
+const ctx = (currentStatus: string | null, previousStatus: string | null = null, paymentStatus: string | null = 'PAID') => ({
+  currentStatus,
+  previousStatus,
+  paymentStatus,
+});
 const both = ['tracking', 'manual'] as const;
 
 describe('status workflow rules', () => {
@@ -94,5 +102,40 @@ describe('status workflow rules', () => {
 
   it('an approved pre-order continues to fulfilment and cannot be "undone" back to pending', () => {
     expect(getAllowedStatuses('manual', ctx('PRE_ORDER_CONFIRMED', 'PRE_ORDER_PENDING'))).toEqual(['PROCESSING', 'CANCELLED']);
+  });
+});
+
+describe('confirmation requires a fully paid order', () => {
+  it('treats only PAID as fully paid', () => {
+    expect(isFullyPaid('PAID')).toBe(true);
+    expect(isFullyPaid(' paid ')).toBe(true);
+    for (const status of ['PENDING', 'FAILED', 'REFUND_REQUESTED', 'REFUNDED', 'CANCELLED', '', null, undefined]) {
+      expect(isFullyPaid(status)).toBe(false);
+    }
+  });
+
+  it.each(['PENDING', 'FAILED', null])('never offers Confirmed for an order whose payment is %s', (payment) => {
+    for (const mode of both) {
+      expect(getAllowedStatuses(mode, ctx('ORDER_RECEIVED', null, payment))).toEqual(['ORDER_PENDING', 'CANCELLED']);
+      expect(getAllowedStatuses(mode, ctx('ORDER_PENDING', 'ORDER_RECEIVED', payment))).not.toContain('CONFIRMED');
+      expect(getAllowedStatuses(mode, ctx(null, null, payment))).not.toContain('CONFIRMED'); // legacy / no status
+      expect(isConfirmBlockedByPayment(mode, ctx('ORDER_RECEIVED', null, payment))).toBe(true);
+    }
+  });
+
+  it('offers Confirmed once the order is paid', () => {
+    expect(getAllowedStatuses('tracking', ctx('ORDER_RECEIVED'))).toContain('CONFIRMED');
+    expect(isConfirmBlockedByPayment('tracking', ctx('ORDER_RECEIVED'))).toBe(false);
+  });
+
+  it('does not report a payment block where confirming is not a next step anyway', () => {
+    expect(isConfirmBlockedByPayment('tracking', ctx('PACKED', null, 'PENDING'))).toBe(false);
+    expect(getAllowedStatuses('tracking', ctx('PACKED', null, 'PENDING'))).toEqual(['OUT_FOR_DELIVERY', 'CANCELLED']);
+  });
+
+  it('explains the block with the current payment status', () => {
+    expect(getPaymentBlockReason('PAID')).toBeNull();
+    expect(getPaymentBlockReason('REFUND_REQUESTED')).toBe("This order can't be confirmed until it is fully paid (payment status: refund requested).");
+    expect(getPaymentBlockReason(null)).toMatch(/not recorded/);
   });
 });

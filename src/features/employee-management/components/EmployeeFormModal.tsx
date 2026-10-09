@@ -155,8 +155,9 @@ export const EmployeeFormModal: React.FC<Props> = ({
 
   // Uniqueness Checks: Phone & Alternate Phone across all employees
   const phoneUniquenessError = useMemo(() => {
-    const cleanPhone = formData.phone.trim().replace(/\s+/g, '');
-    const cleanAltPhone = formData.alternatePhone.trim().replace(/\s+/g, '');
+    // Compared in normalised form so "+91 98765 43210" and "9876543210" count as the same number.
+    const cleanPhone = Validator.normalizePhone(formData.phone);
+    const cleanAltPhone = Validator.normalizePhone(formData.alternatePhone);
 
     if (cleanPhone && cleanAltPhone && cleanPhone === cleanAltPhone) {
       return 'Primary and Alternate phone numbers cannot be identical.';
@@ -167,8 +168,8 @@ export const EmployeeFormModal: React.FC<Props> = ({
         continue;
       }
 
-      const existingPhone = emp.phone ? emp.phone.trim().replace(/\s+/g, '') : '';
-      const existingAltPhone = emp.alternatePhone ? emp.alternatePhone.trim().replace(/\s+/g, '') : '';
+      const existingPhone = Validator.normalizePhone(emp.phone);
+      const existingAltPhone = Validator.normalizePhone(emp.alternatePhone);
 
       if (cleanPhone && (cleanPhone === existingPhone || cleanPhone === existingAltPhone)) {
         return `Phone number '${formData.phone}' is already registered with another employee.`;
@@ -181,6 +182,12 @@ export const EmployeeFormModal: React.FC<Props> = ({
 
     return null;
   }, [formData.phone, formData.alternatePhone, existingEmployees, isEditMode, employeeToEdit]);
+
+  // Alternate phone is optional, but when given it must be a valid number.
+  const alternatePhoneFormatError =
+    formData.alternatePhone.trim() && !Validator.isPhone(formData.alternatePhone)
+      ? 'Enter a valid alternate phone number (e.g. +91 9876543211).'
+      : null;
 
   useEffect(() => {
     let initialValues;
@@ -266,6 +273,7 @@ export const EmployeeFormModal: React.FC<Props> = ({
 
     const phoneErr = Validator.validateField(formData.phone, FORM_RULES.phone);
     if (phoneErr) return setValidationError(phoneErr);
+    if (alternatePhoneFormatError) return setValidationError(alternatePhoneFormatError);
 
     if (formData.personalEmail) {
       if (!isValidEmailTLD(formData.personalEmail)) {
@@ -479,6 +487,7 @@ export const EmployeeFormModal: React.FC<Props> = ({
                 placeholder="+91 9876543211"
                 value={formData.alternatePhone}
                 onChange={handleChange}
+                error={alternatePhoneFormatError ?? undefined}
               />
 
               <div className="space-y-1">
@@ -540,6 +549,7 @@ export const EmployeeFormModal: React.FC<Props> = ({
                   isUsernameTaken ||
                   isPersonalEmailTaken ||
                   Boolean(phoneUniquenessError) ||
+                  Boolean(alternatePhoneFormatError) ||
                   (!isEditMode && !Validator.isAlphanumeric(formData.username))
                 }
                 className="px-5 py-2.5 bg-[#0071e3] hover:bg-[#0077ed] text-white rounded-xl text-xs font-semibold flex items-center gap-2 cursor-pointer shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"

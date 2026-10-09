@@ -21,6 +21,10 @@ vi.mock('../../../api/ecommerceAxiosClient', () => ({
   ecommerceAxiosClient: { get: vi.fn(), post: vi.fn(), put: vi.fn(), patch: vi.fn(), delete: vi.fn() },
 }));
 const http = vi.mocked(ecommerceAxiosClient);
+// The product form also loads the Procurement item list (components); keep it off the network.
+vi.mock('../../../api/axiosClient', () => ({
+  axiosClient: { get: vi.fn(async () => ({ data: { success: true, message: 'OK', data: { content: [], totalPages: 0, totalElements: 0 } } })) },
+}));
 
 const httpError = (status: number, data: Record<string, unknown>) => {
   const response = { status, statusText: String(status), data, headers: {}, config: { headers: new AxiosHeaders() } } as AxiosResponse;

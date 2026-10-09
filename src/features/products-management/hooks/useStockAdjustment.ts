@@ -3,6 +3,8 @@ import { productApi } from '../api/productsApi';
 import type { ProductResponse, UpdateProductRequest } from '../types/product.types';
 import { buildStockUpdatePayload, calculateNewStock, describeStockChange, type StockAdjustMode } from '../utils/stockAdjustment';
 import { useNotify } from '../../../hooks/useNotify';
+import { loadComponentCapacity, type ComponentCapacity } from '../utils/componentStock';
+import { getApiErrorMessage } from '../../../utils/apiError';
 
 export interface StockAdjustResult {
   ok: boolean;
@@ -26,6 +28,9 @@ export const useStockAdjustment = (
   const [isLoading, setIsLoading] = useState(true);
   const [loadFailed, setLoadFailed] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  // For products built from components: how many units the item stock allows adding.
+  const [capacity, setCapacity] = useState<ComponentCapacity | null>(null);
+  const [capacityError, setCapacityError] = useState<string | null>(null);
   const inFlight = useRef(false);
   const notify = useNotify();
 
@@ -47,12 +52,23 @@ export const useStockAdjustment = (
 
   useEffect(() => {
     let active = true;
-    fetchLatest(productId).then((latest) => {
-      if (!active) return;
-      setProduct(latest);
-      setLoadFailed(!latest);
-      setIsLoading(false);
-    });
+    fetchLatest(productId)
+      .then(async (latest) => {
+        if (!active) return;
+        setProduct(latest);
+        setLoadFailed(!latest);
+        if (latest?.components.length) {
+          try {
+            const loaded = await loadComponentCapacity(latest.components);
+            if (active) setCapacity(loaded);
+          } catch (err: unknown) {
+            if (active) setCapacityError(getApiErrorMessage(err, "Couldn't check item stock for this product's components."));
+          }
+        }
+      })
+      .finally(() => {
+        if (active) setIsLoading(false);
+      });
     return () => {
       active = false;
     };
@@ -68,7 +84,19 @@ export const useStockAdjustment = (
         if (!latest) return { ok: false };
         setProduct(latest);
 
-        const result = calculateNewStock(latest.stockQuantity, mode, quantity);
+        // Additions use component item stock: re-check it now, not when the dialog opened.
+        let maxAdd: number | null = null;
+        if (mode === 'add' && latest.components.length > 0) {
+          try {
+            const fresh = await loadComponentCapacity(latest.components);
+            setCapacity(fresh);
+            maxAdd = fresh.maxAddable;
+          } catch (err: unknown) {
+            return { ok: false, quantityError: getApiErrorMessage(err, "Couldn't check item stock. Try again.") };
+          }
+        }
+
+        const result = calculateNewStock(latest.stockQuantity, mode, quantity, maxAdd);
         if (!result.ok) return { ok: false, quantityError: result.error };
 
         const description = describeStockChange(mode, latest.stockQuantity, result.newStock, note);
@@ -82,5 +110,5 @@ export const useStockAdjustment = (
     [productId, fetchLatest, updateProduct]
   );
 
-  return { product, isLoading, loadFailed, isSaving, adjust };
+  return { product, isLoading, loadFailed, isSaving, adjust, capacity, capacityError };
 };

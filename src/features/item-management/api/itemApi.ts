@@ -5,6 +5,7 @@ import type {
   CreateItemRequest,
   ItemFilterParams,
   ItemResponse,
+  ItemWarrantyResponse,
   UpdateItemRequest,
 } from '../types/item.types';
 
@@ -57,6 +58,12 @@ export const itemApi = {
     const response = await axiosClient.get<ApiResponse<ItemResponse>>(
       `${BASE_URL}/${id}`
     );
+    return response.data;
+  },
+
+  /** GET /v1/admin/items/{id}/warranties — every warranty of the item (inactive included). */
+  getItemWarranties: async (id: number): Promise<ApiResponse<ItemWarrantyResponse[]>> => {
+    const response = await axiosClient.get<ApiResponse<ItemWarrantyResponse[]>>(`${BASE_URL}/${id}/warranties`);
     return response.data;
   },
 

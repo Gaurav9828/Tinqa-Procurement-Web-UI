@@ -157,6 +157,9 @@ export const DealerFormModal: React.FC<DealerFormModalProps> = ({
       const err = Validator.validateField(config.value, config.rule);
       if (err) errors[field] = err;
     });
+    // The alternate number must differ from the main one (format is checked above).
+    const phonePair = Validator.validatePhonePair(formData.phoneNumber, formData.alternatePhoneNumber);
+    if (phonePair.alternate && !errors.alternatePhoneNumber) errors.alternatePhoneNumber = phonePair.alternate;
 
     return errors;
   }, [formData]);

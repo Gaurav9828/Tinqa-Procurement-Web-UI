@@ -1,5 +1,5 @@
 import type { CreateProductRequest, UpdateProductRequest } from '../types/product.types';
-import { validateWarrantyText, type WarrantyTextField } from '../utils/warrantyForm';
+import { WARRANTY_TEXT_MAX } from '../types/product.types';
 
 export const validateProductPayload = (payload: CreateProductRequest | UpdateProductRequest): string => {
   if (!payload) {
@@ -81,9 +81,47 @@ export const validateProductPayload = (payload: CreateProductRequest | UpdatePro
   // 8. Warranties (the form shows these inline first; this is the last line of defence)
   if (payload.warranties) {
     for (const [index, warranty] of payload.warranties.entries()) {
-      for (const field of ['title', 'description', 'generalTermsAndConditions'] as WarrantyTextField[]) {
-        const error = validateWarrantyText(warranty[field] ?? '', field);
-        if (error) return `Warranty ${index + 1}: ${error}`;
+      const label = `Warranty ${index + 1}`;
+      if (!['MANUFACTURER', 'SELLER', 'EXTENDED', 'REPLACEMENT', 'SERVICE', 'PARTS', 'LIMITED'].includes(warranty.warrantyType)) {
+        return `${label}: select a supported warranty type.`;
+      }
+      if (!warranty.title?.trim()) return `${label}: title is required.`;
+      if (!Number.isInteger(warranty.durationValue) || warranty.durationValue <= 0) return `${label}: duration must be a whole number greater than 0.`;
+      if (!['DAYS', 'MONTHS', 'YEARS'].includes(warranty.durationUnit)) return `${label}: duration unit must be Days, Months or Years.`;
+      for (const [value, max, field] of [
+        [warranty.title, 255, 'title'],
+        [warranty.provider, 255, 'provider'],
+        [warranty.coverage, WARRANTY_TEXT_MAX, 'coverage'],
+        [warranty.exclusions, WARRANTY_TEXT_MAX, 'exclusions'],
+        [warranty.termsAndConditions, WARRANTY_TEXT_MAX, 'terms and conditions'],
+      ] as const) {
+        const error = value ? sanitizeText(value, max, `${label} ${field}`) : null;
+        if (error) return error;
+      }
+    }
+  }
+
+  // 9. Components (the form shows these inline first)
+  if (payload.components) {
+    const seen = new Set<number>();
+    for (const [index, component] of payload.components.entries()) {
+      if (!Number.isInteger(component.itemId) || component.itemId <= 0) return `Component ${index + 1}: select an item.`;
+      if (seen.has(component.itemId)) return `Component ${index + 1}: this item is already listed.`;
+      seen.add(component.itemId);
+      if (!(Number(component.quantity) > 0)) return `Component ${index + 1}: quantity must be greater than 0.`;
+      const nameError = sanitizeText(component.itemName, 150, `Component ${index + 1} item name`);
+      if (nameError) return nameError;
+      for (const warranty of component.warranties ?? []) {
+        for (const [value, max, label] of [
+          [warranty.title, 255, 'warranty title'],
+          [warranty.provider, 255, 'warranty provider'],
+          [warranty.coverage, 20000, 'warranty coverage'],
+          [warranty.exclusions, 20000, 'warranty exclusions'],
+          [warranty.termsAndConditions, 20000, 'warranty terms'],
+        ] as const) {
+          const error = value ? sanitizeText(value, max, `Component ${index + 1} ${label}`) : null;
+          if (error) return error;
+        }
       }
     }
   }

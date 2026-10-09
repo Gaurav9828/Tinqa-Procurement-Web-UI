@@ -27,6 +27,7 @@ import { ItemFormModal } from '../components/ItemFormModal';
 import { ItemStatusBadge } from '../components/ItemStatusBadge';
 import { ItemPreviewModal } from '../components/ItemPreviewModal';
 import { HeaderColumnFilter } from '../components/HeaderColumnFilter';
+import { WarrantySummary } from '../components/WarrantyBadge';
 
 export const ItemManagementPage: React.FC = () => {
     const {
@@ -41,6 +42,8 @@ export const ItemManagementPage: React.FC = () => {
 
     const {
         isSubmitting,
+        fieldErrors,
+        clearFieldErrors,
         createCategory,
         createItem,
         updateItem,
@@ -117,11 +120,13 @@ export const ItemManagementPage: React.FC = () => {
     };
 
     const handleOpenCreateItem = () => {
+        clearFieldErrors();
         setSelectedItem(null);
         setIsItemModalOpen(true);
     };
 
     const handleOpenEditItem = (item: ItemResponse) => {
+        clearFieldErrors();
         setSelectedItem(item);
         setIsItemModalOpen(true);
     };
@@ -218,6 +223,7 @@ export const ItemManagementPage: React.FC = () => {
                                         />
                                     </th>
                                     <th className="p-4">MRP</th>
+                                    <th className="p-4">Warranties</th>
                                     <th className="p-4">
                                         <HeaderColumnFilter
                                             title="Status"
@@ -273,6 +279,9 @@ export const ItemManagementPage: React.FC = () => {
                                                       minimumFractionDigits: 2,
                                                   })}`
                                                 : 'N/A'}
+                                        </td>
+                                        <td className="p-4" data-testid="item-warranties">
+                                            <WarrantySummary warranties={item.warranties} />
                                         </td>
                                         <td className="p-4">
                                             <ItemStatusBadge active={item.isActive} />
@@ -411,6 +420,7 @@ export const ItemManagementPage: React.FC = () => {
                 initialData={selectedItem}
                 onClose={() => setIsItemModalOpen(false)}
                 onSubmit={handleItemSubmit}
+                serverFieldErrors={fieldErrors}
             />
         </div>
     );

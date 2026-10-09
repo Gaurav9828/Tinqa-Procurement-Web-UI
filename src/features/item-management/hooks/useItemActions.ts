@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { useNotify } from '../../../hooks/useNotify';
+import { getApiFieldErrors } from '../../../utils/apiError';
 import { invalidateItemOptions } from '../../../hooks/useLookupOptions';
 import { itemApi } from '../api/itemApi';
 import type {
@@ -11,6 +12,9 @@ import type {
 
 export const useItemActions = (onSuccessCallback?: () => void) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  // Backend 400 field errors (`errors: [{ field, message }]`, e.g. `warranties[0].title`) from the last create/update.
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const clearFieldErrors = useCallback(() => setFieldErrors({}), []);
   const notify = useNotify();
 
   const createCategory = async (payload: CreateCategoryRequest): Promise<boolean> => {
@@ -33,6 +37,7 @@ export const useItemActions = (onSuccessCallback?: () => void) => {
 
   const createItem = async (payload: CreateItemRequest): Promise<boolean> => {
     setIsSubmitting(true);
+    setFieldErrors({});
     try {
       const res = await itemApi.createItem(payload);
       if (res.success) {
@@ -51,6 +56,7 @@ export const useItemActions = (onSuccessCallback?: () => void) => {
       } else {
         notify.error(err, 'Error creating item.');
       }
+      setFieldErrors(getApiFieldErrors(err));
       return false;
     } finally {
       setIsSubmitting(false);
@@ -59,6 +65,7 @@ export const useItemActions = (onSuccessCallback?: () => void) => {
 
   const updateItem = async (id: number, payload: UpdateItemRequest): Promise<boolean> => {
     setIsSubmitting(true);
+    setFieldErrors({});
     try {
       const res = await itemApi.updateItem(id, payload);
       if (res.success) {
@@ -71,6 +78,7 @@ export const useItemActions = (onSuccessCallback?: () => void) => {
       return false;
     } catch (err: unknown) {
       notify.error(err, 'Error updating item.');
+      setFieldErrors(getApiFieldErrors(err));
       return false;
     } finally {
       setIsSubmitting(false);
@@ -88,11 +96,11 @@ export const useItemActions = (onSuccessCallback?: () => void) => {
         mrp: item.mrp,
         countryOfOrigin: item.countryOfOrigin || 'India',
         rawMaterialsUsed: item.rawMaterialsUsed,
-        warrantyMonths: item.warrantyMonths ?? 0,
         termsAndCondition: item.termsAndCondition,
         description: item.description,
         attributes: item.attributes,
         isActive: targetStatus,
+        // `warranties` deliberately omitted: the backend then leaves them untouched.
       };
 
       const res = await itemApi.updateItem(item.id, payload);
@@ -117,6 +125,8 @@ export const useItemActions = (onSuccessCallback?: () => void) => {
 
   return {
     isSubmitting,
+    fieldErrors,
+    clearFieldErrors,
     toggleItemStatus,
     createCategory,
     createItem,

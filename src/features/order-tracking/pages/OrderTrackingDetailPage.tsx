@@ -68,8 +68,9 @@ export const OrderTrackingDetailPage: React.FC = () => {
     return {
       currentStatus: current?.status ?? detail.order?.orderStatus ?? null,
       previousStatus: index > 0 ? detail.timeline[index - 1].status : null,
+      paymentStatus: detail.order?.paymentStatus ?? null,
     };
-  }, [detail.timeline, detail.order?.orderStatus]);
+  }, [detail.timeline, detail.order?.orderStatus, detail.order?.paymentStatus]);
 
   // A status must exist on the server AND be a valid move from the current stage.
   const isAllowed = useCallback(

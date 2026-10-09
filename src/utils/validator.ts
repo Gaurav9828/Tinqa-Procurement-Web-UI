@@ -24,6 +24,43 @@ export const Validator = {
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
   },
 
+  /**
+   * Comparable form of a phone number: digits only, Indian numbers reduced to their 10 digits, so
+   * "+91 98765-43210", "098765 43210" and "9876543210" are the same number.
+   */
+  normalizePhone: (phone: string | null | undefined): string => {
+    const digits = (phone ?? '').replace(/\D/g, '');
+    if (digits.length === 12 && digits.startsWith('91')) return digits.slice(2);
+    if (digits.length === 11 && digits.startsWith('0')) return digits.slice(1);
+    return digits;
+  },
+
+  /**
+   * Primary + alternate phone rules shared by every form: valid format (alternate is optional)
+   * and the two numbers must differ. Returns one message per field, or nothing when valid.
+   */
+  validatePhonePair: (
+    primary: string | null | undefined,
+    alternate: string | null | undefined,
+    options: { primaryRequired?: boolean } = {}
+  ): { primary?: string; alternate?: string } => {
+    const errors: { primary?: string; alternate?: string } = {};
+    const p = (primary ?? '').trim();
+    const a = (alternate ?? '').trim();
+    if (!p) {
+      if (options.primaryRequired !== false) errors.primary = 'Phone number is required.';
+    } else if (!Validator.isPhone(p)) {
+      errors.primary = 'Enter a valid phone number (e.g. +91 9876543210).';
+    }
+    if (a) {
+      if (!Validator.isPhone(a)) errors.alternate = 'Enter a valid alternate phone number (e.g. +91 9876543211).';
+      else if (p && Validator.normalizePhone(p) === Validator.normalizePhone(a)) {
+        errors.alternate = 'Alternate phone number cannot be the same as the phone number.';
+      }
+    }
+    return errors;
+  },
+
   isPhone: (phone: string): boolean => {
     if (!Validator.isValid(phone)) return false;
     const sanitized = phone.trim().replace(/[\s-()]/g, '');

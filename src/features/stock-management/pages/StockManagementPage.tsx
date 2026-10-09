@@ -6,7 +6,6 @@ import type {
   StockResponse,
   CreateStockFromOrderRequest,
   UpdateStockRequest,
-  QuantityAdjustmentRequest,
   ApprovalDecisionRequest,
 } from '../types/stock.types';
 
@@ -15,7 +14,6 @@ import { StockTable } from '../components/StockTable';
 import { StockFormModal } from '../components/StockFormModal';
 import { StockPreviewModal } from '../components/StockPreviewModal';
 import { StockEditModal } from '../components/StockEditModal'; // <--- Import Edit Modal
-import { QuantityAdjustmentModal } from '../components/QuantityAdjustmentModal';
 import { StockApprovalModal } from '../components/StockApprovalModal';
 import { ActionConfirmationModal } from '../components/ActionConfirmationModal';
 
@@ -34,7 +32,6 @@ export const StockManagementPage: React.FC = () => {
     isSubmitting,
     createStockFromOrder,
     updateStock, // <--- Make sure your useStockActions hook exposes updateStock
-    adjustQuantity,
     processApproval,
   } = useStockActions(refetch);
 
@@ -50,11 +47,6 @@ export const StockManagementPage: React.FC = () => {
     stock: StockResponse | null;
   }>({ isOpen: false, stock: null });
 
-  const [adjustmentState, setAdjustmentState] = useState<{
-    isOpen: boolean;
-    type: 'ADD' | 'REDUCE';
-    stock: StockResponse | null;
-  }>({ isOpen: false, type: 'ADD', stock: null });
 
   const [approvalModalState, setApprovalModalState] = useState<{
     isOpen: boolean;
@@ -67,8 +59,6 @@ export const StockManagementPage: React.FC = () => {
   const [pendingEditPayload, setPendingEditPayload] = useState<{ id: number; data: UpdateStockRequest } | null>(null);
   const [isConfirmEditOpen, setIsConfirmEditOpen] = useState(false);
 
-  const [pendingAdjustmentPayload, setPendingAdjustmentPayload] = useState<QuantityAdjustmentRequest | null>(null);
-  const [isConfirmAdjustmentOpen, setIsConfirmAdjustmentOpen] = useState(false);
 
   const [pendingApprovalPayload, setPendingApprovalPayload] = useState<ApprovalDecisionRequest | null>(null);
   const [isConfirmApprovalOpen, setIsConfirmApprovalOpen] = useState(false);
@@ -105,24 +95,6 @@ export const StockManagementPage: React.FC = () => {
     }
   };
 
-  const handleAdjustmentSubmitRequest = (payload: QuantityAdjustmentRequest) => {
-    setPendingAdjustmentPayload(payload);
-    setIsConfirmAdjustmentOpen(true);
-  };
-
-  const executeAdjustmentSubmit = async () => {
-    if (!pendingAdjustmentPayload || !adjustmentState.stock) return;
-    const ok = await adjustQuantity(
-      adjustmentState.stock.id,
-      adjustmentState.type,
-      pendingAdjustmentPayload
-    );
-    setIsConfirmAdjustmentOpen(false);
-    if (ok) {
-      setAdjustmentState({ isOpen: false, type: 'ADD', stock: null });
-      setPendingAdjustmentPayload(null);
-    }
-  };
 
   const handleApprovalSubmitRequest = (payload: ApprovalDecisionRequest) => {
     setPendingApprovalPayload(payload);
@@ -174,7 +146,6 @@ export const StockManagementPage: React.FC = () => {
         isLoading={isLoading}
         onView={(stock) => setPreviewState({ isOpen: true, stock })}
         onEdit={(stock) => setEditState({ isOpen: true, stock })} // <--- Wired Table Edit button if available
-        onAdjustQuantity={(stock, type) => setAdjustmentState({ isOpen: true, type, stock })}
         onApproval={(stock) => setApprovalModalState({ isOpen: true, stock })}
       />
 
@@ -203,15 +174,6 @@ export const StockManagementPage: React.FC = () => {
         onRequestSubmit={handleFormSubmitRequest}
       />
 
-      {/* Quantity Adjustment Modal */}
-      <QuantityAdjustmentModal
-        isOpen={adjustmentState.isOpen}
-        type={adjustmentState.type}
-        stockIdentity={adjustmentState.stock?.stockIdentityNumber || ''}
-        isSubmitting={isSubmitting}
-        onClose={() => setAdjustmentState({ isOpen: false, type: 'ADD', stock: null })}
-        onRequestSubmit={handleAdjustmentSubmitRequest}
-      />
 
       {/* Admin L2 Approval Modal */}
       <StockApprovalModal
@@ -241,14 +203,6 @@ export const StockManagementPage: React.FC = () => {
         onConfirm={executeEditSubmit}
       />
 
-      <ActionConfirmationModal
-        isOpen={isConfirmAdjustmentOpen}
-        title={`Confirm Quantity ${adjustmentState.type === 'ADD' ? 'Addition' : 'Reduction'}`}
-        description={`Are you sure you want to ${adjustmentState.type.toLowerCase()} quantity for stock entry ${adjustmentState.stock?.stockIdentityNumber}?`}
-        isSubmitting={isSubmitting}
-        onClose={() => setIsConfirmAdjustmentOpen(false)}
-        onConfirm={executeAdjustmentSubmit}
-      />
 
       <ActionConfirmationModal
         isOpen={isConfirmApprovalOpen}

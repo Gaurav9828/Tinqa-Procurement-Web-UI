@@ -6,6 +6,7 @@ import type { ItemResponse } from '../../item-management/types/item.types';
 import type { DealerResponse } from '../../dealer-management/types/dealer.types';
 import { HasAccess } from '../../../auth/HasAccess';
 import { CommonInput, CommonSelect } from '../../../components/ui/FormInputs';
+import { unitSelectOptions } from '../../../constants/unitsOfMeasure';
 
 interface EditOrderModalProps {
   order: OrderResponse | null;
@@ -193,13 +194,16 @@ export const EditOrderModal: React.FC<EditOrderModalProps> = ({
                 onChange={(e) => setQuantity(Number(e.target.value))}
               />
 
-              <CommonInput
+              <CommonSelect
                 label="Unit Type"
-                type="text"
                 required
+                // Follows the selected item's unit; chosen from the fixed list only when the item has none.
                 disabled={isUnitDisabled}
+                placeholder="Select unit"
+                options={unitSelectOptions(unitOfMeasure)}
                 value={unitOfMeasure}
-                onChange={(e) => setUnitOfMeasure(e.target.value.toUpperCase())}
+                onChange={(e) => setUnitOfMeasure(e.target.value)}
+                data-testid="order-unit-type"
               />
             </div>
 

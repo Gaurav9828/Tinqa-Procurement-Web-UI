@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { CheckCircle2, Clock, Loader2, PackageCheck } from 'lucide-react';
 import { ConfirmationModal } from '../../../components/ui/ConfirmationModal';
 import type { AdminOrderDetail } from '../types/orderTracking.types';
+import { getPaymentBlockReason } from '../utils/statusWorkflow';
 
 interface Props {
   order: AdminOrderDetail;
@@ -21,6 +22,9 @@ export const PreOrderReviewCard: React.FC<Props> = ({ order, canAct, isApproving
 
   const lines = (order.items ?? []).filter((item) => item.preOrder);
   const isWaiting = order.orderStatus === 'PRE_ORDER_PENDING';
+  // Approval confirms the order, so it also needs a fully paid order (the backend enforces this too).
+  const paymentBlockReason = getPaymentBlockReason(order.paymentStatus);
+  const canApprove = !!order.canApprovePreOrder && !paymentBlockReason;
   const isApproved = !isWaiting && order.orderStatus !== 'PRE_ORDER_RECEIVED' && order.orderStatus !== 'CANCELLED';
 
   // Readiness is the server's decision (it sums quantities per product); per-line marks are a guide.
@@ -87,7 +91,7 @@ export const PreOrderReviewCard: React.FC<Props> = ({ order, canAct, isApproving
         <div className="space-y-2">
           <button
             type="button"
-            disabled={!order.canApprovePreOrder || isApproving}
+            disabled={!canApprove || isApproving}
             onClick={() => setConfirming(true)}
             className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-[#0071e3] hover:bg-[#0077ed] text-white rounded-xl text-xs font-semibold transition-colors disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
           >
@@ -95,9 +99,11 @@ export const PreOrderReviewCard: React.FC<Props> = ({ order, canAct, isApproving
             {isApproving ? 'Approving…' : 'Approve pre-order'}
           </button>
           <p className="text-[11px] text-gray-500 dark:text-neutral-400">
-            {order.canApprovePreOrder
-              ? 'Approving reserves the stock and moves the order to Pre-order Confirmed. Stock is checked again at approval.'
-              : 'Approval becomes available once every pre-order product has enough stock for its ordered quantity.'}
+            {paymentBlockReason
+              ? paymentBlockReason
+              : order.canApprovePreOrder
+                ? 'Approving reserves the stock and moves the order to Pre-order Confirmed. Stock is checked again at approval.'
+                : 'Approval becomes available once every pre-order product has enough stock for its ordered quantity.'}
           </p>
         </div>
       )}

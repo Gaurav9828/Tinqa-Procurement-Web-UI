@@ -1,9 +1,19 @@
 import React, { useState } from 'react';
 import { X, Plus, Trash2, CheckCircle2 } from 'lucide-react';
 import type { CreateProductRequest, SpecificationDTO } from '../types/product.types';
-import { WarrantiesSection, type WarrantiesChange } from './WarrantiesSection';
+import { ProductWarrantiesEditor } from './ProductWarrantiesEditor';
 import { FormFieldErrors } from './FormFieldErrors';
-import { dropWarrantyErrors, toWarrantyRequests, validateWarranties, type WarrantyFormItem } from '../utils/warrantyForm';
+import { toProductWarrantyRequests, validateProductWarranties } from '../utils/warrantyForm';
+import { useProductWarranties } from '../hooks/useProductWarranties';
+import { formatWarrantyDuration, formatWarrantyType } from '../../item-management/utils/itemWarranty';
+import { ProductComponentsSection } from './ProductComponentsSection';
+import { ComponentsPreview } from './ComponentsPreview';
+import { dropComponentErrors, toComponentRequests, validateComponentRows, type ComponentFormRow } from '../utils/componentForm';
+import { componentMaxFor } from '../utils/componentStock';
+
+/** A new product always starts with exactly one unit: its components describe what one unit uses. */
+const NEW_PRODUCT_STOCK = 1;
+const NO_SAVED_COMPONENTS = new Map<number, number>();
 
 interface CreateProductModalProps {
     isOpen: boolean;
@@ -26,7 +36,6 @@ export const CreateProductModal: React.FC<CreateProductModalProps> = ({
     const [description, setDescription] = useState('');
     const [price, setPrice] = useState<number | ''>('');
     const [discountPercentage, setDiscountPercentage] = useState<number | ''>('');
-    const [stockQuantity, setStockQuantity] = useState<number | ''>('');
     const [enabled, setIsEnabled] = useState(true);
 
     // Dynamic Image URLs (up to 5, starting with 1)
@@ -37,9 +46,12 @@ export const CreateProductModal: React.FC<CreateProductModalProps> = ({
         { specKey: '', specValue: '' },
     ]);
 
-    // Warranties (product-level). Zero is allowed.
-    const [warranties, setWarranties] = useState<WarrantyFormItem[]>([]);
+    // Components (items) with their auto-added item warranties. Zero is allowed.
+    const [components, setComponents] = useState<ComponentFormRow[]>([]);
+
     const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+    // Warranties (product-level), including copies of the selected items' warranties. Zero is allowed.
+    const { warranties, onChange: handleWarrantiesChange, reset: resetWarranties } = useProductWarranties(components, setFieldErrors);
     // Show backend field errors from the latest save inline (state adjusted during render, not in an effect).
     const [shownServerErrors, setShownServerErrors] = useState(serverFieldErrors);
     if (serverFieldErrors !== shownServerErrors) {
@@ -53,13 +65,11 @@ export const CreateProductModal: React.FC<CreateProductModalProps> = ({
 
     if (!isOpen) return null;
 
-    // Required fields check: Title, Price, and Stock Quantity must be provided and valid
+    // Required fields check: Title and Price must be provided and valid (stock is fixed at 1 on creation)
     const isFormValid =
         title.trim() !== '' &&
         price !== '' &&
-        Number(price) >= 0 &&
-        stockQuantity !== '' &&
-        Number(stockQuantity) >= 0;
+        Number(price) >= 0;
 
     const handleAddImageUrl = () => {
         if (imageUrls.length < 5) {
@@ -93,18 +103,16 @@ export const CreateProductModal: React.FC<CreateProductModalProps> = ({
         setSpecifications(updated.length > 0 ? updated : [{ specKey: '', specValue: '' }]);
     };
 
-    const handleWarrantiesChange: WarrantiesChange = (items, edited) => {
-        setWarranties(items);
-        setFieldErrors((prev) => dropWarrantyErrors(prev, edited));
-    };
-
     const handleInitialSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         if (!isFormValid) return;
 
-        const warrantyErrors = validateWarranties(warranties);
-        setFieldErrors(warrantyErrors);
-        if (Object.keys(warrantyErrors).length > 0) return;
+        const clientErrors = {
+            ...validateComponentRows(components, componentMaxFor(NEW_PRODUCT_STOCK, NO_SAVED_COMPONENTS)),
+            ...validateProductWarranties(warranties),
+        };
+        setFieldErrors(clientErrors);
+        if (Object.keys(clientErrors).length > 0) return;
 
         // Filter out empty specifications if any
         const filteredSpecs = specifications.filter(
@@ -117,7 +125,7 @@ export const CreateProductModal: React.FC<CreateProductModalProps> = ({
             description: description || undefined,
             price: Number(price) || 0,
             discountPercentage: discountPercentage !== '' ? Number(discountPercentage) : undefined,
-            stockQuantity: Number(stockQuantity) || 0,
+            stockQuantity: NEW_PRODUCT_STOCK,
             enabled,
             lastUpdateDescription: undefined,
             image1Url: imageUrls[0] || undefined,
@@ -127,7 +135,9 @@ export const CreateProductModal: React.FC<CreateProductModalProps> = ({
             image5Url: imageUrls[4] || undefined,
             specifications: filteredSpecs.length > 0 ? filteredSpecs : undefined,
             // New product: never send ids.
-            warranties: warranties.length > 0 ? toWarrantyRequests(warranties, false) : undefined,
+            // New product: never send ids. Includes the warranties copied from the selected items.
+            warranties: warranties.length > 0 ? toProductWarrantyRequests(warranties, false) : undefined,
+            components: components.length > 0 ? toComponentRequests(components) : undefined,
         };
 
         setPendingPayload(payload);
@@ -145,10 +155,10 @@ export const CreateProductModal: React.FC<CreateProductModalProps> = ({
             setDescription('');
             setPrice('');
             setDiscountPercentage('');
-            setStockQuantity('');
             setImageUrls(['']);
             setSpecifications([{ specKey: '', specValue: '' }]);
-            setWarranties([]);
+            resetWarranties([]);
+            setComponents([]);
             setFieldErrors({});
             setShowPreviewModal(false);
             setPendingPayload(null);
@@ -237,16 +247,14 @@ export const CreateProductModal: React.FC<CreateProductModalProps> = ({
                                 />
                             </div>
                             <div>
-                                <label className="block font-medium text-gray-700 dark:text-gray-300 mb-1">Stock Qty *</label>
-                                <input
-                                    type="number"
-                                    required
-                                    min={0}
-                                    value={stockQuantity}
-                                    onChange={(e) => setStockQuantity(e.target.value === '' ? '' : Number(e.target.value))}
-                                    placeholder="0"
-                                    className="w-full px-3 py-2 bg-black/[0.02] dark:bg-white/[0.02] border border-black/10 dark:border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0071e3] text-black dark:text-white"
-                                />
+                                <span className="block font-medium text-gray-700 dark:text-gray-300 mb-1">Stock Qty</span>
+                                <p
+                                    data-testid="new-product-stock"
+                                    className="w-full px-3 py-2 bg-black/[0.04] dark:bg-white/[0.04] border border-black/10 dark:border-white/10 rounded-xl text-gray-600 dark:text-gray-300"
+                                >
+                                    1
+                                </p>
+                                <p className="mt-1 text-[10px] text-gray-400">New products start with 1 unit. Use Add stock later.</p>
                             </div>
                         </div>
 
@@ -329,7 +337,16 @@ export const CreateProductModal: React.FC<CreateProductModalProps> = ({
                             </button>
                         </div>
 
-                        <WarrantiesSection items={warranties} onChange={handleWarrantiesChange} errors={fieldErrors} disabled={isSubmitting} />
+                        <ProductComponentsSection
+                            productStock={NEW_PRODUCT_STOCK}
+                            rows={components}
+                            setRows={setComponents}
+                            errors={fieldErrors}
+                            onClearErrors={(keys) => setFieldErrors((prev) => dropComponentErrors(prev, keys))}
+                            disabled={isSubmitting}
+                        />
+
+                        <ProductWarrantiesEditor items={warranties} onChange={handleWarrantiesChange} errors={fieldErrors} disabled={isSubmitting} />
 
                         <FormFieldErrors errors={fieldErrors} />
 
@@ -455,6 +472,11 @@ export const CreateProductModal: React.FC<CreateProductModalProps> = ({
                                 </div>
                             )}
 
+                            {/* Components + their item warranties */}
+                            {pendingPayload.components && pendingPayload.components.length > 0 && (
+                                <ComponentsPreview components={pendingPayload.components} />
+                            )}
+
                             {/* Warranties Preview */}
                             {pendingPayload.warranties && pendingPayload.warranties.length > 0 && (
                                 <div>
@@ -463,7 +485,10 @@ export const CreateProductModal: React.FC<CreateProductModalProps> = ({
                                         {pendingPayload.warranties.map((warranty, i) => (
                                             <li key={i} className="flex justify-between gap-2 px-3 py-1.5 border-b last:border-b-0 border-black/5 dark:border-white/5">
                                                 <span className="font-medium text-black dark:text-white">{warranty.title}</span>
-                                                <span className="text-gray-500 shrink-0">{warranty.isActive ? 'Active' : 'Inactive'}</span>
+                                                <span className="text-gray-500 shrink-0">
+                                                    {formatWarrantyType(warranty.warrantyType)} · {formatWarrantyDuration(warranty.durationValue, warranty.durationUnit)} ·{' '}
+                                                    {warranty.isActive ? 'Active' : 'Inactive'}
+                                                </span>
                                             </li>
                                         ))}
                                     </ul>

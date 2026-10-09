@@ -81,6 +81,22 @@ export const START_STATUSES: readonly string[] = [
  */
 export const APPROVAL_ONLY_STATUSES: ReadonlySet<string> = new Set(['PRE_ORDER_CONFIRMED']);
 
+/**
+ * Statuses that confirm an order. An order may be confirmed only once it is fully paid
+ * (paymentStatus PAID) — the backend enforces the same rule (409 ORDER_PAYMENT_INCOMPLETE).
+ */
+export const PAYMENT_REQUIRED_STATUSES: ReadonlySet<string> = new Set(['CONFIRMED', 'PRE_ORDER_CONFIRMED']);
+
+/** Only PAID counts: PENDING, FAILED, REFUND_REQUESTED, missing… all block confirmation. */
+export const isFullyPaid = (paymentStatus: string | null | undefined): boolean => (paymentStatus ?? '').trim().toUpperCase() === 'PAID';
+
+/** Why the order can't be confirmed yet, or null when it is paid. */
+export const getPaymentBlockReason = (paymentStatus: string | null | undefined): string | null => {
+  if (isFullyPaid(paymentStatus)) return null;
+  const current = paymentStatus?.trim() ? paymentStatus.trim().replace(/_/g, ' ').toLowerCase() : 'not recorded';
+  return `This order can't be confirmed until it is fully paid (payment status: ${current}).`;
+};
+
 /** Final statuses: nothing can follow them, in either mode. */
 export const LOCKED_STATUSES: ReadonlySet<string> = new Set(['CANCELLED', 'RETURN_COMPLETED']);
 
@@ -99,6 +115,8 @@ export interface WorkflowContext {
   currentStatus: string | null;
   /** Status of the event before the current one (for manual "undo last step"). */
   previousStatus: string | null;
+  /** The order's payment status; confirming requires PAID. */
+  paymentStatus: string | null;
 }
 
 /**
@@ -107,7 +125,18 @@ export interface WorkflowContext {
  *  - manual:   forward transitions, plus reverting to the previous step while the order is
  *              still before shipment. Locked orders allow nothing in either mode.
  */
-export const getAllowedStatuses = (mode: StatusUpdateMode, { currentStatus, previousStatus }: WorkflowContext): string[] => {
+export const getAllowedStatuses = (mode: StatusUpdateMode, context: WorkflowContext): string[] => {
+  const allowed = getWorkflowStatuses(mode, context);
+  // Confirmation needs a fully paid order, whichever way the admin tries to get there.
+  return isFullyPaid(context.paymentStatus) ? allowed : allowed.filter((status) => !PAYMENT_REQUIRED_STATUSES.has(status));
+};
+
+/** Whether confirming is a valid next step for this order and is held back only by payment. */
+export const isConfirmBlockedByPayment = (mode: StatusUpdateMode, context: WorkflowContext): boolean =>
+  !isFullyPaid(context.paymentStatus) && getWorkflowStatuses(mode, context).some((status) => PAYMENT_REQUIRED_STATUSES.has(status));
+
+/** The status table alone, before the payment rule. */
+const getWorkflowStatuses = (mode: StatusUpdateMode, { currentStatus, previousStatus }: WorkflowContext): string[] => {
   if (isLockedStatus(currentStatus)) return [];
   if (!isKnownStatus(currentStatus)) return [...START_STATUSES];
 

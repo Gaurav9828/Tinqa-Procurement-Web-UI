@@ -3,8 +3,8 @@ import type { ApiResponse } from '../../../types/common.types';
 import type { ProcessApprovalPayload } from '../../approvals/types/approval.types';
 import type {
   CreateStockFromOrderRequest,
+  ItemAvailabilityResponse,
   UpdateStockRequest,
-  QuantityAdjustmentRequest,
   StockResponse,
 } from '../types/stock.types';
 
@@ -26,27 +26,6 @@ export const stockApi = {
     return response.data;
   },
 
-  addStockQuantity: async (
-    id: number,
-    payload: QuantityAdjustmentRequest
-  ): Promise<ApiResponse<StockResponse>> => {
-    const response = await axiosClient.post<ApiResponse<StockResponse>>(
-      `${BASE_URL}/${id}/add-quantity`,
-      payload
-    );
-    return response.data;
-  },
-
-  reduceStockQuantity: async (
-    id: number,
-    payload: QuantityAdjustmentRequest
-  ): Promise<ApiResponse<StockResponse>> => {
-    const response = await axiosClient.post<ApiResponse<StockResponse>>(
-      `${BASE_URL}/${id}/reduce-quantity`,
-      payload
-    );
-    return response.data;
-  },
 
   processAdminL2Approval: async (
     id: number,
@@ -61,6 +40,12 @@ export const stockApi = {
 
   getStockById: async (id: number): Promise<ApiResponse<StockResponse>> => {
     const response = await axiosClient.get<ApiResponse<StockResponse>>(`${BASE_URL}/${id}`);
+    return response.data;
+  },
+
+  /** Exact consumable units of one item (what product components can use). */
+  getItemAvailability: async (itemId: number): Promise<ApiResponse<ItemAvailabilityResponse>> => {
+    const response = await axiosClient.get<ApiResponse<ItemAvailabilityResponse>>(`${BASE_URL}/items/${itemId}/availability`);
     return response.data;
   },
 

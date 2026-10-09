@@ -4,6 +4,7 @@ import { OrderStatusBadge } from './OrderStatusBadge';
 import type { OrderResponse, UpdateOrderStatusRequest } from '../types/order.types';
 import { useAuthStore } from '../../../store/useAuthStore';
 import { ORDER_STATUS, type OrderStatus } from '../../../types/common.types';
+import { todayLocalIsoDate } from '../validator/orderValidator';
 
 interface OrderTableProps {
     orders: OrderResponse[];
@@ -38,14 +39,28 @@ export const OrderTable: React.FC<OrderTableProps> = ({
         
         // Pre-fill delivery date if available and updating to DELIVERED, otherwise default to today
         if (newStatus === 'DELIVERED') {
-            setActualDeliveryDate(order.actualDelivery || new Date().toISOString().split('T')[0]);
+            // Default to today in the user's timezone (toISOString() would give the UTC day).
+            setActualDeliveryDate(order.actualDelivery || todayLocalIsoDate());
         } else {
             setActualDeliveryDate('');
         }
     };
 
+    // Delivery has happened, so the date can't be in the future (or before the order was placed).
+    const today = todayLocalIsoDate();
+    const deliveryDateError =
+        pendingChange?.newStatus !== 'DELIVERED'
+            ? null
+            : !actualDeliveryDate
+              ? 'Actual delivery date is required.'
+              : actualDeliveryDate > today
+                ? 'Actual delivery date cannot be in the future.'
+                : pendingChange.order.orderDate && actualDeliveryDate < pendingChange.order.orderDate
+                  ? `Actual delivery date cannot be before the order date (${pendingChange.order.orderDate}).`
+                  : null;
+
     const handleConfirmStatusChange = () => {
-        if (!pendingChange) return;
+        if (!pendingChange || deliveryDateError) return;
 
         const { order, newStatus } = pendingChange;
 
@@ -199,11 +214,17 @@ export const OrderTable: React.FC<OrderTableProps> = ({
                                 </label>
                                 <input
                                     type="date"
+                                    aria-label="Actual Delivery Date"
                                     value={actualDeliveryDate}
                                     min={pendingChange.order.orderDate}
+                                    max={today}
+                                    aria-invalid={!!deliveryDateError}
                                     onChange={(e) => setActualDeliveryDate(e.target.value)}
                                     className="w-full px-3 py-1.5 text-xs rounded-xl bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 text-black dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0071e3]"
                                 />
+                                {deliveryDateError && actualDeliveryDate && (
+                                    <p role="alert" className="text-[11px] text-red-500">{deliveryDateError}</p>
+                                )}
                             </div>
                         )}
 
@@ -218,7 +239,7 @@ export const OrderTable: React.FC<OrderTableProps> = ({
                             <button
                                 type="button"
                                 onClick={handleConfirmStatusChange}
-                                disabled={pendingChange.newStatus === 'DELIVERED' && !actualDeliveryDate}
+                                disabled={!!deliveryDateError}
                                 className="px-3 py-1.5 text-xs font-semibold rounded-xl bg-[#0071e3] text-white hover:bg-[#0071e3]/90 disabled:opacity-50 transition-colors cursor-pointer"
                             >
                                 Confirm
