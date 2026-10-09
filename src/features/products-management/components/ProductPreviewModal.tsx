@@ -1,5 +1,6 @@
 import React from 'react';
 import { X } from 'lucide-react';
+import { ComponentsPreview } from './ComponentsPreview';
 import type { ProductResponse } from '../types/product.types';
 
 interface ProductPreviewModalProps {
@@ -51,6 +52,8 @@ export const ProductPreviewModal: React.FC<ProductPreviewModalProps> = ({ produc
               <p className="text-gray-600 dark:text-gray-300 leading-relaxed">{product.description}</p>
             </div>
           )}
+
+          {product.components.length > 0 && <ComponentsPreview components={product.components} />}
 
           {product.specifications && product.specifications.length > 0 && (
             <div>

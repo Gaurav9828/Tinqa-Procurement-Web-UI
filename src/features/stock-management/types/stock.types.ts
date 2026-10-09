@@ -9,11 +9,6 @@ export interface CreateStockFromOrderRequest {
   additionalInfo?: Record<string, any>;
 }
 
-export interface QuantityAdjustmentRequest {
-  quantity: number;
-  reason?: string;
-}
-
 export interface StockResponse {
   id: number;
   stockIdentityNumber: string;
@@ -40,6 +35,24 @@ export interface StockResponse {
   isActive: boolean;
   createdAt: string;
   createdBy: number;
+}
+
+/** StockDTOs.ItemAvailabilityResponse — GET /v1/stocks/items/{itemId}/availability. */
+export interface ItemAvailabilityResponse {
+  itemId: number;
+  itemName: string;
+  itemSku: string;
+  unitOfMeasure: string;
+  /** Consumable units: active, approved stock from delivered orders. */
+  totalAvailableUnits: number;
+  stocks: {
+    stockId: number;
+    stockIdentityNumber: string;
+    batchNumber: string;
+    orderNumber: string;
+    availableUnits: number;
+    dateOfArrival: string;
+  }[];
 }
 
 export interface UpdateStockRequest {

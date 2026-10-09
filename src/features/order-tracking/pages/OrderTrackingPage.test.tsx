@@ -626,6 +626,29 @@ describe('OrderTrackingPage', () => {
   });
 
   describe('stage-based status rules', () => {
+    it('does not offer Confirmed until the order is fully paid, and says why', async () => {
+      api.getOrder.mockResolvedValue(ok({ ...withCurrent('ORDER_RECEIVED'), paymentStatus: 'PENDING' }));
+      renderPage('/order-tracking/ORD-1001');
+      const panel = detailPage();
+      await waitFor(() => expect(within(panel).getByLabelText('Status')).toBeEnabled());
+      const values = () => within(within(panel).getByLabelText('Status')).getAllByRole('option').slice(1).map((o) => o.getAttribute('value'));
+      expect(values()).not.toContain('CONFIRMED');
+      expect(values()).toContain('CANCELLED');
+      expect(within(panel).getByRole('note', { name: 'Payment required' })).toHaveTextContent(
+        "This order can't be confirmed until it is fully paid (payment status: pending)."
+      );
+    });
+
+    it('offers Confirmed for a paid order, with no payment notice', async () => {
+      api.getOrder.mockResolvedValue(ok({ ...withCurrent('ORDER_RECEIVED'), paymentStatus: 'PAID' }));
+      renderPage('/order-tracking/ORD-1001');
+      const panel = detailPage();
+      await waitFor(() => expect(within(panel).getByLabelText('Status')).toBeEnabled());
+      const values = within(within(panel).getByLabelText('Status')).getAllByRole('option').map((o) => o.getAttribute('value'));
+      expect(values).toContain('CONFIRMED');
+      expect(within(panel).queryByRole('note', { name: 'Payment required' })).not.toBeInTheDocument();
+    });
+
     it('shows the order stage with the current stage highlighted', async () => {
       const { user } = renderPage();
       const panel = await openOrder(user); // PACKED → Fulfilment
@@ -1128,6 +1151,13 @@ describe('Pre-order review and approval', () => {
     const payment = within(detailPage()).getByRole('region', { name: 'Payment' });
     expect(payment).toHaveTextContent('UPI');
     expect(payment).toHaveTextContent('Paid');
+  });
+
+  it('cannot approve a ready pre-order until it is fully paid', async () => {
+    await openPreOrder({ ...ready(), paymentStatus: 'PENDING' });
+    expect(approveButton()).toBeDisabled();
+    expect(card()).toHaveTextContent("This order can't be confirmed until it is fully paid (payment status: pending).");
+    expect(api.approvePreOrder).not.toHaveBeenCalled();
   });
 
   it('never offers Pre-order Confirmed in the generic status form (approval is a dedicated action)', async () => {

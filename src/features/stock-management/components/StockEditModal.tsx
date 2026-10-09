@@ -86,8 +86,9 @@ export const StockEditModal: React.FC<StockEditModalProps> = ({
         dealerId: { required: true, customMessage: 'Dealer selection is required.' },
         itemId: { required: true, customMessage: 'Item selection is required.' },
         dateOfArrival: { required: true, customMessage: 'Date of arrival is required.' },
-        unitsPassedTest: { type: 'number', min: 0, customMessage: 'Passed units cannot be negative.' },
-        defectedUnits: { type: 'number', min: 0, customMessage: 'Defected units cannot be negative.' },
+        // Read-only (fixed when the entry was created from its order), so not validated here.
+        unitsPassedTest: {},
+        defectedUnits: {},
         hasTested: {},
         additionalInfo: {},
         isActive: {},
@@ -99,11 +100,7 @@ export const StockEditModal: React.FC<StockEditModalProps> = ({
         (Object.keys(validationRules) as Array<keyof FormState>).forEach((field) => {
             const rule = validationRules[field];
             if (rule && Object.keys(rule).length > 0) {
-                let valueToValidate: unknown = formData[field];
-                if (field === 'unitsPassedTest' || field === 'defectedUnits') {
-                    valueToValidate = formData[field] !== '' ? Number(formData[field]) : '';
-                }
-                const err = Validator.validateField(valueToValidate, rule);
+                const err = Validator.validateField(formData[field], rule);
                 if (err) errors[field] = err;
             }
         });
@@ -132,13 +129,15 @@ export const StockEditModal: React.FC<StockEditModalProps> = ({
             return;
         }
 
+        // Units, quality result, dealer and item belong to the order and the original entry: they are
+        // never edited here and are sent back exactly as stored (the update API still requires them).
         const payload: UpdateStockRequest = {
             batchNumber: formData.batchNumber.trim(),
-            dealerId: Number(formData.dealerId),
-            itemId: Number(formData.itemId),
-            unitsPassedTest: Number(formData.unitsPassedTest),
-            defectedUnits: Number(formData.defectedUnits),
-            hasTested: formData.hasTested,
+            dealerId: stock.dealerId,
+            itemId: stock.itemId,
+            unitsPassedTest: Number(stock.unitsPassedTest ?? 0),
+            defectedUnits: Number(stock.defectedUnits ?? 0),
+            hasTested: Boolean(stock.hasTested),
             dateOfArrival: formData.dateOfArrival,
             additionalInfo: formData.additionalInfo,
             isActive: formData.isActive,
@@ -202,9 +201,9 @@ export const StockEditModal: React.FC<StockEditModalProps> = ({
                                 options={dealerOptions}
                                 placeholder="Select Dealer..."
                                 value={formData.dealerId}
-                                onBlur={() => handleBlur('dealerId')}
-                                onChange={(e) => handleChange('dealerId', e.target.value)}
-                                error={touched.dealerId ? validationErrors.dealerId : undefined}
+                                disabled
+                                title="Fixed to the order's dealer"
+                                onChange={() => undefined}
                             />
                         </div>
 
@@ -216,36 +215,42 @@ export const StockEditModal: React.FC<StockEditModalProps> = ({
                                 options={itemOptions}
                                 placeholder="Select Item..."
                                 value={formData.itemId}
-                                onBlur={() => handleBlur('itemId')}
-                                onChange={(e) => handleChange('itemId', e.target.value)}
-                                error={touched.itemId ? validationErrors.itemId : undefined}
+                                disabled
+                                title="Fixed to the order's item"
+                                onChange={() => undefined}
                             />
                         </div>
 
+                        {/* Stock quantities and the test result are set when the entry is created and never edited.
+                            To add stock, create a new stock entry from the order. */}
                         <CommonInput
                             label="Units Passed Test"
                             type="number"
+                            disabled
                             value={formData.unitsPassedTest}
-                            onBlur={() => handleBlur('unitsPassedTest')}
-                            onChange={(e) => handleChange('unitsPassedTest', e.target.value)}
-                            error={touched.unitsPassedTest ? validationErrors.unitsPassedTest : undefined}
+                            onChange={() => undefined}
+                            data-testid="edit-units-passed"
                         />
 
                         <CommonInput
                             label="Defected Units"
                             type="number"
+                            disabled
                             value={formData.defectedUnits}
-                            onBlur={() => handleBlur('defectedUnits')}
-                            onChange={(e) => handleChange('defectedUnits', e.target.value)}
-                            error={touched.defectedUnits ? validationErrors.defectedUnits : undefined}
+                            onChange={() => undefined}
+                            data-testid="edit-defected-units"
                         />
 
                         <div className="pt-2 sm:col-span-2 space-y-2">
                             <CommonCheckbox
                                 label="Has Passed Quality Testing"
+                                disabled
                                 checked={formData.hasTested}
-                                onChange={(checked) => handleChange('hasTested', checked)}
+                                onChange={() => undefined}
                             />
+                            <p className="text-[11px] text-gray-400 pl-6">
+                                Units, test result, dealer and item are fixed by the order and can't be edited. To add stock, create a new stock entry.
+                            </p>
                             <CommonCheckbox
                                 label="Is Active"
                                 checked={formData.isActive}

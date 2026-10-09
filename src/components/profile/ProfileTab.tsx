@@ -49,6 +49,8 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({
                 customMessage: 'Enter a valid alternate phone number.',
             });
             if (altPhoneErr) errs.alternate_phone = altPhoneErr;
+            const pairErr = Validator.validatePhonePair(employeeData.phone, employeeData.alternate_phone).alternate;
+            if (!errs.alternate_phone && pairErr) errs.alternate_phone = pairErr;
         }
 
         if (employeeData.personal_email) {

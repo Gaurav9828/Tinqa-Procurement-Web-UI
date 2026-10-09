@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { useNotify } from './useNotify';
 import { itemApi } from '../features/item-management/api/itemApi';
 import { dealerApi } from '../features/dealer-management/api/dealerApi';
+import { stockApi } from '../features/stock-management/api/stockApi';
+import type { StockResponse } from '../features/stock-management/types/stock.types';
 import type { ItemResponse } from '../features/item-management/types/item.types';
 import type { DealerResponse } from '../features/dealer-management/types/dealer.types';
 
@@ -87,7 +89,15 @@ const dealerLookup = createLookup<DealerResponse>(async () => {
   return res.data?.content ?? [];
 });
 
+// All stock entries (used to narrow item pickers to items that have stock).
+const stockLookup = createLookup<StockResponse>(async () => {
+  const res = await stockApi.getAllStocks();
+  return Array.isArray(res.data) ? res.data : [];
+});
+
 export const useItemOptions = itemLookup.useOptions;
+export const useStockOptions = stockLookup.useOptions;
+export const invalidateStockOptions = stockLookup.invalidate;
 export const useDealerOptions = dealerLookup.useOptions;
 export const invalidateItemOptions = itemLookup.invalidate;
 export const invalidateDealerOptions = dealerLookup.invalidate;

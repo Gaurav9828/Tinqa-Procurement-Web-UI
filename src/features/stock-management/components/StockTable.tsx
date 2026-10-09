@@ -1,5 +1,5 @@
 import React from 'react';
-import { Edit3, PlusCircle, MinusCircle, CheckSquare, Eye, PackageSearch } from 'lucide-react';
+import { Edit3, CheckSquare, Eye, PackageSearch } from 'lucide-react';
 import { StockStatusBadge } from './StockStatusBadge';
 import type { StockResponse } from '../types/stock.types';
 import { useAuthStore } from '../../../store/useAuthStore';
@@ -9,7 +9,6 @@ interface StockTableProps {
     isLoading: boolean;
     onView: (stock: StockResponse) => void;
     onEdit?: (stock: StockResponse) => void;
-    onAdjustQuantity: (stock: StockResponse, type: 'ADD' | 'REDUCE') => void;
     onApproval: (stock: StockResponse) => void;
 }
 
@@ -18,7 +17,6 @@ export const StockTable: React.FC<StockTableProps> = ({
     isLoading,
     onView,
     onEdit,
-    onAdjustQuantity,
     onApproval,
 }) => {
     const { user } = useAuthStore();
@@ -109,23 +107,8 @@ export const StockTable: React.FC<StockTableProps> = ({
                                             </button>
                                         )}
 
-                                        <button
-                                            type="button"
-                                            onClick={() => onAdjustQuantity(stock, 'ADD')}
-                                            title="Add Stock Quantity"
-                                            className="p-2 hover:bg-emerald-500/10 text-emerald-600 rounded-lg transition-colors cursor-pointer"
-                                        >
-                                            <PlusCircle className="w-4 h-4" />
-                                        </button>
-
-                                        <button
-                                            type="button"
-                                            onClick={() => onAdjustQuantity(stock, 'REDUCE')}
-                                            title="Reduce Stock Quantity"
-                                            className="p-2 hover:bg-rose-500/10 text-rose-600 rounded-lg transition-colors cursor-pointer"
-                                        >
-                                            <MinusCircle className="w-4 h-4" />
-                                        </button>
+                                        {/* No add/reduce: a stock entry's units come from its order and can't be adjusted.
+                                            More stock is added by creating a new stock entry. */}
 
                                         {stock.approvalStatus === 'PENDING' && (
                                             <button

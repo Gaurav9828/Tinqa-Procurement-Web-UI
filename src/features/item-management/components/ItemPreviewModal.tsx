@@ -1,7 +1,8 @@
 import React from 'react';
-import { X, Package, ShieldCheck, FileText, Globe, Tag, IndianRupee, Layers } from 'lucide-react';
+import { X, Package, FileText, Globe, Tag, IndianRupee, Layers } from 'lucide-react';
 import type { ItemResponse } from '../types/item.types';
 import { ItemStatusBadge } from './ItemStatusBadge';
+import { ItemWarrantyList } from './ItemWarrantyList';
 
 interface Props {
   isOpen: boolean;
@@ -95,20 +96,16 @@ export const ItemPreviewModal: React.FC<Props> = ({ isOpen, item, onClose }) => 
                 <span className="text-black dark:text-white font-medium">{item.rawMaterialsUsed}</span>
               </div>
             )}
-            {item.warrantyMonths !== undefined && (
-              <div className="flex items-center gap-1.5 text-black dark:text-white">
-                <ShieldCheck className="w-4 h-4 text-emerald-500" />
-                <span className="font-semibold text-gray-500">Warranty:</span>{' '}
-                <span>{item.warrantyMonths} Months</span>
-              </div>
-            )}
           </div>
 
-          {/* Terms & Conditions */}
+          {/* Warranties */}
+          <ItemWarrantyList warranties={item.warranties} />
+
+          {/* General Terms & Conditions (item-level, separate from each warranty's own T&C) */}
           {item.termsAndCondition && (
             <div className="space-y-1 pt-1">
               <span className="font-semibold text-gray-500 flex items-center gap-1">
-                <FileText className="w-3.5 h-3.5 text-amber-500" /> Terms & Conditions
+                <FileText className="w-3.5 h-3.5 text-amber-500" /> General Terms & Conditions
               </span>
               <p className="text-[11px] text-gray-600 dark:text-neutral-400 bg-amber-500/5 p-3 rounded-xl border border-amber-500/10">
                 {item.termsAndCondition}

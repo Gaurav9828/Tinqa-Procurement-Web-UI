@@ -10,8 +10,16 @@ export const STOCK_NOTE_MAX_LENGTH = 150;
 
 export type StockCalculation = { ok: true; newStock: number } | { ok: false; error: string };
 
-/** Validates the quantity and returns the resulting stock (never negative). */
-export const calculateNewStock = (currentStock: number, mode: StockAdjustMode, quantityInput: string | number): StockCalculation => {
+/**
+ * Validates the quantity and returns the resulting stock (never negative).
+ * `maxAdd` caps additions when the product's components limit how many units can be built (null = no limit).
+ */
+export const calculateNewStock = (
+  currentStock: number,
+  mode: StockAdjustMode,
+  quantityInput: string | number,
+  maxAdd: number | null = null
+): StockCalculation => {
   const raw = String(quantityInput).trim();
   if (!raw) return { ok: false, error: 'Enter a quantity.' };
   const quantity = Number(raw);
@@ -21,6 +29,12 @@ export const calculateNewStock = (currentStock: number, mode: StockAdjustMode, q
   const current = Math.max(0, Number(currentStock) || 0);
   if (mode === 'reduce' && quantity > current) {
     return { ok: false, error: `You can reduce by at most ${current} (current stock).` };
+  }
+  if (mode === 'add' && maxAdd !== null && quantity > maxAdd) {
+    return {
+      ok: false,
+      error: maxAdd < 1 ? 'Not enough item stock to add any units.' : `You can add at most ${maxAdd} (limited by item stock).`,
+    };
   }
   return { ok: true, newStock: mode === 'add' ? current + quantity : current - quantity };
 };

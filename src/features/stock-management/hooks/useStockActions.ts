@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { useNotify } from '../../../hooks/useNotify';
+import { invalidateStockOptions } from '../../../hooks/useLookupOptions';
 import { stockApi } from '../api/stockApi';
 import type {
   CreateStockFromOrderRequest,
   UpdateStockRequest,
-  QuantityAdjustmentRequest,
 } from '../types/stock.types';
 import type { ProcessApprovalPayload } from '../../approvals/types/approval.types';
 
@@ -18,6 +18,8 @@ export const useStockActions = (onSuccessCallback?: () => void) => {
       const res = await stockApi.createStockFromOrder(payload);
       if (res.success) {
         notify.success(res.message || 'Stock created from order successfully.');
+        // The order is now used: drop it from the cached stock list so it isn't offered again.
+        invalidateStockOptions();
         if (onSuccessCallback) onSuccessCallback();
         return true;
       }
@@ -50,31 +52,6 @@ export const useStockActions = (onSuccessCallback?: () => void) => {
     }
   };
 
-  const adjustQuantity = async (
-    id: number,
-    type: 'ADD' | 'REDUCE',
-    payload: QuantityAdjustmentRequest
-  ): Promise<boolean> => {
-    setIsSubmitting(true);
-    try {
-      const res =
-        type === 'ADD'
-          ? await stockApi.addStockQuantity(id, payload)
-          : await stockApi.reduceStockQuantity(id, payload);
-      if (res.success) {
-        notify.success(res.message || `Stock quantity ${type.toLowerCase()}ed successfully.`);
-        if (onSuccessCallback) onSuccessCallback();
-        return true;
-      }
-      notify.error(res.message || 'Failed to adjust stock quantity.');
-      return false;
-    } catch (err: unknown) {
-      notify.error(err, 'Error adjusting stock quantity.');
-      return false;
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
 
   const processApproval = async (id: number, payload: ProcessApprovalPayload): Promise<boolean> => {
     setIsSubmitting(true);
@@ -99,7 +76,6 @@ export const useStockActions = (onSuccessCallback?: () => void) => {
     isSubmitting,
     createStockFromOrder,
     updateStock,
-    adjustQuantity,
     processApproval,
   };
 };

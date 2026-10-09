@@ -8,6 +8,16 @@ import type {
   UpdateItemRequest,
 } from '../types/item.types';
 import { AttributeInputBuilder } from '../../../components/ui/AttributeInputBuilder';
+import { UnitOfMeasureSelect } from '../../../components/ui/UnitOfMeasureSelect';
+import { ItemWarrantiesEditor, type WarrantyEditorChange } from './ItemWarrantiesEditor';
+import {
+  dropWarrantyErrors,
+  nonWarrantyErrors,
+  toWarrantyForms,
+  toWarrantyRequests,
+  validateWarrantyForms,
+  type WarrantyFormItem,
+} from '../utils/itemWarranty';
 
 interface Props {
   isOpen: boolean;
@@ -17,11 +27,13 @@ interface Props {
   initialData: ItemResponse | null;
   onClose: () => void;
   onSubmit: (data: CreateItemRequest | UpdateItemRequest) => Promise<boolean>;
+  /** Backend 400 field errors from the last save (e.g. `warranties[0].title`). */
+  serverFieldErrors?: Record<string, string>;
 }
 
 // Keep in sync with the backend item constraints.
 const validateItemPayload = (
-  payload: { categoryId: number; name: string; mrp: number; warrantyMonths: number; unitOfMeasure: string; countryOfOrigin: string },
+  payload: { categoryId: number; name: string; mrp: number; unitOfMeasure: string; countryOfOrigin: string },
   sku?: string
 ): string | null => {
   if (!Number.isInteger(payload.categoryId) || payload.categoryId <= 0) return 'Please select a category.';
@@ -31,9 +43,6 @@ const validateItemPayload = (
   }
   if (!Number.isFinite(payload.mrp) || payload.mrp <= 0 || payload.mrp > 10_000_000) {
     return 'MRP must be a positive amount.';
-  }
-  if (!Number.isInteger(payload.warrantyMonths) || payload.warrantyMonths < 0 || payload.warrantyMonths > 600) {
-    return 'Warranty must be a whole number of months between 0 and 600.';
   }
   if (!payload.unitOfMeasure) return 'Unit of measure is required.';
   if (!payload.countryOfOrigin) return 'Country of origin is required.';
@@ -48,6 +57,7 @@ export const ItemFormModal: React.FC<Props> = ({
   initialData,
   onClose,
   onSubmit,
+  serverFieldErrors,
 }) => {
   const [formData, setFormData] = useState({
     categoryId: '',
@@ -58,13 +68,21 @@ export const ItemFormModal: React.FC<Props> = ({
     mrp: '',
     countryOfOrigin: 'India',
     rawMaterialsUsed: '',
-    warrantyMonths: '0',
     termsAndCondition: '',
     description: '',
   });
 
   const [attributes, setAttributes] = useState<Record<string, string>>({});
+  const [warranties, setWarranties] = useState<WarrantyFormItem[]>([]);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const notify = useNotify();
+
+  // Show backend field errors from the latest save on their cards (adjusted during render, not in an effect).
+  const [shownServerErrors, setShownServerErrors] = useState(serverFieldErrors);
+  if (serverFieldErrors !== shownServerErrors) {
+    setShownServerErrors(serverFieldErrors);
+    setFieldErrors(serverFieldErrors ?? {});
+  }
 
   useEffect(() => {
     if (initialData) {
@@ -77,11 +95,11 @@ export const ItemFormModal: React.FC<Props> = ({
         mrp: String(initialData.mrp),
         countryOfOrigin: initialData.countryOfOrigin || 'India',
         rawMaterialsUsed: initialData.rawMaterialsUsed || '',
-        warrantyMonths: String(initialData.warrantyMonths ?? 0),
         termsAndCondition: initialData.termsAndCondition || '',
         description: initialData.description || '',
       });
       setAttributes(initialData.attributes || {});
+      setWarranties(toWarrantyForms(initialData.warranties));
     } else {
       setFormData({
         categoryId: categories[0]?.id ? String(categories[0].id) : '',
@@ -92,15 +110,23 @@ export const ItemFormModal: React.FC<Props> = ({
         mrp: '',
         countryOfOrigin: 'India',
         rawMaterialsUsed: '',
-        warrantyMonths: '0',
-        termsAndCondition: '',
+            termsAndCondition: '',
         description: '',
       });
       setAttributes({});
+      setWarranties([]);
     }
+    setFieldErrors({});
   }, [initialData, categories, isOpen]);
 
   if (!isOpen) return null;
+
+  const isEdit = !!initialData;
+
+  const handleWarrantiesChange: WarrantyEditorChange = (items, edited) => {
+    setWarranties(items);
+    setFieldErrors((prev) => dropWarrantyErrors(prev, edited));
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -113,7 +139,6 @@ export const ItemFormModal: React.FC<Props> = ({
       mrp: Number(formData.mrp),
       countryOfOrigin: formData.countryOfOrigin.trim(),
       rawMaterialsUsed: formData.rawMaterialsUsed.trim() || undefined,
-      warrantyMonths: Number(formData.warrantyMonths),
       termsAndCondition: formData.termsAndCondition.trim() || undefined,
       description: formData.description.trim() || undefined,
       attributes: Object.keys(attributes).length > 0 ? attributes : undefined,
@@ -125,9 +150,22 @@ export const ItemFormModal: React.FC<Props> = ({
       return;
     }
 
+    const warrantyErrors = validateWarrantyForms(warranties);
+    setFieldErrors(warrantyErrors);
+    if (Object.keys(warrantyErrors).length > 0) {
+      notify.error('Please fix the highlighted warranty fields.');
+      return;
+    }
+
+    // Edit: always the complete set (saved ones with id, new ones without; [] removes all).
+    // Create: never ids, and no key at all when there are none.
     const payload: CreateItemRequest | UpdateItemRequest = initialData
-      ? { ...basePayload, isActive: initialData.isActive }
-      : { ...basePayload, sku: formData.sku.trim() };
+      ? { ...basePayload, isActive: initialData.isActive, warranties: toWarrantyRequests(warranties, true) }
+      : {
+          ...basePayload,
+          sku: formData.sku.trim(),
+          ...(warranties.length > 0 ? { warranties: toWarrantyRequests(warranties, false) } : {}),
+        };
 
     const success = await onSubmit(payload);
     if (success) onClose();
@@ -217,20 +255,14 @@ export const ItemFormModal: React.FC<Props> = ({
               />
             </div>
 
-            {/* Unit of Measure */}
-            <div>
-              <label className="block text-xs font-semibold text-gray-600 dark:text-neutral-300 mb-1">
-                Unit of Measure *
-              </label>
-              <input
-                type="text"
-                required
-                value={formData.unitOfMeasure}
-                onChange={(e) => setFormData({ ...formData, unitOfMeasure: e.target.value })}
-                placeholder="e.g. PCS, KG, METERS"
-                className="w-full px-3 py-2 text-xs bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0071e3]"
-              />
-            </div>
+            {/* Unit of Measure (fixed list) */}
+            <UnitOfMeasureSelect
+              id="item-unit-of-measure"
+              label="Unit of Measure"
+              required
+              value={formData.unitOfMeasure}
+              onChange={(unitOfMeasure) => setFormData({ ...formData, unitOfMeasure })}
+            />
 
             {/* MRP */}
             <div>
@@ -263,22 +295,16 @@ export const ItemFormModal: React.FC<Props> = ({
                 className="w-full px-3 py-2 text-xs bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0071e3]"
               />
             </div>
-
-            {/* Warranty Months */}
-            <div>
-              <label className="block text-xs font-semibold text-gray-600 dark:text-neutral-300 mb-1">
-                Warranty (Months)
-              </label>
-              <input
-                type="number"
-                min="0"
-                max="999"
-                value={formData.warrantyMonths}
-                onChange={(e) => setFormData({ ...formData, warrantyMonths: e.target.value })}
-                className="w-full px-3 py-2 text-xs bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0071e3]"
-              />
-            </div>
           </div>
+
+          {/* Warranties (after pricing / origin) */}
+          <ItemWarrantiesEditor
+            items={warranties}
+            onChange={handleWarrantiesChange}
+            errors={fieldErrors}
+            isEdit={isEdit}
+            disabled={isSubmitting}
+          />
 
           {/* Raw Materials */}
           <div>
@@ -328,6 +354,19 @@ export const ItemFormModal: React.FC<Props> = ({
             attributes={attributes}
             onChange={setAttributes}
           />
+
+          {nonWarrantyErrors(fieldErrors).length > 0 && (
+            <div role="alert" className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-xs text-rose-600 dark:text-rose-400 space-y-1">
+              <p className="font-semibold">The server rejected some fields:</p>
+              <ul className="list-disc pl-4">
+                {nonWarrantyErrors(fieldErrors).map(([field, message]) => (
+                  <li key={field}>
+                    <span className="font-mono">{field}</span>: {message}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
 
           {/* Footer Submit */}
           <div className="flex justify-end gap-3 pt-4 border-t border-black/10 dark:border-white/10">

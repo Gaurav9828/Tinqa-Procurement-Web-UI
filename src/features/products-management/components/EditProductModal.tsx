@@ -1,18 +1,29 @@
 import React, { useState, useEffect } from 'react';
 import { X, Plus, Trash2, CheckCircle2 } from 'lucide-react';
 import type { ProductResponse, UpdateProductRequest, SpecificationDTO } from '../types/product.types';
-import { WarrantiesSection, type WarrantiesChange } from './WarrantiesSection';
+import { ProductWarrantiesEditor } from './ProductWarrantiesEditor';
+import { useProductWarranties } from '../hooks/useProductWarranties';
 import { FormFieldErrors } from './FormFieldErrors';
 import {
   describeWarrantyChanges,
-  dropWarrantyErrors,
   summarizeWarranties,
-  toWarrantyFormItems,
-  toWarrantyRequests,
-  validateWarranties,
+  toProductWarrantyForms,
+  toProductWarrantyRequests,
+  validateProductWarranties,
   warrantiesChanged,
-  type WarrantyFormItem,
 } from '../utils/warrantyForm';
+import { ProductComponentsSection } from './ProductComponentsSection';
+import {
+  componentsChanged,
+  describeComponentChanges,
+  dropComponentErrors,
+  summarizeComponents,
+  toComponentRequests,
+  toComponentRows,
+  validateComponentRows,
+  type ComponentFormRow,
+} from '../utils/componentForm';
+import { componentMaxFor } from '../utils/componentStock';
 
 interface EditProductModalProps {
   product: ProductResponse | null;
@@ -50,9 +61,11 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
   const [showPreviewModal, setShowPreviewModal] = useState(false);
   const [pendingPayload, setPendingPayload] = useState<UpdateProductRequest | null>(null);
 
-  // Warranties come from the admin list (GET /products, inactive included). Saved ones keep their id.
-  const [warranties, setWarranties] = useState<WarrantyFormItem[]>([]);
+  // Components keep the warranty snapshot stored with the product until an item is changed or refreshed.
+  const [components, setComponents] = useState<ComponentFormRow[]>([]);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  // Saved warranties keep their id; warranties of newly selected items are copied in (see useProductWarranties).
+  const { warranties, onChange: handleWarrantiesChange, reset: resetWarranties } = useProductWarranties(components, setFieldErrors);
   // Show backend field errors from the latest save inline (state adjusted during render, not in an effect).
   const [shownServerErrors, setShownServerErrors] = useState(serverFieldErrors);
   if (serverFieldErrors !== shownServerErrors) {
@@ -78,12 +91,18 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
         lastUpdateDescription: '',
         specifications: product.specifications ? product.specifications.map(s => ({ specKey: s.specKey, specValue: s.specValue })) : [],
       });
-      setWarranties(toWarrantyFormItems(product.warranties));
+      resetWarranties(toProductWarrantyForms(product.warranties));
+      setComponents(toComponentRows(product.components));
       setFieldErrors({});
     }
-  }, [product]);
+  }, [product, resetWarranties]);
 
   if (!product) return null;
+
+  // Each product unit uses its components' item stock, so stock changes go through Add/Reduce stock.
+  const stockManagedByComponents = (product.components ?? []).length > 0;
+  const savedPerUnit = new Map((product.components ?? []).map((c) => [c.itemId, Number(c.quantity)]));
+  const componentLimit = componentMaxFor(product.stockQuantity, savedPerUnit);
 
   // Helper to compute diffs between original product and formData
   const getChangedFields = () => {
@@ -132,6 +151,16 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
       });
     }
 
+    // Check components (items + their warranty snapshots)
+    const originalComponents = product.components ?? [];
+    if (componentsChanged(originalComponents, components)) {
+      changes.push({
+        label: 'Components & item warranties',
+        oldVal: summarizeComponents(originalComponents),
+        newVal: describeComponentChanges(originalComponents, components).join('\n') || summarizeComponents(components),
+      });
+    }
+
     // Check warranties
     const originalWarranties = product.warranties ?? [];
     if (warrantiesChanged(originalWarranties, warranties)) {
@@ -174,21 +203,21 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
     setFormData((prev) => ({ ...prev, specifications: updated }));
   };
 
-  const handleWarrantiesChange: WarrantiesChange = (items, edited) => {
-    setWarranties(items);
-    setFieldErrors((prev) => dropWarrantyErrors(prev, edited));
-  };
-
   const handleInitialSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!isFormValid) return;
 
-    const warrantyErrors = validateWarranties(warranties);
-    setFieldErrors(warrantyErrors);
-    if (Object.keys(warrantyErrors).length > 0) return;
+    const clientErrors = { ...validateComponentRows(components, componentLimit), ...validateProductWarranties(warranties) };
+    setFieldErrors(clientErrors);
+    if (Object.keys(clientErrors).length > 0) return;
 
-    // Always send the full list (saved ones with id, new ones without) so removals are applied.
-    setPendingPayload({ ...formData, warranties: toWarrantyRequests(warranties, true) });
+    // Warranties: always the full list (saved ones with id, new ones without) so removals are applied.
+    // Components: sent only when changed (the list replaces them all); omitted otherwise so stored snapshots stay untouched.
+    setPendingPayload({
+      ...formData,
+      warranties: toProductWarrantyRequests(warranties, true),
+      ...(componentsChanged(product.components ?? [], components) ? { components: toComponentRequests(components) } : {}),
+    });
     setShowPreviewModal(true);
   };
 
@@ -260,9 +289,16 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
                   required
                   min={0}
                   value={formData.stockQuantity}
+                  readOnly={stockManagedByComponents}
+                  aria-describedby={stockManagedByComponents ? 'edit-stock-hint' : undefined}
                   onChange={(e) => setFormData({ ...formData, stockQuantity: Number(e.target.value) })}
-                  className="w-full px-3 py-2 bg-black/[0.02] dark:bg-white/[0.02] border border-black/10 dark:border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0071e3] text-black dark:text-white"
+                  className="w-full px-3 py-2 bg-black/[0.02] dark:bg-white/[0.02] border border-black/10 dark:border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0071e3] text-black dark:text-white read-only:bg-black/[0.05] read-only:text-gray-500"
                 />
+                {stockManagedByComponents && (
+                  <p id="edit-stock-hint" className="mt-1 text-[10px] text-gray-400">
+                    Uses item stock — change it with Add/Reduce stock.
+                  </p>
+                )}
               </div>
               <div>
                 <label className="block font-semibold text-gray-700 dark:text-gray-300 mb-1">Discount %</label>
@@ -341,7 +377,17 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
               </div>
             </div>
 
-            <WarrantiesSection items={warranties} onChange={handleWarrantiesChange} errors={fieldErrors} disabled={isSubmitting} />
+            <ProductComponentsSection
+              productStock={product.stockQuantity}
+              savedPerUnit={savedPerUnit}
+              rows={components}
+              setRows={setComponents}
+              errors={fieldErrors}
+              onClearErrors={(keys) => setFieldErrors((prev) => dropComponentErrors(prev, keys))}
+              disabled={isSubmitting}
+            />
+
+            <ProductWarrantiesEditor items={warranties} onChange={handleWarrantiesChange} errors={fieldErrors} disabled={isSubmitting} />
 
             <FormFieldErrors errors={fieldErrors} />
 
