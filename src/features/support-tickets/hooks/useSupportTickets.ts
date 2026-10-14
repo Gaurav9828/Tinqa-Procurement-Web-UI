@@ -44,7 +44,7 @@ export const useSupportTickets = () => {
         setData(res.data);
       } else {
         setErrorKind('unknown');
-        notify.error(res.message || 'Failed to load support tickets.');
+        notify.error(res, 'Failed to load support tickets.');
       }
     } catch (err: unknown) {
       if (!isCurrent()) return;

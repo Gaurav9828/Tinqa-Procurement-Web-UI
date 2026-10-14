@@ -15,7 +15,7 @@ export const useEmployeeDetails = () => {
       if (response.success && response.data) {
         setEmployee(response.data);
       } else {
-        notify.error(response.message || 'Unable to retrieve employee details.');
+        notify.error(response, 'Unable to retrieve employee details.');
       }
     } catch (err: unknown) {
       notify.error(err, 'Error fetching employee details.');

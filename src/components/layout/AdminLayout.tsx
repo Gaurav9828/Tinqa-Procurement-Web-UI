@@ -23,7 +23,9 @@ import {
   LayoutDashboard,
   ShoppingCart,
   Truck,
-  LifeBuoy
+  LifeBuoy,
+  Star,
+  Building2
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useThemeStore } from '../../store/useThemeStore';
@@ -32,6 +34,7 @@ import { authService } from '../../api/services/authService';
 import { APP_NAVIGATION } from '../../config/permissions.config';
 import type { UserRole } from '../../config/permissions.config';
 import { NotificationBell } from '../../components/notifications/NotificationBell';
+import { usePendingCompanyChangeBadge } from '../../features/company-profile/hooks/useCompanyProfileData';
 
 // Comprehensive Icon mapping dictionary
 const ICON_MAP: Record<string, LucideIcon> = {
@@ -51,8 +54,10 @@ const ICON_MAP: Record<string, LucideIcon> = {
   ShoppingCart,
   Truck,
   LifeBuoy,
+  Star,
   FileText,
   LayoutDashboard,
+  Building2,
 };
 
 export const AdminLayout: React.FC = () => {
@@ -86,6 +91,10 @@ export const AdminLayout: React.FC = () => {
       item.allowedRoles.includes(currentRole)
     );
   }, [user?.role]);
+
+  // "1" next to Company Profile while a change waits for approval.
+  const hasCompanyProfileNav = visibleNavItems.some((item) => item.id === 'company-profile');
+  const companyChangePending = usePendingCompanyChangeBadge(hasCompanyProfileNav);
 
   const userInitial = user?.username ? user.username.charAt(0).toUpperCase() : 'A';
 
@@ -189,6 +198,14 @@ export const AdminLayout: React.FC = () => {
                       <span className={isActive ? 'text-white' : ''}>
                         {item.label}
                       </span>
+                      {item.id === 'company-profile' && companyChangePending && (
+                        <span
+                          className="ml-auto min-w-5 h-5 px-1.5 rounded-full bg-amber-500 text-white text-[10px] font-bold flex items-center justify-center"
+                          aria-label="1 change waiting for approval"
+                        >
+                          1
+                        </span>
+                      )}
                     </>
                   )}
                 </NavLink>

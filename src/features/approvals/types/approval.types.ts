@@ -1,4 +1,6 @@
 import type { ApprovalStatus, OrderStatus } from "../../../types/common.types";
+import type { ProductApprovalResponse } from "../../products-management/types/productApproval.types";
+import type { EmployeeResponse } from "../../employee-management/types/employee.types";
 
 export interface ProfileApprovalRequest {
   requestId: number;
@@ -74,7 +76,9 @@ export type UnifiedApprovalItem =
   | (DocumentApprovalItem & { approvalType: 'DOCUMENT' } )
   | (ProfileApprovalRequest & { approvalType: 'PROFILE' })
   | (StocksApprovalRequest & { approvalType: 'STOCKS'})
-  | (OrdersApprovalRequest & { approvalType: 'ORDERS'});
+  | (OrdersApprovalRequest & { approvalType: 'ORDERS'})
+  | (ProductApprovalResponse & { approvalType: 'PRODUCTS' })
+  | (EmployeeResponse & { approvalType: 'EMPLOYEE' });
 
 export interface PreviewModalProps {
   request: UnifiedApprovalItem | null;

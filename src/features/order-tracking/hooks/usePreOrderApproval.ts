@@ -24,7 +24,7 @@ export const usePreOrderApproval = (orderNumber: string, refresh: () => void) =>
     try {
       const res = await orderTrackingApi.approvePreOrder(orderNumber);
       if (!res.success) {
-        notify.error(res.message || 'The pre-order could not be approved.');
+        notify.error(res, 'The pre-order could not be approved.');
         refresh();
         return false;
       }

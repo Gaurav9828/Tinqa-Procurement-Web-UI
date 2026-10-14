@@ -156,6 +156,10 @@ export interface ProductResponseDto {
     specifications?: SpecificationDTO[] | null;
     warranties?: WarrantyResponse[] | null;
     components?: ProductComponentResponse[] | null;
+    /** Average of active reviews (0.0 when there are none). */
+    averageRating?: number | null;
+    /** Number of active reviews. */
+    reviewCount?: number | null;
 }
 
 /** UI product model (normalised from ProductResponseDto by toProduct()). */
@@ -181,4 +185,6 @@ export interface ProductResponse {
     /** Items the product is built from, with their component-level warranties. */
     components: ProductComponentResponse[];
     createdAt?: string | null;
+    averageRating: number;
+    reviewCount: number;
 }

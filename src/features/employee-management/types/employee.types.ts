@@ -34,6 +34,13 @@ export interface EmployeeResponse {
   personalEmail?: string;
   workEmail?: string
   status: EmployeeStatus;
+  // Who created the employee and, for employees that needed approval, the Admin L2 decision
+  createdBy?: number | null;
+  createdByUsername?: string | null;
+  approvalDecidedBy?: number | null;
+  approvalDecidedByUsername?: string | null;
+  approvalDecidedAt?: string | null;
+  approvalRejectionReason?: string | null;
   createdAt: string;
   updatedAt: string;
 }

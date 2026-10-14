@@ -21,6 +21,8 @@ const PRODUCT: ProductResponse = {
   warranties: [
     { id: 4, warrantyType: 'MANUFACTURER', title: '1 Year Warranty', durationValue: 1, durationUnit: 'YEARS', isActive: true },
   ],
+  averageRating: 0,
+  reviewCount: 0,
   components: [
     { id: 8, itemId: 7, itemName: 'Motherboard', quantity: 1, warranties: [{ id: 80, warrantyType: 'MANUFACTURER', title: '1 Year', durationValue: 1, durationUnit: 'YEARS' }] },
   ],

@@ -10,6 +10,9 @@ import { ApprovalPreviewModal } from './components/ApprovalPreviewModal';
 import { RejectionModal } from './components/RejectionModal';
 import { ConfirmationModal } from '../../components/ui/ConfirmationModal';
 import type { ApprovalItem, ApprovalStatus, OrderStatus } from '../../types/common.types';
+import { ProductApprovalReviewModal } from '../products-management/components/ProductApprovalReviewModal';
+import { useProductActions } from '../products-management/hooks/useProductActions';
+import type { ProductApprovalResponse } from '../products-management/types/productApproval.types';
 
 export const ApprovalsHub: React.FC = () => {
   const {
@@ -19,6 +22,15 @@ export const ApprovalsHub: React.FC = () => {
     refreshApprovals,
     processPendingApproval,
     downloadDocument } = useApprovals();
+
+  // Products have their own review (snapshot + Approve / Reject / Cancel), which also activates the product.
+  const [productReview, setProductReview] = useState<ProductApprovalResponse | null>(null);
+  const { decideApproval, isSubmitting: isDecidingProduct } = useProductActions(refreshApprovals);
+  const openProductReview = (item: ApprovalItem | null | undefined): boolean => {
+    if (item?.approvalType !== 'PRODUCTS') return false;
+    setProductReview(item as ProductApprovalResponse);
+    return true;
+  };
 
   // Modal States
   const [selectedRequest, setSelectedRequest] = useState<UnifiedApprovalItem | null>(null);
@@ -55,6 +67,7 @@ export const ApprovalsHub: React.FC = () => {
   };
 
   const handleInitiateApprove = (item: ApprovalItem) => {
+    if (openProductReview(item)) return;
     switch(item.approvalType){
       case 'ORDERS': {
         setConfirmAction('DEALER_LEVEL_PENDING');
@@ -74,6 +87,7 @@ export const ApprovalsHub: React.FC = () => {
   };
 
   const handleInitiateReject = (item: ApprovalItem) => {
+    if (openProductReview(item)) return;
     setIsPreviewOpen(false);
     setRejectionTargetItem(item);
     setIsRejectionModalOpen(true);
@@ -131,7 +145,7 @@ export const ApprovalsHub: React.FC = () => {
             Approval Hub
           </h1>
           <p className="text-gray-500 dark:text-neutral-400 text-sm mt-1">
-            Review and action incoming requests across documents and user profile updates.
+            Review and action incoming requests across documents, profile updates, new employees, stock, orders and products.
           </p>
         </div>
         <button
@@ -152,6 +166,7 @@ export const ApprovalsHub: React.FC = () => {
         approvals={approvals}
         isLoading={isLoading}
         onPreview={(item) => {
+          if (openProductReview(item)) return;
           setSelectedRequest(item);
           setIsPreviewOpen(true);
         }}
@@ -183,6 +198,19 @@ export const ApprovalsHub: React.FC = () => {
         requestId={rejectionTargetItem ? ('id' in rejectionTargetItem ? rejectionTargetItem.id : rejectionTargetItem.requestId) : null}
         onClose={() => setIsRejectionModalOpen(false)}
         onSubmit={(reason: string) => handleRejectionReasonSubmit(reason, rejectionTargetItem?.approvalType)}
+      />
+
+      <ProductApprovalReviewModal
+        key={productReview?.id ?? 'none'}
+        request={productReview}
+        isSubmitting={isDecidingProduct}
+        onClose={() => setProductReview(null)}
+        onDecide={async (decision, reason) => {
+          if (!productReview) return false;
+          const ok = await decideApproval(productReview, decision, reason);
+          if (ok) setProductReview(null);
+          return ok;
+        }}
       />
 
       <ConfirmationModal

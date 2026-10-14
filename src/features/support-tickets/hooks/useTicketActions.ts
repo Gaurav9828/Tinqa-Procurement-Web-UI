@@ -41,7 +41,7 @@ export const useTicketActions = (
       try {
         const res = await call();
         if (!res.success || !res.data) {
-          notify.error(res.message || 'The request could not be completed.');
+          notify.error(res, 'The request could not be completed.');
           return { ok: false, fieldErrors: {} };
         }
         onUpdated(res.data);

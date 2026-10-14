@@ -45,7 +45,7 @@ export const useAdminOrderDetail = (orderNumber: string | null) => {
         } else if (!background) {
           setOrder(null);
           setErrorKind('unknown');
-          notify.error(res.message || 'Failed to load order details.');
+          notify.error(res, 'Failed to load order details.');
         }
       } catch (err: unknown) {
         if (!isCurrent()) return;

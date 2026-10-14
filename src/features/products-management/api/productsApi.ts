@@ -21,8 +21,9 @@ import { toProduct } from '../utils/productMapper';
 const BASE_URL = '/products';
 
 export const productApi = {
-    createProduct: async (payload: CreateProductRequest): Promise<ApiResponse<unknown>> => {
-        const response = await ecommerceAxiosClient.post<ApiResponse<unknown>>(BASE_URL, payload);
+    /** Returns the created product (the backend responds with it, including its new id). */
+    createProduct: async (payload: CreateProductRequest): Promise<ApiResponse<ProductResponseDto | null>> => {
+        const response = await ecommerceAxiosClient.post<ApiResponse<ProductResponseDto | null>>(BASE_URL, payload);
         return response.data;
     },
 

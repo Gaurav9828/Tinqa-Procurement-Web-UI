@@ -37,7 +37,7 @@ export const ResetPasswordPage: React.FC = () => {
       });
 
       if (!response.success) {
-        notify.error(response.message || 'Failed to update password.');
+        notify.error(response, 'Failed to update password.');
         return;
       }
 

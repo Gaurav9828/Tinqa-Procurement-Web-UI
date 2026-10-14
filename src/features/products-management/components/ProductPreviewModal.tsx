@@ -1,6 +1,7 @@
 import React from 'react';
 import { X } from 'lucide-react';
 import { ComponentsPreview } from './ComponentsPreview';
+import { ProductRatingSummary } from '../../reviews/components/ProductRatingSummary';
 import type { ProductResponse } from '../types/product.types';
 
 interface ProductPreviewModalProps {
@@ -30,6 +31,11 @@ export const ProductPreviewModal: React.FC<ProductPreviewModalProps> = ({ produc
           {product.tagline && (
             <p className="text-gray-500 dark:text-gray-400 italic font-medium">{product.tagline}</p>
           )}
+
+          <div className="flex items-center justify-between gap-3 p-3 bg-black/[0.02] dark:bg-white/[0.02] border border-black/10 dark:border-white/10 rounded-xl">
+            <span className="text-gray-400">Customer rating</span>
+            <ProductRatingSummary productId={product.id} averageRating={product.averageRating} reviewCount={product.reviewCount} />
+          </div>
 
           <div className="grid grid-cols-3 gap-3 p-3 bg-black/[0.02] dark:bg-white/[0.02] border border-black/10 dark:border-white/10 rounded-xl">
             <div>

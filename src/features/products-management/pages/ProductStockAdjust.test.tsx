@@ -2,12 +2,14 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Provider } from 'react-redux';
+import { MemoryRouter } from 'react-router-dom';
 import { configureStore } from '@reduxjs/toolkit';
 import { AxiosError, AxiosHeaders, type AxiosResponse } from 'axios';
 import alertReducer from '../../../store/alertSlice';
 import { GlobalAlertContainer } from '../../../components/ui/GlobalAlertContainer';
 import { ProductManagementPage } from './ProductManagementPage';
 import { ecommerceAxiosClient } from '../../../api/ecommerceAxiosClient';
+import { mockDirectEditApprovals } from './directEditApprovals.testUtil';
 import type { ProductResponseDto, SpecificationDTO } from '../types/product.types';
 
 /**
@@ -111,10 +113,12 @@ const renderPage = () => {
   const store = configureStore({ reducer: { alert: alertReducer } });
   const user = userEvent.setup();
   render(
-    <Provider store={store}>
-      <GlobalAlertContainer />
-      <ProductManagementPage />
-    </Provider>
+    <MemoryRouter>
+      <Provider store={store}>
+        <GlobalAlertContainer />
+        <ProductManagementPage />
+      </Provider>
+    </MemoryRouter>
   );
   return { user };
 };
@@ -251,6 +255,8 @@ describe('Product stock add/reduce', () => {
 });
 
 describe('Edit product (regression)', () => {
+  beforeEach(mockDirectEditApprovals);
+
   it('loads existing specifications and user-guide rows and keeps them on save', async () => {
     const { user } = renderPage();
     await screen.findByText('SummitX');

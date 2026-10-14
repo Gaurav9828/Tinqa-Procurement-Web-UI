@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { Package, RefreshCw } from 'lucide-react';
 import { useProductList } from '../hooks/useProductList';
 import { useProductActions } from '../hooks/useProductActions';
@@ -11,6 +11,11 @@ import { ProductStatusModal } from '../components/ProductStatusModal';
 import { StockAdjustModal } from '../components/StockAdjustModal';
 import type { StockAdjustMode } from '../utils/stockAdjustment';
 import type { ProductResponse, CreateProductRequest, UpdateProductRequest } from '../types/product.types';
+import type { ProductApprovalResponse, ProductChangeSummary } from '../types/productApproval.types';
+import { useProductApprovals } from '../hooks/useProductApprovals';
+import { ProductApprovalReviewModal } from '../components/ProductApprovalReviewModal';
+import { getApprovalPermissions, getApprovalState } from '../utils/productApproval';
+import { useAuthStore } from '../../../store/useAuthStore';
 
 export const ProductManagementPage: React.FC = () => {
     const {
@@ -24,6 +29,15 @@ export const ProductManagementPage: React.FC = () => {
         refetch,
     } = useProductList();
 
+    // Admin L2 approval state of the listed products (Procurement backend).
+    const productIds = useMemo(() => products.map((p) => p.id), [products]);
+    const approvals = useProductApprovals(productIds);
+    const { reload: reloadApprovals } = approvals;
+    const refreshAll = useCallback(() => {
+        refetch();
+        reloadApprovals();
+    }, [refetch, reloadApprovals]);
+
     const {
         isSubmitting,
         fieldErrors,
@@ -31,7 +45,23 @@ export const ProductManagementPage: React.FC = () => {
         createProduct,
         updateProduct,
         updateProductStatus,
-    } = useProductActions(refetch);
+        requestProductUpdate,
+        applyApprovedUpdate,
+        submitForApproval,
+        decideApproval,
+    } = useProductActions(refreshAll);
+
+    const isAdminL2 = useAuthStore((state) => state.user?.role) === 'ADMIN_L2';
+    const [reviewRequest, setReviewRequest] = useState<ProductApprovalResponse | null>(null);
+
+    const approvalFor = useCallback(
+        (product: ProductResponse) => {
+            const latest = approvals.byProductId.get(product.id);
+            return { state: getApprovalState(product, latest, approvals.loaded), latest };
+        },
+        [approvals.byProductId, approvals.loaded]
+    );
+    const canActivate = (product: ProductResponse) => getApprovalPermissions(approvalFor(product).state).canActivate;
 
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
     const [editingProduct, setEditingProduct] = useState<ProductResponse | null>(null);
@@ -47,8 +77,16 @@ export const ProductManagementPage: React.FC = () => {
         return success;
     };
 
-    const handleEditProductSubmit = async (id: number, payload: UpdateProductRequest) => {
-        const success = await updateProduct(id, payload);
+    const handleEditProductSubmit = async (id: number, payload: UpdateProductRequest, changes: ProductChangeSummary[]) => {
+        const target = products.find((p) => p.id === id);
+        if (!target) return false;
+        const permissions = getApprovalPermissions(approvalFor(target).state);
+        if (!permissions.canEdit) return false;
+        // Approved products change only after Admin L2 approves; never-approved (inactive) ones are saved directly
+        // and stay inactive until their own approval.
+        const success = permissions.editNeedsApproval
+            ? await requestProductUpdate(target, payload, changes)
+            : await updateProduct(id, permissions.canActivate ? payload : { ...payload, enabled: false });
         if (success) {
             setEditingProduct(null);
         }
@@ -56,6 +94,8 @@ export const ProductManagementPage: React.FC = () => {
     };
 
     const handleStatusUpdateSubmit = async (id: number, isEnabled: boolean) => {
+        const target = products.find((p) => p.id === id);
+        if (isEnabled && target && !canActivate(target)) return false; // needs Admin L2 approval first
         const success = await updateProductStatus(id, { isEnabled });
         if (success) {
             setStatusModalProduct(null);
@@ -105,6 +145,37 @@ export const ProductManagementPage: React.FC = () => {
                     setEditingProduct(product);
                 }}
                 onAdjustStock={(product, mode) => setStockTarget({ product, mode })}
+                approvalFor={approvalFor}
+                canReview={isAdminL2}
+                onSubmitForApproval={(product, isResubmission) => {
+                    void submitForApproval(product, isResubmission);
+                }}
+                onReview={setReviewRequest}
+                onApplyUpdate={(request) => {
+                    void applyApprovedUpdate(request);
+                }}
+            />
+
+            {approvals.error && (
+                <p role="alert" className="text-xs text-amber-600 dark:text-amber-400">
+                    Approval status couldn't be loaded ({approvals.error}). Inactive products can't be activated until it loads.{' '}
+                    <button type="button" onClick={reloadApprovals} className="underline cursor-pointer">
+                        Retry
+                    </button>
+                </p>
+            )}
+
+            <ProductApprovalReviewModal
+                key={reviewRequest?.id ?? 'none'}
+                request={reviewRequest}
+                isSubmitting={isSubmitting}
+                onClose={() => setReviewRequest(null)}
+                onDecide={async (decision, reason) => {
+                    if (!reviewRequest) return false;
+                    const ok = await decideApproval(reviewRequest, decision, reason);
+                    if (ok) setReviewRequest(null);
+                    return ok;
+                }}
             />
 
             {/* Modals */}
@@ -118,6 +189,7 @@ export const ProductManagementPage: React.FC = () => {
 
             <EditProductModal
                 product={editingProduct}
+                approval={editingProduct ? approvalFor(editingProduct) : undefined}
                 isSubmitting={isSubmitting}
                 onClose={() => setEditingProduct(null)}
                 onSubmit={handleEditProductSubmit}

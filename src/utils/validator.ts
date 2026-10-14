@@ -36,13 +36,13 @@ export const Validator = {
   },
 
   /**
-   * Primary + alternate phone rules shared by every form: valid format (alternate is optional)
-   * and the two numbers must differ. Returns one message per field, or nothing when valid.
+   * Primary + alternate phone rules shared by every form: both are required and must be a valid
+   * format, and the two numbers must differ. Returns one message per field, or nothing when valid.
    */
   validatePhonePair: (
     primary: string | null | undefined,
     alternate: string | null | undefined,
-    options: { primaryRequired?: boolean } = {}
+    options: { primaryRequired?: boolean; alternateRequired?: boolean } = {}
   ): { primary?: string; alternate?: string } => {
     const errors: { primary?: string; alternate?: string } = {};
     const p = (primary ?? '').trim();
@@ -52,7 +52,9 @@ export const Validator = {
     } else if (!Validator.isPhone(p)) {
       errors.primary = 'Enter a valid phone number (e.g. +91 9876543210).';
     }
-    if (a) {
+    if (!a) {
+      if (options.alternateRequired !== false) errors.alternate = 'Alternate phone number is required.';
+    } else {
       if (!Validator.isPhone(a)) errors.alternate = 'Enter a valid alternate phone number (e.g. +91 9876543211).';
       else if (p && Validator.normalizePhone(p) === Validator.normalizePhone(a)) {
         errors.alternate = 'Alternate phone number cannot be the same as the phone number.';

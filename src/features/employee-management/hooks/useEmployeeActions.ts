@@ -20,7 +20,7 @@ export const useEmployeeActions = (onSuccessCallback?: () => void) => {
                 onSuccessCallback?.();
                 return true;
             }
-            notify.error(res.message || 'Failed to create employee');
+            notify.error(res, 'Failed to create employee');
             return false;
         } catch (err: unknown) {
             notify.error(err, 'Error occurred while creating employee.');
@@ -39,7 +39,7 @@ export const useEmployeeActions = (onSuccessCallback?: () => void) => {
                 if (onSuccessCallback) onSuccessCallback();
                 return true;
             }
-            notify.error(res.message || 'Failed to update employee');
+            notify.error(res, 'Failed to update employee');
             return false;
         } catch (err: unknown) {
             notify.error(err, 'Error occurred while updating employee.');
@@ -58,7 +58,7 @@ export const useEmployeeActions = (onSuccessCallback?: () => void) => {
                 if (onSuccessCallback) onSuccessCallback();
                 return true;
             }
-            notify.error(res.message || 'Failed to request deletion');
+            notify.error(res, 'Failed to request deletion');
             return false;
         } catch (err: unknown) {
             notify.error(err, 'Error requesting employee deletion.');
@@ -81,7 +81,7 @@ export const useEmployeeActions = (onSuccessCallback?: () => void) => {
                 if (onSuccessCallback) onSuccessCallback();
                 return true;
             }
-            notify.error(res.message || 'Failed to permanently delete employee');
+            notify.error(res, 'Failed to permanently delete employee');
             return false;
         } catch (err: unknown) {
             notify.error(err, 'Error executing permanent deletion.');

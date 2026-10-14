@@ -38,7 +38,7 @@ export const useEmployeeList = (initialFilters: EmployeeFilterParams = {}) => {
         setTotalPages(response.data.totalPages);
         setTotalElements(response.data.totalElements);
       } else {
-        notify.error(response.message || 'Failed to fetch employee list.');
+        notify.error(response, 'Failed to fetch employee list.');
       }
     } catch (err: unknown) {
       if (isCurrent()) notify.error(err, 'Server error fetching employees.');

@@ -35,7 +35,7 @@ export const useSupportTicket = (referenceNumber: string) => {
           setErrorKind(null);
         } else if (!background) {
           setErrorKind('unknown');
-          notify.error(res.message || 'Failed to load the ticket.');
+          notify.error(res, 'Failed to load the ticket.');
         }
       } catch (err: unknown) {
         if (!isCurrent()) return;

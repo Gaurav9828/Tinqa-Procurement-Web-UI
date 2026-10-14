@@ -358,7 +358,10 @@ describe('OrderTrackingPage', () => {
         axiosError(400, { message: 'Validation failed', errors: [{ field: 'sort', message: 'Unsupported sort field or format.' }] })
       );
       renderPage();
-      expect(await screen.findByText('Validation failed')).toBeInTheDocument();
+      // Field errors are shown (each as its own alert) instead of the generic summary.
+      const alerts = await screen.findByRole('list', { name: 'Notifications' });
+      expect(within(alerts).getByText('Unsupported sort field or format.')).toBeInTheDocument();
+      expect(within(alerts).queryByText('Validation failed')).not.toBeInTheDocument();
       expect(screen.getByText('Request rejected')).toBeInTheDocument();
     });
   });
@@ -583,7 +586,9 @@ describe('OrderTrackingPage', () => {
       await user.selectOptions(within(panel).getByLabelText('Status'), 'OUT_FOR_DELIVERY');
       await user.click(within(panel).getByRole('button', { name: 'Add tracking event' }));
 
-      expect(await screen.findByText('Validation failed')).toBeInTheDocument();
+      const alerts = await screen.findByRole('list', { name: 'Notifications' });
+      expect(within(alerts).getByText('Notes must be at most 500 characters.')).toBeInTheDocument();
+      expect(within(alerts).queryByText('Validation failed')).not.toBeInTheDocument();
       expect(await within(panel).findByText('Notes must be at most 500 characters.')).toBeInTheDocument();
     });
 

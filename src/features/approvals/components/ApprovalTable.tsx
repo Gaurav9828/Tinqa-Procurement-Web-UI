@@ -10,6 +10,8 @@ import {
   HelpCircle,
   ShoppingCart,
   BoxIcon,
+  PackageCheck,
+  UserPlus,
 } from 'lucide-react';
 import type { ApprovalItem } from '../../../types/common.types';
 
@@ -51,10 +53,17 @@ export const ApprovalTable = <T extends ApprovalItem>({
         subtitle: item.fileSize ? `${(item.fileSize / 1024).toFixed(1)} KB` : undefined,
       };
     }
-    if ('employeeCode' in item && item.employeeCode && item?.approvalType == 'PROFILE') {
+    if ('requestId' in item && 'employeeCode' in item && item.employeeCode && item?.approvalType == 'PROFILE') {
       return {
         title: `Emp Code: ${item.employeeCode}`,
         subtitle: item.requestedByUsername ? `@${item.requestedByUsername}` : undefined,
+      };
+    }
+    if (item?.approvalType == 'EMPLOYEE' && 'createdByUsername' in item) {
+      const name = item.displayName || `${item.firstName || ''} ${item.lastName || ''}`.trim();
+      return {
+        title: `New Employee: ${name || item.employeeCode}`,
+        subtitle: `${item.employeeCode} · ${item.designation}${item.createdByUsername ? ` · by @${item.createdByUsername}` : ''}`,
       };
     }
     if ('batchNumber' in item && 'orderNumber' in item && item?.approvalType == 'STOCKS') {
@@ -62,6 +71,17 @@ export const ApprovalTable = <T extends ApprovalItem>({
         title: `Batch: ${item.batchNumber}`,
         subtitle: `Dealer: ${item.dealerName ? item.dealerName : undefined}`,
       }
+    }
+    if (item?.approvalType == 'PRODUCTS' && 'productTitle' in item) {
+      return {
+        title: `Product: ${item.productTitle}`,
+        subtitle:
+          item.requestType === 'UPDATE'
+            ? 'Changes to a live product'
+            : item.requestType === 'RESUBMISSION'
+              ? 'Resubmitted after rejection'
+              : 'New product',
+      };
     }
     if ('orderNumber' in item && item?.approvalType == 'ORDERS') {
       return {
@@ -89,11 +109,27 @@ export const ApprovalTable = <T extends ApprovalItem>({
         </span>
       );
     }
+    if (item?.approvalType == 'EMPLOYEE') {
+      return (
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20">
+          <UserPlus className="w-3.5 h-3.5" />
+          Employee Approval
+        </span>
+      );
+    }
     if (item?.approvalType == 'STOCKS') {
       return (
         <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">
           <BoxIcon className="w-3.5 h-3.5" />
           Stock Approval
+        </span>
+      );
+    }
+    if (item?.approvalType == 'PRODUCTS') {
+      return (
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+          <PackageCheck className="w-3.5 h-3.5" />
+          Product Approval
         </span>
       );
     }

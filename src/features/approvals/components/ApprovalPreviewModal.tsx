@@ -22,6 +22,7 @@ import {
   Hash,
   Boxes,
   UserRound,
+  UserPlus,
 } from 'lucide-react';
 
 import type { UnifiedApprovalItem } from '../types/approval.types';
@@ -51,7 +52,7 @@ export const ApprovalPreviewModal: React.FC<PreviewModalProps> = ({
 
   /*
    * PROFILE uses requestId.
-   * DOCUMENT, STOCKS and ORDERS use id.
+   * DOCUMENT, STOCKS, ORDERS and EMPLOYEE use id.
    */
   const targetId =
     request.approvalType === 'PROFILE'
@@ -90,6 +91,23 @@ export const ApprovalPreviewModal: React.FC<PreviewModalProps> = ({
           iconClass: 'bg-cyan-500/10 text-cyan-500',
           title: 'Order Approval Details',
           subtitle: 'Order approval request',
+        };
+
+      case 'EMPLOYEE':
+        return {
+          icon: <UserPlus className="w-5 h-5" />,
+          iconClass: 'bg-indigo-500/10 text-indigo-500',
+          title: 'New Employee Details',
+          subtitle: 'Employee account waiting for Admin L2 approval',
+        };
+
+      // Products are reviewed in ProductApprovalReviewModal; this is only a fallback header.
+      case 'PRODUCTS':
+        return {
+          icon: <Boxes className="w-5 h-5" />,
+          iconClass: 'bg-emerald-500/10 text-emerald-500',
+          title: 'Product Approval Details',
+          subtitle: 'Product approval request',
         };
     }
   };
@@ -378,6 +396,82 @@ export const ApprovalPreviewModal: React.FC<PreviewModalProps> = ({
                 <Clock className="w-4 h-4 text-gray-400" />
                 <span>
                   Requested at: {formatTime(request.requestedAt)}
+                </span>
+              </div>
+
+            </div>
+          )}
+
+          {/* ==========================================================
+              EMPLOYEE PREVIEW
+          ========================================================== */}
+          {request.approvalType === 'EMPLOYEE' && (
+            <div className="space-y-4">
+
+              <div className="p-4 rounded-xl bg-black/5 dark:bg-white/5 space-y-3">
+
+                <div className="flex justify-between items-start gap-4">
+
+                  <div>
+                    <label className="text-xs text-gray-500 dark:text-neutral-400 font-medium uppercase">
+                      New Employee
+                    </label>
+
+                    <p className="font-semibold text-lg text-black dark:text-white">
+                      {request.displayName ||
+                        [request.firstName, request.middleName, request.lastName].filter(Boolean).join(' ') ||
+                        'N/A'}
+                    </p>
+
+                    <p className="text-xs text-gray-500 font-mono">@{request.username || 'N/A'}</p>
+                  </div>
+
+                  <span className="font-mono text-xs px-2.5 py-1 rounded-md bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20 whitespace-nowrap">
+                    Emp Code: {request.employeeCode || 'N/A'}
+                  </span>
+
+                </div>
+
+                <p className="text-xs text-gray-500">
+                  Created by:{' '}
+                  <span className="font-medium text-black dark:text-white">
+                    {request.createdByUsername ? `@${request.createdByUsername}` : 'N/A'}
+                  </span>
+                </p>
+
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 text-xs">
+                {[
+                  { icon: <Mail className="w-4 h-4 text-blue-500 shrink-0" />, label: 'Work Email', value: request.workEmail },
+                  { icon: <Mail className="w-4 h-4 text-sky-500 shrink-0" />, label: 'Personal Email', value: request.personalEmail },
+                  { icon: <Phone className="w-4 h-4 text-emerald-500 shrink-0" />, label: 'Phone', value: request.phone },
+                  { icon: <Phone className="w-4 h-4 text-teal-500 shrink-0" />, label: 'Alternate Phone', value: request.alternatePhone },
+                  { icon: <Building className="w-4 h-4 text-amber-500 shrink-0" />, label: 'Department', value: request.department },
+                  { icon: <Briefcase className="w-4 h-4 text-purple-500 shrink-0" />, label: 'Designation', value: request.designation },
+                  { icon: <User className="w-4 h-4 text-rose-500 shrink-0" />, label: 'Gender', value: request.gender },
+                  { icon: <Calendar className="w-4 h-4 text-cyan-500 shrink-0" />, label: 'Date of Birth', value: request.dateOfBirth },
+                  { icon: <Calendar className="w-4 h-4 text-indigo-500 shrink-0" />, label: 'Joining Date', value: request.joiningDate },
+                  { icon: <Briefcase className="w-4 h-4 text-gray-500 shrink-0" />, label: 'Employment Type', value: request.employmentType },
+                ].map(({ icon, label, value }) => (
+                  <div key={label} className="p-3 rounded-xl border border-black/10 dark:border-white/10 flex items-center gap-2.5">
+                    {icon}
+                    <div className="truncate">
+                      <span className="text-gray-400 block text-[10px]">
+                        {label}
+                      </span>
+                      <span className="font-medium truncate text-black dark:text-white">
+                        {value || 'N/A'}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="flex items-center gap-2 text-xs text-gray-500 pt-2">
+                <Clock className="w-4 h-4 text-gray-400" />
+                <span>
+                  Created at: {formatTime(request.createdAt)}
                 </span>
               </div>
 

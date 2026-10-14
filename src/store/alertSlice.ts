@@ -3,22 +3,25 @@ import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
 /** 'alert' renders the amber warning style. */
 export type AlertType = 'error' | 'success' | 'alert';
 
-interface AlertState {
-  /** Increments on every showAlert so a repeated identical message still re-displays. */
+export interface AlertItem {
+  /** Unique per alert, so the same text shown twice still appears twice. */
   id: number;
-  message: string | null;
+  message: string;
   type: AlertType;
   duration: number;
-  isOpen: boolean;
 }
 
-const initialState: AlertState = {
-  id: 0,
-  message: null,
-  type: 'success',
-  duration: 5000,
-  isOpen: false,
-};
+interface AlertState {
+  nextId: number;
+  /** Visible alerts, newest first. Each one is a separate section with its own close button / timer. */
+  alerts: AlertItem[];
+}
+
+/** More than this and the oldest alerts are dropped. */
+export const MAX_VISIBLE_ALERTS = 6;
+const DEFAULT_DURATION = 5000;
+
+const initialState: AlertState = { nextId: 1, alerts: [] };
 
 interface ShowAlertPayload {
   message: string;
@@ -26,23 +29,41 @@ interface ShowAlertPayload {
   duration?: number;
 }
 
+interface ShowAlertsPayload {
+  /** One alert per message (e.g. one per field error from the server). */
+  messages: string[];
+  type?: AlertType;
+  duration?: number;
+}
+
+const push = (state: AlertState, message: string, type: AlertType, duration: number) => {
+  state.alerts.unshift({ id: state.nextId++, message, type, duration });
+  if (state.alerts.length > MAX_VISIBLE_ALERTS) state.alerts.length = MAX_VISIBLE_ALERTS;
+};
+
 const alertSlice = createSlice({
   name: 'alert',
   initialState,
   reducers: {
     showAlert: (state, action: PayloadAction<ShowAlertPayload>) => {
-      state.id += 1;
-      state.message = action.payload.message;
-      state.type = action.payload.type || 'success';
-      state.duration = action.payload.duration || 5000;
-      state.isOpen = true;
+      const { message, type = 'success', duration = DEFAULT_DURATION } = action.payload;
+      if (message.trim()) push(state, message, type, duration);
     },
-    hideAlert: (state) => {
-      state.message = null;
-      state.isOpen = false;
+    showAlerts: (state, action: PayloadAction<ShowAlertsPayload>) => {
+      const { messages, type = 'error', duration = DEFAULT_DURATION } = action.payload;
+      // Pushed in reverse so the list reads in server order, top to bottom.
+      [...messages].reverse().forEach((message) => {
+        if (message.trim()) push(state, message, type, duration);
+      });
+    },
+    dismissAlert: (state, action: PayloadAction<number>) => {
+      state.alerts = state.alerts.filter((alert) => alert.id !== action.payload);
+    },
+    clearAlerts: (state) => {
+      state.alerts = [];
     },
   },
 });
 
-export const { showAlert, hideAlert } = alertSlice.actions;
+export const { showAlert, showAlerts, dismissAlert, clearAlerts } = alertSlice.actions;
 export default alertSlice.reducer;

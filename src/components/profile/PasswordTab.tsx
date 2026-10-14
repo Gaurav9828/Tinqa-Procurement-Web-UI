@@ -61,7 +61,7 @@ export const PasswordTab: React.FC = () => {
           }, 1500);
         }
       } else {
-        notify.error(response.message || 'Failed to update password.');
+        notify.error(response, 'Failed to update password.');
       }
     } catch (err: unknown) {
       notify.error(err, 'Failed to update password. Please check your current password.');

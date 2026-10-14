@@ -2,6 +2,7 @@ import { axiosClient } from '../../../api/axiosClient';
 import { documentService } from '../../../api/services/documentService';
 import type { DocumentApprovalItem, ProfileApprovalRequest, ProcessApprovalPayload, StocksApprovalRequest, OrdersApprovalRequest } from '../types/approval.types';
 import type { ApiResponse } from '../../../types/common.types'
+import type { EmployeeResponse } from '../../employee-management/types/employee.types';
 
 
 export const approvalService = {
@@ -28,6 +29,12 @@ export const approvalService = {
     return response.data.data || [];
   },
 
+  // New employees (e.g. admin accounts created by Admin L1) waiting for Admin L2, oldest first
+  getEmployeeApprovals: async (): Promise<EmployeeResponse[]> => {
+    const response = await axiosClient.get<ApiResponse<EmployeeResponse[]>>(`/v1/admin/employees/pending-approvals`);
+    return response.data.data || [];
+  },
+
   // Process Document
   processDocumentApproval: async (id: number, payload: ProcessApprovalPayload) => {
     const response = await axiosClient.patch<ApiResponse<any>>(
@@ -42,6 +49,16 @@ export const approvalService = {
     const response = await axiosClient.put<ApiResponse<any>>(
       `/admin/profile-approvals/${id}`,
       payload
+    );
+    return response.data;
+  },
+
+  // Process Employee: the backend takes `reason` (required only when rejecting)
+  processEmployeeApproval: async (id: number, payload: ProcessApprovalPayload) => {
+    const rejecting = payload.decision === 'REJECTED';
+    const response = await axiosClient.patch<ApiResponse<EmployeeResponse>>(
+      `/v1/admin/employees/${id}/approval`,
+      { decision: rejecting ? 'REJECTED' : 'APPROVED', reason: rejecting ? payload.rejectionReason?.trim() : undefined }
     );
     return response.data;
   },

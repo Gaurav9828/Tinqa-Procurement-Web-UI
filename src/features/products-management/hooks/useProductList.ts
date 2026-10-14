@@ -1,17 +1,18 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { productApi } from '../api/productsApi'
 import type { ProductResponse } from '../types/product.types';
-import { useDispatch } from 'react-redux';
-import { showAlert } from '../../../store/alertSlice';
 import { useLatestRequest } from '../../../hooks/useLatestRequest';
-import { getApiErrorMessage } from '../../../utils/apiError';
+import { useNotify } from '../../../hooks/useNotify';
 
 export const useProductList = () => {
   const [products, setProducts] = useState<ProductResponse[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
-  const dispatch = useDispatch();
+  const notify = useNotify();
 
-  const [search, setSearch] = useState<string>('');
+  // `?search=` pre-fills the box, e.g. when following a product link from the Reviews screen.
+  const [searchParams] = useSearchParams();
+  const [search, setSearch] = useState<string>(() => searchParams.get('search') ?? '');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
 
   const beginRequest = useLatestRequest();
@@ -25,14 +26,14 @@ export const useProductList = () => {
       if (response.success && response.data) {
         setProducts(response.data);
       } else {
-        dispatch(showAlert({ message: response.message || 'Failed to fetch products', type: 'error' }));
+        notify.error(response, 'Failed to fetch products');
       }
     } catch (err: unknown) {
-      if (isCurrent()) dispatch(showAlert({ message: getApiErrorMessage(err, 'Error fetching product catalog.'), type: 'error' }));
+      if (isCurrent()) notify.error(err, 'Error fetching product catalog.');
     } finally {
       if (isCurrent()) setIsLoading(false);
     }
-  }, [beginRequest, dispatch]);
+  }, [beginRequest, notify]);
 
   useEffect(() => {
     fetchProducts();
