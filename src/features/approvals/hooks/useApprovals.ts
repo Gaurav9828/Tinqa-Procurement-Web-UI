@@ -6,7 +6,9 @@ import type { ProcessApprovalPayload, UnifiedApprovalItem } from '../types/appro
 import { useAuthStore } from '../../../store/useAuthStore';
 import { stockApi } from '../../stock-management/api/stockApi';
 import { orderApi } from '../../order-management/api/orderApi';
+import { productApprovalApi } from '../../products-management/api/productApprovalApi';
 import type { ApprovalItem } from '../../../types/common.types';
+import type { EmployeeResponse } from '../../employee-management/types/employee.types';
 import { useNotify } from '../../../hooks/useNotify';
 
 export const useApprovals = () => {
@@ -25,11 +27,13 @@ export const useApprovals = () => {
     setIsLoading(true);
 
     try {
-      const [documentsResult, profilesResult, stocksResult, orderResult] = await Promise.allSettled([
+      const [documentsResult, profilesResult, stocksResult, orderResult, productResult, employeeResult] = await Promise.allSettled([
         approvalService.getPendingDocuments(),
         approvalService.getProfileApprovals(),
         approvalService.getStocksApprovals(),
-        approvalService.getOrdersApprovals()
+        approvalService.getOrdersApprovals(),
+        productApprovalApi.getPending().then((res) => (res.success && Array.isArray(res.data) ? res.data : [])),
+        approvalService.getEmployeeApprovals(),
       ]);
       if (!isCurrent()) return;
 
@@ -71,10 +75,27 @@ export const useApprovals = () => {
         );
       }
 
-      const failedQueues = [documentsResult, profilesResult, stocksResult, orderResult].filter(
-        (result) => result.status === 'rejected'
-      ).length;
-      if (failedQueues === 4) {
+      if (productResult.status === 'fulfilled') {
+        mergedApprovals.push(
+          ...productResult.value.map((request) => ({
+            ...request,
+            approvalType: 'PRODUCTS' as const,
+          }))
+        );
+      }
+
+      if (employeeResult.status === 'fulfilled') {
+        mergedApprovals.push(
+          ...employeeResult.value.map((employee) => ({
+            ...employee,
+            approvalType: 'EMPLOYEE' as const,
+          }))
+        );
+      }
+
+      const queues = [documentsResult, profilesResult, stocksResult, orderResult, productResult, employeeResult];
+      const failedQueues = queues.filter((result) => result.status === 'rejected').length;
+      if (failedQueues === queues.length) {
         notify.error('Failed to load pending approvals.');
       } else if (failedQueues > 0) {
         notify.warning('Some approval queues could not be loaded. The list may be incomplete.');
@@ -103,13 +124,20 @@ export const useApprovals = () => {
       return false;
     }
 
+    // The backend refuses this too; checking here saves a round trip and gives the same message.
+    const employeeCreatedBy = item.approvalType === 'EMPLOYEE' ? (item as EmployeeResponse).createdBy : null;
+    if (employeeCreatedBy != null && employeeCreatedBy === user?.userId) {
+      notify.error('You created this employee, so another Admin L2 has to review them.');
+      return false;
+    }
+
     try {
       if (item.approvalType === 'DOCUMENT') {
         const res = await approvalService.processDocumentApproval(targetId, payload);
         if (res.success) {
           notify.success(res.message || 'Document L2 approval status updated.');
         } else {
-          notify.error(res.message || 'Failed to process document approval.');
+          notify.error(res, 'Failed to process document approval.');
           return false;
         }
       } else if (item.approvalType === 'PROFILE') {
@@ -117,7 +145,7 @@ export const useApprovals = () => {
         if (res.success) {
           notify.success(res.message || 'Profile L2 approval status updated.');
         } else {
-          notify.error(res.message || 'Failed to process Profile approval.');
+          notify.error(res, 'Failed to process Profile approval.');
           return false;
         }
 
@@ -126,7 +154,7 @@ export const useApprovals = () => {
         if (res.success) {
           notify.success(res.message || 'Stock L2 approval status updated.');
         } else {
-          notify.error(res.message || 'Failed to process stock approval.');
+          notify.error(res, 'Failed to process stock approval.');
           return false;
         }
       } else if (item.approvalType === 'ORDERS') {
@@ -134,7 +162,15 @@ export const useApprovals = () => {
         if (res.success) {
           notify.success(res.message || 'Order L2 approval status updated.');
         } else {
-          notify.error(res.message || 'Failed to process Order approval.');
+          notify.error(res, 'Failed to process Order approval.');
+          return false;
+        }
+      } else if (item.approvalType === 'EMPLOYEE') {
+        const res = await approvalService.processEmployeeApproval(targetId, payload);
+        if (res.success) {
+          notify.success(res.message || 'Employee approval status updated.');
+        } else {
+          notify.error(res, 'Failed to process employee approval.');
           return false;
         }
       }

@@ -39,8 +39,22 @@ const SupportTicketsPage = lazy(() =>
 const SupportTicketDetailPage = lazy(() =>
   import('./features/support-tickets/pages/SupportTicketDetailPage').then((m) => ({ default: m.SupportTicketDetailPage }))
 );
+const ReviewsPage = lazy(() => import('./features/reviews/pages/ReviewsPage').then((m) => ({ default: m.ReviewsPage })));
 const ProductManagementPage = lazy(() =>
   import('./features/products-management/pages/ProductManagementPage').then((m) => ({ default: m.ProductManagementPage }))
+);
+
+const CompanyProfilePage = lazy(() =>
+  import('./features/company-profile/pages/CompanyProfilePage').then((m) => ({ default: m.CompanyProfilePage }))
+);
+const CompanyProfileEditorPage = lazy(() =>
+  import('./features/company-profile/pages/CompanyProfileEditorPage').then((m) => ({ default: m.CompanyProfileEditorPage }))
+);
+const CompanyProfileReviewPage = lazy(() =>
+  import('./features/company-profile/pages/CompanyProfileReviewPage').then((m) => ({ default: m.CompanyProfileReviewPage }))
+);
+const CompanyProfileHistoryPage = lazy(() =>
+  import('./features/company-profile/pages/CompanyProfileHistoryPage').then((m) => ({ default: m.CompanyProfileHistoryPage }))
 );
 
 const PageLoader: React.FC = () => (
@@ -97,6 +111,9 @@ export const App: React.FC = () => {
                   <Route path="support-tickets" element={<SupportTicketsPage />} />
                   <Route path="support-tickets/:referenceNumber" element={<SupportTicketDetailPage />} />
                 </Route>
+                <Route element={<RequireNavAccess navId="reviews" />}>
+                  <Route path="reviews" element={<ReviewsPage />} />
+                </Route>
                 <Route element={<RequireNavAccess navId="employees" />}>
                   <Route path="employees" element={<EmployeeManagementPage />} />
                 </Route>
@@ -123,6 +140,12 @@ export const App: React.FC = () => {
                 </Route>
                 <Route element={<RequireNavAccess navId="documents" />}>
                   <Route path="documents" element={<Placeholder title="Document Library Container" />} />
+                </Route>
+                <Route element={<RequireNavAccess navId="company-profile" />}>
+                  <Route path="settings/company-profile" element={<CompanyProfilePage />} />
+                  <Route path="settings/company-profile/history" element={<CompanyProfileHistoryPage />} />
+                  <Route path="settings/company-profile/drafts/:id" element={<CompanyProfileEditorPage />} />
+                  <Route path="settings/company-profile/versions/:id" element={<CompanyProfileReviewPage />} />
                 </Route>
                 <Route element={<RequireNavAccess navId="system-settings" />}>
                   <Route path="settings" element={<Placeholder title="System Configuration Container" />} />

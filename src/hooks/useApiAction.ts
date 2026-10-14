@@ -27,7 +27,9 @@ export const useApiAction = (onSuccess?: () => void) => {
           onSuccess?.();
           return true;
         }
-        notify.error(res.message || messages.failure);
+        // A `success: false` body may still carry field errors: show each of them.
+        notify.error(res, messages.failure);
+        messages.onError?.(res);
         return false;
       } catch (err: unknown) {
         notify.error(err, messages.failure);

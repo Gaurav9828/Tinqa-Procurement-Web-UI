@@ -34,7 +34,7 @@ export const useItemList = () => {
         setTotalPages(response.data.totalPages);
         setTotalElements(response.data.totalElements);
       } else {
-        notify.error(response.message || 'Failed to fetch items');
+        notify.error(response, 'Failed to fetch items');
       }
     } catch (err: unknown) {
       if (isCurrent()) notify.error(err, 'Error fetching item catalog.');

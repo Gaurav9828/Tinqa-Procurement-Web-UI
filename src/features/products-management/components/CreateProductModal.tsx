@@ -36,7 +36,6 @@ export const CreateProductModal: React.FC<CreateProductModalProps> = ({
     const [description, setDescription] = useState('');
     const [price, setPrice] = useState<number | ''>('');
     const [discountPercentage, setDiscountPercentage] = useState<number | ''>('');
-    const [enabled, setIsEnabled] = useState(true);
 
     // Dynamic Image URLs (up to 5, starting with 1)
     const [imageUrls, setImageUrls] = useState<string[]>(['']);
@@ -126,7 +125,8 @@ export const CreateProductModal: React.FC<CreateProductModalProps> = ({
             price: Number(price) || 0,
             discountPercentage: discountPercentage !== '' ? Number(discountPercentage) : undefined,
             stockQuantity: NEW_PRODUCT_STOCK,
-            enabled,
+            // Always inactive: activation happens when Admin L2 approves the product.
+            enabled: false,
             lastUpdateDescription: undefined,
             image1Url: imageUrls[0] || undefined,
             image2Url: imageUrls[1] || undefined,
@@ -350,18 +350,10 @@ export const CreateProductModal: React.FC<CreateProductModalProps> = ({
 
                         <FormFieldErrors errors={fieldErrors} />
 
-                        <div className="flex items-center gap-2 pt-2">
-                            <input
-                                type="checkbox"
-                                id="isEnabled"
-                                checked={enabled}
-                                onChange={(e) => setIsEnabled(e.target.checked)}
-                                className="rounded border-black/10 text-[#0071e3] focus:ring-[#0071e3] cursor-pointer"
-                            />
-                            <label htmlFor="isEnabled" className="font-medium text-gray-700 dark:text-gray-300 cursor-pointer">
-                                Enable product immediately
-                            </label>
-                        </div>
+                        <p role="note" className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-400">
+                            New products are created <strong>inactive</strong> and sent to Admin L2 for approval. The product
+                            goes live once Admin L2 approves it.
+                        </p>
 
                         {/* Footer Actions */}
                         <div className="flex items-center justify-end gap-2 pt-4 border-t border-black/10 dark:border-white/10">

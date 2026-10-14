@@ -43,15 +43,9 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({
         });
         if (phoneErr) errs.phone = phoneErr;
 
-        if (employeeData.alternate_phone) {
-            const altPhoneErr = Validator.validateField(employeeData.alternate_phone, {
-                type: 'phone',
-                customMessage: 'Enter a valid alternate phone number.',
-            });
-            if (altPhoneErr) errs.alternate_phone = altPhoneErr;
-            const pairErr = Validator.validatePhonePair(employeeData.phone, employeeData.alternate_phone).alternate;
-            if (!errs.alternate_phone && pairErr) errs.alternate_phone = pairErr;
-        }
+        // Required, valid format and different from the primary phone.
+        const altPhoneErr = Validator.validatePhonePair(employeeData.phone, employeeData.alternate_phone).alternate;
+        if (altPhoneErr) errs.alternate_phone = altPhoneErr;
 
         if (employeeData.personal_email) {
             const personalEmailErr = Validator.validateField(employeeData.personal_email, {
@@ -162,6 +156,7 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({
 
                         <CommonInput
                             label="Alternate Phone"
+                            required
                             value={employeeData.alternate_phone}
                             error={errors.alternate_phone}
                             onChange={(e) =>

@@ -19,7 +19,7 @@ export const useDocuments = () => {
       if (response.success && response.data) {
         setUploadedDocuments(response.data);
       } else {
-        notify.error(response.message || 'Failed to fetch documents.');
+        notify.error(response, 'Failed to fetch documents.');
       }
     } catch (err: unknown) {
       notify.error(err, 'An error occurred while fetching documents.');
@@ -46,7 +46,7 @@ export const useDocuments = () => {
           }
           return true;
         }
-        notify.error(response.message || 'Failed to upload document.');
+        notify.error(response, 'Failed to upload document.');
         return false;
       } catch (err: unknown) {
         notify.error(err, 'Server error occurred while uploading.');
@@ -68,7 +68,7 @@ export const useDocuments = () => {
         setUploadedDocuments((prev) => prev.filter((doc) => doc.id !== documentId));
         return true;
       }
-      notify.error(response.message || 'Failed to delete document.');
+      notify.error(response, 'Failed to delete document.');
       return false;
     } catch (err: unknown) {
       notify.error(err, 'Failed to delete document.');

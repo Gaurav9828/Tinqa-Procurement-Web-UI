@@ -25,7 +25,7 @@ export const useItemActions = (onSuccessCallback?: () => void) => {
         notify.success('Category created successfully!');
         return true;
       }
-      notify.error(res.message || 'Failed to create category.');
+      notify.error(res, 'Failed to create category.');
       return false;
     } catch (err: unknown) {
       notify.error(err, 'Error creating category.');
@@ -46,16 +46,11 @@ export const useItemActions = (onSuccessCallback?: () => void) => {
         if (onSuccessCallback) onSuccessCallback();
         return true;
       }
-      notify.error(res.message || 'Failed to create item.');
+      notify.error(res, 'Failed to create item.');
       return false;
     } catch (err: unknown) {
-      // Item validation errors arrive as a list of messages in `data`.
-      const responseData = (err as { response?: { data?: { data?: unknown } } })?.response?.data;
-      if (Array.isArray(responseData?.data)) {
-        notify.error(responseData.data.join(' | '));
-      } else {
-        notify.error(err, 'Error creating item.');
-      }
+      // Field errors (or the older `data: [messages]` form) each get their own alert.
+      notify.error(err, 'Error creating item.');
       setFieldErrors(getApiFieldErrors(err));
       return false;
     } finally {
@@ -74,7 +69,7 @@ export const useItemActions = (onSuccessCallback?: () => void) => {
         if (onSuccessCallback) onSuccessCallback();
         return true;
       }
-      notify.error(res.message || 'Failed to update item.');
+      notify.error(res, 'Failed to update item.');
       return false;
     } catch (err: unknown) {
       notify.error(err, 'Error updating item.');
@@ -112,7 +107,7 @@ export const useItemActions = (onSuccessCallback?: () => void) => {
         if (onSuccessCallback) onSuccessCallback();
         return true;
       } else {
-        notify.error(res.message || `Failed to ${targetStatus ? 'activate' : 'inactivate'} item.`);
+        notify.error(res, `Failed to ${targetStatus ? 'activate' : 'inactivate'} item.`);
         return false;
       }
     } catch (err: unknown) {

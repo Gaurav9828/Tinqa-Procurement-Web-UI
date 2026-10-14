@@ -110,7 +110,7 @@ export const useAdminOrders = () => {
         setData(res.data);
       } else {
         setErrorKind('unknown');
-        notify.error(res.message || 'Failed to load orders.');
+        notify.error(res, 'Failed to load orders.');
       }
     } catch (err: unknown) {
       if (!isCurrent()) return;

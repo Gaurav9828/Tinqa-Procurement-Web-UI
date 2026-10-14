@@ -23,7 +23,7 @@ export const useStockActions = (onSuccessCallback?: () => void) => {
         if (onSuccessCallback) onSuccessCallback();
         return true;
       }
-      notify.error(res.message || 'Failed to create stock from order.');
+      notify.error(res, 'Failed to create stock from order.');
       return false;
     } catch (err: unknown) {
       notify.error(err, 'Error occurred while creating stock.');
@@ -42,7 +42,7 @@ export const useStockActions = (onSuccessCallback?: () => void) => {
         if (onSuccessCallback) onSuccessCallback();
         return true;
       }
-      notify.error(res.message || 'Failed to update stock.');
+      notify.error(res, 'Failed to update stock.');
       return false;
     } catch (err: unknown) {
       notify.error(err, 'Error occurred while updating stock.');
@@ -62,7 +62,7 @@ export const useStockActions = (onSuccessCallback?: () => void) => {
         if (onSuccessCallback) onSuccessCallback();
         return true;
       }
-      notify.error(res.message || 'Failed to process approval.');
+      notify.error(res, 'Failed to process approval.');
       return false;
     } catch (err: unknown) {
       notify.error(err, 'Error processing stock approval.');

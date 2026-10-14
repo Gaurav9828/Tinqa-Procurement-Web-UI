@@ -2,12 +2,14 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Provider } from 'react-redux';
+import { MemoryRouter } from 'react-router-dom';
 import { configureStore } from '@reduxjs/toolkit';
 import { AxiosError, AxiosHeaders, type AxiosResponse } from 'axios';
 import alertReducer from '../../../store/alertSlice';
 import { GlobalAlertContainer } from '../../../components/ui/GlobalAlertContainer';
 import { ProductManagementPage } from './ProductManagementPage';
 import { ecommerceAxiosClient } from '../../../api/ecommerceAxiosClient';
+import { mockDirectEditApprovals } from './directEditApprovals.testUtil';
 import type { ProductResponseDto, WarrantyRequest, WarrantyResponse } from '../types/product.types';
 
 /**
@@ -140,10 +142,12 @@ const renderPage = () => {
   const store = configureStore({ reducer: { alert: alertReducer } });
   const user = userEvent.setup();
   render(
-    <Provider store={store}>
-      <GlobalAlertContainer />
-      <ProductManagementPage />
-    </Provider>
+    <MemoryRouter>
+      <Provider store={store}>
+        <GlobalAlertContainer />
+        <ProductManagementPage />
+      </Provider>
+    </MemoryRouter>
   );
   return { user };
 };
@@ -300,12 +304,16 @@ describe('Create product with typed warranties', () => {
 
     expect(await within(card(n)).findByText('Warranty duration unit must be DAYS, MONTHS or YEARS')).toBeInTheDocument();
     expect(field(n, 'Duration unit')).toHaveAttribute('aria-invalid', 'true');
-    expect(screen.getByText('Request validation failed.')).toBeInTheDocument();
+    const alerts = within(screen.getByRole('list', { name: 'Notifications' }));
+    expect(alerts.getByText('Warranty duration unit must be DAYS, MONTHS or YEARS')).toBeInTheDocument();
+    expect(screen.queryByText('Request validation failed.')).not.toBeInTheDocument();
   });
 });
 
 // ---------- edit ----------
 describe('Edit product typed warranties', () => {
+  beforeEach(mockDirectEditApprovals);
+
   it('pre-fills every field, shows migrated inactive warranties muted with a badge, and audit info when present', async () => {
     const { user } = renderPage();
     await openEdit(user);

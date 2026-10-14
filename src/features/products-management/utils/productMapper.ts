@@ -40,4 +40,6 @@ export const toProduct = (dto: ProductResponseDto): ProductResponse => ({
   warranties: Array.isArray(dto.warranties) ? dto.warranties : [],
   components: Array.isArray(dto.components) ? dto.components : [],
   createdAt: dto.createdAt ?? null,
+  averageRating: Number(dto.averageRating ?? 0) || 0,
+  reviewCount: dto.reviewCount ?? 0,
 });

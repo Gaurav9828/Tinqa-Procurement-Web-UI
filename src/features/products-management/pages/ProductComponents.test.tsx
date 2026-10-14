@@ -2,12 +2,14 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Provider } from 'react-redux';
+import { MemoryRouter } from 'react-router-dom';
 import { configureStore } from '@reduxjs/toolkit';
 import { AxiosError, AxiosHeaders, type AxiosResponse } from 'axios';
 import alertReducer from '../../../store/alertSlice';
 import { GlobalAlertContainer } from '../../../components/ui/GlobalAlertContainer';
 import { ProductManagementPage } from './ProductManagementPage';
 import { ecommerceAxiosClient } from '../../../api/ecommerceAxiosClient';
+import { mockDirectEditApprovals } from './directEditApprovals.testUtil';
 import { axiosClient } from '../../../api/axiosClient';
 import type { ItemResponse, ItemWarrantyResponse } from '../../item-management/types/item.types';
 import type { ProductComponentRequest, ProductComponentResponse, ProductResponseDto } from '../types/product.types';
@@ -150,10 +152,12 @@ const renderPage = () => {
   const store = configureStore({ reducer: { alert: alertReducer } });
   const user = userEvent.setup();
   render(
-    <Provider store={store}>
-      <GlobalAlertContainer />
-      <ProductManagementPage />
-    </Provider>
+    <MemoryRouter>
+      <Provider store={store}>
+        <GlobalAlertContainer />
+        <ProductManagementPage />
+      </Provider>
+    </MemoryRouter>
   );
   return { user };
 };
@@ -429,6 +433,8 @@ describe('Create product: components auto-add their item warranties', () => {
 
 // ---------- edit ----------
 describe('Edit product components', () => {
+  beforeEach(mockDirectEditApprovals);
+
   it('shows the stored snapshot and omits `components` when they were not changed', async () => {
     const { user } = renderPage();
     await openEdit(user);
@@ -534,7 +540,9 @@ describe('Edit product components', () => {
     await user.click(screen.getByRole('button', { name: 'Review & Update' }));
     await user.click(await screen.findByRole('button', { name: 'Confirm & Update' }));
     expect(await within(row(2)).findByText('Component quantity can have at most 11 digits and 3 decimal places')).toBeInTheDocument();
-    expect(screen.getByText('Request validation failed.')).toBeInTheDocument();
+    const alerts = within(screen.getByRole('list', { name: 'Notifications' }));
+    expect(alerts.getByText('Component quantity can have at most 11 digits and 3 decimal places')).toBeInTheDocument();
+    expect(screen.queryByText('Request validation failed.')).not.toBeInTheDocument();
   });
 });
 

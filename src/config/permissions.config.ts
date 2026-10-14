@@ -87,7 +87,7 @@ export const APP_NAVIGATION: NavigationItem[] = [
   },
   {
     id: 'order-tracking',
-    label: 'Order Tracking',
+    label: 'Customer Order Tracking',
     path: '/order-tracking',
     iconName: 'Truck',
     allowedRoles: ['ADMIN_L1', 'ADMIN_L2'],
@@ -97,6 +97,14 @@ export const APP_NAVIGATION: NavigationItem[] = [
     label: 'Support Tickets',
     path: '/support-tickets',
     iconName: 'LifeBuoy',
+    allowedRoles: ['ADMIN_L1', 'ADMIN_L2'],
+  },
+  {
+    id: 'reviews',
+    label: 'Reviews',
+    path: '/reviews',
+    iconName: 'Star',
+    // UX gating only; /api/admin/reviews/** is authorized by the Ecommerce BE.
     allowedRoles: ['ADMIN_L1', 'ADMIN_L2'],
   },
   {
@@ -134,13 +142,13 @@ export const APP_NAVIGATION: NavigationItem[] = [
     iconName: 'Users',
     allowedRoles: ['ADMIN_L1', 'ADMIN_L2'],
   },
-  {
-    id: 'auctions',
-    label: 'Auctions Control',
-    path: '/auctions',
-    iconName: 'Gavel',
-    allowedRoles: ['ADMIN_L1', 'ADMIN_L2'],
-  },
+  // {
+  //   id: 'auctions',
+  //   label: 'Auctions Control',
+  //   path: '/auctions',
+  //   iconName: 'Gavel',
+  //   allowedRoles: ['ADMIN_L1', 'ADMIN_L2'],
+  // },
   {
     id: 'payments',
     label: 'Payments & Chalans',
@@ -148,25 +156,33 @@ export const APP_NAVIGATION: NavigationItem[] = [
     iconName: 'CreditCard',
     allowedRoles: ['ADMIN_L1', 'ADMIN_L2'],
   },
+  // {
+  //   id: 'complaints',
+  //   label: 'Complaints & Claims',
+  //   path: '/complaints',
+  //   iconName: 'AlertCircle',
+  //   allowedRoles: ['ADMIN_L1', 'ADMIN_L2'],
+  // },
+  // {
+  //   id: 'documents',
+  //   label: 'Document Library',
+  //   path: '/documents',
+  //   iconName: 'Folder',
+  //   allowedRoles: ['ADMIN_L1', 'ADMIN_L2'],
+  // },
   {
-    id: 'complaints',
-    label: 'Complaints & Claims',
-    path: '/complaints',
-    iconName: 'AlertCircle',
+    // Settings → Company profile. L1 proposes changes, L2 approves them (enforced by the Ecommerce BE).
+    id: 'company-profile',
+    label: 'Company Profile',
+    path: '/settings/company-profile',
+    iconName: 'Building2',
     allowedRoles: ['ADMIN_L1', 'ADMIN_L2'],
   },
-  {
-    id: 'documents',
-    label: 'Document Library',
-    path: '/documents',
-    iconName: 'Folder',
-    allowedRoles: ['ADMIN_L1', 'ADMIN_L2'],
-  },
-  {
-    id: 'system-settings',
-    label: 'System Configuration',
-    path: '/settings',
-    iconName: 'Settings',
-    allowedRoles: ['ADMIN_L2'],
-  },
+  // {
+  //   id: 'system-settings',
+  //   label: 'System Configuration',
+  //   path: '/settings',
+  //   iconName: 'Settings',
+  //   allowedRoles: ['ADMIN_L2'],
+  // },
 ];

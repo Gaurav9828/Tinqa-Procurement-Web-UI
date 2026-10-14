@@ -117,7 +117,6 @@ export const DealerFormModal: React.FC<DealerFormModalProps> = ({
       name: { value: formData.name, rule: { required: true, customMessage: 'Dealer name is required.' } },
       email: { value: formData.email, rule: { required: true, type: 'email' } },
       phoneNumber: { value: formData.phoneNumber, rule: { required: true, type: 'phone' } },
-      alternatePhoneNumber: { value: formData.alternatePhoneNumber, rule: { type: 'phone' } },
       street: { value: formData.street, rule: { required: true, customMessage: 'Street address is required.' } },
       city: { value: formData.city, rule: { required: true, customMessage: 'City is required.' } },
       state: { value: formData.state, rule: { required: true, customMessage: 'State is required.' } },
@@ -157,9 +156,9 @@ export const DealerFormModal: React.FC<DealerFormModalProps> = ({
       const err = Validator.validateField(config.value, config.rule);
       if (err) errors[field] = err;
     });
-    // The alternate number must differ from the main one (format is checked above).
+    // The alternate number is required, must be valid and must differ from the main one.
     const phonePair = Validator.validatePhonePair(formData.phoneNumber, formData.alternatePhoneNumber);
-    if (phonePair.alternate && !errors.alternatePhoneNumber) errors.alternatePhoneNumber = phonePair.alternate;
+    if (phonePair.alternate) errors.alternatePhoneNumber = phonePair.alternate;
 
     return errors;
   }, [formData]);
@@ -203,7 +202,7 @@ export const DealerFormModal: React.FC<DealerFormModalProps> = ({
       tradeName: formData.tradeName.trim() || undefined,
       email: formData.email.trim(),
       phoneNumber: formData.phoneNumber.trim(),
-      alternatePhoneNumber: formData.alternatePhoneNumber.trim() || undefined,
+      alternatePhoneNumber: formData.alternatePhoneNumber.trim(),
       street: formData.street.trim(),
       landmark: formData.landmark.trim() || undefined,
       city: formData.city.trim(),
@@ -376,7 +375,7 @@ export const DealerFormModal: React.FC<DealerFormModalProps> = ({
 
               <div>
                 <label htmlFor="alternatePhoneNumber" className="block text-xs font-medium mb-1 text-gray-700 dark:text-neutral-300">
-                  Alternate Phone
+                  Alternate Phone <span className="text-red-500">*</span>
                 </label>
                 <input
                   id="alternatePhoneNumber"

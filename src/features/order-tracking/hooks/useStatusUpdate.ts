@@ -63,7 +63,7 @@ export const useStatusUpdate = (
             : await orderTrackingApi.updateTracking(orderNumber, { status, notes: finalNotes });
 
         if (!res.success) {
-          notify.error(res.message || 'Failed to update order status.');
+          notify.error(res, 'Failed to update order status.');
           return { ok: false, fieldErrors: {} };
         }
         notify.success(res.message || 'Order status updated successfully.');

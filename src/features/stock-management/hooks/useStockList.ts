@@ -25,7 +25,7 @@ export const useStockList = () => {
       if (res.success && res.data) {
         setStocks(res.data);
       } else {
-        notify.error(res.message || 'Failed to fetch stock entries.');
+        notify.error(res, 'Failed to fetch stock entries.');
       }
     } catch (err: unknown) {
       if (isCurrent()) notify.error(err, 'Error occurred while loading stocks.');

@@ -2,6 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { X, Plus, Trash2, CheckCircle2 } from 'lucide-react';
 import type { ProductResponse, UpdateProductRequest, SpecificationDTO } from '../types/product.types';
 import { ProductWarrantiesEditor } from './ProductWarrantiesEditor';
+import type { ProductApprovalInfo } from './ProductTable';
+import type { ProductChangeSummary } from '../types/productApproval.types';
+import { getApprovalPermissions } from '../utils/productApproval';
 import { useProductWarranties } from '../hooks/useProductWarranties';
 import { FormFieldErrors } from './FormFieldErrors';
 import {
@@ -28,10 +31,13 @@ import { componentMaxFor } from '../utils/componentStock';
 interface EditProductModalProps {
   product: ProductResponse | null;
   onClose: () => void;
-  onSubmit: (id: number, payload: UpdateProductRequest) => Promise<boolean>;
+  /** `changes` is what was edited (sent to Admin L2 when the product is approved). */
+  onSubmit: (id: number, payload: UpdateProductRequest, changes: ProductChangeSummary[]) => Promise<boolean>;
   isSubmitting: boolean;
   /** Backend 400 field errors from the last save (e.g. `warranties[0].title`). */
   serverFieldErrors?: Record<string, string>;
+  /** Admin L2 approval state: an unapproved product can't be switched on here. */
+  approval?: ProductApprovalInfo;
 }
 
 export const EditProductModal: React.FC<EditProductModalProps> = ({
@@ -40,6 +46,7 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
   onSubmit,
   isSubmitting,
   serverFieldErrors,
+  approval,
 }) => {
   const [formData, setFormData] = useState<UpdateProductRequest>({
     title: '',
@@ -98,6 +105,9 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
   }, [product, resetWarranties]);
 
   if (!product) return null;
+
+  // Approved products aren't changed directly: saving sends the changes to Admin L2.
+  const needsApproval = !!approval && getApprovalPermissions(approval.state).editNeedsApproval;
 
   // Each product unit uses its components' item stock, so stock changes go through Add/Reduce stock.
   const stockManagedByComponents = (product.components ?? []).length > 0;
@@ -224,7 +234,11 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
   const handleConfirmSubmit = async () => {
     if (!pendingPayload) return;
 
-    const success = await onSubmit(product.id, pendingPayload);
+    const success = await onSubmit(
+      product.id,
+      pendingPayload,
+      changedFields.map((f) => ({ label: f.label, oldValue: String(f.oldVal), newValue: String(f.newVal) }))
+    );
     
     if (success) {
       setShowPreviewModal(false);
@@ -247,6 +261,24 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
           </div>
 
           <form onSubmit={handleInitialSubmit} className="p-6 space-y-4 overflow-y-auto flex-1 text-xs">
+            {approval?.state === 'REJECTED' && (
+              <div role="note" className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-700 dark:text-rose-400 space-y-0.5">
+                <p className="font-semibold">Rejected by Admin L2</p>
+                {approval.latest?.decisionReason && <p>Reason: {approval.latest.decisionReason}</p>}
+                <p>After saving your changes, use "Resubmit for approval" in the product list.</p>
+              </div>
+            )}
+            {approval?.state === 'UPDATE_REJECTED' && (
+              <div role="note" className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-700 dark:text-rose-400 space-y-0.5">
+                <p className="font-semibold">Your last changes were rejected by Admin L2</p>
+                {approval.latest?.decisionReason && <p>Reason: {approval.latest.decisionReason}</p>}
+              </div>
+            )}
+            {needsApproval && (
+              <p role="note" data-testid="edit-needs-approval" className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-400">
+                Changes to this product need Admin L2 approval. The product stays as it is until they are approved.
+              </p>
+            )}
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
@@ -391,17 +423,26 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
 
             <FormFieldErrors errors={fieldErrors} />
 
-            <div className="flex items-center gap-2 pt-2">
-              <input
-                type="checkbox"
-                id="editIsEnabled"
-                checked={formData.enabled}
-                onChange={(e) => setFormData({ ...formData, enabled: e.target.checked })}
-                className="rounded border-black/10 text-[#0071e3] focus:ring-[#0071e3] cursor-pointer"
-              />
-              <label htmlFor="editIsEnabled" className="font-semibold text-gray-700 dark:text-gray-300 cursor-pointer">
-                Product is Enabled (Active in store)
-              </label>
+            <div className="space-y-1 pt-2">
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="editIsEnabled"
+                  checked={formData.enabled}
+                  // Switching on needs Admin L2 approval; switching off is always allowed.
+                  disabled={!formData.enabled && !!approval && !getApprovalPermissions(approval.state).canActivate}
+                  onChange={(e) => setFormData({ ...formData, enabled: e.target.checked })}
+                  className="rounded border-black/10 text-[#0071e3] focus:ring-[#0071e3] cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+                />
+                <label htmlFor="editIsEnabled" className="font-semibold text-gray-700 dark:text-gray-300 cursor-pointer">
+                  Product is Enabled (Active in store)
+                </label>
+              </div>
+              {!formData.enabled && approval && !getApprovalPermissions(approval.state).canActivate && (
+                <p className="text-[11px] text-gray-500 pl-6" data-testid="activation-locked">
+                  This product can be activated only after Admin L2 approves it.
+                </p>
+              )}
             </div>
 
             <div className="flex items-center justify-end gap-2 pt-4 border-t border-black/10 dark:border-white/10">
@@ -417,7 +458,7 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
                 disabled={!isFormValid || isSubmitting}
                 className="px-4 py-2 bg-[#0071e3] hover:bg-[#0077ed] text-white rounded-xl font-medium disabled:opacity-50 cursor-pointer"
               >
-                Review & Update
+                {needsApproval ? 'Review & Request Approval' : 'Review & Update'}
               </button>
             </div>
           </form>
@@ -443,7 +484,11 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
                 <p className="text-center text-gray-500 py-4 font-medium">No changes detected in your product details.</p>
               ) : (
                 <div className="space-y-3">
-                  <p className="text-gray-500 font-medium">Only the following modified fields will be updated:</p>
+                  <p className="text-gray-500 font-medium">
+                    {needsApproval
+                      ? 'These changes will be sent to Admin L2 and applied once approved:'
+                      : 'Only the following modified fields will be updated:'}
+                  </p>
                   {changedFields.map((field, idx) => (
                     <div key={idx} className="border border-black/10 dark:border-white/10 rounded-xl p-3 space-y-1">
                       <span className="font-bold text-black dark:text-white block">{field.label}</span>
@@ -477,7 +522,7 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
                 onClick={handleConfirmSubmit}
                 className="px-4 py-2 bg-[#0071e3] hover:bg-[#0077ed] text-white rounded-xl font-medium cursor-pointer disabled:opacity-50"
               >
-                {isSubmitting ? 'Saving...' : 'Confirm & Update'}
+                {isSubmitting ? 'Saving...' : needsApproval ? 'Send for Approval' : 'Confirm & Update'}
               </button>
             </div>
           </div>

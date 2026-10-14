@@ -29,7 +29,7 @@ export const useDealerList = () => {
                 setTotalElements(res.data.totalElements);
                 setTotalPages(res.data.totalPages);
             } else {
-                notify.error(res.message || 'Failed to load dealers');
+                notify.error(res, 'Failed to load dealers');
             }
         } catch (err: unknown) {
             if (isCurrent()) notify.error(err, 'Failed to load dealers');

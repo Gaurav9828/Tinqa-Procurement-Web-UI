@@ -8,15 +8,16 @@ describe('phone numbers', () => {
     expect(Validator.normalizePhone('+91 98765 43211')).not.toBe(Validator.normalizePhone('9876543210'));
   });
 
-  it('accepts a valid primary with no alternate', () => {
-    expect(Validator.validatePhonePair('+91 9876543210', '')).toEqual({});
+  it('requires the alternate unless told otherwise', () => {
+    expect(Validator.validatePhonePair('+91 9876543210', '').alternate).toBe('Alternate phone number is required.');
+    expect(Validator.validatePhonePair('+91 9876543210', '', { alternateRequired: false })).toEqual({});
   });
 
   it('rejects a malformed primary or alternate', () => {
     expect(Validator.validatePhonePair('12345', '').primary).toMatch(/valid phone number/);
     expect(Validator.validatePhonePair('9876543210', '55555').alternate).toMatch(/valid alternate phone number/);
     expect(Validator.validatePhonePair('', '').primary).toBe('Phone number is required.');
-    expect(Validator.validatePhonePair('', '', { primaryRequired: false })).toEqual({});
+    expect(Validator.validatePhonePair('', '', { primaryRequired: false, alternateRequired: false })).toEqual({});
   });
 
   it('rejects an alternate that is the same number, however it is written', () => {

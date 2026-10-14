@@ -37,7 +37,7 @@ export const useOrderList = ({ enabled = true, initialStatus }: UseOrderListOpti
       if (response.success && response.data) {
         setOrders(response.data);
       } else {
-        notify.error(response.message || 'Failed to fetch orders');
+        notify.error(response, 'Failed to fetch orders');
       }
     } catch (err: unknown) {
       if (isCurrent()) notify.error(err, 'Error fetching order catalog.');

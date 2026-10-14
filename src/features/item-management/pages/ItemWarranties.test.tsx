@@ -292,8 +292,13 @@ describe('Create item with warranties', () => {
     await submitCreate(user);
 
     expect(await within(card(1)).findByText('Warranty title cannot exceed 255 characters')).toBeInTheDocument();
-    expect(screen.getByText('Request validation failed')).toBeInTheDocument();
-    expect(screen.getByText(/SKU already exists/)).toBeInTheDocument();
+    // Two field errors → two separate alerts (in server order); no generic summary.
+    const alerts = within(screen.getByRole('list', { name: 'Notifications' })).getAllByRole('listitem');
+    expect(alerts).toHaveLength(2);
+    expect(alerts[0]).toHaveTextContent('Warranty title cannot exceed 255 characters');
+    expect(alerts[1]).toHaveTextContent('SKU already exists');
+    expect(screen.queryByText('Request validation failed')).not.toBeInTheDocument();
+    expect(screen.getAllByText(/SKU already exists/).length).toBeGreaterThan(0);
     expect(screen.getByRole('button', { name: 'Create Item' })).toBeInTheDocument(); // form stays open
   });
 });

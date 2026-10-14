@@ -1,8 +1,8 @@
 import { useMemo } from 'react';
 import { useDispatch } from 'react-redux';
 import axios from 'axios';
-import { showAlert } from '../store/alertSlice';
-import { getApiErrorMessage } from '../utils/apiError';
+import { showAlert, showAlerts } from '../store/alertSlice';
+import { getApiErrorMessages } from '../utils/apiError';
 
 /**
  * The app's single feedback channel. Hooks report API outcomes here directly,
@@ -10,7 +10,10 @@ import { getApiErrorMessage } from '../utils/apiError';
  *
  *   const notify = useNotify();
  *   notify.success(res.message || 'Saved.');
- *   notify.error(err, 'Failed to save.');   // accepts a thrown error or a string
+ *   notify.error(err, 'Failed to save.');   // a thrown error, a `success: false` response, or a string
+ *
+ * Errors follow the backend envelope ({ message, errors: [{ field, message }] }): every field error
+ * gets its own alert; without field errors the envelope's `message` is shown.
  */
 export const useNotify = () => {
   const dispatch = useDispatch();
@@ -22,12 +25,11 @@ export const useNotify = () => {
       error: (errOrMessage: unknown, fallback = 'Something went wrong. Please try again.') => {
         // Cancelled requests (e.g. expired session → redirect) are not user-facing errors.
         if (axios.isCancel(errOrMessage)) return;
-        dispatch(
-          showAlert({
-            message: typeof errOrMessage === 'string' ? errOrMessage : getApiErrorMessage(errOrMessage, fallback),
-            type: 'error',
-          })
-        );
+        const messages =
+          typeof errOrMessage === 'string'
+            ? [errOrMessage.trim() || fallback]
+            : getApiErrorMessages(errOrMessage, fallback);
+        dispatch(showAlerts({ messages, type: 'error' }));
       },
     }),
     [dispatch]

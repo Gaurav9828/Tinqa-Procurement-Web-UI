@@ -183,11 +183,11 @@ export const EmployeeFormModal: React.FC<Props> = ({
     return null;
   }, [formData.phone, formData.alternatePhone, existingEmployees, isEditMode, employeeToEdit]);
 
-  // Alternate phone is optional, but when given it must be a valid number.
-  const alternatePhoneFormatError =
-    formData.alternatePhone.trim() && !Validator.isPhone(formData.alternatePhone)
-      ? 'Enter a valid alternate phone number (e.g. +91 9876543211).'
-      : null;
+  // Alternate phone is required, must be a valid number and must differ from the primary.
+  const alternatePhoneError =
+    Validator.validatePhonePair(formData.phone, formData.alternatePhone, { primaryRequired: false }).alternate ?? null;
+  // Only shown once the user has typed something, so a fresh form isn't covered in errors.
+  const alternatePhoneFormatError = formData.alternatePhone.trim() ? alternatePhoneError : null;
 
   useEffect(() => {
     let initialValues;
@@ -273,7 +273,7 @@ export const EmployeeFormModal: React.FC<Props> = ({
 
     const phoneErr = Validator.validateField(formData.phone, FORM_RULES.phone);
     if (phoneErr) return setValidationError(phoneErr);
-    if (alternatePhoneFormatError) return setValidationError(alternatePhoneFormatError);
+    if (alternatePhoneError) return setValidationError(alternatePhoneError);
 
     if (formData.personalEmail) {
       if (!isValidEmailTLD(formData.personalEmail)) {
@@ -484,6 +484,7 @@ export const EmployeeFormModal: React.FC<Props> = ({
                 label="Alternate Phone"
                 name="alternatePhone"
                 type="tel"
+                required
                 placeholder="+91 9876543211"
                 value={formData.alternatePhone}
                 onChange={handleChange}
