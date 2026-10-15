@@ -5,10 +5,13 @@ import type { CompanyProfileAccess } from '../hooks/useCompanyProfileAccess';
 import { useCompanyProfileActions } from '../hooks/useCompanyProfileActions';
 import { ConfirmDialog, RejectDialog } from './Dialogs';
 import { BUTTON } from '../utils/companyProfileUi';
+import { HOME_VIDEO_APPROVAL_NOTE, changesLiveHomeVideo } from '../utils/companyProfile.utils';
 
 interface Props {
   version: CompanyProfileVersion;
   access: CompanyProfileAccess;
+  /** The live profile, when known; otherwise the version's own `changes` are used. */
+  live?: CompanyProfileVersion | null;
   /** After a successful action, with the updated version. */
   onDone: (updated: CompanyProfileVersion, action: 'approve' | 'reject' | 'withdraw') => void;
   /** After a 409 (the version moved on). */
@@ -19,7 +22,7 @@ interface Props {
  * Checker: Approve / Reject (never on a change they made). Maker: withdraw what they submitted.
  * Renders nothing when the current admin can't act on this version.
  */
-export const ReviewActions: React.FC<Props> = ({ version, access, onDone, onStale }) => {
+export const ReviewActions: React.FC<Props> = ({ version, access, live, onDone, onStale }) => {
   const actions = useCompanyProfileActions({ onStale });
   const [dialog, setDialog] = useState<'approve' | 'reject' | 'withdraw' | null>(null);
   const [rejectError, setRejectError] = useState<string>();
@@ -73,6 +76,7 @@ export const ReviewActions: React.FC<Props> = ({ version, access, onDone, onStal
         <ConfirmDialog
           title="Approve this change?"
           body="This will replace the live company profile on the storefront. Shoppers see it within about 5 minutes."
+          note={changesLiveHomeVideo(version, live) ? HOME_VIDEO_APPROVAL_NOTE : null}
           confirmLabel="Approve"
           tone="approve"
           busy={actions.busy === 'approve'}

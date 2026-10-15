@@ -5,7 +5,7 @@ import { ProductWarrantiesEditor } from './ProductWarrantiesEditor';
 import { FormFieldErrors } from './FormFieldErrors';
 import { toProductWarrantyRequests, validateProductWarranties } from '../utils/warrantyForm';
 import { useProductWarranties } from '../hooks/useProductWarranties';
-import { formatWarrantyDuration, formatWarrantyType } from '../../item-management/utils/itemWarranty';
+import { formatWarrantyDuration, formatWarrantyType, warrantiesComplete } from '../../item-management/utils/itemWarranty';
 import { ProductComponentsSection } from './ProductComponentsSection';
 import { ComponentsPreview } from './ComponentsPreview';
 import { dropComponentErrors, toComponentRequests, validateComponentRows, type ComponentFormRow } from '../utils/componentForm';
@@ -68,7 +68,9 @@ export const CreateProductModal: React.FC<CreateProductModalProps> = ({
     const isFormValid =
         title.trim() !== '' &&
         price !== '' &&
-        Number(price) >= 0;
+        Number(price) >= 0 &&
+        components.every((row) => row.itemId !== null && !!row.quantity.trim()) &&
+        warrantiesComplete(warranties);
 
     const handleAddImageUrl = () => {
         if (imageUrls.length < 5) {
@@ -351,8 +353,8 @@ export const CreateProductModal: React.FC<CreateProductModalProps> = ({
                         <FormFieldErrors errors={fieldErrors} />
 
                         <p role="note" className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-400">
-                            New products are created <strong>inactive</strong> and sent to Admin L2 for approval. The product
-                            goes live once Admin L2 approves it.
+                            New products are created <strong>inactive</strong> and sent for approval. The product
+                            goes live once a catalog approver approves it.
                         </p>
 
                         {/* Footer Actions */}

@@ -1,5 +1,5 @@
 import { axiosClient } from '../axiosClient';
-import type { LoginRequest, AuthResponse, AdminProfile , ChangePasswordRequest, ChangePasswordResponse} from '../../types/auth';
+import type { LoginRequest, AuthResponse, AdminProfile, ChangePasswordRequest, ChangePasswordResponse, FirstLoginPasswordRequest } from '../../types/auth';
 
 export const authService = {
   login: async (payload: LoginRequest): Promise<AuthResponse> => {
@@ -23,6 +23,16 @@ export const authService = {
   changePassword: async (data: ChangePasswordRequest): Promise<ChangePasswordResponse> => {
     const response = await axiosClient.post<ChangePasswordResponse>(
       `/auth/change-password`,
+      data,
+      { skipAuthRedirect: true }
+    );
+    return response.data;
+  },
+
+  /** Allowed only while the account is in FIRST_LOGIN; the backend checks that from the token. */
+  setFirstLoginPassword: async (data: FirstLoginPasswordRequest): Promise<ChangePasswordResponse> => {
+    const response = await axiosClient.post<ChangePasswordResponse>(
+      `/auth/first-login/password`,
       data,
       { skipAuthRedirect: true }
     );

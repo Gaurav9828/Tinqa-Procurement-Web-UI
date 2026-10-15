@@ -6,6 +6,7 @@ import { configureStore } from '@reduxjs/toolkit';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { AxiosError, AxiosHeaders, type AxiosResponse } from 'axios';
 import alertReducer from '../../../store/alertSlice';
+import companyProfileReducer from '../../../store/companyProfileSlice';
 import { GlobalAlertContainer } from '../../../components/ui/GlobalAlertContainer';
 import { useAuthStore } from '../../../store/useAuthStore';
 import { companyProfileApi } from '../api/companyProfileApi';
@@ -15,6 +16,8 @@ import { CompanyProfilePage } from './CompanyProfilePage';
 import { CompanyProfileEditorPage } from './CompanyProfileEditorPage';
 import { CompanyProfileReviewPage } from './CompanyProfileReviewPage';
 import { CompanyProfileHistoryPage } from './CompanyProfileHistoryPage';
+import { clearPincodeCache } from '../../../utils/pincode';
+import { superAdminPermissions } from '../../../test/access';
 
 // Only the network layer is mocked: a small fake of the Ecommerce BE maker-checker rules.
 vi.mock('../api/companyProfileApi', () => ({
@@ -56,12 +59,14 @@ const FIELDS: CompanyProfileFields = {
   pan: 'AAACT1234A',
   cin: null,
   headquartersName: 'Pune HQ',
-  address: { line1: 'Plot 7, Hinjawadi', line2: null, city: 'Pune', state: 'Maharashtra', stateCode: '27', postalCode: '411057', country: 'India' },
+  address: { line1: 'Plot 7, Hinjawadi', line2: null, city: 'Pune', district: 'Pune', state: 'Maharashtra', stateCode: '27', postalCode: '411057', country: 'India' },
   supportEmail: 'help@tinqa.com',
   supportPhone: '+91 20 1234 5678',
   careersEmail: null,
   website: 'https://tinqa.com',
   invoiceTerms: ['Goods once sold are not returnable.', 'Subject to Pune jurisdiction.'],
+  homeVideoEnabled: false,
+  homeVideoUrl: null,
 };
 
 let versions: CompanyProfileVersion[];
@@ -121,7 +126,7 @@ const installBackend = () => {
     ok({
       live: structuredClone(live()),
       pending: structuredClone(pending()),
-      myDrafts: versions.filter((v) => (v.status === 'DRAFT' || v.status === 'REJECTED') && v.createdBy === me).reverse(),
+      myDrafts: structuredClone(versions.filter((v) => (v.status === 'DRAFT' || v.status === 'REJECTED') && v.createdBy === me).reverse()),
     })
   );
   api.listVersions.mockImplementation(async () => {
@@ -154,7 +159,7 @@ const installBackend = () => {
   });
   api.approve.mockImplementation(async (id) => {
     const v = find(id);
-    if (v.createdBy === me || v.submittedBy === me) throw apiError(403, 'APPROVAL_SELF_NOT_ALLOWED', 'You created or submitted this change; another Level 2 admin must approve it.');
+    if (v.createdBy === me || v.submittedBy === me) throw apiError(403, 'APPROVAL_SELF_NOT_ALLOWED', 'You created or submitted this change; another approver must approve it.');
     const previous = live();
     if (previous) previous.status = 'SUPERSEDED';
     return transition(v, 'APPROVED', { reviewedBy: me, reviewedAt: '2026-10-13T11:00:00' });
@@ -171,17 +176,18 @@ const installBackend = () => {
 };
 
 const jwt = (payload: object) => `h.${btoa(JSON.stringify(payload)).replace(/=+$/, '')}.s`;
-const signIn = (username: string, roles: ('ADMIN_L1' | 'ADMIN_L2')[]) => {
+// Default permissions are a Super Admin's at those levels; pass them explicitly for a narrower designation
+const signIn = (username: string, roles: ('ADMIN_L1' | 'ADMIN_L2')[], permissions: string[] = superAdminPermissions(...roles)) => {
   me = username;
   useAuthStore.setState({
     token: jwt({ sub: username, roles: roles.map((r) => `ROLE_${r}`) }),
     isAuthenticated: true,
-    user: { userId: 1, username, email: `${username}@tinqa.com`, role: roles[0], authClient: 'web', isFirstLogin: false },
+    user: { userId: 1, username, email: `${username}@tinqa.com`, role: roles[0], authClient: 'web', isFirstLogin: false, permissions },
   });
 };
 
 const renderAt = (path: string) => {
-  const store = configureStore({ reducer: { alert: alertReducer } });
+  const store = configureStore({ reducer: { alert: alertReducer, companyProfile: companyProfileReducer } });
   const user = userEvent.setup();
   render(
     <MemoryRouter initialEntries={[path]}>
@@ -230,7 +236,7 @@ describe('Maker proposes a change (acceptance 1)', () => {
     await waitFor(() => expect(api.submitDraft).toHaveBeenCalledWith(2));
     const body = api.saveDraft.mock.calls[0][1];
     expect(body).toMatchObject({ brandName: 'TinQa Plus', logoUrl: 'https://assets.tinqa.com/company/new-logo.png', lockVersion: 0, legalName: FIELDS.legalName });
-    expect(Object.keys(body)).toHaveLength(17); // every field + lockVersion (PUT is a full replacement)
+    expect(Object.keys(body)).toHaveLength(19); // every field + lockVersion (PUT is a full replacement)
 
     const panel = await screen.findByRole('region', { name: 'Pending change' });
     expect(within(panel).getByText(/Version 2 submitted by maker1/)).toBeInTheDocument();
@@ -243,7 +249,8 @@ describe('Maker proposes a change (acceptance 1)', () => {
 describe('Checker reviews (acceptance 2, 3, 6)', () => {
   beforeEach(() => {
     versions.push(version(2, 'PENDING_APPROVAL', { brandName: 'TinQa Plus', logoUrl: 'https://assets.tinqa.com/company/new-logo.png' }));
-    signIn('checker1', ['ADMIN_L2']);
+    // An approver whose designation doesn't include drafting
+    signIn('checker1', ['ADMIN_L2'], ['COMPANY_PROFILE_VIEW', 'COMPANY_PROFILE_APPROVE']);
   });
 
   it('sees the changes vs live and approves; the old version becomes superseded', async () => {
@@ -263,7 +270,7 @@ describe('Checker reviews (acceptance 2, 3, 6)', () => {
     const liveCard = await screen.findByRole('region', { name: 'Live profile' });
     expect(within(liveCard).getByText('TinQa Plus')).toBeInTheDocument();
     expect(versions[0].status).toBe('SUPERSEDED');
-    expect(screen.queryByRole('button', { name: 'Propose a change' })).not.toBeInTheDocument(); // checkers never edit
+    expect(screen.queryByRole('button', { name: 'Propose a change' })).not.toBeInTheDocument(); // no COMPANY_PROFILE_EDIT
   });
 
   it('rejects with a required comment', async () => {
@@ -367,12 +374,13 @@ describe('Editor validation (acceptance 7, 8)', () => {
     expect(screen.getByLabelText('PAN')).toHaveAttribute('aria-invalid', 'true');
   });
 
-  it('lists missing fields when submitting an incomplete draft', async () => {
-    versions.push(version(2, 'DRAFT', { legalName: null, address: { line1: null, line2: null, city: null, state: null, stateCode: null, postalCode: null, country: 'India' }, gstin: null }));
+  it('keeps submit disabled while required fields are missing', async () => {
+    versions.push(version(2, 'DRAFT', { legalName: null, address: { line1: null, line2: null, city: null, district: null, state: null, stateCode: null, postalCode: null, country: 'India' }, gstin: null }));
     const { user } = renderAt('/settings/company-profile/drafts/2');
-    await user.click(await screen.findByRole('button', { name: 'Save & submit for approval' }));
-    const missing = screen.getByRole('list', { name: 'Missing fields' });
-    expect(within(missing).getAllByRole('listitem').map((li) => li.textContent)).toEqual(['Legal name', 'Address line 1', 'City', 'State', 'Postal code']);
+    const submit = await screen.findByRole('button', { name: 'Save & submit for approval' });
+    expect(submit).toBeDisabled();
+    expect(submit).toHaveAttribute('title', 'Fill in all required fields to submit.');
+    await user.click(submit);
     expect(api.saveDraft).not.toHaveBeenCalled();
     expect(api.submitDraft).not.toHaveBeenCalled();
   });
@@ -443,6 +451,126 @@ describe('Withdraw and history (acceptance 11)', () => {
     expect(await screen.findByRole('region', { name: 'Changes vs live' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Save draft' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Approve' })).not.toBeInTheDocument();
+  });
+});
+
+describe('Home page video', () => {
+  const LINK = 'https://youtu.be/dQw4w9WgXcQ';
+
+  it('toggling the switch and entering a link sends both fields; the preview appears for a valid link', async () => {
+    versions.push(version(2, 'DRAFT'));
+    const { user } = renderAt('/settings/company-profile/drafts/2');
+    const toggle = await screen.findByRole('switch', { name: 'Show background video on the home page' });
+    expect(toggle).not.toBeChecked();
+    await user.click(toggle);
+    expect(toggle).toBeChecked();
+
+    const link = screen.getByLabelText('YouTube link');
+    expect(link).toHaveAccessibleDescription(/Plays muted and on loop/);
+    await user.type(link, 'https://vimeo.com/1');
+    expect(screen.queryByAltText('Video preview')).not.toBeInTheDocument();
+    await user.clear(link);
+    await user.type(link, LINK);
+    expect(screen.getByAltText('Video preview')).toHaveAttribute('src', 'https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg');
+    expect(screen.getByRole('link', { name: /Watch on YouTube/ })).toHaveAttribute('rel', 'noopener noreferrer');
+
+    await user.click(screen.getByRole('button', { name: 'Save draft' }));
+    await waitFor(() => expect(api.saveDraft).toHaveBeenCalledWith(2, expect.objectContaining({ homeVideoEnabled: true, homeVideoUrl: LINK })));
+  });
+
+  it('keeps the link while off and blocks submitting "on" without a link', async () => {
+    versions.push(version(2, 'DRAFT', { homeVideoEnabled: true, homeVideoUrl: LINK }));
+    const { user } = renderAt('/settings/company-profile/drafts/2');
+    const toggle = await screen.findByRole('switch', { name: 'Show background video on the home page' });
+    await waitFor(() => expect(toggle).toBeChecked());
+    await user.click(toggle);
+    expect(screen.getByLabelText('YouTube link')).toHaveValue(LINK);
+    expect(screen.getByText('Saved, but not shown while the video is off.')).toBeInTheDocument();
+
+    await user.click(toggle);
+    await user.clear(screen.getByLabelText('YouTube link'));
+    expect(screen.getByRole('button', { name: 'Save & submit for approval' })).toBeDisabled();
+    expect(api.saveDraft).not.toHaveBeenCalled();
+  });
+
+  it('shows a server error on the link input', async () => {
+    versions.push(version(2, 'DRAFT'));
+    api.saveDraft.mockRejectedValueOnce(apiError(400, 'VALIDATION_FAILED', 'Validation failed', [{ field: 'homeVideoUrl', message: 'This video can’t be embedded.' }]));
+    const { user } = renderAt('/settings/company-profile/drafts/2');
+    await user.type(await screen.findByLabelText('YouTube link'), LINK);
+    await user.click(screen.getByRole('button', { name: 'Save draft' }));
+    await waitFor(() => expect(screen.getByLabelText('YouTube link')).toHaveAttribute('aria-invalid', 'true'));
+    expect(screen.getByLabelText('YouTube link')).toHaveAccessibleDescription(/This video can’t be embedded\./);
+  });
+
+  it('change rows show Off → On, and the checker is told approval changes the live video', async () => {
+    versions.push(version(2, 'PENDING_APPROVAL', { homeVideoEnabled: true, homeVideoUrl: LINK }));
+    signIn('checker1', ['ADMIN_L2']);
+    const { user } = renderAt('/settings/company-profile/versions/2');
+    const row = await screen.findByTestId('change-homeVideoEnabled');
+    expect(within(row).getByRole('rowheader')).toHaveTextContent('Home page video');
+    expect(within(row).getAllByRole('cell').map((c) => c.textContent)).toEqual(['Off', 'On']);
+    const urlRow = screen.getByTestId('change-homeVideoUrl');
+    expect(within(urlRow).getByRole('link', { name: LINK })).toHaveAttribute('href', LINK);
+    expect(screen.getByTestId('home-video-approval-note')).toHaveTextContent('Approving changes the video on the live home page.');
+
+    await user.click(screen.getByRole('button', { name: 'Approve' }));
+    expect(screen.getByRole('dialog', { name: 'Approve this change?' })).toHaveTextContent('Approving changes the video on the live home page.');
+  });
+
+  it('no approval note when only the link changes while the video stays off', async () => {
+    versions.push(version(2, 'PENDING_APPROVAL', { homeVideoUrl: LINK }));
+    signIn('checker1', ['ADMIN_L2']);
+    const { user } = renderAt(OVERVIEW);
+    await user.click(await screen.findByRole('button', { name: 'Approve' }));
+    expect(screen.getByRole('dialog', { name: 'Approve this change?' })).not.toHaveTextContent('Approving changes the video');
+  });
+
+  it('the live profile shows the video status, link and thumbnail', async () => {
+    Object.assign(versions[0], { homeVideoEnabled: true, homeVideoUrl: LINK });
+    renderAt(OVERVIEW);
+    const group = await screen.findByRole('group', { name: 'Home page video' });
+    expect(within(group).getByText('On')).toBeInTheDocument();
+    expect(within(group).getByRole('link', { name: LINK })).toBeInTheDocument();
+    expect(within(group).getByAltText('Video preview')).toBeInTheDocument();
+  });
+});
+
+describe('Address from PIN code', () => {
+  beforeEach(() => {
+    clearPincodeCache();
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) =>
+        new Response(
+          JSON.stringify([
+            url.endsWith('/411057')
+              ? { Status: 'Success', PostOffice: [{ Name: 'Hinjawadi', District: 'Pune', State: 'Maharashtra' }] }
+              : { Status: 'Error', PostOffice: null },
+          ])
+        )
+      )
+    );
+  });
+
+  it('fills a missing district on open without marking the draft as changed; city/district/state are read-only', async () => {
+    versions.push(version(2, 'DRAFT', { address: { ...FIELDS.address!, district: null } }));
+    renderAt('/settings/company-profile/drafts/2');
+    await waitFor(() => expect(screen.getByLabelText('District')).toHaveValue('Pune'));
+    expect(screen.getByLabelText('City')).toHaveAttribute('readonly');
+    expect(screen.getByLabelText('State')).toHaveAttribute('readonly');
+    expect(screen.queryByText('Unsaved changes')).not.toBeInTheDocument();
+  });
+
+  it('blocks saving with an unknown PIN code', async () => {
+    versions.push(version(2, 'DRAFT'));
+    const { user } = renderAt('/settings/company-profile/drafts/2');
+    const postal = await screen.findByLabelText('Postal code');
+    await user.clear(postal);
+    await user.type(postal, '999999');
+    await waitFor(() => expect(postal).toHaveAccessibleDescription(/PIN code not found/));
+    await user.click(screen.getByRole('button', { name: 'Save draft' }));
+    expect(api.saveDraft).not.toHaveBeenCalled();
   });
 });
 

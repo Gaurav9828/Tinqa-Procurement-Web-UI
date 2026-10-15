@@ -44,8 +44,10 @@ export const SupportTicketDetailPage: React.FC = () => {
   }, [referenceNumber]);
 
   // Only link to the order page if this role can open it (UX only; the backend still authorizes).
-  const { authorizedNavigation } = useAccess();
+  const { authorizedNavigation, can } = useAccess();
   const canOpenOrder = authorizedNavigation().some((item) => item.id === 'order-tracking');
+  const canReply = can('SUPPORT_TICKET_REPLY');
+  const canChangeStatus = can('SUPPORT_TICKET_UPDATE_STATUS');
 
   // Reply draft lives here so a suggestion can be placed into the box for editing.
   const [draft, setDraft] = useState('');
@@ -127,7 +129,7 @@ export const SupportTicketDetailPage: React.FC = () => {
             </div>
             <div className="apple-card p-5 space-y-3">
               <h2 className="text-sm font-semibold text-black dark:text-white">Reply</h2>
-              {suggestions && (
+              {suggestions && canReply && (
                 <ReplySuggestions
                   result={suggestions}
                   referenceNumber={ticket.referenceNumber}
@@ -142,7 +144,7 @@ export const SupportTicketDetailPage: React.FC = () => {
                 draft={draft}
                 onDraftChange={setDraft}
                 textareaRef={replyBox}
-                canReply={ticket.canReply}
+                canReply={ticket.canReply && canReply}
                 isSending={actions.pending === 'reply'}
                 disabled={actions.isBusy}
                 onSend={actions.reply}
@@ -175,6 +177,7 @@ export const SupportTicketDetailPage: React.FC = () => {
 
             <TicketOrderSection orderNumber={ticket.orderNumber} order={ticket.order} canOpenOrder={canOpenOrder} />
 
+            {canChangeStatus && (
             <div className="apple-card p-5 space-y-3">
               <h2 className="text-sm font-semibold text-black dark:text-white">Status</h2>
               <TicketStatusControls
@@ -186,6 +189,7 @@ export const SupportTicketDetailPage: React.FC = () => {
                 onChange={actions.setStatus}
               />
             </div>
+            )}
           </div>
         </div>
       )}

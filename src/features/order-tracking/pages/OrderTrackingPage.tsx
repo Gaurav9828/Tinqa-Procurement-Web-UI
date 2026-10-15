@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { ChevronLeft, ChevronRight, RefreshCw, Truck } from 'lucide-react';
 import { useAdminOrders } from '../hooks/useAdminOrders';
 import { useTrackingStatuses } from '../hooks/useTrackingStatuses';
-import { OrderTrackingFilterBar } from '../components/OrderTrackingFilterBar';
+import { OrderSearchField, OrderTrackingFilterBar } from '../components/OrderTrackingFilterBar';
 import { OrderTrackingTable } from '../components/OrderTrackingTable';
 import { OrderTrackingStateMessage } from '../components/OrderTrackingStateMessage';
 import { clearListPosition, peekListPosition, saveListPosition } from '../../../utils/listReturnPosition';
@@ -106,23 +106,31 @@ export const OrderTrackingPage: React.FC = () => {
 
   return (
     <div className="p-6 space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+        <div className="min-w-0">
           <h1 className="text-xl font-bold text-black dark:text-white flex items-center gap-2">
-            <Truck className="w-5 h-5 text-[#0071e3]" /> Order Tracking
+            <Truck className="w-5 h-5 text-[#0071e3]" /> Customer Order Tracking
           </h1>
           <p className="text-xs text-gray-500 mt-0.5">
             Follow ecommerce orders through fulfilment and record tracking updates
             {list.hasLoaded ? ` (${list.totalElements} orders)` : ''}
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() => list.refetch()}
-          className="self-start sm:self-auto flex items-center gap-1.5 px-3 py-1.5 bg-black/5 dark:bg-white/10 hover:bg-black/10 dark:hover:bg-white/20 text-black dark:text-white rounded-xl text-xs font-medium transition-colors cursor-pointer"
-        >
-          <RefreshCw className={`w-3.5 h-3.5 ${list.isLoading ? 'animate-spin' : ''}`} /> Refresh
-        </button>
+        {/* Search first, then Refresh, on the header line. */}
+        <div className="flex items-center gap-2 w-full lg:w-auto">
+          <OrderSearchField
+            value={list.filters.search}
+            onChange={(value) => list.updateFilter('search', value)}
+            className="flex-1 lg:flex-none lg:w-[28rem]"
+          />
+          <button
+            type="button"
+            onClick={() => list.refetch()}
+            className="shrink-0 flex items-center gap-1.5 px-3 py-2 bg-black/5 dark:bg-white/10 hover:bg-black/10 dark:hover:bg-white/20 text-black dark:text-white rounded-xl text-xs font-medium transition-colors cursor-pointer"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${list.isLoading ? 'animate-spin' : ''}`} /> Refresh
+          </button>
+        </div>
       </div>
 
       <OrderTrackingFilterBar

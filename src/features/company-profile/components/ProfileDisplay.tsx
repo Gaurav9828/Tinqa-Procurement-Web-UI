@@ -1,7 +1,8 @@
 import React from 'react';
-import { ImageOff } from 'lucide-react';
+import { ExternalLink, ImageOff } from 'lucide-react';
 import type { CompanyProfileFields, TrademarkMark, VersionStatus } from '../types/companyProfile.types';
-import { STATUS_LABELS, TRADEMARK_SYMBOLS } from '../utils/companyProfile.utils';
+import { STATUS_LABELS, TRADEMARK_SYMBOLS, onOff } from '../utils/companyProfile.utils';
+import { isHttpsUrl, toYouTubeVideoId } from '../utils/companyProfileForm';
 
 const STATUS_TONES: Record<VersionStatus, string> = {
   DRAFT: 'bg-gray-500/10 text-gray-600 dark:text-gray-300 border-gray-500/20',
@@ -64,6 +65,52 @@ export const ProfileImage: React.FC<{ url: string | null | undefined; alt: strin
   );
 };
 
+/**
+ * Thumbnail + "Watch on YouTube" for a valid YouTube link; nothing otherwise. A thumbnail (not an
+ * embedded player) keeps the console free of YouTube frames.
+ */
+export const YouTubePreview: React.FC<{ url: string | null | undefined }> = ({ url }) => {
+  const id = toYouTubeVideoId(url);
+  const [failedId, setFailedId] = React.useState<string | null>(null);
+  if (!id) return null;
+  return (
+    <div className="space-y-1.5 w-full max-w-xs" data-testid="video-preview">
+      {failedId === id ? (
+        <p className="text-[11px] text-amber-700 dark:text-amber-400">Couldn't load a preview; check that the video is public and embeddable.</p>
+      ) : (
+        <img
+          src={`https://i.ytimg.com/vi/${id}/hqdefault.jpg`}
+          alt="Video preview"
+          className="w-full aspect-video object-cover rounded-lg border border-black/10 dark:border-white/10 bg-black/5"
+          onError={() => setFailedId(id)}
+          // Unknown videos come back as YouTube's 120×90 placeholder rather than an error.
+          onLoad={(e) => e.currentTarget.naturalWidth > 0 && e.currentTarget.naturalWidth <= 120 && setFailedId(id)}
+        />
+      )}
+      <a
+        href={`https://www.youtube.com/watch?v=${id}`}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#0071e3] hover:underline"
+      >
+        Watch on YouTube <ExternalLink className="w-3 h-3" />
+      </a>
+    </div>
+  );
+};
+
+/** A link as plain text, clickable only when it's an https URL. */
+export const UrlLink: React.FC<{ url: string | null | undefined }> = ({ url }) => {
+  if (!url || !url.trim()) return <>—</>;
+  return isHttpsUrl(url) ? (
+    <a href={url} target="_blank" rel="noopener noreferrer" className="text-[#0071e3] hover:underline break-all">
+      {url}
+    </a>
+  ) : (
+    <span className="break-all">{url}</span>
+  );
+};
+
 const Field: React.FC<{ label: string; children: React.ReactNode }> = ({ label, children }) => (
   <div className="min-w-0">
     <dt className="text-[10px] uppercase tracking-wider text-gray-400 font-semibold">{label}</dt>
@@ -89,7 +136,7 @@ export const InvoiceTermsList: React.FC<{ terms: string[] | null | undefined; la
 /** Read-only profile (live card, proposed version). Every value is rendered as text, never HTML. */
 export const ProfileDetails: React.FC<{ profile: CompanyProfileFields }> = ({ profile: p }) => {
   const a = p.address;
-  const addressLines = [a?.line1, a?.line2, [a?.city, a?.state].filter(Boolean).join(', '), [a?.postalCode, a?.country].filter(Boolean).join(' ')]
+  const addressLines = [a?.line1, a?.line2, [a?.city, a?.district && a.district !== a.city ? a.district : null, a?.state].filter(Boolean).join(', '), [a?.postalCode, a?.country].filter(Boolean).join(' ')]
     .filter((line) => line && line.trim())
     .join('\n');
   return (
@@ -131,6 +178,19 @@ export const ProfileDetails: React.FC<{ profile: CompanyProfileFields }> = ({ pr
         <div className="text-black dark:text-white">
           <InvoiceTermsList terms={p.invoiceTerms} />
         </div>
+      </div>
+
+      <div role="group" aria-label="Home page video">
+        <span className="block text-[10px] uppercase tracking-wider text-gray-400 font-semibold mb-1">Home page video</span>
+        <dl className="grid grid-cols-1 sm:grid-cols-[120px_1fr] gap-4">
+          <Field label="Status">{onOff(p.homeVideoEnabled)}</Field>
+          <Field label="YouTube link">
+            <UrlLink url={p.homeVideoUrl} />
+            <div className="mt-2 whitespace-normal">
+              <YouTubePreview url={p.homeVideoUrl} />
+            </div>
+          </Field>
+        </dl>
       </div>
     </div>
   );

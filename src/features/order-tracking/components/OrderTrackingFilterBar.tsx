@@ -1,9 +1,10 @@
 import React from 'react';
-import { Clock, Search, X } from 'lucide-react';
+import { Search, X } from 'lucide-react';
 import type { AdminOrderSort, TrackingStatusOption } from '../types/orderTracking.types';
 import type { AdminOrderFilters } from '../hooks/useAdminOrders';
 import { ADMIN_ORDERS_SEARCH_MAX_LENGTH } from '../hooks/useAdminOrders';
 import { formatStatusLabel } from '../utils/orderTracking.utils';
+import { PAYMENT_STATUS_FILTER_OPTIONS, formatPaymentStatus } from '../utils/payment.utils';
 
 const SORT_OPTIONS: { value: AdminOrderSort; label: string }[] = [
   { value: 'createdAt,desc', label: 'Newest first' },
@@ -23,10 +24,28 @@ interface Props {
   onReset: () => void;
 }
 
-const WAITING_PRE_ORDER_STATUS = 'PRE_ORDER_PENDING';
-
 const controlClass =
   'px-3 py-2 text-xs rounded-xl border bg-white dark:bg-[#1c1c1e] focus:outline-none focus:ring-2 focus:ring-[#0071e3] cursor-pointer';
+
+/** Order search, shown in the page header next to Refresh. */
+export const OrderSearchField: React.FC<{ value: string; onChange: (value: string) => void; className?: string }> = ({
+  value,
+  onChange,
+  className = '',
+}) => (
+  <div className={`relative ${className}`}>
+    <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+    <input
+      type="search"
+      aria-label="Search orders"
+      placeholder="Search order number, item, customer name or email"
+      value={value}
+      maxLength={ADMIN_ORDERS_SEARCH_MAX_LENGTH}
+      onChange={(e) => onChange(e.target.value)}
+      className={`${controlClass} w-full pl-9 border-black/10 dark:border-white/10 cursor-text`}
+    />
+  </div>
+);
 
 export const OrderTrackingFilterBar: React.FC<Props> = ({
   filters,
@@ -40,93 +59,80 @@ export const OrderTrackingFilterBar: React.FC<Props> = ({
 
   return (
     <div className="space-y-2">
-      <div className="flex flex-col lg:flex-row gap-3">
-        <div className="relative flex-1 min-w-0">
-          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-          <input
-            type="search"
-            aria-label="Search orders"
-            placeholder="Search order number, item, customer name or email"
-            value={filters.search}
-            maxLength={ADMIN_ORDERS_SEARCH_MAX_LENGTH}
-            onChange={(e) => onFilterChange('search', e.target.value)}
-            className={`${controlClass} w-full pl-9 border-black/10 dark:border-white/10 cursor-text`}
-          />
-        </div>
+      {/* Filters, right-aligned under the page header (the search sits in the header). */}
+      <div className="grid grid-cols-2 sm:flex sm:flex-wrap sm:items-center sm:justify-end gap-3">
+        <select
+          aria-label="Filter by status"
+          value={filters.status}
+          onChange={(e) => onFilterChange('status', e.target.value)}
+          className={`${controlClass} sm:w-48 border-black/10 dark:border-white/10`}
+        >
+          <option value="">All statuses</option>
+          {statuses.map((option) => (
+            <option key={option.status} value={option.status}>
+              {formatStatusLabel(option.status)}
+            </option>
+          ))}
+        </select>
 
-        <div className="grid grid-cols-2 sm:flex gap-3">
-          {/* Shortcut to the pre-order review queue (status=PRE_ORDER_PENDING). */}
+        <select
+          aria-label="Filter by payment status"
+          value={filters.paymentStatus}
+          onChange={(e) => onFilterChange('paymentStatus', e.target.value)}
+          className={`${controlClass} sm:w-44 border-black/10 dark:border-white/10`}
+        >
+          <option value="">All payments</option>
+          {PAYMENT_STATUS_FILTER_OPTIONS.map((status) => (
+            <option key={status} value={status}>
+              {formatPaymentStatus(status)}
+            </option>
+          ))}
+        </select>
+
+        <select
+          aria-label="Sort orders"
+          value={filters.sort}
+          onChange={(e) => onFilterChange('sort', e.target.value as AdminOrderSort)}
+          className={`${controlClass} sm:w-44 border-black/10 dark:border-white/10`}
+        >
+          {SORT_OPTIONS.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+
+        <input
+          type="date"
+          aria-label="From date"
+          value={filters.fromDate}
+          max={filters.toDate || undefined}
+          onChange={(e) => onFilterChange('fromDate', e.target.value)}
+          className={`${controlClass} ${dateBorder} min-w-0 w-full sm:w-auto`}
+        />
+        <input
+          type="date"
+          aria-label="To date"
+          value={filters.toDate}
+          min={filters.fromDate || undefined}
+          onChange={(e) => onFilterChange('toDate', e.target.value)}
+          className={`${controlClass} ${dateBorder} min-w-0 w-full sm:w-auto`}
+        />
+
+        {hasActiveFilters && (
           <button
             type="button"
-            aria-pressed={filters.status === WAITING_PRE_ORDER_STATUS}
-            onClick={() =>
-              onFilterChange('status', filters.status === WAITING_PRE_ORDER_STATUS ? '' : WAITING_PRE_ORDER_STATUS)
-            }
-            className={`col-span-2 sm:col-span-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs rounded-xl border font-medium whitespace-nowrap cursor-pointer transition-colors ${
-              filters.status === WAITING_PRE_ORDER_STATUS
-                ? 'bg-amber-500/10 border-amber-500/30 text-amber-700 dark:text-amber-400'
-                : 'border-black/10 dark:border-white/10 hover:bg-black/5 dark:hover:bg-white/10'
-            }`}
+            onClick={onReset}
+            aria-label="Clear filters"
+            title="Clear filters"
+            className="col-span-2 sm:col-span-1 flex items-center justify-center p-2 rounded-xl border border-black/10 dark:border-white/10 text-gray-500 hover:text-rose-600 hover:bg-rose-500/10 hover:border-rose-500/30 cursor-pointer transition-colors"
           >
-            <Clock className="w-3.5 h-3.5" /> Waiting pre-orders
+            <X className="w-4 h-4" />
           </button>
-          <select
-            aria-label="Filter by status"
-            value={filters.status}
-            onChange={(e) => onFilterChange('status', e.target.value)}
-            className={`${controlClass} sm:w-48 border-black/10 dark:border-white/10`}
-          >
-            <option value="">All statuses</option>
-            {statuses.map((option) => (
-              <option key={option.status} value={option.status}>
-                {formatStatusLabel(option.status)}
-              </option>
-            ))}
-          </select>
-
-          <select
-            aria-label="Sort orders"
-            value={filters.sort}
-            onChange={(e) => onFilterChange('sort', e.target.value as AdminOrderSort)}
-            className={`${controlClass} sm:w-44 border-black/10 dark:border-white/10`}
-          >
-            {SORT_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-
-          <input
-            type="date"
-            aria-label="From date"
-            value={filters.fromDate}
-            max={filters.toDate || undefined}
-            onChange={(e) => onFilterChange('fromDate', e.target.value)}
-            className={`${controlClass} ${dateBorder}`}
-          />
-          <input
-            type="date"
-            aria-label="To date"
-            value={filters.toDate}
-            min={filters.fromDate || undefined}
-            onChange={(e) => onFilterChange('toDate', e.target.value)}
-            className={`${controlClass} ${dateBorder}`}
-          />
-
-          {hasActiveFilters && (
-            <button
-              type="button"
-              onClick={onReset}
-              className="col-span-2 sm:col-span-1 flex items-center justify-center gap-1 px-3 py-2 text-xs rounded-xl bg-black/5 dark:bg-white/10 hover:bg-black/10 dark:hover:bg-white/20 cursor-pointer whitespace-nowrap"
-            >
-              <X className="w-3.5 h-3.5" /> Clear filters
-            </button>
-          )}
-        </div>
+        )}
       </div>
       {dateRangeInvalid && (
-        <p role="alert" className="text-[11px] text-red-500 px-1">
+        <p role="alert" className="text-[11px] text-red-500 px-1 sm:text-right">
           "From date" must be on or before "To date".
         </p>
       )}

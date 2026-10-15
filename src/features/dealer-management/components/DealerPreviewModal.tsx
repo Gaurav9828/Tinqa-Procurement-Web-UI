@@ -41,7 +41,7 @@ export const DealerPreviewModal: React.FC<DealerPreviewModalProps> = ({ isOpen, 
                         <div className="flex items-start gap-2">
                             <MapPin className="w-4 h-4 text-[#0071e3] shrink-0 mt-0.5" />
                             <span>
-                                {[dealer.street, dealer.landmark, dealer.city, dealer.state, dealer.pincode].filter(Boolean).join(', ') || 'No address details'}
+                                {[dealer.street, dealer.landmark, dealer.city, dealer.district && dealer.district !== dealer.city ? dealer.district : null, dealer.state, dealer.pincode].filter(Boolean).join(', ') || 'No address details'}
                             </span>
                         </div>
                     </div>

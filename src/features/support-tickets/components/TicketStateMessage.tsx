@@ -10,7 +10,7 @@ const CONTENT: Record<Variant, { icon: React.ElementType; title: string; body: s
   forbidden: {
     icon: ShieldAlert,
     title: 'Permission denied',
-    body: 'Your account is not allowed to view support tickets. Contact an Admin L2 if you need access.',
+    body: 'Your account is not allowed to view support tickets. Ask an administrator if you need access.',
   },
   notFound: { icon: SearchX, title: 'Ticket not found', body: 'This ticket does not exist or the reference number is incorrect.' },
   unsupported: {

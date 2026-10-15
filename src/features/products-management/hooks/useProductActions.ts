@@ -11,10 +11,10 @@ import { buildApprovalSnapshot, buildApprovedUpdatePayload, snapshotFromRequest 
 import { toProduct } from '../utils/productMapper';
 
 export const PRODUCT_SUBMITTED_MESSAGE =
-  'Product created and sent for Admin L2 approval. It stays inactive until Admin L2 approves it.';
+  'Product created and sent for approval. It stays inactive until it is approved.';
 
 export const UPDATE_SUBMITTED_MESSAGE =
-  'Changes sent for Admin L2 approval. The product stays as it is until Admin L2 approves them.';
+  'Changes sent for approval. The product stays as it is until they are approved.';
 
 export const useProductActions = (onSuccessCallback?: () => void) => {
   const { isSubmitting: isRunning, run, reject } = useApiAction(onSuccessCallback);
@@ -166,8 +166,8 @@ export const useProductActions = (onSuccessCallback?: () => void) => {
       },
       {
         success: isResubmission
-          ? 'Product resubmitted for Admin L2 approval. It stays inactive until approved.'
-          : 'Product sent for Admin L2 approval. It stays inactive until approved.',
+          ? 'Product resubmitted for approval. It stays inactive until approved.'
+          : 'Product sent for approval. It stays inactive until approved.',
         failure: 'Could not send the product for approval.',
       }
     );

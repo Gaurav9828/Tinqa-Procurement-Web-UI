@@ -15,7 +15,7 @@ import type { ProductApprovalResponse, ProductChangeSummary } from '../types/pro
 import { useProductApprovals } from '../hooks/useProductApprovals';
 import { ProductApprovalReviewModal } from '../components/ProductApprovalReviewModal';
 import { getApprovalPermissions, getApprovalState } from '../utils/productApproval';
-import { useAuthStore } from '../../../store/useAuthStore';
+import { useAccess } from '../../../hooks/useAccess';
 
 export const ProductManagementPage: React.FC = () => {
     const {
@@ -51,7 +51,17 @@ export const ProductManagementPage: React.FC = () => {
         decideApproval,
     } = useProductActions(refreshAll);
 
-    const isAdminL2 = useAuthStore((state) => state.user?.role) === 'ADMIN_L2';
+    const { can } = useAccess();
+    const canReview = can('PRODUCT_APPROVAL_DECIDE');
+    const productActions = useMemo(
+        () => ({
+            canEdit: can('PRODUCT_UPDATE'),
+            canAdjustStock: can('STOREFRONT_STOCK_UPDATE'),
+            canSubmit: can('PRODUCT_APPROVAL_SUBMIT'),
+            canPublish: can('PRODUCT_PUBLISH'),
+        }),
+        [can]
+    );
     const [reviewRequest, setReviewRequest] = useState<ProductApprovalResponse | null>(null);
 
     const approvalFor = useCallback(
@@ -95,7 +105,7 @@ export const ProductManagementPage: React.FC = () => {
 
     const handleStatusUpdateSubmit = async (id: number, isEnabled: boolean) => {
         const target = products.find((p) => p.id === id);
-        if (isEnabled && target && !canActivate(target)) return false; // needs Admin L2 approval first
+        if (isEnabled && target && !canActivate(target)) return false; // needs approval first
         const success = await updateProductStatus(id, { isEnabled });
         if (success) {
             setStatusModalProduct(null);
@@ -129,10 +139,14 @@ export const ProductManagementPage: React.FC = () => {
                 statusFilter={statusFilter}
                 onSearchChange={updateSearch}
                 onStatusFilterChange={updateStatusFilter}
-                onOpenCreateModal={() => {
-                    clearFieldErrors();
-                    setIsCreateModalOpen(true);
-                }}
+                onOpenCreateModal={
+                    can('PRODUCT_CREATE')
+                        ? () => {
+                              clearFieldErrors();
+                              setIsCreateModalOpen(true);
+                          }
+                        : undefined
+                }
             />
 
             {/* Products Table */}
@@ -146,7 +160,8 @@ export const ProductManagementPage: React.FC = () => {
                 }}
                 onAdjustStock={(product, mode) => setStockTarget({ product, mode })}
                 approvalFor={approvalFor}
-                canReview={isAdminL2}
+                canReview={canReview}
+                actions={productActions}
                 onSubmitForApproval={(product, isResubmission) => {
                     void submitForApproval(product, isResubmission);
                 }}

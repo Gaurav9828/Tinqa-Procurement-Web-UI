@@ -19,6 +19,7 @@ export interface CompanyProfileForm {
     line1: string;
     line2: string;
     city: string;
+    district: string;
     state: string;
     stateCode: string;
     postalCode: string;
@@ -29,6 +30,8 @@ export interface CompanyProfileForm {
   careersEmail: string;
   website: string;
   invoiceTerms: string[];
+  homeVideoEnabled: boolean;
+  homeVideoUrl: string;
 }
 
 export type FormErrors = Record<string, string>;
@@ -41,6 +44,7 @@ export const LIMITS = {
   place: 100,
   invoiceTerms: 10,
   invoiceTerm: 300,
+  homeVideoUrl: 500,
   rejectComment: { min: 3, max: 500 },
 } as const;
 
@@ -70,12 +74,14 @@ export const emptyForm = (): CompanyProfileForm => ({
   pan: '',
   cin: '',
   headquartersName: '',
-  address: { line1: '', line2: '', city: '', state: '', stateCode: '', postalCode: '', country: DEFAULT_COUNTRY },
+  address: { line1: '', line2: '', city: '', district: '', state: '', stateCode: '', postalCode: '', country: DEFAULT_COUNTRY },
   supportEmail: '',
   supportPhone: '',
   careersEmail: '',
   website: '',
   invoiceTerms: [],
+  homeVideoEnabled: false,
+  homeVideoUrl: '',
 });
 
 export const toForm = (v: CompanyProfileFields): CompanyProfileForm => ({
@@ -93,6 +99,7 @@ export const toForm = (v: CompanyProfileFields): CompanyProfileForm => ({
     line1: str(v.address?.line1),
     line2: str(v.address?.line2),
     city: str(v.address?.city),
+    district: str(v.address?.district),
     state: str(v.address?.state),
     stateCode: str(v.address?.stateCode),
     postalCode: str(v.address?.postalCode),
@@ -104,6 +111,8 @@ export const toForm = (v: CompanyProfileFields): CompanyProfileForm => ({
   careersEmail: str(v.careersEmail),
   website: str(v.website),
   invoiceTerms: [...(v.invoiceTerms ?? [])],
+  homeVideoEnabled: v.homeVideoEnabled === true,
+  homeVideoUrl: str(v.homeVideoUrl),
 });
 
 const orNull = (value: string) => {
@@ -135,6 +144,7 @@ export const toBody = (form: CompanyProfileForm): CompanyProfileFields => {
       line1: orNull(form.address.line1),
       line2: orNull(form.address.line2),
       city: orNull(form.address.city),
+      district: orNull(form.address.district),
       state: orNull(form.address.state),
       stateCode: orNull(form.address.stateCode) ?? (gstin ? stateCodeFromGstin(gstin) : null),
       postalCode: orNull(form.address.postalCode),
@@ -145,6 +155,8 @@ export const toBody = (form: CompanyProfileForm): CompanyProfileFields => {
     careersEmail: orNull(form.careersEmail),
     website: orNull(form.website),
     invoiceTerms: form.invoiceTerms.map((term) => term.trim()),
+    homeVideoEnabled: form.homeVideoEnabled,
+    homeVideoUrl: orNull(form.homeVideoUrl),
   };
 };
 
@@ -157,6 +169,31 @@ export const isHttpsUrl = (value: string) => {
   } catch {
     return false;
   }
+};
+
+const YOUTUBE_HOSTS = new Set(['youtube.com', 'www.youtube.com', 'm.youtube.com', 'youtu.be', 'www.youtube-nocookie.com']);
+const YOUTUBE_ID = /^[A-Za-z0-9_-]{11}$/;
+const YOUTUBE_PATH_PREFIXES = ['embed', 'shorts', 'live'];
+
+/**
+ * The 11-character video id of an https YouTube link, or null. Mirrors the backend: watch?v=<id>,
+ * youtu.be/<id>, /embed/<id>, /shorts/<id> and /live/<id> on the YouTube hosts only.
+ */
+export const toYouTubeVideoId = (value: string | null | undefined): string | null => {
+  if (!value) return null;
+  let url: URL;
+  try {
+    url = new URL(value.trim());
+  } catch {
+    return null;
+  }
+  if (url.protocol !== 'https:' || !YOUTUBE_HOSTS.has(url.hostname)) return null;
+  const segments = url.pathname.split('/').filter(Boolean);
+  let id: string | null = null;
+  if (url.hostname === 'youtu.be') id = segments.length === 1 ? segments[0] : null;
+  else if (segments.length === 1 && segments[0] === 'watch') id = url.searchParams.get('v');
+  else if (segments.length === 2 && YOUTUBE_PATH_PREFIXES.includes(segments[0])) id = segments[1];
+  return id && YOUTUBE_ID.test(id) ? id : null;
 };
 
 /** PAN vs GSTIN characters 3-12; null when either is incomplete or they match. */
@@ -226,6 +263,7 @@ export const validateForSave = (form: CompanyProfileForm, { knownImageUrls }: Sa
   checkText(errors, 'address.line1', a.line1, 'Address line 1', LIMITS.addressLine);
   checkText(errors, 'address.line2', a.line2, 'Address line 2', LIMITS.addressLine);
   checkText(errors, 'address.city', a.city, 'City', LIMITS.place);
+  checkText(errors, 'address.district', a.district, 'District', LIMITS.place);
   checkText(errors, 'address.state', a.state, 'State', LIMITS.place);
   checkText(errors, 'address.country', a.country, 'Country', LIMITS.place);
   if (gstin && !a.state.trim()) errors['address.state'] = 'State is required when a GSTIN is set.';
@@ -265,6 +303,11 @@ export const validateForSave = (form: CompanyProfileForm, { knownImageUrls }: Sa
     else checkText(errors, key, t, `Term ${i + 1}`, LIMITS.invoiceTerm);
   });
 
+  // "On" without a link is a valid draft; submit requires the link (see validateForSubmit).
+  const videoUrl = form.homeVideoUrl.trim();
+  if (videoUrl.length > LIMITS.homeVideoUrl) errors.homeVideoUrl = `YouTube link can't be longer than ${LIMITS.homeVideoUrl} characters.`;
+  else if (videoUrl && !toYouTubeVideoId(videoUrl)) errors.homeVideoUrl = 'Enter a YouTube video link, e.g. https://www.youtube.com/watch?v=…';
+
   return errors;
 };
 
@@ -282,6 +325,7 @@ export const missingForSubmit = (form: CompanyProfileForm) => SUBMIT_REQUIRED.fi
 export const validateForSubmit = (form: CompanyProfileForm, options?: SaveRuleOptions): FormErrors => {
   const errors = validateForSave(form, options);
   for (const field of missingForSubmit(form)) errors[field.key] ??= `${field.label} is required to submit.`;
+  if (form.homeVideoEnabled && !form.homeVideoUrl.trim()) errors.homeVideoUrl ??= 'Add a YouTube link or switch the home page video off.';
   return errors;
 };
 

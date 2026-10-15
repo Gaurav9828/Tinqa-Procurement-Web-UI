@@ -9,6 +9,7 @@ import { ApprovalsHub } from './ApprovalsHub';
 import { useAuthStore } from '../../store/useAuthStore';
 import { axiosClient } from '../../api/axiosClient';
 import { ecommerceAxiosClient } from '../../api/ecommerceAxiosClient';
+import { superAdminPermissions } from '../../test/access';
 
 vi.mock('./services/approvalService', () => ({
   approvalService: {
@@ -53,7 +54,7 @@ beforeEach(() => {
   useAuthStore.setState({
     token: 't',
     isAuthenticated: true,
-    user: { userId: 9, username: 'admin_l2', email: 'l2@tinqa.com', role: 'ADMIN_L2', authClient: 'web', isFirstLogin: false },
+    user: { userId: 9, username: 'admin_l2', email: 'l2@tinqa.com', role: 'ADMIN_L2', authClient: 'web', isFirstLogin: false, permissions: superAdminPermissions('ADMIN_L2') },
   });
 });
 

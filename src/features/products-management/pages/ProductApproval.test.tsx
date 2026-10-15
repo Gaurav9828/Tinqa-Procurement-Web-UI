@@ -13,6 +13,7 @@ import { axiosClient } from '../../../api/axiosClient';
 import { useAuthStore } from '../../../store/useAuthStore';
 import type { ProductResponseDto } from '../types/product.types';
 import type { ProductApprovalResponse, ProductApprovalStatus } from '../types/productApproval.types';
+import { superAdminPermissions } from '../../../test/access';
 
 /**
  * Products live in the Ecommerce backend (mocked ecommerceAxiosClient); Admin L2 approval requests live in
@@ -136,7 +137,7 @@ const signIn = (role: 'ADMIN_L1' | 'ADMIN_L2') =>
   useAuthStore.setState({
     token: 'test-token',
     isAuthenticated: true,
-    user: { userId: 4, username: role.toLowerCase(), email: 'a@tinqa.com', role, authClient: 'web', isFirstLogin: false },
+    user: { userId: 4, username: role.toLowerCase(), email: 'a@tinqa.com', role, authClient: 'web', isFirstLogin: false, permissions: superAdminPermissions(role) },
   });
 
 const renderPage = () => {
@@ -178,7 +179,7 @@ beforeEach(() => {
   signIn('ADMIN_L1');
 });
 
-describe('Creating a product needs Admin L2 approval', () => {
+describe('Creating a product needs approval', () => {
   const fillCreate = async (user: User) => {
     await screen.findByText('Legacy Lamp');
     await user.click(screen.getByRole('button', { name: /Create Product/ }));
@@ -195,7 +196,7 @@ describe('Creating a product needs Admin L2 approval', () => {
     const { user } = renderPage();
     await fillCreate(user);
     expect(screen.queryByLabelText('Enable product immediately')).not.toBeInTheDocument();
-    expect(screen.getByRole('note')).toHaveTextContent('created inactive and sent to Admin L2 for approval');
+    expect(screen.getByRole('note')).toHaveTextContent('created inactive and sent for approval');
     await confirmCreate(user);
 
     await waitFor(() => expect(procurement.post).toHaveBeenCalledTimes(1));
@@ -204,7 +205,7 @@ describe('Creating a product needs Admin L2 approval', () => {
       '/v1/product-approvals',
       expect.objectContaining({ ecommerceProductId: 100, productTitle: 'Touch Panel', snapshot: expect.objectContaining({ title: 'Touch Panel', price: 2999 }) })
     );
-    expect(await screen.findByText('Product created and sent for Admin L2 approval. It stays inactive until Admin L2 approves it.')).toBeInTheDocument();
+    expect(await screen.findByText('Product created and sent for approval. It stays inactive until it is approved.')).toBeInTheDocument();
     await waitFor(() => expect(stateOf(100)).toHaveAttribute('data-state', 'PENDING'));
   });
 
@@ -235,9 +236,9 @@ describe('Product list shows the approval state and limits actions', () => {
     expect(stateOf(5)).toHaveTextContent('Not submitted');
     expect(stateOf(6)).toHaveTextContent('Approved');
 
-    const edit = (id: number) => within(row(id)).getByTitle(/Edit Product|Waiting for Admin L2|Cancelled by Admin L2/);
+    const edit = (id: number) => within(row(id)).getByTitle(/Edit Product|Waiting for a catalog approver|Cancelled by an approver/);
     expect(edit(2)).toBeDisabled(); // under review
-    expect(edit(2)).toHaveAttribute('title', expect.stringContaining('Waiting for Admin L2 approval'));
+    expect(edit(2)).toHaveAttribute('title', expect.stringContaining('Waiting for a catalog approver'));
     expect(edit(4)).toBeDisabled(); // cancelled is final
     expect(edit(3)).toBeEnabled();
     expect(edit(6)).toBeEnabled();
@@ -260,7 +261,7 @@ describe('Product list shows the approval state and limits actions', () => {
     await waitForStates();
     await user.click(within(row(3)).getByRole('button', { name: 'Resubmit Rejected Router for approval' }));
     await waitFor(() => expect(stateOf(3)).toHaveAttribute('data-state', 'PENDING'));
-    expect(await screen.findByText('Product resubmitted for Admin L2 approval. It stays inactive until approved.')).toBeInTheDocument();
+    expect(await screen.findByText('Product resubmitted for approval. It stays inactive until approved.')).toBeInTheDocument();
   });
 
   it('a rejected product can be edited but not switched on; the reason is shown', async () => {
@@ -268,12 +269,12 @@ describe('Product list shows the approval state and limits actions', () => {
     await screen.findByText('Rejected Router');
     await waitForStates();
     await user.click(within(row(3)).getByTitle('Edit Product'));
-    expect(screen.getByRole('note')).toHaveTextContent('Rejected by Admin L2');
+    expect(screen.getByRole('note')).toHaveTextContent('Rejected by an approver');
     expect(screen.getByRole('note')).toHaveTextContent('Reason: Price is too high');
     const enabled = screen.getByLabelText('Product is Enabled (Active in store)');
     expect(enabled).not.toBeChecked();
     expect(enabled).toBeDisabled();
-    expect(screen.getByTestId('activation-locked')).toHaveTextContent('activated only after Admin L2 approves it');
+    expect(screen.getByTestId('activation-locked')).toHaveTextContent('activated only after a catalog approver approves it');
 
     const title = screen.getByDisplayValue('Rejected Router');
     await user.clear(title);
@@ -346,8 +347,7 @@ describe('Admin L2 review', () => {
     const { user } = renderPage();
     const dialog = await openReview(user);
     await user.click(within(dialog).getByRole('radio', { name: label }));
-    await user.click(within(dialog).getByRole('button', { name: label }));
-    expect(within(dialog).getByRole('alert')).toHaveTextContent('A reason is required.');
+    expect(within(dialog).getByRole('button', { name: label })).toBeDisabled();
     expect(procurement.patch).not.toHaveBeenCalled();
 
     await user.type(within(dialog).getByLabelText('Reason *'), '  Missing certification  ');
@@ -359,7 +359,7 @@ describe('Admin L2 review', () => {
   });
 });
 
-describe('Updating an approved product needs Admin L2 approval', () => {
+describe('Updating an approved product needs approval', () => {
   const update = (status: ProductApprovalStatus, extra: Partial<ProductApprovalResponse> = {}): ProductApprovalResponse => ({
     ...request(70, 6, 'Approved Adapter', status),
     requestType: 'UPDATE',
@@ -392,10 +392,10 @@ describe('Updating an approved product needs Admin L2 approval', () => {
       snapshot: expect.objectContaining({ title: 'Adapter Pro' }),
       changeSummary: [{ label: 'Title', oldValue: 'Approved Adapter', newValue: 'Adapter Pro' }],
     });
-    expect(await screen.findByText(/Changes sent for Admin L2 approval/)).toBeInTheDocument();
+    expect(await screen.findByText(/Changes sent for approval/)).toBeInTheDocument();
     await waitFor(() => expect(stateOf(6)).toHaveAttribute('data-state', 'UPDATE_PENDING'));
     expect(within(row(6)).getByText('Approved Adapter')).toBeInTheDocument(); // live product unchanged
-    expect(within(row(6)).getByTitle(/Changes are waiting for Admin L2 approval/)).toBeDisabled();
+    expect(within(row(6)).getByTitle(/Changes are waiting for a catalog approver/)).toBeDisabled();
   });
 
   it('Admin L2 approval applies the changes, keeping the live stock', async () => {

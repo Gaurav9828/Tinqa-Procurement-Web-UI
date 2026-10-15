@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Loader2, RefreshCw } from 'lucide-react';
+import { ArrowLeft, Loader2, MessageSquareWarning, RefreshCw } from 'lucide-react';
 import { useAdminOrderDetail } from '../hooks/useAdminOrderDetail';
 import { useTrackingStatuses } from '../hooks/useTrackingStatuses';
 import { useStatusUpdate } from '../hooks/useStatusUpdate';
@@ -13,9 +13,10 @@ import { PreOrderReviewCard } from '../components/PreOrderReviewCard';
 import { usePreOrderApproval } from '../hooks/usePreOrderApproval';
 import { ShippingAddressLink } from '../components/ShippingAddressLink';
 import { PaymentDetailsCard } from '../components/PaymentDetailsCard';
-import { getAllowedStatuses, type WorkflowContext } from '../utils/statusWorkflow';
-import { formatCurrency, formatDateTime, formatUpdater, getCurrentEntry, hasPreOrderLines } from '../utils/orderTracking.utils';
-import type { StatusUpdateMode } from '../types/orderTracking.types';
+import { RefundPanel } from '../../refunds/components/RefundPanel';
+import { useOrderRefunds } from '../../refunds/hooks/useOrderRefunds';
+import { getAllowedStatuses, getDeliveryOutcomes, getStage, isFullyPaid, type WorkflowContext } from '../utils/statusWorkflow';
+import { formatCurrency, formatDateTime, formatUpdater, getCurrentEntry, hasPreOrderLines, sortTimeline } from '../utils/orderTracking.utils';
 import { useAccess } from '../../../hooks/useAccess';
 import { ORDER_TRACKING_LIST_PATH, type OrderDetailLocationState } from '../utils/orderTrackingRoutes';
 
@@ -46,6 +47,7 @@ export const OrderTrackingDetailPage: React.FC = () => {
   const backLabel = navState?.backLabel ?? 'Back to orders';
 
   const detail = useAdminOrderDetail(orderNumber || null);
+  const refunds = useOrderRefunds(orderNumber || null);
   const statusList = useTrackingStatuses();
   const knownStatuses = useMemo(() => new Set(statusList.statuses.map((option) => option.status)), [statusList.statuses]);
 
@@ -61,32 +63,51 @@ export const OrderTrackingDetailPage: React.FC = () => {
     else navigate(ORDER_TRACKING_LIST_PATH);
   };
 
-  // Workflow position comes from the server-loaded history: the current event and the one before it.
-  const workflow = useMemo<WorkflowContext>(() => {
-    const current = getCurrentEntry(detail.timeline);
-    const index = current ? detail.timeline.findIndex((e) => e.id === current.id) : -1;
-    return {
-      currentStatus: current?.status ?? detail.order?.orderStatus ?? null,
-      previousStatus: index > 0 ? detail.timeline[index - 1].status : null,
+  // Workflow position comes from the server-loaded history: the current event (or the order status).
+  const workflow = useMemo<WorkflowContext>(
+    () => ({
+      currentStatus: getCurrentEntry(detail.timeline)?.status ?? detail.order?.orderStatus ?? null,
       paymentStatus: detail.order?.paymentStatus ?? null,
-    };
-  }, [detail.timeline, detail.order?.orderStatus, detail.order?.paymentStatus]);
+    }),
+    [detail.timeline, detail.order?.orderStatus, detail.order?.paymentStatus]
+  );
+  const statusHistory = useMemo(() => sortTimeline(detail.timeline).map((entry) => entry.status), [detail.timeline]);
 
-  // A status must exist on the server AND be a valid move from the current stage.
+  // While a cancelled order is open or being refunded, show why it was cancelled (the reason is the event's notes),
+  // so the admin can check it before refunding.
+  const cancellation = useMemo(() => {
+    const status = workflow.currentStatus;
+    const relevant = status === 'CANCELLED' || (getStage(status) === 'REFUND' && !statusHistory.includes('DELIVERED'));
+    if (!relevant) return null;
+    return [...sortTimeline(detail.timeline)].reverse().find((entry) => entry.status === 'CANCELLED') ?? null;
+  }, [workflow.currentStatus, statusHistory, detail.timeline]);
+
+  // UX only: the backend authorizes every request from the bearer token.
+  const { can } = useAccess();
+  const canUpdateAnyStatus = can('CUSTOMER_ORDER_TRACKING_UPDATE');
+  // Delivery riders record delivery outcomes only, through their own endpoint.
+  const deliveryOnly = !canUpdateAnyStatus && can('DELIVERY_STATUS_UPDATE');
+  const canUpdate = canUpdateAnyStatus || deliveryOnly;
+  const canApprovePreOrder = can('CUSTOMER_ORDER_PRE_ORDER_APPROVE');
+
+  // A status must exist on the server AND be a valid move from the current stage (a delivery outcome, for riders).
   const isAllowed = useCallback(
-    (mode: StatusUpdateMode, status: string) => knownStatuses.has(status) && getAllowedStatuses(mode, workflow).includes(status),
-    [knownStatuses, workflow]
+    (status: string) =>
+      knownStatuses.has(status) && (deliveryOnly ? getDeliveryOutcomes(workflow) : getAllowedStatuses(workflow)).includes(status),
+    [knownStatuses, workflow, deliveryOnly]
   );
 
   // After a change (or a 409 conflict) reload from the server — no optimistic audit values.
+  // A status or refund change can affect both the order and its refunds, so both are reloaded.
   const { refresh } = detail;
-  const { isSubmitting, submit } = useStatusUpdate(isAllowed, { onSuccess: refresh, onConflict: refresh });
+  const { refresh: refreshRefunds } = refunds;
+  const refreshAll = useCallback(() => {
+    refresh();
+    refreshRefunds();
+  }, [refresh, refreshRefunds]);
+  const { isSubmitting, submit } = useStatusUpdate(isAllowed, { onSuccess: refreshAll, onConflict: refreshAll, deliveryOnly });
   // Pre-orders are approved only through the dedicated endpoint; the result is reloaded from the server.
   const { approve: approvePreOrder, isApproving } = usePreOrderApproval(orderNumber, refresh);
-
-  // UX only: the backend authorizes every request from the bearer token.
-  const { hasFeature } = useAccess();
-  const canUpdate = hasFeature('MANAGE_ORDER_TRACKING');
 
   const { order, timeline } = detail;
   const currentEvent = getCurrentEntry(timeline);
@@ -113,7 +134,7 @@ export const OrderTrackingDetailPage: React.FC = () => {
         {order && (
           <button
             type="button"
-            onClick={() => detail.refresh()}
+            onClick={refreshAll}
             className="self-start sm:self-auto flex items-center gap-1.5 px-3 py-1.5 bg-black/5 dark:bg-white/10 hover:bg-black/10 dark:hover:bg-white/20 text-black dark:text-white rounded-xl text-xs font-medium transition-colors cursor-pointer"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${detail.isRefreshing ? 'animate-spin' : ''}`} /> Refresh
@@ -131,7 +152,7 @@ export const OrderTrackingDetailPage: React.FC = () => {
         <div className="grid gap-6 lg:grid-cols-3 items-start">
           <div className="lg:col-span-2 space-y-6 min-w-0">
             <Card>
-              <StageProgress currentStatus={workflow.currentStatus} />
+              <StageProgress currentStatus={workflow.currentStatus} paid={isFullyPaid(order.paymentStatus)} history={statusHistory} />
 
               <dl className="grid grid-cols-1 sm:grid-cols-3 gap-4 p-4 rounded-xl bg-black/[0.03] dark:bg-white/[0.04]">
                 <Field label="Order status" testId="order-status">
@@ -165,6 +186,8 @@ export const OrderTrackingDetailPage: React.FC = () => {
 
             <PaymentDetailsCard order={order} />
 
+            <RefundPanel orderNumber={orderNumber} refunds={refunds} onChanged={refreshAll} />
+
             {(order.items?.length ?? 0) > 0 && (
               <Card title={`Items (${order.itemCount})`}>
                 <table className="w-full text-left">
@@ -193,10 +216,28 @@ export const OrderTrackingDetailPage: React.FC = () => {
 
           <div className="space-y-6 min-w-0 lg:sticky lg:top-20">
             {(hasPreOrderLines(order) || order.orderStatus === 'PRE_ORDER_PENDING') && (
-              <PreOrderReviewCard order={order} canAct={canUpdate} isApproving={isApproving} onApprove={approvePreOrder} />
+              <PreOrderReviewCard order={order} canAct={canApprovePreOrder} isApproving={isApproving} onApprove={approvePreOrder} />
+            )}
+            {cancellation && (
+              <section aria-label="Cancellation" className="apple-card p-5 space-y-2 border-rose-500/30">
+                <h2 className="text-sm font-semibold text-black dark:text-white flex items-center gap-1.5">
+                  <MessageSquareWarning className="w-4 h-4 text-rose-500" /> Cancellation
+                </h2>
+                <p className="text-gray-500">
+                  Cancelled {formatDateTime(cancellation.createdAt)} by{' '}
+                  <span className={cancellation.updatedBy ? 'font-semibold text-black dark:text-white' : 'italic'}>{formatUpdater(cancellation.updatedBy)}</span>
+                </p>
+                <p className="text-[10px] uppercase tracking-wider text-gray-400 font-semibold">Reason</p>
+                <p data-testid="cancellation-reason" className="p-3 rounded-xl bg-black/[0.03] dark:bg-white/[0.04] text-black dark:text-white whitespace-pre-line break-words">
+                  {cancellation.notes?.trim() || <span className="italic text-gray-500">No reason was given.</span>}
+                </p>
+                {isFullyPaid(order.paymentStatus) && workflow.currentStatus === 'CANCELLED' && (
+                  <p className="text-amber-700 dark:text-amber-400">The order was paid. Check the reason, then use Request refund in the Refunds section.</p>
+                )}
+              </section>
             )}
             {canUpdate && (
-              <Card title="Change Status">
+              <Card title={deliveryOnly ? 'Delivery update' : 'Next step'}>
                 <StatusUpdateForm
                   orderNumber={orderNumber}
                   statuses={statusList.statuses}
@@ -206,6 +247,7 @@ export const OrderTrackingDetailPage: React.FC = () => {
                   workflow={workflow}
                   isSubmitting={isSubmitting}
                   onSubmit={submit}
+                  deliveryOnly={deliveryOnly}
                 />
               </Card>
             )}

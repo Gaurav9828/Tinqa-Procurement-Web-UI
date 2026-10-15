@@ -6,6 +6,7 @@ import {
   stateCodeMismatch,
   toBody,
   toForm,
+  toYouTubeVideoId,
   validateForSave,
   validateForSubmit,
   type CompanyProfileForm,
@@ -99,12 +100,80 @@ describe('toBody', () => {
       invoiceTerms: ['Pay in 30 days'],
       address: { city: null, stateCode: '27', country: 'India' },
     });
-    expect(Object.keys(body)).toHaveLength(16);
+    expect(Object.keys(body)).toHaveLength(18);
   });
 
   it('round-trips a version', () => {
     const fields = toBody(form({ legalName: 'TinQa Pvt Ltd' }, { line1: 'Plot 1' }));
     expect(toBody(toForm(fields))).toEqual(fields);
+  });
+});
+
+describe('home page video', () => {
+  const ID = 'dQw4w9WgXcQ';
+
+  it.each([
+    `https://www.youtube.com/watch?v=${ID}`,
+    `https://youtube.com/watch?v=${ID}&t=42s`,
+    `https://m.youtube.com/watch?feature=share&v=${ID}`,
+    `https://youtu.be/${ID}`,
+    `https://youtu.be/${ID}?si=abc`,
+    `https://www.youtube.com/embed/${ID}`,
+    `https://www.youtube-nocookie.com/embed/${ID}`,
+    `https://www.youtube.com/shorts/${ID}`,
+    `https://www.youtube.com/live/${ID}`,
+    ` https://WWW.YOUTUBE.COM/watch?v=${ID} `,
+  ])('reads the id from %s', (url) => {
+    expect(toYouTubeVideoId(url)).toBe(ID);
+  });
+
+  it.each([
+    ['another host', `https://vimeo.com/watch?v=${ID}`],
+    ['a look-alike host', `https://youtube.com.evil.com/watch?v=${ID}`],
+    ['nocookie without www', `https://youtube-nocookie.com/embed/${ID}`],
+    ['http', `http://www.youtube.com/watch?v=${ID}`],
+    ['a missing id', 'https://www.youtube.com/watch'],
+    ['a short id', 'https://youtu.be/abc'],
+    ['a channel page', 'https://www.youtube.com/@tinqa'],
+    ['an unknown path', `https://www.youtube.com/clip/${ID}`],
+    ['not a URL', 'youtube.com/watch?v=' + ID],
+    ['empty', ''],
+  ])('rejects %s', (_name, url) => {
+    expect(toYouTubeVideoId(url)).toBeNull();
+  });
+
+  it('maps both fields to and from the request', () => {
+    expect(emptyForm()).toMatchObject({ homeVideoEnabled: false, homeVideoUrl: '' });
+    const body = toBody(form({ homeVideoEnabled: true, homeVideoUrl: ` https://youtu.be/${ID} ` }));
+    expect(body).toMatchObject({ homeVideoEnabled: true, homeVideoUrl: `https://youtu.be/${ID}` });
+    expect(toBody(form())).toMatchObject({ homeVideoEnabled: false, homeVideoUrl: null });
+    expect(toForm({ ...body, homeVideoEnabled: null, homeVideoUrl: null })).toMatchObject({ homeVideoEnabled: false, homeVideoUrl: '' });
+    expect(toBody(toForm(body))).toEqual(body);
+  });
+
+  it('a draft may be on without a link; submit requires one', () => {
+    const on = form({ homeVideoEnabled: true }, {});
+    expect(validateForSave(on)).toEqual({});
+    expect(validateForSubmit(on).homeVideoUrl).toBe('Add a YouTube link or switch the home page video off.');
+    expect(validateForSubmit(form({ homeVideoEnabled: false })).homeVideoUrl).toBeUndefined();
+    expect(validateForSubmit(form({ homeVideoEnabled: true, homeVideoUrl: `https://youtu.be/${ID}` })).homeVideoUrl).toBeUndefined();
+  });
+
+  it('checks the link on save, even while the video is off', () => {
+    expect(validateForSave(form({ homeVideoUrl: 'https://vimeo.com/123' })).homeVideoUrl).toMatch(/^Enter a YouTube video link/);
+    expect(validateForSave(form({ homeVideoUrl: `http://youtu.be/${ID}` })).homeVideoUrl).toMatch(/^Enter a YouTube video link/);
+    expect(validateForSave(form({ homeVideoUrl: `https://youtu.be/${ID}` }))).toEqual({});
+  });
+
+  it('rejects links longer than 500 characters', () => {
+    const long = `https://www.youtube.com/watch?v=${ID}&x=${'a'.repeat(500)}`;
+    expect(toYouTubeVideoId(long)).toBe(ID);
+    expect(validateForSave(form({ homeVideoUrl: long })).homeVideoUrl).toMatch(/500/);
+  });
+
+  it('labels the change rows', () => {
+    expect(fieldLabel('homeVideoEnabled')).toBe('Home page video');
+    expect(fieldLabel('homeVideoUrl')).toBe('Home page video link');
   });
 });
 

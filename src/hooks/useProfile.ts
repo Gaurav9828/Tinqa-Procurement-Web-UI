@@ -1,27 +1,10 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { authService } from '../api/services/authService';
 import { useNotify } from './useNotify';
-import type { AdminProfile } from '../types/auth';
+import { useAppDispatch, useAppSelector } from '../store/store';
+import { fetchProfile, profileSaved, type ProfileFormState } from '../store/profileSlice';
 
-export interface ProfileFormState {
-    username: string;
-    email: string;
-    employee_code: string;
-    first_name: string;
-    middle_name: string;
-    last_name: string;
-    display_name: string;
-    date_of_birth: string;
-    gender: string;
-    designation: string;
-    department: string;
-    employment_type: string;
-    joining_date: string;
-    phone: string;
-    alternate_phone: string;
-    personal_email: string;
-    status: string;
-}
+export type { ProfileFormState };
 
 const EMPTY_FORM_STATE: ProfileFormState = {
     username: '',
@@ -34,6 +17,7 @@ const EMPTY_FORM_STATE: ProfileFormState = {
     date_of_birth: '',
     gender: '',
     designation: '',
+    designation_label: '',
     department: '',
     employment_type: '',
     joining_date: '',
@@ -43,74 +27,28 @@ const EMPTY_FORM_STATE: ProfileFormState = {
     status: '',
 };
 
-interface ApiResponseEnvelope<T> {
-    success?: boolean;
-    message?: string;
-    data?: T;
-}
-
 export const useProfile = () => {
-    const [isLoading, setIsLoading] = useState<boolean>(true);
-    const [isUpdating, setIsUpdating] = useState<boolean>(false);
-    // The message itself goes to the global alert; this only drives the page's empty state.
-    const [loadFailed, setLoadFailed] = useState<boolean>(false);
+    const dispatch = useAppDispatch();
     const notify = useNotify();
+    // The profile lives in Redux, so it is fetched once per session — not on every visit to the page.
+    const cached = useAppSelector((state) => state.profile.data);
+    const status = useAppSelector((state) => state.profile.status);
+    const [isUpdating, setIsUpdating] = useState<boolean>(false);
 
-    const [initialData, setInitialData] = useState<ProfileFormState>(EMPTY_FORM_STATE);
-    const [employeeData, setEmployeeData] = useState<ProfileFormState>(EMPTY_FORM_STATE);
-    // Ref guard prevents React 18 Strict Mode double-fetching
-    const isFetched = useRef(false);
+    const initialData = cached ?? EMPTY_FORM_STATE;
+    // Unsaved edits; null means "same as the saved profile".
+    const [draft, setDraft] = useState<ProfileFormState | null>(null);
+    const employeeData = draft ?? initialData;
 
     useEffect(() => {
-        if (isFetched.current) return;
-        isFetched.current = true;
+        // No-op while a request is in flight or once the profile is loaded (see fetchProfile's condition).
+        dispatch(fetchProfile());
+    }, [dispatch]);
 
-        const controller = new AbortController();
-
-        const fetchProfile = async () => {
-            setIsLoading(true);
-            setLoadFailed(false);
-            try {
-                const rawResponse = await authService.getProfile();
-                const envelope = rawResponse as ApiResponseEnvelope<AdminProfile> & AdminProfile;
-                const profilePayload: AdminProfile = envelope.data || envelope;
-
-                const mappedData: ProfileFormState = {
-                    username: profilePayload.username || '',
-                    email: profilePayload.workEmail || '',
-                    employee_code: profilePayload.employeeCode || '',
-                    first_name: profilePayload.firstName || '',
-                    middle_name: profilePayload.middleName || '',
-                    last_name: profilePayload.lastName || '',
-                    display_name: profilePayload.displayName || '',
-                    date_of_birth: profilePayload.dateOfBirth || '',
-                    gender: profilePayload.gender || 'MALE',
-                    designation: profilePayload.designation || '',
-                    department: profilePayload.department || '',
-                    employment_type: profilePayload.employmentType || '',
-                    joining_date: profilePayload.joiningDate || '',
-                    phone: profilePayload.primaryPhone || '',
-                    alternate_phone: profilePayload.alternatePhone || '',
-                    personal_email: profilePayload.personalEmail || '',
-                    status: profilePayload.status || 'ACTIVE',
-                };
-
-                setInitialData(mappedData);
-                setEmployeeData(mappedData);
-            } catch (err: unknown) {
-                if ((err as Error).name === 'CanceledError' || (err as Error).name === 'AbortError') return;
-
-                setLoadFailed(true);
-                notify.error(err, 'Failed to load profile details.');
-            } finally {
-                setIsLoading(false);
-            }
-        };
-
-        fetchProfile();
-
-        return () => controller.abort();
-    }, [notify]);
+    const setEmployeeData = useCallback<React.Dispatch<React.SetStateAction<ProfileFormState>>>(
+        (value) => setDraft((prev) => (typeof value === 'function' ? value(prev ?? initialData) : value)),
+        [initialData]
+    );
 
     // Compute modified fields only
     const dirtyFields = useMemo(() => {
@@ -124,10 +62,8 @@ export const useProfile = () => {
         if (employeeData.first_name !== initialData.first_name) payload.firstName = employeeData.first_name.trim();
         if (employeeData.middle_name !== initialData.middle_name) payload.middleName = employeeData.middle_name.trim();
         if (employeeData.last_name !== initialData.last_name) payload.lastName = employeeData.last_name.trim();
-        if (employeeData.department !== initialData.department) payload.department = employeeData.department;
-        if (employeeData.designation !== initialData.designation) payload.designation = employeeData.designation;
         if (employeeData.gender !== initialData.gender) payload.gender = employeeData.gender;
-        // status, employmentType and joiningDate are HR-controlled and never sent from self-service.
+        // designation, department, status, employmentType and joiningDate are HR-controlled and never sent from self-service.
 
         return payload;
     }, [employeeData, initialData]);
@@ -142,7 +78,8 @@ export const useProfile = () => {
         try {
             const response = await authService.updateProfile(dirtyFields);
             notify.success(response.message || 'Profile update submitted successfully!');
-            setInitialData(employeeData);
+            dispatch(profileSaved(employeeData));
+            setDraft(null);
         } catch (err: unknown) {
             notify.error(err, 'Failed to update profile.');
         } finally {
@@ -151,9 +88,9 @@ export const useProfile = () => {
     };
 
     return {
-        isLoading,
+        isLoading: status === 'idle' || status === 'loading',
         isUpdating,
-        loadFailed,
+        loadFailed: status === 'failed',
         employeeData,
         setEmployeeData,
         hasChanges,

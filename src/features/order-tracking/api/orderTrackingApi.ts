@@ -4,7 +4,6 @@ import type {
   AdminOrderDetail,
   AdminOrderListParams,
   AdminOrderSummary,
-  OrderStatusUpdateResponse,
   OrderTrackingEntry,
   TrackingStatusOption,
   UpdateTrackingRequest,
@@ -22,6 +21,7 @@ const toQueryParams = (params: AdminOrderListParams) => {
   const query: Record<string, string | number> = { page: params.page, size: params.size, sort: params.sort };
   if (params.search?.trim()) query.search = params.search.trim();
   if (params.status) query.status = params.status;
+  if (params.paymentStatus) query.paymentStatus = params.paymentStatus;
   if (params.fromDate) query.fromDate = params.fromDate;
   if (params.toDate) query.toDate = params.toDate;
   return query;
@@ -64,9 +64,9 @@ export const orderTrackingApi = {
   },
 
   /**
-   * Option A — "Update tracking".
-   * PATCH /api/orders/{orderNumber}/tracking with JSON `{ status, notes }`.
-   * Appends one history event, marks it current and updates orderStatus.
+   * PATCH /api/orders/{orderNumber}/tracking with JSON `{ status, notes }` — the console's only way to
+   * change status. Appends one history event, marks it current and updates orderStatus. The backend
+   * rejects any status that is not an allowed next step (409 INVALID_STATUS_TRANSITION).
    */
   updateTracking: async (
     orderNumber: string,
@@ -80,23 +80,16 @@ export const orderTrackingApi = {
   },
 
   /**
-   * Option B — "Manually update order status".
-   * PATCH /api/orders/{orderNumber}/status?status=…&notes=… — status and notes are
-   * query parameters (axios encodes them via URLSearchParams); there is no JSON body.
-   * Appends one history event and updates orderStatus. Never call both options for
-   * the same user action: that would record two history events.
+   * PATCH /api/orders/{orderNumber}/delivery-status with JSON `{ status, notes }` — a delivery rider's update. Same
+   * effect and rules as updateTracking, but only for DELIVERY_OUTCOMES (403 DELIVERY_STATUS_NOT_ALLOWED otherwise).
    */
-  setOrderStatus: async (
+  updateDeliveryStatus: async (
     orderNumber: string,
-    status: string,
-    notes: string | null
-  ): Promise<ApiResponse<OrderStatusUpdateResponse>> => {
-    const params = new URLSearchParams({ status });
-    if (notes) params.set('notes', notes);
-    const response = await ecommerceAxiosClient.patch<ApiResponse<OrderStatusUpdateResponse>>(
-      `${orderPath(ORDERS_BASE_URL, orderNumber)}/status`,
-      undefined,
-      { params }
+    payload: UpdateTrackingRequest
+  ): Promise<ApiResponse<OrderTrackingEntry>> => {
+    const response = await ecommerceAxiosClient.patch<ApiResponse<OrderTrackingEntry>>(
+      `${orderPath(ORDERS_BASE_URL, orderNumber)}/delivery-status`,
+      payload
     );
     return response.data;
   },

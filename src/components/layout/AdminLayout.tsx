@@ -31,8 +31,8 @@ import type { LucideIcon } from 'lucide-react';
 import { useThemeStore } from '../../store/useThemeStore';
 import { useAuthStore } from '../../store/useAuthStore';
 import { authService } from '../../api/services/authService';
-import { APP_NAVIGATION } from '../../config/permissions.config';
-import type { UserRole } from '../../config/permissions.config';
+import { useAccess } from '../../hooks/useAccess';
+import { useAccessSync } from '../../auth/useAccessSync';
 import { NotificationBell } from '../../components/notifications/NotificationBell';
 import { usePendingCompanyChangeBadge } from '../../features/company-profile/hooks/useCompanyProfileData';
 
@@ -83,14 +83,11 @@ export const AdminLayout: React.FC = () => {
     }
   };
 
-  // Filter navigation links based on user's current role
-  const visibleNavItems = useMemo(() => {
-    const currentRole = user?.role as UserRole | undefined;
-    if (!currentRole) return [];
-    return APP_NAVIGATION.filter((item) =>
-      item.allowedRoles.includes(currentRole)
-    );
-  }, [user?.role]);
+  useAccessSync();
+  const { authorizedNavigation, designationLabel, level } = useAccess();
+  // Only the modules the user's permissions open
+  const visibleNavItems = useMemo(() => authorizedNavigation(), [authorizedNavigation]);
+  const levelLabel = level === 'ADMIN_L2' ? 'Level 2' : level === 'ADMIN_L1' ? 'Level 1' : level;
 
   // "1" next to Company Profile while a change waits for approval.
   const hasCompanyProfileNav = visibleNavItems.some((item) => item.id === 'company-profile');
@@ -111,7 +108,7 @@ export const AdminLayout: React.FC = () => {
           <span className="font-semibold text-lg tracking-tight flex items-center">
             TinQa Procurement 
             <span className="text-xs px-2 py-0.5 rounded-full bg-blue-500/10 text-[#0071e3] dark:text-blue-400 ml-2 font-mono uppercase">
-              {user?.role || 'Admin'}
+              {designationLabel ? `${designationLabel} · ${levelLabel}` : levelLabel || 'Admin'}
             </span>
           </span>
         </div>
@@ -171,7 +168,14 @@ export const AdminLayout: React.FC = () => {
             <p className="px-3 py-2 text-[11px] font-bold tracking-wider text-gray-400 dark:text-neutral-500 uppercase select-none">
               Management Modules
             </p>
-            
+
+            {visibleNavItems.length === 0 && (
+              <p className="px-3 py-2 text-xs text-gray-500 dark:text-neutral-400">
+                {designationLabel
+                  ? 'Your designation has no modules yet.'
+                  : 'No designation is assigned to your account. Ask an administrator to assign one in Employee Management.'}
+              </p>
+            )}
             {visibleNavItems.map((item) => {
               const Icon = ICON_MAP[item.iconName] || HelpCircle;
               return (

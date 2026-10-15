@@ -1,4 +1,4 @@
-import type { Department, Designation, Gender } from "../../../types/common.types";
+import type { Gender } from "../../../types/common.types";
 
 export const EmployeeConstants = {
   FIRST_LOGIN: 'FIRST_LOGIN',
@@ -11,6 +11,13 @@ export const EmployeeConstants = {
 
 export type EmployeeStatus = (typeof EmployeeConstants)[keyof typeof EmployeeConstants];
 
+/**
+ * Admin level. With the designation it decides access: the designation picks the business areas (permission
+ * groups), and Level 1 holds them minus the approval-level groups while Level 2 holds them all.
+ * DEALER and INSPECTOR also exist in the backend but are created elsewhere, never from this screen.
+ */
+export type EmployeeRole = 'ADMIN_L1' | 'ADMIN_L2';
+
 export interface EmployeeResponse {
   id: number;
   userId: number;
@@ -22,8 +29,14 @@ export interface EmployeeResponse {
   displayName: string;
   dateOfBirth: string;
   gender: Gender;
-  designation: Designation;
-  department: Department;
+  /** Designation code (see config/access DESIGNATIONS); decides the employee's permission groups. */
+  designation: string;
+  /** Human-readable designation, from the server. */
+  designationLabel?: string | null;
+  /** Admin level (ADMIN_L1 / ADMIN_L2), or DEALER / INSPECTOR for mobile accounts. */
+  role?: string | null;
+  /** Follows the designation; set by the server. */
+  department: string;
   employmentType: string;
   joiningDate: string;
   leavingDate?: string | null;
@@ -34,7 +47,7 @@ export interface EmployeeResponse {
   personalEmail?: string;
   workEmail?: string
   status: EmployeeStatus;
-  // Who created the employee and, for employees that needed approval, the Admin L2 decision
+  // Who created the employee and, for employees that needed approval, the approver's decision
   createdBy?: number | null;
   createdByUsername?: string | null;
   approvalDecidedBy?: number | null;
@@ -55,7 +68,8 @@ export interface CreateEmployeeRequest {
   dateOfBirth: string;
   gender: string;
   designation: string;
-  department: string;
+  /** Optional: the server derives it from the designation and rejects a different value. */
+  department?: string;
   employmentType: string;
   joiningDate: string;
   salaryAmount?: number;
@@ -63,7 +77,7 @@ export interface CreateEmployeeRequest {
   phone: string;
   alternatePhone?: string;
   personalEmail?: string;
-  role?: string;
+  role: EmployeeRole;
 }
 
 export interface UpdateEmployeeRequest {
@@ -84,7 +98,22 @@ export interface UpdateEmployeeRequest {
   alternatePhone?: string;
   personalEmail?: string;
   status?: EmployeeStatus;
+  /** Changes the admin level; only an employee approver may, and never on their own record. Send only when changed. */
+  role?: EmployeeRole;
 }
+
+/** Fields an admin may not change on their own employee record (designation and level decide their access). */
+export const SELF_LOCKED_FIELDS = [
+  'designation',
+  'department',
+  'employmentType',
+  'joiningDate',
+  'leavingDate',
+  'salaryAmount',
+  'salaryCurrency',
+  'status',
+  'role',
+] as const satisfies readonly (keyof UpdateEmployeeRequest)[];
 
 export interface EmployeeFilterParams {
   status?: EmployeeStatus | '';

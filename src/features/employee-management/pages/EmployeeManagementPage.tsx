@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { UserCheck, RefreshCw } from 'lucide-react';
+import { UserCheck, RefreshCw, BookOpen } from 'lucide-react';
 import { useEmployeeList } from '../hooks/useEmployeeList';
 import { useEmployeeActions } from '../hooks/useEmployeeActions';
 import { useEmployeeDetails } from '../hooks/useEmployeeDetails';
@@ -9,6 +9,9 @@ import { EmployeeTable } from '../components/EmployeeTable';
 import { EmployeeFormModal } from '../components/EmployeeFormModal';
 import { EmployeeDetailsModal } from '../components/EmployeeDetailsModal';
 import { DeleteConfirmationModal } from '../components/DeleteConfirmationModal';
+import { EmployeeAccessModal } from '../components/EmployeeAccessModal';
+import { AccessCatalogModal } from '../components/AccessCatalogModal';
+import { useAccess } from '../../../hooks/useAccess';
 
 export const EmployeeManagementPage: React.FC = () => {
     const {
@@ -25,7 +28,7 @@ export const EmployeeManagementPage: React.FC = () => {
 
     const {
         isSubmitting,
-        userRole,
+        isSelf,
         createEmployee,
         updateEmployee,
         requestDeletion,
@@ -43,6 +46,9 @@ export const EmployeeManagementPage: React.FC = () => {
     const [isFormModalOpen, setIsFormModalOpen] = useState(false);
     const [employeeToEdit, setEmployeeToEdit] = useState<EmployeeResponse | null>(null);
     const [employeeToDelete, setEmployeeToDelete] = useState<EmployeeResponse | null>(null);
+    const [employeeForAccess, setEmployeeForAccess] = useState<EmployeeResponse | null>(null);
+    const [isCatalogOpen, setIsCatalogOpen] = useState(false);
+    const { can } = useAccess();
 
     const handleOpenCreate = () => {
         setEmployeeToEdit(null);
@@ -60,13 +66,20 @@ export const EmployeeManagementPage: React.FC = () => {
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
                     <h1 className="text-2xl font-bold tracking-tight text-black dark:text-white flex items-center gap-2">
-                        <UserCheck className="w-6 h-6 text-[#0071e3]" /> Employee Directory
+                        <UserCheck className="w-6 h-6 text-[#0071e3]" /> Employee Management
                     </h1>
                     <p className="text-sm text-gray-500 dark:text-neutral-400 mt-1">
-                        Manage personnel profiles, employment statuses, and multi-tier approval deletion requests.
+                        Manage personnel profiles, their designation and admin level, and approval-based deletion requests.
                     </p>
                 </div>
                 <div className="flex items-center gap-2">
+                    <button
+                        type="button"
+                        onClick={() => setIsCatalogOpen(true)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium bg-black/5 dark:bg-white/10 hover:bg-black/10 dark:hover:bg-white/20 transition-colors cursor-pointer"
+                    >
+                        <BookOpen className="w-3.5 h-3.5" /> Roles &amp; permissions
+                    </button>
                     <button
                         onClick={() => refetch()}
                         className="p-2 hover:bg-black/5 dark:hover:bg-white/10 rounded-xl text-gray-500 transition-colors cursor-pointer"
@@ -86,17 +99,18 @@ export const EmployeeManagementPage: React.FC = () => {
                 selectedStatus={filters.status || ''}
                 onSearchChange={updateSearch}
                 onStatusChange={updateStatus}
-                onOpenCreateModal={handleOpenCreate}
+                onOpenCreateModal={can('EMPLOYEE_CREATE') ? handleOpenCreate : undefined}
             />
 
             {/* Data Table */}
             <EmployeeTable
                 employees={employees}
                 isLoading={isLoading}
-                userRole={userRole}
+                isSelf={isSelf}
                 onView={(id) => fetchDetails(id)}
                 onEdit={handleOpenEdit}
                 onDelete={(emp) => setEmployeeToDelete(emp)}
+                onManageAccess={(emp) => setEmployeeForAccess(emp)}
             />
 
             {/* Pagination Bar */}
@@ -127,24 +141,33 @@ export const EmployeeManagementPage: React.FC = () => {
             <EmployeeFormModal
                 isOpen={isFormModalOpen}
                 employeeToEdit={employeeToEdit}
-                userRole={userRole}
+                isSelfEdit={employeeToEdit ? isSelf(employeeToEdit) : false}
                 existingEmployees={employees}
                 isSubmitting={isSubmitting}
                 onClose={() => setIsFormModalOpen(false)}
                 onSubmitCreate={createEmployee}
-                onSubmitUpdate={updateEmployee}
+                onSubmitUpdate={(id, data) => updateEmployee(id, data, employeeToEdit ?? undefined)}
             />
 
             <DeleteConfirmationModal
                 isOpen={Boolean(employeeToDelete)}
                 employee={employeeToDelete}
-                userRole={userRole}
                 isSubmitting={isSubmitting}
                 onClose={() => setEmployeeToDelete(null)}
                 onRequestDeletion={requestDeletion}
                 onFinalizeDelete={finalizeDelete}
-                onUpdateStatus={(id, status) => updateEmployee(id, { status })}
+                onUpdateStatus={async (id, status) => (await updateEmployee(id, { status }, employeeToDelete ?? undefined)).ok}
             />
+
+            <EmployeeAccessModal
+                employee={employeeForAccess}
+                isSelf={employeeForAccess ? isSelf(employeeForAccess) : false}
+                isSubmitting={isSubmitting}
+                onClose={() => setEmployeeForAccess(null)}
+                onSave={(id, payload) => updateEmployee(id, payload, employeeForAccess ?? undefined)}
+            />
+
+            <AccessCatalogModal isOpen={isCatalogOpen} onClose={() => setIsCatalogOpen(false)} />
 
             {/* Read Details Modal */}
             <EmployeeDetailsModal

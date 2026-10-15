@@ -10,6 +10,7 @@ import { GlobalAlertContainer } from '../../../components/ui/GlobalAlertContaine
 import { ReviewsPage } from './ReviewsPage';
 import { ecommerceAxiosClient } from '../../../api/ecommerceAxiosClient';
 import type { AdminReview } from '../types/review.types';
+import { signInAsSuperAdmin } from '../../../test/access';
 
 vi.mock('../../../api/ecommerceAxiosClient', () => ({ ecommerceAxiosClient: { get: vi.fn(), patch: vi.fn() } }));
 const ecom = vi.mocked(ecommerceAxiosClient);
@@ -79,6 +80,7 @@ const lastListParams = () => {
 };
 
 beforeEach(() => {
+  signInAsSuperAdmin('ADMIN_L1');
   vi.clearAllMocks();
   reviews = [review(), review({ id: 8, rating: 1, comment: 'Broke after a week', active: false, editedAt: null })];
   ecom.get.mockImplementation(async (url: string) => {

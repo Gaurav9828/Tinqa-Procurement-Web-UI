@@ -32,6 +32,7 @@ export interface DealerResponse {
   street: string;
   landmark?: string;
   city: string;
+  district?: string;
   state: string;
   country: string;
   pincode: string;
@@ -61,6 +62,7 @@ export interface CreateDealerRequest {
   street: string;
   landmark?: string;
   city: string;
+  district?: string;
   state: string;
   country: string;
   pincode: string;
@@ -85,6 +87,7 @@ export interface UpdateDealerRequest {
   street: string;
   landmark?: string;
   city: string;
+  district?: string;
   state: string;
   country: string;
   pincode: string;

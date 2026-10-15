@@ -10,6 +10,15 @@ import {
   saveSession,
   saveUser,
 } from '../auth/session';
+import { store } from './store';
+import { clearProfile } from './profileSlice';
+import { clearCompanyProfile } from './companyProfileSlice';
+
+/** Cached server data belongs to the session that loaded it. */
+const clearCachedData = () => {
+  store.dispatch(clearProfile());
+  store.dispatch(clearCompanyProfile());
+};
 
 const readSession = (clearIfInvalid = true): { token: string | null; user: UserProfile | null } => {
   const token = getToken();
@@ -38,9 +47,14 @@ export const useAuthStore = create<AuthState>((set) => ({
       role: data.role,
       authClient: data.authClient,
       isFirstLogin: data.isFirstLogin ?? false,
+      designation: data.designation ?? null,
+      designationLabel: data.designationLabel ?? null,
+      permissionGroups: data.permissionGroups ?? [],
+      permissions: data.permissions ?? [],
     };
 
     saveSession(data.accessToken, resolveExpiry(data), userProfile);
+    clearCachedData();
 
     set({
       token: data.accessToken,
@@ -67,8 +81,26 @@ export const useAuthStore = create<AuthState>((set) => ({
     });
   },
 
+  setAccess: (access) => {
+    set((state) => {
+      if (!state.user) return state;
+      const updatedUser: UserProfile = {
+        ...state.user,
+        role: access.role ?? state.user.role,
+        designation: access.designation,
+        designationLabel: access.designationLabel,
+        permissionGroups: access.permissionGroups,
+        permissions: access.permissions,
+      };
+      saveUser(updatedUser);
+      return { ...state, user: updatedUser };
+    });
+  },
+
   logout: () => {
     clearSession();
+    // The cached profile belongs to the user who just left.
+    clearCachedData();
     set({ token: null, user: null, isAuthenticated: false });
   },
 }));
@@ -79,6 +111,7 @@ if (typeof window !== 'undefined') {
     if (event.key !== null && !Object.values(SESSION_STORAGE_KEYS).includes(event.key as never)) return;
     // Read-only here: another tab may be mid-way through writing its session.
     const next = readSession(false);
+    if (next.user?.username !== useAuthStore.getState().user?.username) clearCachedData();
     useAuthStore.setState({ token: next.token, user: next.user, isAuthenticated: !!next.token });
   });
 }

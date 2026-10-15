@@ -4,7 +4,7 @@ import type { ItemResponse } from '../../item-management/types/item.types';
 import type { DealerResponse } from '../../dealer-management/types/dealer.types';
 import type { CreateOrderRequest } from '../types/order.types';
 import { ORDER_LIMITS, todayLocalIsoDate } from '../validator/orderValidator';
-import { HasAccess } from '../../../auth/HasAccess';
+import { useAccess } from '../../../hooks/useAccess';
 import { CommonInput, CommonSelect } from '../../../components/ui/FormInputs'; // Adjust import path as needed
 import { unitSelectOptions } from '../../../constants/unitsOfMeasure';
 
@@ -38,6 +38,7 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
   onClose,
   onSubmit,
 }) => {
+  const { can } = useAccess();
   const [selectedItemId, setSelectedItemId] = useState<number | ''>('');
   const [selectedDealerId, setSelectedDealerId] = useState<number | ''>('');
   const [quantity, setQuantity] = useState<number | ''>('');
@@ -69,9 +70,18 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
   const itemMrp = selectedItem?.mrp || 0;
   const currentPrice = Number(unitPrice) || 0;
   const priceVariance = calculatePriceVariance(itemMrp, currentPrice);
+  const isFormComplete =
+    selectedItemId !== '' &&
+    selectedDealerId !== '' &&
+    Number(quantity) >= 1 &&
+    currentPrice > 0 &&
+    !!unitOfMeasure.trim() &&
+    shipmentPrice !== '' &&
+    Number(shipmentPrice) >= 0;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!isFormComplete) return;
     onSubmit({
       itemId: Number(selectedItemId),
       dealerId: Number(selectedDealerId),
@@ -113,14 +123,14 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
           </button>
         </div>
 
-        <HasAccess roles="ADMIN_L1">
+        {!can('PROCUREMENT_ORDER_APPROVE') && (
           <div className="mx-5 mt-5 p-3.5 bg-amber-500/10 border border-amber-500/20 rounded-xl flex items-start gap-3 text-xs text-amber-700 dark:text-amber-400">
             <Info className="w-4 h-4 shrink-0 mt-0.5" />
             <span>
-              <strong>Notice:</strong> Orders created by Admin Level 1 require final review and approval from an Admin Level 2 authorization officer.
+              <strong>Notice:</strong> Orders you create need final review and approval by an order approver.
             </span>
           </div>
-        </HasAccess>
+        )}
 
         {/* Form Body */}
         <form onSubmit={handleSubmit} className="p-5 space-y-4">
@@ -229,8 +239,8 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
             </button>
             <button
               type="submit"
-              disabled={isSubmitting}
-              className="px-4 py-2 text-xs font-medium text-white bg-[#0071e3] hover:bg-[#0071e3]/90 rounded-xl transition-colors cursor-pointer disabled:opacity-50"
+              disabled={isSubmitting || !isFormComplete}
+              className="px-4 py-2 text-xs font-medium text-white bg-[#0071e3] hover:bg-[#0071e3]/90 rounded-xl transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isSubmitting ? 'Submitting...' : 'Create Order'}
             </button>

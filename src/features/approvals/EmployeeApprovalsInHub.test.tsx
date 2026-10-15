@@ -8,6 +8,7 @@ import { GlobalAlertContainer } from '../../components/ui/GlobalAlertContainer';
 import { ApprovalsHub } from './ApprovalsHub';
 import { useAuthStore } from '../../store/useAuthStore';
 import { axiosClient } from '../../api/axiosClient';
+import { superAdminPermissions } from '../../test/access';
 
 vi.mock('../../api/axiosClient', () => ({ axiosClient: { get: vi.fn(), patch: vi.fn() } }));
 vi.mock('../../api/ecommerceAxiosClient', () => ({ ecommerceAxiosClient: { patch: vi.fn() } }));
@@ -64,7 +65,7 @@ beforeEach(() => {
   useAuthStore.setState({
     token: 't',
     isAuthenticated: true,
-    user: { userId: 9, username: 'admin_l2', email: 'l2@tinqa.com', role: 'ADMIN_L2', authClient: 'web', isFirstLogin: false },
+    user: { userId: 9, username: 'admin_l2', email: 'l2@tinqa.com', role: 'ADMIN_L2', authClient: 'web', isFirstLogin: false, permissions: superAdminPermissions('ADMIN_L2') },
   });
 });
 
@@ -109,7 +110,7 @@ describe('Approvals hub: new employees', () => {
 
   it('does not let an Admin L2 approve an employee they created', async () => {
     useAuthStore.setState({
-      user: { userId: 4, username: 'admin_l2_b', email: 'l2b@tinqa.com', role: 'ADMIN_L2', authClient: 'web', isFirstLogin: false },
+      user: { userId: 4, username: 'admin_l2_b', email: 'l2b@tinqa.com', role: 'ADMIN_L2', authClient: 'web', isFirstLogin: false, permissions: superAdminPermissions('ADMIN_L2') },
     });
     const user = userEvent.setup();
     renderHub();
@@ -118,7 +119,7 @@ describe('Approvals hub: new employees', () => {
     await user.click(screen.getByTitle('Approve Request'));
     await user.click(screen.getByRole('button', { name: 'Yes, Approve' }));
 
-    expect(await screen.findByText(/another Admin L2 has to review them/)).toBeInTheDocument();
+    expect(await screen.findByText(/another employee approver has to review them/)).toBeInTheDocument();
     expect(procurement.patch).not.toHaveBeenCalled();
   });
 });

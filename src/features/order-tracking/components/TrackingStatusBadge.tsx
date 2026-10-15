@@ -11,11 +11,11 @@ const TONES: Record<string, string> = {
 };
 
 const toneFor = (status: string): string => {
-  if (status === 'DELIVERED' || status === 'RETURN_COMPLETED') return TONES.green;
-  if (status === 'CANCELLED') return TONES.rose;
-  if (status.startsWith('RETURN_')) return TONES.purple;
-  if (status.endsWith('_PENDING') || status.endsWith('_RECEIVED')) return TONES.amber;
-  if (['CONFIRMED', 'PRE_ORDER_CONFIRMED', 'PROCESSING', 'PACKED', 'OUT_FOR_DELIVERY'].includes(status)) {
+  if (['DELIVERED', 'RETURN_COMPLETED', 'REFUND_COMPLETED'].includes(status)) return TONES.green;
+  if (['CANCELLED', 'DELIVERY_FAILED', 'CUSTOMER_UNAVAILABLE', 'INVALID_ADDRESS', 'CUSTOMER_CANCELLED_DELIVERY', 'REFUND_FAILED', 'RETURN_REJECTED', 'RETURN_INSPECTION_FAILED', 'RETURN_CANCELLED'].includes(status)) return TONES.rose;
+  if (status.startsWith('RETURN_') || status === 'OUT_FOR_PICKUP') return TONES.purple;
+  if (status.endsWith('_PENDING') || status.endsWith('_RECEIVED') || status === 'REFUND_INITIATED' || status === 'REFUND_REQUESTED') return TONES.amber;
+  if (['CONFIRMED', 'PRE_ORDER_CONFIRMED', 'PROCESSING', 'PACKED', 'SHIPPED', 'IN_TRANSIT', 'OUT_FOR_DELIVERY', 'DELIVERY_REATTEMPT'].includes(status)) {
     return TONES.blue;
   }
   return TONES.gray;

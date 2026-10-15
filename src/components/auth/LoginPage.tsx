@@ -43,7 +43,7 @@ export const LoginPage: React.FC = () => {
 
       loginStore(response);
       const from = (location.state as { from?: string } | null)?.from;
-      navigate(response.isFirstLogin ? '/reset-password' : from || '/analytics', { replace: true });
+      navigate(response.isFirstLogin ? '/reset-password' : from || '/', { replace: true });
     } catch (err: unknown) {
       notify.error(err, 'Authentication failed. Please check your credentials.');
     } finally {
@@ -121,8 +121,8 @@ export const LoginPage: React.FC = () => {
             {/* Submit Button */}
             <button
               type="submit"
-              disabled={isLoading}
-              className="w-full mt-2 py-2.5 px-4 bg-[#0071e3] hover:bg-[#0077ed] text-white rounded-xl text-sm font-semibold transition-colors duration-150 shadow-sm flex items-center justify-center gap-2 cursor-pointer disabled:opacity-70"
+              disabled={isLoading || !credentials.username.trim() || !credentials.password}
+              className="w-full mt-2 py-2.5 px-4 bg-[#0071e3] hover:bg-[#0077ed] text-white rounded-xl text-sm font-semibold transition-colors duration-150 shadow-sm flex items-center justify-center gap-2 cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed"
             >
               {isLoading ? (
                 <>

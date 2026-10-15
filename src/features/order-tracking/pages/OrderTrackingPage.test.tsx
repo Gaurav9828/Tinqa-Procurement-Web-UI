@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
@@ -11,18 +11,19 @@ import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { OrderTrackingPage } from './OrderTrackingPage';
 import { OrderTrackingDetailPage } from './OrderTrackingDetailPage';
 import { orderTrackingApi } from '../api/orderTrackingApi';
+import { refundApi } from '../../refunds/api/refundApi';
 import { resetTrackingStatusCache } from '../hooks/useTrackingStatuses';
 import { resetAdminOrdersCache } from '../hooks/useAdminOrders';
 import type { ApiResponse, PageResponse } from '../../../types/common.types';
 import type {
   AdminOrderDetail,
   AdminOrderSummary,
-  OrderStatusUpdateResponse,
   OrderPaymentAttempt,
   OrderTrackingEntry,
   TrackingStatusOption,
 } from '../types/orderTracking.types';
 import { formatDateTime } from '../utils/orderTracking.utils';
+import { superAdminPermissions } from '../../../test/access';
 
 // Only the network layer is mocked.
 vi.mock('../api/orderTrackingApi', () => ({
@@ -31,12 +32,26 @@ vi.mock('../api/orderTrackingApi', () => ({
     getOrder: vi.fn(),
     getTrackingStatuses: vi.fn(),
     updateTracking: vi.fn(),
-    setOrderStatus: vi.fn(),
+    updateDeliveryStatus: vi.fn(),
     approvePreOrder: vi.fn(),
   },
 }));
 
+// The refund panel has its own suite (features/refunds); here it just loads an order with no refunds.
+vi.mock('../../refunds/api/refundApi', () => ({
+  refundApi: {
+    getOrderRefunds: vi.fn(),
+    requestRefund: vi.fn(),
+    approveRefund: vi.fn(),
+    rejectRefund: vi.fn(),
+    syncRefund: vi.fn(),
+    listRefunds: vi.fn(),
+    getRefund: vi.fn(),
+  },
+}));
+
 const api = vi.mocked(orderTrackingApi);
+const refunds = vi.mocked(refundApi);
 type User = ReturnType<typeof userEvent.setup>;
 
 // ---------- fixtures ----------
@@ -118,11 +133,30 @@ const STATUSES: TrackingStatusOption[] = [
   'CONFIRMED',
   'PROCESSING',
   'PACKED',
+  'SHIPPED',
+  'IN_TRANSIT',
   'OUT_FOR_DELIVERY',
+  'DELIVERY_FAILED',
+  'CUSTOMER_UNAVAILABLE',
+  'INVALID_ADDRESS',
+  'CUSTOMER_CANCELLED_DELIVERY',
+  'DELIVERY_REATTEMPT',
   'DELIVERED',
   'RETURN_REQUESTED',
+  'RETURN_APPROVED',
+  'RETURN_REJECTED',
+  'OUT_FOR_PICKUP',
+  'RETURN_PICKED_UP',
   'RETURN_IN_TRANSIT',
+  'RETURN_RECEIVED',
+  'RETURN_INSPECTION',
+  'RETURN_INSPECTION_FAILED',
+  'RETURN_CANCELLED',
   'RETURN_COMPLETED',
+  'REFUND_REQUESTED',
+  'REFUND_INITIATED',
+  'REFUND_FAILED',
+  'REFUND_COMPLETED',
   'CANCELLED',
 ].map((status) => ({ status, stage: status }));
 
@@ -153,10 +187,7 @@ const axiosError = (status: number, data: Record<string, unknown> = {}) => {
 const networkError = () => new AxiosError('Network Error', 'ERR_NETWORK', { headers: new AxiosHeaders() }, {});
 
 const trackingOk = (message = 'Order status updated successfully') =>
-  ok<OrderTrackingEntry>(entry(9, 'OUT_FOR_DELIVERY', '2026-10-03T09:00:00', { current: true }), message);
-
-const manualOk = (message = 'Order status updated successfully') =>
-  ok<OrderStatusUpdateResponse>({ ...DETAIL, orderStatus: 'PROCESSING' }, message);
+  ok<OrderTrackingEntry>(entry(9, 'SHIPPED', '2026-10-03T09:00:00', { current: true }), message);
 
 // ---------- helpers ----------
 /** Renders the current URL so tests can assert navigation. */
@@ -193,13 +224,21 @@ const openOrder = async (user: User, orderNumber = 'ORD-1001') => {
   await user.click(within(table).getByRole('link', { name: orderNumber }));
   const panel = detailPage(orderNumber);
   await within(panel).findByRole('list', { name: 'Tracking history' });
-  // Status options load from the API.
-  await waitFor(() => expect(within(panel).getByLabelText('Status')).toBeEnabled());
+  // Next steps load from the API.
+  await within(panel).findByRole('radiogroup', { name: 'Next step' });
   return panel;
 };
 
-const chooseMode = (user: User, panel: HTMLElement, label: 'Update tracking' | 'Manually update order status') =>
-  user.click(within(panel).getByRole('radio', { name: label }));
+/** The next-step cards on offer, by status value. */
+const stepValues = (panel: HTMLElement) =>
+  within(within(panel).getByRole('radiogroup', { name: 'Next step' }))
+    .getAllByRole('radio')
+    .map((radio) => radio.getAttribute('value'));
+
+const chooseStep = (user: User, panel: HTMLElement, status: string) =>
+  user.click(within(within(panel).getByRole('radiogroup', { name: 'Next step' })).getAllByRole('radio').find((r) => r.getAttribute('value') === status)!);
+
+const updateButton = (panel: HTMLElement) => within(panel).getByRole('button', { name: 'Update status' });
 
 const historyItems = (container: HTMLElement) =>
   within(within(container).getByRole('list', { name: 'Tracking history' })).getAllByRole('listitem');
@@ -211,11 +250,22 @@ beforeEach(() => {
   api.getOrder.mockResolvedValue(ok(DETAIL));
   api.getTrackingStatuses.mockResolvedValue(ok(STATUSES));
   api.updateTracking.mockResolvedValue(trackingOk());
-  api.setOrderStatus.mockResolvedValue(manualOk());
+  api.updateDeliveryStatus.mockResolvedValue(trackingOk('Delivery status updated successfully'));
+  refunds.getOrderRefunds.mockImplementation(async (orderNumber: string) =>
+    ok({
+      orderNumber,
+      orderStatus: 'PACKED',
+      paymentStatus: 'PAID',
+      payments: [],
+      refunds: [],
+      canRequestRefund: false,
+      refundBlockedReason: 'Only cancelled or returned orders can be refunded.',
+    })
+  );
   useAuthStore.setState({
     token: 'test-token',
     isAuthenticated: true,
-    user: { userId: 7, username: 'admin1', email: 'a@tinqa.com', role: 'ADMIN_L1', authClient: 'web', isFirstLogin: false },
+    user: { userId: 7, username: 'admin1', email: 'a@tinqa.com', role: 'ADMIN_L1', authClient: 'web', isFirstLogin: false, permissions: superAdminPermissions('ADMIN_L1') },
   });
 });
 
@@ -237,6 +287,7 @@ describe('OrderTrackingPage', () => {
         sort: 'createdAt,desc',
         search: '',
         status: '',
+        paymentStatus: '',
         fromDate: '',
         toDate: '',
       });
@@ -252,9 +303,11 @@ describe('OrderTrackingPage', () => {
       expect(within(row).getByText('asha@example.com')).toBeInTheDocument();
       expect(within(row).getByText(/Smart Plug ×2, LED Bulb ×1/)).toBeInTheDocument();
       expect(within(row).getByText('₹2,297.00')).toBeInTheDocument();
-      expect(cells[4]).toHaveTextContent('Packed'); // order status
-      expect(cells[5]).toHaveTextContent('Packed'); // tracking status
-      expect(cells[6]).toHaveTextContent('by admin_l1');
+      expect(cells[4]).toHaveTextContent('Paid'); // payment status
+      expect(cells[4]).toHaveTextContent('UPI'); // payment method
+      expect(cells[5]).toHaveTextContent('Packed'); // order status
+      expect(cells[6]).toHaveTextContent('Packed'); // tracking status
+      expect(cells[7]).toHaveTextContent('by admin_l1');
       expect(screen.getByText(/\(2 orders\)/)).toBeInTheDocument();
     });
 
@@ -302,6 +355,65 @@ describe('OrderTrackingPage', () => {
 
       await user.selectOptions(statusFilter, 'OUT_FOR_DELIVERY');
       await waitFor(() => expect(lastListParams()).toMatchObject({ status: 'OUT_FOR_DELIVERY', page: 0 }));
+    });
+
+    it('shows each order\'s payment status, and "Not recorded" when it is missing', async () => {
+      api.listOrders.mockResolvedValue(
+        page([
+          SUMMARY,
+          { ...LEGACY, paymentStatus: 'REFUND_REQUESTED', paymentMethod: null },
+          { ...LEGACY, id: 3, orderNumber: 'ORD-3003', paymentStatus: null },
+        ])
+      );
+      renderPage();
+      const table = await screen.findByRole('table');
+      const payment = (orderNumber: string) =>
+        within(within(table).getByRole('link', { name: orderNumber }).closest('tr')!).getByTestId('payment-status');
+      expect(payment('ORD-1001')).toHaveTextContent('Paid');
+      expect(payment('ORD-2002')).toHaveTextContent('Refund requested');
+      expect(payment('ORD-3003')).toHaveTextContent('Not recorded');
+    });
+
+    it('filters by payment status (server-side, kept in the URL) and clears with the other filters', async () => {
+      const { user } = renderPage();
+      await screen.findByRole('table');
+      const paymentFilter = screen.getByLabelText('Filter by payment status');
+      expect(within(paymentFilter).getAllByRole('option').map((o) => o.textContent)).toEqual([
+        'All payments',
+        'Pending',
+        'Paid',
+        'Failed',
+        'Refund requested',
+        'Refund initiated',
+        'Refund failed',
+        'Refunded',
+        'Cancelled',
+      ]);
+
+      await user.selectOptions(paymentFilter, 'REFUND_REQUESTED');
+      await waitFor(() => expect(lastListParams()).toMatchObject({ paymentStatus: 'REFUND_REQUESTED', page: 0 }));
+      expect(currentUrl()).toBe('/order-tracking?payment=REFUND_REQUESTED');
+
+      // An icon-only ✕ button, named for screen readers and with a tooltip.
+      const clear = screen.getByRole('button', { name: 'Clear filters' });
+      expect(clear).toHaveTextContent('');
+      expect(clear).toHaveAttribute('title', 'Clear filters');
+      await user.click(clear);
+      await waitFor(() => expect(lastListParams()).toMatchObject({ paymentStatus: '' }));
+      expect(currentUrl()).toBe('/order-tracking');
+    });
+
+    it('reads the payment filter from the URL, case-insensitively', async () => {
+      renderPage('/order-tracking?payment=paid&status=PACKED');
+      await screen.findByRole('table');
+      expect(lastListParams()).toMatchObject({ paymentStatus: 'PAID', status: 'PACKED' });
+      expect(screen.getByLabelText('Filter by payment status')).toHaveValue('PAID');
+    });
+
+    it('ignores a payment filter value it does not know', async () => {
+      renderPage('/order-tracking?payment=BOGUS');
+      await screen.findByRole('table');
+      expect(lastListParams()).toMatchObject({ paymentStatus: '' });
     });
 
     it('sends the date range and sort, and blocks an inverted range client-side', async () => {
@@ -402,13 +514,20 @@ describe('OrderTrackingPage', () => {
   });
 
   describe('status changes', () => {
-    it('offers only valid next steps from the current stage, labelled with their stage', async () => {
+    it('offers only the valid next steps as cards — no list of every status', async () => {
       const { user } = renderPage();
       const panel = await openOrder(user); // current: PACKED
-      const options = within(within(panel).getByLabelText('Status')).getAllByRole('option').slice(1);
-      expect(options.map((o) => o.getAttribute('value'))).toEqual(['OUT_FOR_DELIVERY', 'CANCELLED']);
-      expect(options[0]).toHaveTextContent('Out For Delivery — Out for delivery');
-      expect(options[1]).toHaveTextContent('Cancelled — Closed');
+      expect(within(panel).queryByRole('combobox')).not.toBeInTheDocument();
+      expect(stepValues(panel)).toEqual(['SHIPPED', 'CANCELLED']);
+      expect(within(panel).getByRole('radio', { name: /Mark shipped/ })).toBeInTheDocument();
+      expect(within(panel).getByText('Handed over to the courier.')).toBeInTheDocument();
+    });
+
+    it('does not offer a step the server does not support yet', async () => {
+      api.getTrackingStatuses.mockResolvedValue(ok(STATUSES.filter((s) => s.status !== 'SHIPPED')));
+      const { user } = renderPage();
+      const panel = await openOrder(user);
+      expect(stepValues(panel)).toEqual(['CANCELLED']);
     });
 
     it('keeps actions disabled with a retry when the status list fails to load', async () => {
@@ -417,125 +536,102 @@ describe('OrderTrackingPage', () => {
       const panel = detailPage();
 
       expect(await within(panel).findByText('Status options could not be loaded.')).toBeInTheDocument();
-      expect(within(panel).getByRole('button', { name: 'Add tracking event' })).toBeDisabled();
+      expect(updateButton(panel)).toBeDisabled();
 
       await user.click(within(panel).getByRole('button', { name: 'Retry' }));
-      await waitFor(() => expect(within(panel).getByRole('button', { name: 'Add tracking event' })).toBeEnabled());
+      await waitFor(() => expect(within(panel).getByLabelText('Notes')).toBeEnabled());
+      // Still disabled until a step is chosen.
+      expect(updateButton(panel)).toBeDisabled();
+      await chooseStep(user, panel, 'SHIPPED');
+      expect(updateButton(panel)).toBeEnabled();
     });
 
-    it('requires a status and sends nothing without one', async () => {
+    it('requires a step and sends nothing without one', async () => {
       const { user } = renderPage();
       const panel = await openOrder(user);
-      await user.click(within(panel).getByRole('button', { name: 'Add tracking event' }));
-      expect(await within(panel).findByText('Please select a status.')).toBeInTheDocument();
+      expect(updateButton(panel)).toBeDisabled();
+      await user.click(updateButton(panel));
       expect(api.updateTracking).not.toHaveBeenCalled();
-      expect(api.setOrderStatus).not.toHaveBeenCalled();
     });
 
-    it('"Update tracking" sends one PATCH /tracking with { status, trimmed notes } and never the manual endpoint', async () => {
+    it('sends one PATCH /tracking with { status, trimmed notes }', async () => {
       const { user } = renderPage();
       const panel = await openOrder(user);
 
-      expect(within(panel).getByRole('radio', { name: 'Update tracking' })).toHaveAttribute('aria-checked', 'true');
-      await user.selectOptions(within(panel).getByLabelText('Status'), 'OUT_FOR_DELIVERY');
+      await chooseStep(user, panel, 'SHIPPED');
       await user.type(within(panel).getByLabelText('Notes'), '   Handed to courier   ');
-      await user.click(within(panel).getByRole('button', { name: 'Add tracking event' }));
+      await user.click(updateButton(panel));
 
       await waitFor(() => expect(api.updateTracking).toHaveBeenCalledTimes(1));
-      expect(api.updateTracking).toHaveBeenCalledWith('ORD-1001', { status: 'OUT_FOR_DELIVERY', notes: 'Handed to courier' });
-      expect(api.setOrderStatus).not.toHaveBeenCalled();
+      expect(api.updateTracking).toHaveBeenCalledWith('ORD-1001', { status: 'SHIPPED', notes: 'Handed to courier' });
     });
 
-    it('"Manually update order status" sends one PATCH /status with status and notes, and never the tracking endpoint', async () => {
+    it('sends blank notes as null', async () => {
       const { user } = renderPage();
       const panel = await openOrder(user);
-
-      await chooseMode(user, panel, 'Manually update order status');
-      expect(within(panel).getByText(/Administrative change for corrections/)).toBeInTheDocument();
-      await user.selectOptions(within(panel).getByLabelText('Status'), 'OUT_FOR_DELIVERY');
-      await user.type(within(panel).getByLabelText('Notes'), ' Courier collected early ');
-      await user.click(within(panel).getByRole('button', { name: 'Set order status' }));
-
-      await waitFor(() => expect(api.setOrderStatus).toHaveBeenCalledTimes(1));
-      expect(api.setOrderStatus).toHaveBeenCalledWith('ORD-1001', 'OUT_FOR_DELIVERY', 'Courier collected early');
-      expect(api.updateTracking).not.toHaveBeenCalled();
-    });
-
-    it('sends blank notes as null in both modes', async () => {
-      const { user } = renderPage();
-      const panel = await openOrder(user);
-
-      await user.selectOptions(within(panel).getByLabelText('Status'), 'OUT_FOR_DELIVERY');
+      await chooseStep(user, panel, 'SHIPPED');
       await user.type(within(panel).getByLabelText('Notes'), '    ');
-      await user.click(within(panel).getByRole('button', { name: 'Add tracking event' }));
-      await waitFor(() => expect(api.updateTracking).toHaveBeenCalledWith('ORD-1001', { status: 'OUT_FOR_DELIVERY', notes: null }));
-
-      await chooseMode(user, panel, 'Manually update order status');
-      await user.selectOptions(within(panel).getByLabelText('Status'), 'OUT_FOR_DELIVERY');
-      await user.click(within(panel).getByRole('button', { name: 'Set order status' }));
-      await waitFor(() => expect(api.setOrderStatus).toHaveBeenCalledWith('ORD-1001', 'OUT_FOR_DELIVERY', null));
+      await user.click(updateButton(panel));
+      await waitFor(() => expect(api.updateTracking).toHaveBeenCalledWith('ORD-1001', { status: 'SHIPPED', notes: null }));
     });
 
-    it('asks for confirmation before CANCELLED and sends nothing if dismissed', async () => {
+    it('asks for confirmation before cancelling and sends nothing if dismissed', async () => {
       const { user } = renderPage();
       const panel = await openOrder(user);
 
-      await user.selectOptions(within(panel).getByLabelText('Status'), 'CANCELLED');
-      await user.click(within(panel).getByRole('button', { name: 'Add tracking event' }));
-      expect(await screen.findByText(/will be cancelled\. This is final/)).toBeInTheDocument();
+      await chooseStep(user, panel, 'CANCELLED');
+      await user.click(updateButton(panel));
+      expect(await screen.findByText(/will be cancelled\. It can never move forward/)).toBeInTheDocument();
+      expect(screen.getByText(/the payment will then be refunded/)).toBeInTheDocument();
 
       await user.click(screen.getByRole('button', { name: 'Cancel' }));
-      expect(screen.queryByText(/will be cancelled\. This is final/)).not.toBeInTheDocument();
+      expect(screen.queryByText(/will be cancelled/)).not.toBeInTheDocument();
       expect(api.updateTracking).not.toHaveBeenCalled();
 
-      await user.click(within(panel).getByRole('button', { name: 'Add tracking event' }));
+      await user.click(updateButton(panel));
       await user.click(await screen.findByRole('button', { name: 'Yes, Cancel' }));
       await waitFor(() => expect(api.updateTracking).toHaveBeenCalledTimes(1));
       expect(api.updateTracking).toHaveBeenCalledWith('ORD-1001', { status: 'CANCELLED', notes: null });
     });
 
-    it('asks for confirmation before other final-looking statuses in manual mode', async () => {
+    it('asks for confirmation before marking delivered', async () => {
       api.getOrder.mockResolvedValue(ok(withCurrent('OUT_FOR_DELIVERY')));
       const { user } = renderPage();
       const panel = await openOrder(user);
 
-      await chooseMode(user, panel, 'Manually update order status');
-      await user.selectOptions(within(panel).getByLabelText('Status'), 'DELIVERED');
-      await user.click(within(panel).getByRole('button', { name: 'Set order status' }));
-      expect(await screen.findByText('Manually set "Delivered"?')).toBeInTheDocument();
-      expect(api.setOrderStatus).not.toHaveBeenCalled();
+      await chooseStep(user, panel, 'DELIVERED');
+      await user.click(updateButton(panel));
+      expect(await screen.findByText('Move order to "Delivered"?')).toBeInTheDocument();
+      expect(api.updateTracking).not.toHaveBeenCalled();
 
       await user.click(screen.getByRole('button', { name: 'Confirm' }));
-      await waitFor(() => expect(api.setOrderStatus).toHaveBeenCalledWith('ORD-1001', 'DELIVERED', null));
-      expect(api.updateTracking).not.toHaveBeenCalled();
+      await waitFor(() => expect(api.updateTracking).toHaveBeenCalledWith('ORD-1001', { status: 'DELIVERED', notes: null }));
     });
 
     it('on success shows the API message and re-fetches the order, displaying only server values', async () => {
       const refreshedHistory = [
         ...HISTORY.map((e) => ({ ...e, current: false })),
-        entry(4, 'OUT_FOR_DELIVERY', '2026-10-03T09:00:00', { current: true, updatedBy: 'admin_l2', notes: 'Handed to courier' }),
+        entry(4, 'SHIPPED', '2026-10-03T09:00:00', { current: true, updatedBy: 'admin_l2', notes: 'Handed to courier' }),
       ];
       api.getOrder
         .mockResolvedValueOnce(ok(DETAIL))
-        .mockResolvedValueOnce(
-          ok({ ...DETAIL, orderStatus: 'OUT_FOR_DELIVERY', updatedBy: 'admin_l2', updatedAt: '2026-10-03T09:00:00', tracking: refreshedHistory })
-        );
+        .mockResolvedValueOnce(ok({ ...DETAIL, orderStatus: 'SHIPPED', updatedBy: 'admin_l2', updatedAt: '2026-10-03T09:00:00', tracking: refreshedHistory }));
       // The PATCH response's audit fields must not be used to fabricate the display.
       api.updateTracking.mockResolvedValue(
-        ok({ ...entry(99, 'OUT_FOR_DELIVERY', '2099-01-01T00:00:00', { current: true, updatedBy: 'not-from-refresh' }) }, 'Order status updated successfully')
+        ok({ ...entry(99, 'SHIPPED', '2099-01-01T00:00:00', { current: true, updatedBy: 'not-from-refresh' }) }, 'Order status updated successfully')
       );
       const { user } = renderPage();
       const panel = await openOrder(user);
 
-      await user.selectOptions(within(panel).getByLabelText('Status'), 'OUT_FOR_DELIVERY');
-      await user.click(within(panel).getByRole('button', { name: 'Add tracking event' }));
+      await chooseStep(user, panel, 'SHIPPED');
+      await user.click(updateButton(panel));
 
       expect(await screen.findByText('Order status updated successfully')).toBeInTheDocument();
       await waitFor(() => expect(api.getOrder).toHaveBeenCalledTimes(2));
 
       const stillOpen = detailPage();
-      await waitFor(() => expect(within(stillOpen).getByTestId('order-status')).toHaveTextContent('Out For Delivery'));
-      expect(within(stillOpen).getByTestId('current-tracking')).toHaveTextContent('Out For Delivery');
+      await waitFor(() => expect(within(stillOpen).getByTestId('order-status')).toHaveTextContent('Shipped'));
+      expect(within(stillOpen).getByTestId('current-tracking')).toHaveTextContent('Shipped');
       expect(within(stillOpen).getByTestId('last-updated')).toHaveTextContent('by admin_l2');
 
       const items = historyItems(stillOpen);
@@ -543,7 +639,8 @@ describe('OrderTrackingPage', () => {
       expect(items[3]).toHaveAttribute('data-current', 'true');
       expect(items[3]).toHaveTextContent('by admin_l2');
       expect(stillOpen).not.toHaveTextContent('not-from-refresh');
-      expect(within(stillOpen).getByLabelText('Status')).toHaveValue('');
+      // The next steps now follow Shipped.
+      await waitFor(() => expect(stepValues(stillOpen)).toEqual(['IN_TRANSIT', 'OUT_FOR_DELIVERY']));
     });
 
     it('prevents duplicate submissions while saving', async () => {
@@ -552,24 +649,24 @@ describe('OrderTrackingPage', () => {
       const { user } = renderPage();
       const panel = await openOrder(user);
 
-      await user.selectOptions(within(panel).getByLabelText('Status'), 'OUT_FOR_DELIVERY');
-      await user.click(within(panel).getByRole('button', { name: 'Add tracking event' }));
+      await chooseStep(user, panel, 'SHIPPED');
+      await user.click(updateButton(panel));
       await user.click(within(panel).getByRole('button', { name: /Saving/ }));
 
       expect(api.updateTracking).toHaveBeenCalledTimes(1);
       expect(within(panel).getByRole('button', { name: /Saving/ })).toBeDisabled();
       resolve(trackingOk('done'));
-      expect(await within(panel).findByRole('button', { name: 'Add tracking event' })).toBeEnabled();
+      // Back to idle; disabled again until the next step is chosen.
+      expect(await within(panel).findByRole('button', { name: 'Update status' })).toBeDisabled();
     });
 
     it('on 403 shows the permission message and keeps the user signed in', async () => {
-      api.setOrderStatus.mockRejectedValue(axiosError(403, { message: 'You do not have permission to perform this action.' }));
+      api.updateTracking.mockRejectedValue(axiosError(403, { message: 'You do not have permission to perform this action.' }));
       const { user } = renderPage();
       const panel = await openOrder(user);
 
-      await chooseMode(user, panel, 'Manually update order status');
-      await user.selectOptions(within(panel).getByLabelText('Status'), 'OUT_FOR_DELIVERY');
-      await user.click(within(panel).getByRole('button', { name: 'Set order status' }));
+      await chooseStep(user, panel, 'SHIPPED');
+      await user.click(updateButton(panel));
 
       expect(await screen.findByText('You do not have permission to perform this action.')).toBeInTheDocument();
       expect(useAuthStore.getState().isAuthenticated).toBe(true);
@@ -583,8 +680,8 @@ describe('OrderTrackingPage', () => {
       const { user } = renderPage();
       const panel = await openOrder(user);
 
-      await user.selectOptions(within(panel).getByLabelText('Status'), 'OUT_FOR_DELIVERY');
-      await user.click(within(panel).getByRole('button', { name: 'Add tracking event' }));
+      await chooseStep(user, panel, 'SHIPPED');
+      await user.click(updateButton(panel));
 
       const alerts = await screen.findByRole('list', { name: 'Notifications' });
       expect(within(alerts).getByText('Notes must be at most 500 characters.')).toBeInTheDocument();
@@ -593,40 +690,40 @@ describe('OrderTrackingPage', () => {
     });
 
     it('on 404 shows the backend "not found" message', async () => {
-      api.setOrderStatus.mockRejectedValue(axiosError(404, { message: 'Order not found', errorCode: 'ORDER_NOT_FOUND' }));
+      api.updateTracking.mockRejectedValue(axiosError(404, { message: 'Order not found', errorCode: 'ORDER_NOT_FOUND' }));
       const { user } = renderPage();
       const panel = await openOrder(user);
 
-      await chooseMode(user, panel, 'Manually update order status');
-      await user.selectOptions(within(panel).getByLabelText('Status'), 'OUT_FOR_DELIVERY');
-      await user.click(within(panel).getByRole('button', { name: 'Set order status' }));
+      await chooseStep(user, panel, 'SHIPPED');
+      await user.click(updateButton(panel));
 
       expect(await screen.findByText('Order not found')).toBeInTheDocument();
     });
 
-    it('on 5xx shows a generic, retryable failure and keeps the form filled', async () => {
+    it('on 5xx shows a generic, retryable failure and keeps the choice', async () => {
       api.updateTracking.mockRejectedValue(axiosError(500));
       const { user } = renderPage();
       const panel = await openOrder(user);
 
-      await user.selectOptions(within(panel).getByLabelText('Status'), 'OUT_FOR_DELIVERY');
-      await user.click(within(panel).getByRole('button', { name: 'Add tracking event' }));
+      await chooseStep(user, panel, 'SHIPPED');
+      await user.click(updateButton(panel));
 
       expect(await screen.findByText('Request failed')).toBeInTheDocument();
-      expect(within(panel).getByLabelText('Status')).toHaveValue('OUT_FOR_DELIVERY');
-      expect(within(panel).getByRole('button', { name: 'Add tracking event' })).toBeEnabled();
+      expect(within(panel).getByRole('radio', { name: /Mark shipped/ })).toBeChecked();
+      expect(updateButton(panel)).toBeEnabled();
     });
 
     it('hides the status actions for a role without the permission (UX only)', async () => {
       useAuthStore.setState({
-        user: { userId: 9, username: 'viewer', email: 'v@tinqa.com', role: 'VIEWER', authClient: 'web', isFirstLogin: false },
+        user: { userId: 9, username: 'viewer', email: 'v@tinqa.com', role: 'VIEWER', authClient: 'web', isFirstLogin: false, permissions: [] },
       });
       const { user } = renderPage();
       const table = await screen.findByRole('table');
       await user.click(within(table).getByRole('link', { name: 'ORD-1001' }));
       const panel = detailPage();
       await within(panel).findByRole('list', { name: 'Tracking history' });
-      expect(within(panel).queryByRole('radiogroup', { name: 'Update type' })).not.toBeInTheDocument();
+      expect(within(panel).queryByRole('radiogroup', { name: 'Next step' })).not.toBeInTheDocument();
+      expect(within(panel).queryByRole('button', { name: 'Update status' })).not.toBeInTheDocument();
     });
   });
 
@@ -635,10 +732,9 @@ describe('OrderTrackingPage', () => {
       api.getOrder.mockResolvedValue(ok({ ...withCurrent('ORDER_RECEIVED'), paymentStatus: 'PENDING' }));
       renderPage('/order-tracking/ORD-1001');
       const panel = detailPage();
-      await waitFor(() => expect(within(panel).getByLabelText('Status')).toBeEnabled());
-      const values = () => within(within(panel).getByLabelText('Status')).getAllByRole('option').slice(1).map((o) => o.getAttribute('value'));
-      expect(values()).not.toContain('CONFIRMED');
-      expect(values()).toContain('CANCELLED');
+      await within(panel).findByRole('radiogroup', { name: 'Next step' });
+      expect(stepValues(panel)).not.toContain('CONFIRMED');
+      expect(stepValues(panel)).toContain('CANCELLED');
       expect(within(panel).getByRole('note', { name: 'Payment required' })).toHaveTextContent(
         "This order can't be confirmed until it is fully paid (payment status: pending)."
       );
@@ -648,9 +744,8 @@ describe('OrderTrackingPage', () => {
       api.getOrder.mockResolvedValue(ok({ ...withCurrent('ORDER_RECEIVED'), paymentStatus: 'PAID' }));
       renderPage('/order-tracking/ORD-1001');
       const panel = detailPage();
-      await waitFor(() => expect(within(panel).getByLabelText('Status')).toBeEnabled());
-      const values = within(within(panel).getByLabelText('Status')).getAllByRole('option').map((o) => o.getAttribute('value'));
-      expect(values).toContain('CONFIRMED');
+      await within(panel).findByRole('radiogroup', { name: 'Next step' });
+      expect(stepValues(panel)).toContain('CONFIRMED');
       expect(within(panel).queryByRole('note', { name: 'Payment required' })).not.toBeInTheDocument();
     });
 
@@ -660,10 +755,11 @@ describe('OrderTrackingPage', () => {
       const stage = within(panel).getByLabelText('Order stage');
       expect(stage).toHaveAttribute('data-stage', 'FULFILMENT');
       expect(within(stage).getByText('Fulfilment').closest('li')).toHaveAttribute('aria-current', 'step');
+      expect(within(stage).getByText('Confirmed').closest('li')).toHaveAttribute('data-done', 'true');
     });
 
-    it('locks a cancelled order: no update form, no requests possible', async () => {
-      api.getOrder.mockResolvedValue(ok(withCurrent('CANCELLED')));
+    it('locks a cancelled, unpaid order: no update form, no requests possible', async () => {
+      api.getOrder.mockResolvedValue(ok({ ...withCurrent('CANCELLED'), paymentStatus: 'PENDING' }));
       const { user } = renderPage();
       const table = await screen.findByRole('table');
       await user.click(within(table).getByRole('link', { name: 'ORD-1001' }));
@@ -671,84 +767,138 @@ describe('OrderTrackingPage', () => {
 
       const locked = await within(panel).findByRole('status', { name: 'Status locked' });
       expect(locked).toHaveTextContent('This order is cancelled');
-      expect(within(panel).queryByLabelText('Status')).not.toBeInTheDocument();
-      expect(within(panel).queryByRole('radiogroup', { name: 'Update type' })).not.toBeInTheDocument();
+      expect(within(panel).queryByRole('radiogroup', { name: 'Next step' })).not.toBeInTheDocument();
       expect(within(panel).getByLabelText('Order stage')).toHaveAttribute('data-stage', 'CANCELLED');
       expect(api.updateTracking).not.toHaveBeenCalled();
-      expect(api.setOrderStatus).not.toHaveBeenCalled();
     });
 
-    it('locks an order whose return is completed', async () => {
-      api.getOrder.mockResolvedValue(ok(withCurrent('RETURN_COMPLETED')));
+    it('a paid order cancelled before confirmation shows the customer\'s reason and is refunded from the Refunds section, not the form', async () => {
+      // Paid, cancelled by the customer before any admin confirmed it.
+      const cancelled: AdminOrderDetail = {
+        ...DETAIL,
+        orderStatus: 'CANCELLED',
+        paymentStatus: 'PAID',
+        tracking: [
+          entry(1, 'ORDER_RECEIVED', '2026-10-01T09:00:00'),
+          entry(2, 'CANCELLED', '2026-10-01T11:00:00', { current: true, updatedBy: 'asha@example.com', notes: 'Ordered the wrong size by mistake' }),
+        ],
+      };
+      api.getOrder.mockResolvedValue(ok(cancelled));
+      renderPage('/order-tracking/ORD-1001');
+      const panel = detailPage();
+
+      const reason = await within(panel).findByRole('region', { name: 'Cancellation' });
+      expect(within(reason).getByTestId('cancellation-reason')).toHaveTextContent('Ordered the wrong size by mistake');
+      expect(reason).toHaveTextContent('by asha@example.com');
+      expect(reason).toHaveTextContent('Check the reason, then use Request refund in the Refunds section');
+
+      const stage = within(panel).getByLabelText('Order stage');
+      expect(stage).toHaveAttribute('data-stage', 'CANCELLED');
+      const refund = within(stage).getByRole('list', { name: 'Refund stages' });
+      expect(within(refund).getByText('Cancelled').closest('li')).toHaveAttribute('aria-current', 'step');
+
+      // The status form never offers "Refund requested"; it points to the Refunds section instead.
+      const locked = await within(panel).findByRole('status', { name: 'Status locked' });
+      expect(locked).toHaveTextContent('To refund the customer, use Request refund in the Refunds section.');
+      expect(within(panel).queryByRole('radiogroup', { name: 'Next step' })).not.toBeInTheDocument();
+      expect(api.updateTracking).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ['REFUND_REQUESTED', 'REFUND_REQUESTED', 'An approver approves or rejects it in the Refunds section'],
+      ['REFUND_INITIATED', 'REFUND_REQUESTED', 'The refund is with Razorpay'],
+      ['REFUND_FAILED', 'REFUND_FAILED', 'It can be requested again'],
+    ])('an order at %s points to the Refunds section; the cancellation reason and refund track stay visible', async (status, paymentStatus, text) => {
+      const history = [
+        entry(1, 'ORDER_RECEIVED', '2026-10-01T09:00:00'),
+        entry(2, 'CANCELLED', '2026-10-01T11:00:00', { notes: 'Found it cheaper elsewhere' }),
+        entry(3, status, '2026-10-01T12:00:00', { current: true }),
+      ];
+      api.getOrder.mockResolvedValue(ok({ ...DETAIL, orderStatus: status, paymentStatus, tracking: history }));
+      renderPage('/order-tracking/ORD-1001');
+      const panel = detailPage();
+
+      expect(await within(panel).findByRole('status', { name: 'Status locked' })).toHaveTextContent(text);
+      expect(within(panel).getByTestId('cancellation-reason')).toHaveTextContent('Found it cheaper elsewhere');
+      expect(within(within(panel).getByLabelText('Order stage')).getByRole('list', { name: 'Refund stages' })).toBeInTheDocument();
+      expect(within(panel).queryByRole('radiogroup', { name: 'Next step' })).not.toBeInTheDocument();
+    });
+
+    it('a cancelled unpaid order has no refund track and no cancellation refund prompt', async () => {
+      api.getOrder.mockResolvedValue(ok({ ...withCurrent('CANCELLED'), paymentStatus: 'PENDING' }));
+      renderPage('/order-tracking/ORD-1001');
+      const panel = detailPage();
+      await within(panel).findByRole('status', { name: 'Status locked' });
+      expect(within(panel).queryByRole('list', { name: 'Refund stages' })).not.toBeInTheDocument();
+      expect(within(panel).getByRole('region', { name: 'Cancellation' })).not.toHaveTextContent('record the refund request');
+    });
+
+    it.each([
+      ['RETURN_COMPLETED', 'return for this order is completed'],
+      ['REFUND_COMPLETED', 'refund for this order is completed'],
+      ['RETURN_REJECTED', 'return request was rejected'],
+    ])('locks an order closed as %s', async (status, text) => {
+      api.getOrder.mockResolvedValue(ok(withCurrent(status)));
       const { user } = renderPage();
       const table = await screen.findByRole('table');
       await user.click(within(table).getByRole('link', { name: 'ORD-1001' }));
       const panel = detailPage();
-      expect(await within(panel).findByRole('status', { name: 'Status locked' })).toHaveTextContent('return for this order is completed');
+      expect(await within(panel).findByRole('status', { name: 'Status locked' })).toHaveTextContent(text);
     });
 
-    it('does not offer Cancelled (or going back) once the order is out for delivery, in either mode', async () => {
+    it('once out for delivery: no cancelling and no going back — deliver or record a failed attempt', async () => {
       api.getOrder.mockResolvedValue(ok(withCurrent('OUT_FOR_DELIVERY')));
       const { user } = renderPage();
       const panel = await openOrder(user);
-      const values = () =>
-        within(within(panel).getByLabelText('Status')).getAllByRole('option').slice(1).map((o) => o.getAttribute('value'));
-
-      expect(values()).toEqual(['DELIVERED', 'RETURN_IN_TRANSIT']);
-      await chooseMode(user, panel, 'Manually update order status');
-      expect(values()).toEqual(['DELIVERED', 'RETURN_IN_TRANSIT']);
+      expect(stepValues(panel)).toEqual(['DELIVERED', 'DELIVERY_FAILED', 'CUSTOMER_UNAVAILABLE', 'INVALID_ADDRESS', 'CUSTOMER_CANCELLED_DELIVERY']);
       expect(within(panel).getByLabelText('Order stage')).toHaveAttribute('data-stage', 'DELIVERY');
+    });
+
+    it('a failed delivery is re-attempted or sent back to the warehouse', async () => {
+      api.getOrder.mockResolvedValue(ok(withCurrent('DELIVERY_FAILED')));
+      const { user } = renderPage();
+      const panel = await openOrder(user);
+      expect(stepValues(panel)).toEqual(['OUT_FOR_DELIVERY', 'DELIVERY_REATTEMPT', 'RETURN_IN_TRANSIT']);
     });
 
     it('after delivery only a return can be requested', async () => {
       api.getOrder.mockResolvedValue(ok(withCurrent('DELIVERED')));
       const { user } = renderPage();
       const panel = await openOrder(user);
-      const options = within(within(panel).getByLabelText('Status')).getAllByRole('option').slice(1);
-      expect(options.map((o) => o.getAttribute('value'))).toEqual(['RETURN_REQUESTED']);
+      expect(stepValues(panel)).toEqual(['RETURN_REQUESTED']);
     });
 
-    it('manual mode can undo the last step before shipment, with confirmation; tracking mode cannot', async () => {
-      const { user } = renderPage();
-      const panel = await openOrder(user); // PACKED, previous event CONFIRMED
-      const select = () => within(panel).getByLabelText('Status');
-
-      expect(within(select()).queryByRole('option', { name: /undo last step/ })).not.toBeInTheDocument();
-
-      await chooseMode(user, panel, 'Manually update order status');
-      expect(within(select()).getByRole('option', { name: '↩ Confirmed (undo last step)' })).toBeInTheDocument();
-
-      await user.selectOptions(select(), 'CONFIRMED');
-      await user.click(within(panel).getByRole('button', { name: 'Set order status' }));
-      expect(await screen.findByText('Undo last step and revert to "Confirmed"?')).toBeInTheDocument();
-      expect(api.setOrderStatus).not.toHaveBeenCalled();
-
-      await user.click(screen.getByRole('button', { name: 'Confirm' }));
-      await waitFor(() => expect(api.setOrderStatus).toHaveBeenCalledWith('ORD-1001', 'CONFIRMED', null));
-      expect(api.updateTracking).not.toHaveBeenCalled();
-    });
-
-    it('switching back to tracking mode clears an undo selection it does not allow', async () => {
+    it('shows the return track while a return is in progress', async () => {
+      api.getOrder.mockResolvedValue(ok(withCurrent('RETURN_RECEIVED')));
       const { user } = renderPage();
       const panel = await openOrder(user);
-      await chooseMode(user, panel, 'Manually update order status');
-      await user.selectOptions(within(panel).getByLabelText('Status'), 'CONFIRMED');
-      await chooseMode(user, panel, 'Update tracking');
-      expect(within(panel).getByLabelText('Status')).toHaveValue('');
+      const stage = within(panel).getByLabelText('Order stage');
+      expect(stage).toHaveAttribute('data-stage', 'RETURNS');
+      const returnTrack = within(stage).getByRole('list', { name: 'Return stages' });
+      expect(within(returnTrack).getByText('At warehouse').closest('li')).toHaveAttribute('aria-current', 'step');
+      expect(stepValues(panel)).toEqual(['RETURN_INSPECTION']);
+    });
+
+    it('after inspection a paid return can only fail inspection here; the refund goes through the Refunds section', async () => {
+      api.getOrder.mockResolvedValue(ok(withCurrent('RETURN_INSPECTION')));
+      const { user } = renderPage();
+      const panel = await openOrder(user);
+      expect(stepValues(panel)).toEqual(['RETURN_INSPECTION_FAILED']);
+      expect(within(panel).getByRole('note', { name: 'Refund handled separately' })).toHaveTextContent('use Request refund in the Refunds section');
     });
 
     it('on 409 (order changed elsewhere) shows the message and reloads the order', async () => {
       api.updateTracking.mockRejectedValue(
-        axiosError(409, { message: 'Invalid status transition from CANCELLED to OUT_FOR_DELIVERY', errorCode: 'INVALID_STATUS_TRANSITION' })
+        axiosError(409, { message: 'Invalid status transition from CANCELLED to SHIPPED', errorCode: 'INVALID_STATUS_TRANSITION' })
       );
       const { user } = renderPage();
       const panel = await openOrder(user);
       expect(api.getOrder).toHaveBeenCalledTimes(1);
 
-      await user.selectOptions(within(panel).getByLabelText('Status'), 'OUT_FOR_DELIVERY');
-      await user.click(within(panel).getByRole('button', { name: 'Add tracking event' }));
+      await chooseStep(user, panel, 'SHIPPED');
+      await user.click(updateButton(panel));
 
-      expect(await screen.findByText('Invalid status transition from CANCELLED to OUT_FOR_DELIVERY')).toBeInTheDocument();
+      expect(await screen.findByText('Invalid status transition from CANCELLED to SHIPPED')).toBeInTheDocument();
       await waitFor(() => expect(api.getOrder).toHaveBeenCalledTimes(2));
     });
   });
@@ -767,6 +917,7 @@ describe('OrderTrackingPage', () => {
     it.each([
       ['FAILED', 'Failed'],
       ['REFUND_REQUESTED', 'Refund requested'],
+      ['REFUND_INITIATED', 'Refund initiated'],
       ['REFUNDED', 'Refunded'],
       ['CANCELLED', 'Cancelled'],
       ['PENDING', 'Pending'],
@@ -1021,6 +1172,94 @@ describe('OrderTrackingPage', () => {
   });
 });
 
+describe('delivery riders', () => {
+  // What the Procurement backend reports for a Delivery Rider: view orders, record delivery outcomes
+  const signInAsRider = () =>
+    useAuthStore.setState({
+      token: 'test-token',
+      isAuthenticated: true,
+      user: {
+        userId: 9,
+        username: 'rider1',
+        email: 'rider1@tinqa.com',
+        role: 'ADMIN_L1',
+        authClient: 'web',
+        isFirstLogin: false,
+        permissions: ['CUSTOMER_ORDER_VIEW', 'DELIVERY_STATUS_UPDATE'],
+      },
+    });
+
+  const openAsRider = async (status: string) => {
+    signInAsRider();
+    api.getOrder.mockResolvedValue(ok(withCurrent(status)));
+    const { user } = renderPage('/order-tracking/ORD-1001');
+    const panel = detailPage();
+    await within(panel).findByRole('list', { name: 'Tracking history' });
+    return { user, panel };
+  };
+
+  it('offers only delivery outcomes, never return to origin or failure codes for the store team', async () => {
+    const { panel } = await openAsRider('OUT_FOR_DELIVERY');
+    await within(panel).findByRole('radiogroup', { name: 'Next step' });
+    expect(within(panel).getByRole('heading', { name: 'Delivery update' })).toBeInTheDocument();
+    expect(stepValues(panel)).toEqual(['DELIVERED', 'CUSTOMER_UNAVAILABLE', 'INVALID_ADDRESS', 'CUSTOMER_CANCELLED_DELIVERY']);
+  });
+
+  it('re-attempts a delivery after the customer was unavailable', async () => {
+    const { user, panel } = await openAsRider('CUSTOMER_UNAVAILABLE');
+    await within(panel).findByRole('radiogroup', { name: 'Next step' });
+    expect(stepValues(panel)).toEqual(['DELIVERY_REATTEMPT']);
+
+    await chooseStep(user, panel, 'DELIVERY_REATTEMPT');
+    await user.type(within(panel).getByLabelText('Notes'), 'Customer asked for tomorrow');
+    await user.click(updateButton(panel));
+
+    await waitFor(() =>
+      expect(api.updateDeliveryStatus).toHaveBeenCalledWith('ORD-1001', { status: 'DELIVERY_REATTEMPT', notes: 'Customer asked for tomorrow' })
+    );
+    expect(api.updateTracking).not.toHaveBeenCalled();
+  });
+
+  it('confirms before recording that the customer cancelled the delivery', async () => {
+    const { user, panel } = await openAsRider('OUT_FOR_DELIVERY');
+    await within(panel).findByRole('radiogroup', { name: 'Next step' });
+
+    await chooseStep(user, panel, 'CUSTOMER_CANCELLED_DELIVERY');
+    await user.click(updateButton(panel));
+    expect(await screen.findByText(/recorded as refused by the customer/)).toBeInTheDocument();
+    expect(api.updateDeliveryStatus).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole('button', { name: 'Confirm' }));
+    await waitFor(() =>
+      expect(api.updateDeliveryStatus).toHaveBeenCalledWith('ORD-1001', { status: 'CUSTOMER_CANCELLED_DELIVERY', notes: null })
+    );
+  });
+
+  it('has nothing to record before the order ships or once it is coming back', async () => {
+    for (const status of ['PACKED', 'CUSTOMER_CANCELLED_DELIVERY']) {
+      const { panel } = await openAsRider(status);
+      expect(await within(panel).findByRole('status', { name: 'No delivery update' })).toHaveTextContent('the store team updates this order');
+      expect(within(panel).queryByRole('radiogroup', { name: 'Next step' })).not.toBeInTheDocument();
+      cleanup();
+    }
+    expect(api.updateDeliveryStatus).not.toHaveBeenCalled();
+  });
+
+  it('admins who may change any status keep the full set and the general endpoint', async () => {
+    api.getOrder.mockResolvedValue(ok(withCurrent('CUSTOMER_UNAVAILABLE')));
+    const { user } = renderPage('/order-tracking/ORD-1001');
+    const panel = detailPage();
+    await within(panel).findByRole('radiogroup', { name: 'Next step' });
+    expect(within(panel).getByRole('heading', { name: 'Next step' })).toBeInTheDocument();
+    expect(stepValues(panel)).toEqual(['DELIVERY_REATTEMPT', 'RETURN_IN_TRANSIT']);
+
+    await chooseStep(user, panel, 'DELIVERY_REATTEMPT');
+    await user.click(updateButton(panel));
+    await waitFor(() => expect(api.updateTracking).toHaveBeenCalledWith('ORD-1001', { status: 'DELIVERY_REATTEMPT', notes: null }));
+    expect(api.updateDeliveryStatus).not.toHaveBeenCalled();
+  });
+});
+
 describe('405 METHOD_NOT_ALLOWED handling', () => {
   const RAW = "Request method 'GET' is not supported";
   const methodNotAllowed = () => axiosError(405, { success: false, message: RAW, errorCode: 'METHOD_NOT_ALLOWED' });
@@ -1044,31 +1283,18 @@ describe('405 METHOD_NOT_ALLOWED handling', () => {
     expect(screen.queryByText(RAW)).not.toBeInTheDocument();
   });
 
-  it('tracking update (PATCH …/tracking): friendly alert, form kept, page intact', async () => {
+  it('tracking update (PATCH …/tracking): friendly alert, choice kept, page intact', async () => {
     api.updateTracking.mockRejectedValue(methodNotAllowed());
     const { user } = renderPage();
     const panel = await openOrder(user);
-    await user.selectOptions(within(panel).getByLabelText('Status'), 'OUT_FOR_DELIVERY');
-    await user.click(within(panel).getByRole('button', { name: 'Add tracking event' }));
+    await chooseStep(user, panel, 'SHIPPED');
+    await user.click(updateButton(panel));
 
     expect(await screen.findByText(FRIENDLY)).toBeInTheDocument();
     expect(screen.queryByText(RAW)).not.toBeInTheDocument();
-    expect(within(detailPage()).getByLabelText('Status')).toHaveValue('OUT_FOR_DELIVERY');
+    expect(within(detailPage()).getByRole('radio', { name: /Mark shipped/ })).toBeChecked();
     expect(within(detailPage()).getByRole('list', { name: 'Tracking history' })).toBeInTheDocument();
     expect(api.getOrder).toHaveBeenCalledTimes(1); // no pointless reload
-  });
-
-  it('manual status update (PATCH …/status): friendly alert, nothing else sent', async () => {
-    api.setOrderStatus.mockRejectedValue(methodNotAllowed());
-    const { user } = renderPage();
-    const panel = await openOrder(user);
-    await chooseMode(user, panel, 'Manually update order status');
-    await user.selectOptions(within(panel).getByLabelText('Status'), 'OUT_FOR_DELIVERY');
-    await user.click(within(panel).getByRole('button', { name: 'Set order status' }));
-
-    expect(await screen.findByText(FRIENDLY)).toBeInTheDocument();
-    expect(api.setOrderStatus).toHaveBeenCalledTimes(1);
-    expect(api.updateTracking).not.toHaveBeenCalled();
   });
 
   it('status options (GET …/tracking-statuses): actions stay disabled with a retry', async () => {
@@ -1076,7 +1302,7 @@ describe('405 METHOD_NOT_ALLOWED handling', () => {
     renderPage('/order-tracking/ORD-1001');
     const panel = await screen.findByRole('region', { name: 'Order ORD-1001 details' });
     expect(await within(panel).findByText('Status options could not be loaded.')).toBeInTheDocument();
-    expect(within(panel).getByRole('button', { name: 'Add tracking event' })).toBeDisabled();
+    expect(updateButton(panel)).toBeDisabled();
   });
 });
 
@@ -1120,24 +1346,21 @@ describe('Pre-order review and approval', () => {
     api.getOrder.mockResolvedValue(ok(detail));
     const ctx = renderPage('/order-tracking/ORD-1001');
     await within(detailPage()).findByRole('region', { name: 'Pre-order review' });
-    await waitFor(() => expect(within(detailPage()).getByLabelText('Status')).toBeEnabled());
+    await within(detailPage()).findByRole('radiogroup', { name: 'Next step' });
     return ctx;
   };
 
-  it('"Waiting pre-orders" filters the list by PRE_ORDER_PENDING (URL + request) and can be toggled off', async () => {
+  it('waiting pre-orders are found through the status filter — there is no separate shortcut', async () => {
+    api.getTrackingStatuses.mockResolvedValue(ok(PRE_STATUSES));
     const { user } = renderPage('/order-tracking?page=2');
     await screen.findByRole('table');
-    const toggle = screen.getByRole('button', { name: 'Waiting pre-orders' });
-    expect(toggle).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.queryByRole('button', { name: 'Waiting pre-orders' })).not.toBeInTheDocument();
 
-    await user.click(toggle);
+    const statusFilter = screen.getByLabelText('Filter by status');
+    await waitFor(() => expect(within(statusFilter).getByRole('option', { name: 'Pre Order Pending' })).toBeInTheDocument());
+    await user.selectOptions(statusFilter, 'PRE_ORDER_PENDING');
     await waitFor(() => expect(lastListParams()).toMatchObject({ status: 'PRE_ORDER_PENDING', page: 0 }));
     expect(currentUrl()).toBe('/order-tracking?status=PRE_ORDER_PENDING');
-    expect(toggle).toHaveAttribute('aria-pressed', 'true');
-
-    await user.click(toggle);
-    await waitFor(() => expect(lastListParams()).toMatchObject({ status: '' }));
-    expect(currentUrl()).toBe('/order-tracking');
   });
 
   it('shows requested vs. available stock, "Waiting for stock", and a disabled approval when not ready', async () => {
@@ -1166,11 +1389,8 @@ describe('Pre-order review and approval', () => {
   });
 
   it('never offers Pre-order Confirmed in the generic status form (approval is a dedicated action)', async () => {
-    const { user } = await openPreOrder(ready());
-    const options = () => within(within(detailPage()).getByLabelText('Status')).getAllByRole('option').slice(1).map((o) => o.getAttribute('value'));
-    expect(options()).toEqual(['CANCELLED']);
-    await user.click(within(detailPage()).getByRole('radio', { name: 'Manually update order status' }));
-    expect(options()).toEqual(['CANCELLED']);
+    await openPreOrder(ready());
+    expect(stepValues(detailPage())).toEqual(['CANCELLED']);
   });
 
   it('approves through PATCH …/pre-order/approve after confirmation, then shows the server state', async () => {
@@ -1187,16 +1407,14 @@ describe('Pre-order review and approval', () => {
     expect(api.approvePreOrder).toHaveBeenCalledTimes(1);
     expect(api.approvePreOrder).toHaveBeenCalledWith('ORD-1001');
     expect(api.updateTracking).not.toHaveBeenCalled();
-    expect(api.setOrderStatus).not.toHaveBeenCalled();
     expect(await screen.findByText('Pre-order approved successfully')).toBeInTheDocument();
 
     await waitFor(() => expect(within(detailPage()).getByTestId('order-status')).toHaveTextContent('Pre Order Confirmed'));
     expect(api.getOrder).toHaveBeenCalledTimes(2); // reloaded from the server
     expect(within(card()).getByTestId('pre-order-readiness')).toHaveTextContent('Approved — stock reserved');
     expect(within(card()).queryByRole('button', { name: 'Approve pre-order' })).not.toBeInTheDocument();
-    // Normal fulfilment continues through the usual status form.
-    const options = within(within(detailPage()).getByLabelText('Status')).getAllByRole('option').slice(1).map((o) => o.getAttribute('value'));
-    expect(options).toEqual(['PROCESSING', 'CANCELLED']);
+    // Normal fulfilment continues through the usual next steps.
+    expect(stepValues(detailPage())).toEqual(['PROCESSING', 'CANCELLED']);
   });
 
   it('on PRE_ORDER_STOCK_NOT_READY: clear message, reload, stays waiting, no success shown', async () => {
@@ -1252,7 +1470,7 @@ describe('Pre-order review and approval', () => {
 
   it('hides the approval action for a role that cannot manage order tracking (UX only)', async () => {
     useAuthStore.setState({
-      user: { userId: 9, username: 'viewer', email: 'v@tinqa.com', role: 'VIEWER', authClient: 'web', isFirstLogin: false },
+      user: { userId: 9, username: 'viewer', email: 'v@tinqa.com', role: 'VIEWER', authClient: 'web', isFirstLogin: false, permissions: [] },
     });
     api.getTrackingStatuses.mockResolvedValue(ok(PRE_STATUSES));
     api.getOrder.mockResolvedValue(ok(ready()));

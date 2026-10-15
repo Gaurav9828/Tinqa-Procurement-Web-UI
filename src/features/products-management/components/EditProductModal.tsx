@@ -6,6 +6,7 @@ import type { ProductApprovalInfo } from './ProductTable';
 import type { ProductChangeSummary } from '../types/productApproval.types';
 import { getApprovalPermissions } from '../utils/productApproval';
 import { useProductWarranties } from '../hooks/useProductWarranties';
+import { warrantiesComplete } from '../../item-management/utils/itemWarranty';
 import { FormFieldErrors } from './FormFieldErrors';
 import {
   describeWarrantyChanges,
@@ -191,6 +192,8 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
     formData.title?.trim() !== '' &&
     Number(formData.price) >= 0 &&
     Number(formData.stockQuantity) >= 0 &&
+    components.every((row) => row.itemId !== null && !!row.quantity.trim()) &&
+    warrantiesComplete(warranties) &&
     changedFields.length > 0;
 
   const handleAddSpec = () => {
@@ -263,20 +266,20 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
           <form onSubmit={handleInitialSubmit} className="p-6 space-y-4 overflow-y-auto flex-1 text-xs">
             {approval?.state === 'REJECTED' && (
               <div role="note" className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-700 dark:text-rose-400 space-y-0.5">
-                <p className="font-semibold">Rejected by Admin L2</p>
+                <p className="font-semibold">Rejected by an approver</p>
                 {approval.latest?.decisionReason && <p>Reason: {approval.latest.decisionReason}</p>}
                 <p>After saving your changes, use "Resubmit for approval" in the product list.</p>
               </div>
             )}
             {approval?.state === 'UPDATE_REJECTED' && (
               <div role="note" className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-700 dark:text-rose-400 space-y-0.5">
-                <p className="font-semibold">Your last changes were rejected by Admin L2</p>
+                <p className="font-semibold">Your last changes were rejected by an approver</p>
                 {approval.latest?.decisionReason && <p>Reason: {approval.latest.decisionReason}</p>}
               </div>
             )}
             {needsApproval && (
               <p role="note" data-testid="edit-needs-approval" className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-400">
-                Changes to this product need Admin L2 approval. The product stays as it is until they are approved.
+                Changes to this product need approval. The product stays as it is until they are approved.
               </p>
             )}
 
@@ -429,7 +432,7 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
                   type="checkbox"
                   id="editIsEnabled"
                   checked={formData.enabled}
-                  // Switching on needs Admin L2 approval; switching off is always allowed.
+                  // Switching on needs approval; switching off is always allowed.
                   disabled={!formData.enabled && !!approval && !getApprovalPermissions(approval.state).canActivate}
                   onChange={(e) => setFormData({ ...formData, enabled: e.target.checked })}
                   className="rounded border-black/10 text-[#0071e3] focus:ring-[#0071e3] cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
@@ -440,7 +443,7 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
               </div>
               {!formData.enabled && approval && !getApprovalPermissions(approval.state).canActivate && (
                 <p className="text-[11px] text-gray-500 pl-6" data-testid="activation-locked">
-                  This product can be activated only after Admin L2 approves it.
+                  This product can be activated only after a catalog approver approves it.
                 </p>
               )}
             </div>
@@ -486,7 +489,7 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
                 <div className="space-y-3">
                   <p className="text-gray-500 font-medium">
                     {needsApproval
-                      ? 'These changes will be sent to Admin L2 and applied once approved:'
+                      ? 'These changes will be sent for approval and applied once approved:'
                       : 'Only the following modified fields will be updated:'}
                   </p>
                   {changedFields.map((field, idx) => (

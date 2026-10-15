@@ -50,8 +50,5 @@ export const UNKNOWN_UPDATER_LABEL = 'Unknown / historical update';
 export const formatUpdater = (updatedBy: string | null | undefined): string =>
   updatedBy?.trim() ? updatedBy : UNKNOWN_UPDATER_LABEL;
 
-/** Statuses that look final/irreversible to an admin and therefore require confirmation. */
-export const TERMINAL_STATUSES: ReadonlySet<string> = new Set(['CANCELLED', 'DELIVERED', 'RETURN_COMPLETED']);
-
 /** Orders that carry pre-order lines (waiting or already approved) get a pre-order review card. */
 export const hasPreOrderLines = (order: Pick<AdminOrderDetail, 'items'>) => (order.items ?? []).some((item) => item.preOrder);

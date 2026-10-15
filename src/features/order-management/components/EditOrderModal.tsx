@@ -4,7 +4,7 @@ import type { OrderResponse, UpdateOrderRequest } from '../types/order.types';
 import { ORDER_LIMITS } from '../validator/orderValidator';
 import type { ItemResponse } from '../../item-management/types/item.types';
 import type { DealerResponse } from '../../dealer-management/types/dealer.types';
-import { HasAccess } from '../../../auth/HasAccess';
+import { useAccess } from '../../../hooks/useAccess';
 import { CommonInput, CommonSelect } from '../../../components/ui/FormInputs';
 import { unitSelectOptions } from '../../../constants/unitsOfMeasure';
 
@@ -40,6 +40,7 @@ export const EditOrderModal: React.FC<EditOrderModalProps> = ({
   onClose,
   onSubmit,
 }) => {
+  const { can } = useAccess();
   const [selectedItemId, setSelectedItemId] = useState<number | ''>('');
   const [selectedDealerId, setSelectedDealerId] = useState<number | ''>('');
   const [quantity, setQuantity] = useState<number | ''>('');
@@ -92,6 +93,14 @@ export const EditOrderModal: React.FC<EditOrderModalProps> = ({
   const itemMrp = selectedItem?.mrp || 0;
   const currentPrice = Number(unitPrice) || 0;
   const priceVariance = calculatePriceVariance(itemMrp, currentPrice);
+  const isFormComplete =
+    selectedItemId !== '' &&
+    selectedDealerId !== '' &&
+    Number(quantity) >= 1 &&
+    currentPrice > 0 &&
+    !!unitOfMeasure.trim() &&
+    shipmentPrice !== '' &&
+    Number(shipmentPrice) >= 0;
   const minDeliveryDate = order.orderDate
     ? (() => {
         const d = new Date(order.orderDate);
@@ -102,6 +111,7 @@ export const EditOrderModal: React.FC<EditOrderModalProps> = ({
 
   const handleFormSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!isFormComplete) return;
     setIsConfirmOpen(true);
   };
 
@@ -153,14 +163,14 @@ export const EditOrderModal: React.FC<EditOrderModalProps> = ({
             </button>
           </div>
 
-          <HasAccess roles="ADMIN_L1">
+          {!can('PROCUREMENT_ORDER_APPROVE') && (
             <div className="mx-5 mt-5 p-3.5 bg-amber-500/10 border border-amber-500/20 rounded-xl flex items-start gap-3 text-xs text-amber-700 dark:text-amber-400">
               <Info className="w-4 h-4 shrink-0 mt-0.5" />
               <span>
-                <strong>Notice:</strong> Order modifications will require re-validation by higher authorization tier if pending review.
+                <strong>Notice:</strong> Order modifications will require re-validation by an order approver if pending review.
               </span>
             </div>
-          </HasAccess>
+          )}
 
           {/* Form Body */}
           <form onSubmit={handleFormSubmit} className="p-5 space-y-4">
@@ -268,8 +278,8 @@ export const EditOrderModal: React.FC<EditOrderModalProps> = ({
               </button>
               <button
                 type="submit"
-                disabled={isSubmitting || !hasChanges}
-                className="px-4 py-2 text-xs font-medium text-white bg-[#0071e3] hover:bg-[#0071e3]/90 rounded-xl transition-colors cursor-pointer disabled:opacity-50"
+                disabled={isSubmitting || !hasChanges || !isFormComplete}
+                className="px-4 py-2 text-xs font-medium text-white bg-[#0071e3] hover:bg-[#0071e3]/90 rounded-xl transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isSubmitting ? 'Updating...' : 'Save Changes'}
               </button>

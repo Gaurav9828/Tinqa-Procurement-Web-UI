@@ -11,6 +11,7 @@ import { ProductManagementPage } from './ProductManagementPage';
 import { ecommerceAxiosClient } from '../../../api/ecommerceAxiosClient';
 import { mockDirectEditApprovals } from './directEditApprovals.testUtil';
 import type { ProductResponseDto, WarrantyRequest, WarrantyResponse } from '../types/product.types';
+import { signInAsSuperAdmin } from '../../../test/access';
 
 /**
  * Only the HTTP client is mocked, with a small fake of the Ecommerce BE ProductController/ProductService
@@ -205,6 +206,7 @@ const saveEdit = async (user: User) => {
 const lastPutBody = () => http.put.mock.calls.at(-1)?.[1] as Body;
 
 beforeEach(() => {
+  signInAsSuperAdmin('ADMIN_L1');
   vi.clearAllMocks();
   db = [structuredClone(LAMP), structuredClone(PLUG)];
   nextWarrantyId = 500;
@@ -262,23 +264,25 @@ describe('Create product with typed warranties', () => {
     expect(JSON.parse(JSON.stringify(http.post.mock.calls[0][1]))).not.toHaveProperty('warranties');
   });
 
-  it('blocks a missing duration, missing title and HTML/script text with inline errors', async () => {
+  it('keeps saving disabled without duration/title and blocks HTML/script text with inline errors', async () => {
     const { user } = renderPage();
     await openCreate(user);
     const n = await addWarranty(user);
     await fill(user, n, { provider: 'Acme <b>Co</b>', coverage: 'see javascript:alert(1)' });
+
+    // Duration and title are still empty, so saving stays disabled.
+    expect(screen.getAllByRole('button', { name: 'Create Product' }).at(-1)).toBeDisabled();
+    await fill(user, n, { duration: '12', title: 'Plan' });
     await submitCreate(user);
 
-    expect(within(card(n)).getByText('Duration is required.')).toBeInTheDocument();
-    expect(within(card(n)).getByText('Title is required.')).toBeInTheDocument();
     expect(within(card(n)).getByText('Provider cannot contain HTML tags.')).toBeInTheDocument();
     expect(within(card(n)).getByText(/Coverage contains a blocked script pattern/)).toBeInTheDocument();
-    expect(field(n, 'Duration')).toHaveAttribute('aria-invalid', 'true');
+    expect(field(n, 'Provider')).toHaveAttribute('aria-invalid', 'true');
     expect(screen.queryByRole('button', { name: 'Confirm & Create' })).not.toBeInTheDocument();
     expect(http.post).not.toHaveBeenCalled();
 
-    await fill(user, n, { duration: '12' });
-    expect(within(card(n)).queryByText('Duration is required.')).not.toBeInTheDocument();
+    await fill(user, n, { provider: 'Acme Co' });
+    expect(within(card(n)).queryByText('Provider cannot contain HTML tags.')).not.toBeInTheDocument();
   });
 
   it.each(['0', '1.5'])('rejects a duration of %s', async (duration) => {

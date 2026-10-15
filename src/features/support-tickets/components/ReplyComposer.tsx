@@ -27,7 +27,7 @@ export const ReplyComposer: React.FC<Props> = ({ canReply, isSending, disabled =
   }
 
   const send = async () => {
-    if (isSending || disabled) return;
+    if (isSending || disabled || !draft.trim()) return;
     const result = await onSend(draft);
     setError(result.fieldErrors.message ?? null);
     if (result.ok) onDraftChange('');
@@ -80,7 +80,7 @@ export const ReplyComposer: React.FC<Props> = ({ canReply, isSending, disabled =
       <div className="flex justify-end">
         <button
           type="submit"
-          disabled={isSending || disabled}
+          disabled={isSending || disabled || !draft.trim()}
           className="flex items-center gap-2 px-4 py-2 bg-[#0071e3] hover:bg-[#0077ed] text-white rounded-xl text-xs font-semibold transition-colors disabled:opacity-60 cursor-pointer disabled:cursor-not-allowed"
         >
           {isSending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}

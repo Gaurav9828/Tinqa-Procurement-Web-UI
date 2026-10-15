@@ -51,7 +51,7 @@ export const CompanyProfilePage: React.FC = () => {
             <Building2 className="w-5 h-5 text-[#0071e3]" /> Company profile
           </h1>
           <p className="text-gray-500 mt-0.5">
-            Brand, legal and contact details shown on the storefront and invoices. Every change needs Level 2 approval.
+            Brand, legal and contact details shown on the storefront and invoices. Every change needs approval.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -81,7 +81,7 @@ export const CompanyProfilePage: React.FC = () => {
               <Link to={companyVersionPath(pending.id)} className={BUTTON.secondary}>
                 <Eye className="w-3.5 h-3.5" /> View changes
               </Link>
-              <ReviewActions version={pending} access={access} onStale={reload} onDone={() => void reload()} />
+              <ReviewActions version={pending} access={access} live={live} onStale={reload} onDone={() => void reload()} />
             </div>
           </div>
           {access.isMaker && (
@@ -135,7 +135,7 @@ export const CompanyProfilePage: React.FC = () => {
                     </div>
                     {draft.status === 'REJECTED' && draft.reviewComment && (
                       <p className="p-2 rounded-lg bg-rose-500/10 text-rose-700 dark:text-rose-300 break-words">
-                        <span className="font-semibold">Rejected by {draft.reviewedBy ?? 'a Level 2 admin'}:</span> {draft.reviewComment}
+                        <span className="font-semibold">Rejected by {draft.reviewedBy ?? 'an approver'}:</span> {draft.reviewComment}
                       </p>
                     )}
                   </div>

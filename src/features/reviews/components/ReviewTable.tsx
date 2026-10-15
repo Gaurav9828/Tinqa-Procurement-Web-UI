@@ -12,7 +12,8 @@ interface Props {
   reviews: AdminReview[];
   isLoading: boolean;
   onOpen: (review: AdminReview) => void;
-  onToggleStatus: (review: AdminReview) => void;
+  /** Absent when the user can't moderate reviews (REVIEW_MODERATE): the buttons are hidden. */
+  onToggleStatus?: (review: AdminReview) => void;
 }
 
 const ORDER_LINK_STATE: OrderDetailLocationState = { backLabel: 'Back to reviews' };
@@ -82,10 +83,10 @@ export const ReviewTable: React.FC<Props> = ({ reviews, isLoading, onOpen, onTog
                 >
                   <FileText className="w-4 h-4" />
                 </button>
-                {review.active ? (
+                {onToggleStatus && (review.active ? (
                   <button
                     type="button"
-                    onClick={() => onToggleStatus(review)}
+                    onClick={() => onToggleStatus?.(review)}
                     className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold bg-rose-500/10 text-rose-600 dark:text-rose-400 hover:bg-rose-500/20 cursor-pointer whitespace-nowrap"
                   >
                     <EyeOff className="w-3.5 h-3.5" /> Deactivate
@@ -93,12 +94,12 @@ export const ReviewTable: React.FC<Props> = ({ reviews, isLoading, onOpen, onTog
                 ) : (
                   <button
                     type="button"
-                    onClick={() => onToggleStatus(review)}
+                    onClick={() => onToggleStatus?.(review)}
                     className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/20 cursor-pointer whitespace-nowrap"
                   >
                     <Eye className="w-3.5 h-3.5" /> Activate
                   </button>
-                )}
+                ))}
               </div>
             </td>
           </tr>

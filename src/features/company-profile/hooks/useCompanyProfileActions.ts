@@ -6,6 +6,8 @@ import type { ApiResponse } from '../../../types/common.types';
 import { useNotify } from '../../../hooks/useNotify';
 import { getApiFieldErrors, parseApiError } from '../../../utils/apiError';
 import { ERROR_MESSAGES } from '../utils/companyProfile.utils';
+import { useAppDispatch } from '../../../store/store';
+import { invalidateCompanyOverview } from '../../../store/companyProfileSlice';
 
 export interface ActionResult {
   ok: boolean;
@@ -26,6 +28,7 @@ const STALE_CODES = new Set(['PENDING_CHANGE_EXISTS', 'INVALID_STATE_TRANSITION'
 export const useCompanyProfileActions = ({ onStale }: { onStale?: () => void } = {}) => {
   const [busy, setBusy] = useState<string | null>(null);
   const notify = useNotify();
+  const dispatch = useAppDispatch();
 
   const perform = useCallback(
     async (
@@ -41,6 +44,8 @@ export const useCompanyProfileActions = ({ onStale }: { onStale?: () => void } =
           return { ok: false, code: parseApiError(res).errorCode, fieldErrors: getApiFieldErrors(res) };
         }
         if (messages.success) notify.success(messages.success);
+        // Live / pending / drafts changed: the next visit to an overview page refetches.
+        dispatch(invalidateCompanyOverview());
         return { ok: true, version: res.data };
       } catch (err: unknown) {
         const parsed = parseApiError(err, messages.failure);
@@ -49,13 +54,16 @@ export const useCompanyProfileActions = ({ onStale }: { onStale?: () => void } =
         const body = axios.isAxiosError(err) ? (err.response?.data as { message?: unknown } | undefined) : undefined;
         const hasServerText = (typeof body?.message === 'string' && body.message.trim() !== '') || parsed.errors.length > 0;
         notify.error(!hasServerText && code && ERROR_MESSAGES[code] ? ERROR_MESSAGES[code] : err, messages.failure);
-        if (code && STALE_CODES.has(code)) onStale?.();
+        if (code && STALE_CODES.has(code)) {
+          dispatch(invalidateCompanyOverview());
+          onStale?.();
+        }
         return { ok: false, code, fieldErrors: getApiFieldErrors(err) };
       } finally {
         setBusy(null);
       }
     },
-    [notify, onStale]
+    [notify, dispatch, onStale]
   );
 
   return {
@@ -67,7 +75,7 @@ export const useCompanyProfileActions = ({ onStale }: { onStale?: () => void } =
       perform('save', () => companyProfileApi.saveDraft(id, body), { success, failure: 'Could not save the draft.' }),
     submitDraft: (id: number) =>
       perform('submit', () => companyProfileApi.submitDraft(id), {
-        success: 'Submitted for approval. The live profile stays unchanged until a Level 2 admin approves it.',
+        success: 'Submitted for approval. The live profile stays unchanged until an approver approves it.',
         failure: 'Could not submit the draft.',
       }),
     withdraw: (id: number) =>

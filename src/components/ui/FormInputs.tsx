@@ -125,6 +125,8 @@ export const CommonInput: React.FC<CommonInputProps> = ({
 interface OptionItem {
   label: string;
   value: string | number;
+  /** Shown but not selectable. */
+  disabled?: boolean;
 }
 
 interface CommonSelectProps extends React.SelectHTMLAttributes<HTMLSelectElement> {
@@ -148,6 +150,8 @@ export const CommonSelect: React.FC<CommonSelectProps> = ({
   <InputWrapper label={label} required={required} error={error} disabled={disabled}>
     <div className="relative flex items-center">
       <select
+        // The visible label isn't a <label>, so name the control for assistive tech
+        aria-label={label}
         value={value}
         disabled={disabled}
         className={`w-full px-3.5 py-3 bg-transparent text-sm focus:outline-none appearance-none rounded-xl pr-10 ${
@@ -163,8 +167,9 @@ export const CommonSelect: React.FC<CommonSelectProps> = ({
         {options.map((opt) => {
           const val = typeof opt === 'string' ? opt : opt.value;
           const lbl = typeof opt === 'string' ? opt : opt.label;
+          const optionDisabled = typeof opt === 'string' ? false : !!opt.disabled;
           return (
-            <option key={val} value={val} className="bg-white dark:bg-[#1c1c1e]">
+            <option key={val} value={val} disabled={optionDisabled} className="bg-white dark:bg-[#1c1c1e]">
               {lbl}
             </option>
           );

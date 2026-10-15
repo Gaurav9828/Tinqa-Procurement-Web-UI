@@ -7,6 +7,17 @@ import type { ProductApprovalResponse } from '../types/productApproval.types';
 import { getApprovalPermissions, type ProductApprovalState } from '../utils/productApproval';
 import { ProductRatingSummary } from '../../reviews/components/ProductRatingSummary';
 
+export interface ProductActionAccess {
+  /** PRODUCT_UPDATE */
+  canEdit: boolean;
+  /** STOREFRONT_STOCK_UPDATE */
+  canAdjustStock: boolean;
+  /** PRODUCT_APPROVAL_SUBMIT */
+  canSubmit: boolean;
+  /** PRODUCT_PUBLISH */
+  canPublish: boolean;
+}
+
 export interface ProductApprovalInfo {
   state: ProductApprovalState;
   latest?: ProductApprovalResponse;
@@ -22,6 +33,8 @@ interface ProductTableProps {
   approvalFor: (product: ProductResponse) => ProductApprovalInfo;
   /** Admin L2 can review pending requests from the list. */
   canReview: boolean;
+  /** What the user's permissions allow; combined with what each product's approval state allows. */
+  actions: ProductActionAccess;
   onSubmitForApproval: (product: ProductResponse, isResubmission: boolean) => void;
   onReview: (request: ProductApprovalResponse) => void;
   /** Write approved changes that couldn't be applied when they were approved. */
@@ -33,6 +46,7 @@ export const ProductTable: React.FC<ProductTableProps> = ({
   isLoading,
   onPreview,
   onEdit,
+  actions,
   onAdjustStock,
   approvalFor,
   canReview,
@@ -67,7 +81,12 @@ export const ProductTable: React.FC<ProductTableProps> = ({
           ) : (
             products.map((product) => {
               const approval = approvalFor(product);
-              const permissions = getApprovalPermissions(approval.state);
+              const state = getApprovalPermissions(approval.state);
+              const permissions = {
+                ...state,
+                canSubmit: actions.canSubmit && state.canSubmit,
+                canApplyUpdate: actions.canPublish && state.canApplyUpdate,
+              };
               return (
               <tr key={product.id} data-testid={`product-row-${product.id}`} className="hover:bg-black/[0.01] dark:hover:bg-white/[0.01]">
                 <td className="p-3 font-medium text-black dark:text-white">
@@ -103,7 +122,7 @@ export const ProductTable: React.FC<ProductTableProps> = ({
                       <button
                         onClick={() => onReview(approval.latest!)}
                         className="p-1.5 hover:bg-amber-500/10 rounded-lg text-amber-600 cursor-pointer"
-                        title="Review approval (Admin L2)"
+                        title="Review approval"
                         aria-label={`Review approval for ${product.title}`}
                       >
                         <ShieldCheck className="w-3.5 h-3.5" />
@@ -129,6 +148,7 @@ export const ProductTable: React.FC<ProductTableProps> = ({
                         <Send className="w-3.5 h-3.5" />
                       </button>
                     )}
+                    {actions.canEdit && (
                     <button
                       onClick={() => permissions.canEdit && onEdit(product)}
                       disabled={!permissions.canEdit}
@@ -137,11 +157,14 @@ export const ProductTable: React.FC<ProductTableProps> = ({
                     >
                       <Pencil className="w-3.5 h-3.5" />
                     </button>
+                    )}
+                    {actions.canAdjustStock && (
+                    <>
                     <button
                       onClick={() => onAdjustStock(product, 'add')}
                       disabled={!permissions.canAddStock}
                       className="p-1.5 hover:bg-emerald-500/10 rounded-lg text-gray-500 hover:text-emerald-600 dark:text-white cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent"
-                      title={permissions.canAddStock ? 'Add stock' : 'Stock can be added once Admin L2 approves the product'}
+                      title={permissions.canAddStock ? 'Add stock' : 'Stock can be added once the product is approved'}
                       aria-label={`Add stock for ${product.title}`}
                     >
                       <PackagePlus className="w-3.5 h-3.5" />
@@ -155,6 +178,8 @@ export const ProductTable: React.FC<ProductTableProps> = ({
                     >
                       <PackageMinus className="w-3.5 h-3.5" />
                     </button>
+                    </>
+                    )}
                   </div>
                 </td>
               </tr>

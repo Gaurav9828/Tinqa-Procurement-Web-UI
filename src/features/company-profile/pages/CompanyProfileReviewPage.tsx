@@ -8,7 +8,7 @@ import { AuditTrail, ChangesTable } from '../components/VersionHistoryParts';
 import { ReviewActions } from '../components/ReviewActions';
 import { Skeleton, StateMessage } from '../components/Dialogs';
 import { BUTTON } from '../utils/companyProfileUi';
-import { COMPANY_PROFILE_PATH, companyDraftPath, formatServerTime } from '../utils/companyProfile.utils';
+import { COMPANY_PROFILE_PATH, HOME_VIDEO_APPROVAL_NOTE, changesLiveHomeVideo, companyDraftPath, formatServerTime } from '../utils/companyProfile.utils';
 
 const Meta: React.FC<{ label: string; who: string | null; when: string | null }> = ({ label, who, when }) =>
   who || when ? (
@@ -75,6 +75,12 @@ export const CompanyProfileReviewPage: React.FC = () => {
           <p className="font-semibold">Reviewer comment</p>
           <p className="break-words whitespace-pre-line">{version.reviewComment}</p>
         </div>
+      )}
+
+      {access.canReview(version) && changesLiveHomeVideo(version) && (
+        <p role="note" data-testid="home-video-approval-note" className="p-3 rounded-xl bg-amber-500/10 text-amber-800 dark:text-amber-300 font-semibold">
+          {HOME_VIDEO_APPROVAL_NOTE}
+        </p>
       )}
 
       <div role="region" aria-label="Changes vs live" className="apple-card">

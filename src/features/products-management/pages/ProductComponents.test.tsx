@@ -13,6 +13,7 @@ import { mockDirectEditApprovals } from './directEditApprovals.testUtil';
 import { axiosClient } from '../../../api/axiosClient';
 import type { ItemResponse, ItemWarrantyResponse } from '../../item-management/types/item.types';
 import type { ProductComponentRequest, ProductComponentResponse, ProductResponseDto } from '../types/product.types';
+import { signInAsSuperAdmin } from '../../../test/access';
 
 /**
  * Two fake backends, HTTP clients only:
@@ -200,6 +201,7 @@ const quantityValues = (n: number) => within(quantitySelect(n)).getAllByRole('op
 const lastBody = (method: 'post' | 'put') => ecom[method].mock.calls.at(-1)?.[1] as Record<string, unknown> & { components?: ProductComponentRequest[] };
 
 beforeEach(() => {
+  signInAsSuperAdmin('ADMIN_L1');
   vi.clearAllMocks();
   itemWarranties = {
     7: [iw(70, 7, '3 Years Manufacturer Warranty'), iw(71, 7, '6 Months Parts Warranty', { warrantyType: 'PARTS', durationValue: 6, durationUnit: 'MONTHS', provider: null }), iw(72, 7, 'Retired plan', { isActive: false })],
@@ -321,8 +323,9 @@ describe('Create product: components auto-add their item warranties', () => {
     expect(await within(row(2)).findByText('Procurement service unavailable')).toBeInTheDocument();
     expect(quantitySelect(2)).toBeDisabled();
 
+    // Row 1 has no item yet, so saving stays disabled.
+    expect(screen.getAllByRole('button', { name: 'Create Product' }).at(-1)).toBeDisabled();
     await submitCreate(user);
-    expect(within(row(1)).getByText('Select an item.')).toBeInTheDocument();
     expect(within(row(2)).getByText('Procurement service unavailable')).toBeInTheDocument(); // row stays flagged
     expect(screen.queryByRole('button', { name: 'Confirm & Create' })).not.toBeInTheDocument();
     expect(ecom.post).not.toHaveBeenCalled();

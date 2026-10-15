@@ -7,6 +7,7 @@ import type {
 import type { ProcessApprovalPayload } from '../../approvals/types/approval.types';
 import { useApiAction } from '../../../hooks/useApiAction';
 import { validateOrderPayload } from '../validator/orderValidator';
+import { orderStatusLabel } from '../utils/orderWorkflow';
 
 export const useOrderActions = (onSuccessCallback?: () => void) => {
   const { isSubmitting, run, reject } = useApiAction(onSuccessCallback);
@@ -31,7 +32,7 @@ export const useOrderActions = (onSuccessCallback?: () => void) => {
 
   const updateOrderStatus = async (id: number, payload: UpdateOrderStatusRequest): Promise<boolean> =>
     run(() => orderApi.updateOrderStatus(id, payload), {
-      success: `Order status updated to ${payload.status}`,
+      success: `Order moved to ${orderStatusLabel(payload.status)}.`,
       failure: 'Failed to update order status.',
     });
 

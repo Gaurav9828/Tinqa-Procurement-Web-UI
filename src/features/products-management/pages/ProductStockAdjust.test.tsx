@@ -11,6 +11,7 @@ import { ProductManagementPage } from './ProductManagementPage';
 import { ecommerceAxiosClient } from '../../../api/ecommerceAxiosClient';
 import { mockDirectEditApprovals } from './directEditApprovals.testUtil';
 import type { ProductResponseDto, SpecificationDTO } from '../types/product.types';
+import { signInAsSuperAdmin } from '../../../test/access';
 
 /**
  * Only the HTTP client is mocked, with a tiny fake of the real Ecommerce BE ProductController:
@@ -131,6 +132,7 @@ const openDialog = async (user: ReturnType<typeof userEvent.setup>, action: 'Add
 };
 
 beforeEach(() => {
+  signInAsSuperAdmin('ADMIN_L1');
   db = [structuredClone(LAMP), structuredClone(PLUG)];
   installFakeBackend();
 });

@@ -7,7 +7,7 @@ import { ResetPasswordPage } from './components/auth/ResetPasswordPage';
 import { GlobalErrorBoundary } from './components/ErrorBoundary';
 import { GlobalErrorPage } from './pages/ErrorPage';
 import { GlobalAlertContainer } from './components/ui/GlobalAlertContainer';
-import { RedirectIfAuthenticated, RequireAuth, RequireNavAccess } from './auth/RouteGuards';
+import { HomeRedirect, RedirectIfAuthenticated, RequireAuth, RequireNavAccess } from './auth/RouteGuards';
 
 // Feature modules are code-split so the login screen does not ship every admin page.
 const ProfilePage = lazy(() => import('./pages/ProfilePage').then((m) => ({ default: m.ProfilePage })));
@@ -91,7 +91,7 @@ export const App: React.FC = () => {
             {/* Protected Admin Routes */}
             <Route element={<RequireAuth />}>
               <Route path="/" element={<AdminLayout />}>
-                <Route index element={<Navigate to="/analytics" replace />} />
+                <Route index element={<HomeRedirect />} />
                 <Route path="profile" element={<ProfilePage />} />
 
                 <Route element={<RequireNavAccess navId="analytics" />}>
@@ -117,12 +117,14 @@ export const App: React.FC = () => {
                 <Route element={<RequireNavAccess navId="employees" />}>
                   <Route path="employees" element={<EmployeeManagementPage />} />
                 </Route>
-                <Route element={<RequireNavAccess navId="items" />}>
+                <Route element={<RequireNavAccess navId="items" requires={['ITEM_VIEW']} />}>
                   <Route path="item" element={<ItemManagementPage />} />
                 </Route>
-                <Route element={<RequireNavAccess navId="stocks" />}>
-                  <Route path="stocks" element={<StockManagementPage />} />
+                <Route element={<RequireNavAccess navId="items" requires={['STOCK_VIEW']} />}>
+                  <Route path="item/stocks" element={<StockManagementPage />} />
                 </Route>
+                {/* Old sidebar link; stock management now lives under Item Management. */}
+                <Route path="stocks" element={<Navigate to="/item/stocks" replace />} />
                 <Route element={<RequireNavAccess navId="products" />}>
                   <Route path="products" element={<ProductManagementPage />} />
                 </Route>

@@ -78,7 +78,8 @@ export const RejectionModal: React.FC<RejectionModalProps> = ({
             </button>
             <button
               type="submit"
-              className="px-4 py-2 rounded-xl text-sm font-semibold bg-rose-500 text-white hover:bg-rose-600 transition-all shadow-sm"
+              disabled={!reason.trim()}
+              className="px-4 py-2 rounded-xl text-sm font-semibold bg-rose-500 text-white hover:bg-rose-600 transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Proceed to Confirmation
             </button>

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { RefreshCw } from 'lucide-react';
+import { ArrowRight, RefreshCw, Undo2 } from 'lucide-react';
 import { useApprovals } from './hooks/useApprovals';
 import type { UnifiedApprovalItem } from './types/approval.types';
 
@@ -13,8 +13,51 @@ import type { ApprovalItem, ApprovalStatus, OrderStatus } from '../../types/comm
 import { ProductApprovalReviewModal } from '../products-management/components/ProductApprovalReviewModal';
 import { useProductActions } from '../products-management/hooks/useProductActions';
 import type { ProductApprovalResponse } from '../products-management/types/productApproval.types';
+import { RefundsQueue } from '../refunds/components/RefundsQueue';
+import { usePendingRefundCount } from '../refunds/hooks/usePendingRefundCount';
+import { useAccess } from '../../hooks/useAccess';
+
+type HubTab = 'requests' | 'refunds';
+const TAB_STORAGE_KEY = 'approvals.tab';
+
+/** Remembered per browser tab, so Back from an order opened in the refunds queue returns to it. */
+const readTab = (): HubTab => {
+  try {
+    return sessionStorage.getItem(TAB_STORAGE_KEY) === 'refunds' ? 'refunds' : 'requests';
+  } catch {
+    return 'requests';
+  }
+};
+
+const TABS: { id: HubTab; label: string }[] = [
+  { id: 'requests', label: 'Requests' },
+  { id: 'refunds', label: 'Refunds' },
+];
 
 export const ApprovalsHub: React.FC = () => {
+  const [selectedTab, setTab] = useState<HubTab>(readTab);
+  const { can, canAny } = useAccess();
+  // Requests: every approval queue except refunds; Refunds: the refund approval queue
+  const availableTabs = TABS.filter(({ id }) =>
+    id === 'refunds'
+      ? can('REFUND_APPROVE')
+      : canAny('DOCUMENT_APPROVE', 'EMPLOYEE_PROFILE_CHANGE_APPROVE', 'STOCK_APPROVE', 'PROCUREMENT_ORDER_APPROVE',
+          'PRODUCT_APPROVAL_DECIDE', 'EMPLOYEE_APPROVE')
+  );
+  const tab: HubTab = availableTabs.some(({ id }) => id === selectedTab) ? selectedTab : availableTabs[0]?.id ?? 'requests';
+  // Refunds live in their own tab; the count keeps them visible from the Requests tab.
+  const pendingRefunds = usePendingRefundCount();
+  const pendingRefundCount = pendingRefunds.count ?? 0;
+  const selectTab = (next: HubTab) => {
+    setTab(next);
+    pendingRefunds.refresh();
+    try {
+      sessionStorage.setItem(TAB_STORAGE_KEY, next);
+    } catch {
+      // Storage unavailable: the tab just isn't remembered.
+    }
+  };
+
   const {
     approvals,
     isLoading,
@@ -145,39 +188,91 @@ export const ApprovalsHub: React.FC = () => {
             Approval Hub
           </h1>
           <p className="text-gray-500 dark:text-neutral-400 text-sm mt-1">
-            Review and action incoming requests across documents, profile updates, new employees, stock, orders and products.
+            Review and action incoming requests across documents, profile updates, new employees, stock, orders, products and refunds.
           </p>
         </div>
-        <button
-          onClick={refreshApprovals}
-          disabled={isLoading}
-          className="px-4 py-2 rounded-xl bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 text-black dark:text-white transition-colors flex items-center gap-2 text-sm font-medium cursor-pointer"
-        >
-          <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
-          Refresh
-        </button>
+        {tab === 'requests' && (
+          <button
+            onClick={refreshApprovals}
+            disabled={isLoading}
+            className="px-4 py-2 rounded-xl bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 text-black dark:text-white transition-colors flex items-center gap-2 text-sm font-medium cursor-pointer"
+          >
+            <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+            Refresh
+          </button>
+        )}
       </div>
 
-      {/* Metrics Section */}
-      <ApprovalMetrics approvals={approvals} />
+      <div role="tablist" aria-label="Approval queues" className="inline-flex p-1 rounded-xl bg-black/5 dark:bg-white/5">
+        {availableTabs.map(({ id, label }) => (
+          <button
+            key={id}
+            type="button"
+            role="tab"
+            aria-selected={tab === id}
+            onClick={() => selectTab(id)}
+            className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-colors cursor-pointer ${
+              tab === id ? 'bg-white dark:bg-neutral-800 text-black dark:text-white shadow-sm' : 'text-gray-500 hover:text-black dark:hover:text-white'
+            }`}
+          >
+            {label}
+            {id === 'refunds' && pendingRefundCount > 0 && (
+              <span
+                aria-label={`${pendingRefundCount} awaiting approval`}
+                className="ml-2 inline-flex items-center justify-center min-w-5 h-5 px-1.5 rounded-full bg-amber-500 text-white text-[10px] font-bold"
+              >
+                {pendingRefundCount}
+              </span>
+            )}
+          </button>
+        ))}
+      </div>
 
-      {/* Unified Data Table */}
-      <ApprovalTable
-        approvals={approvals}
-        isLoading={isLoading}
-        onPreview={(item) => {
-          if (openProductReview(item)) return;
-          setSelectedRequest(item);
-          setIsPreviewOpen(true);
-        }}
-        onInitiateApprove={(item) => {
-          if (item) handleInitiateApprove(item);
-        }}
-        onInitiateReject={(item) => {
-          if (item) handleInitiateReject(item);
-        }}
-        formatTime={formatTime}
-      />
+      {tab === 'refunds' ? (
+        <RefundsQueue onChanged={pendingRefunds.refresh} />
+      ) : (
+        <>
+          {pendingRefundCount > 0 && (
+            <div
+              role="note"
+              aria-label="Refunds awaiting approval"
+              className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-sm text-amber-800 dark:text-amber-300"
+            >
+              <span className="flex items-center gap-2">
+                <Undo2 className="w-4 h-4 shrink-0" />
+                {pendingRefundCount === 1 ? '1 refund is' : `${pendingRefundCount} refunds are`} awaiting approval.
+              </span>
+              <button
+                type="button"
+                onClick={() => selectTab('refunds')}
+                className="self-start sm:self-auto flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-semibold cursor-pointer"
+              >
+                Review refunds <ArrowRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
+          {/* Metrics Section */}
+          <ApprovalMetrics approvals={approvals} />
+
+          {/* Unified Data Table */}
+          <ApprovalTable
+            approvals={approvals}
+            isLoading={isLoading}
+            onPreview={(item) => {
+              if (openProductReview(item)) return;
+              setSelectedRequest(item);
+              setIsPreviewOpen(true);
+            }}
+            onInitiateApprove={(item) => {
+              if (item) handleInitiateApprove(item);
+            }}
+            onInitiateReject={(item) => {
+              if (item) handleInitiateReject(item);
+            }}
+            formatTime={formatTime}
+          />
+        </>
+      )}
 
       <ApprovalPreviewModal
         request={selectedRequest}

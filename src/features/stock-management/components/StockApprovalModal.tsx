@@ -51,7 +51,7 @@ export const StockApprovalModal: React.FC<Props> = ({
       <div className="relative w-full max-w-md bg-white dark:bg-neutral-900 rounded-2xl p-6 shadow-2xl border border-black/10 dark:border-white/10">
         <div className="flex items-center justify-between pb-3 border-b border-black/10 dark:border-white/10 mb-4">
           <h3 className="text-base font-semibold text-black dark:text-white">
-            Admin L2 Approval Decision
+            Approval decision
           </h3>
           <button onClick={onClose} className="text-gray-400 hover:text-black dark:hover:text-white cursor-pointer">
             <X className="w-5 h-5" />

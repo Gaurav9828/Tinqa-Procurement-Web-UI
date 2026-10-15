@@ -4,6 +4,7 @@ import { Search, Plus } from 'lucide-react';
 
 import type { DealerResponse } from '../../dealer-management/types/dealer.types';
 import { ORDER_STATUS, type OrderStatus } from '../../../types/common.types';
+import { orderStatusLabel } from '../utils/orderWorkflow';
 
 interface OrderFilterBarProps {
   searchQuery: string;
@@ -13,7 +14,8 @@ interface OrderFilterBarProps {
   onSearchChange: (val: string) => void;
   onStatusChange: (status?: OrderStatus) => void;
   onDealerChange: (dealerId?: number) => void;
-  onOpenCreateOrderModal: () => void;
+  /** Hidden when absent (the user can't create orders). */
+  onOpenCreateOrderModal?: () => void;
 }
 
 export const OrderFilterBar: React.FC<OrderFilterBarProps> = ({
@@ -50,7 +52,7 @@ export const OrderFilterBar: React.FC<OrderFilterBarProps> = ({
           <option value="">All Statuses</option>
           {ORDER_STATUS.map((st) => (
             <option key={st} value={st}>
-              {st}
+              {orderStatusLabel(st)}
             </option>
           ))}
         </select>
@@ -70,6 +72,7 @@ export const OrderFilterBar: React.FC<OrderFilterBarProps> = ({
         </select>
       </div>
 
+      {onOpenCreateOrderModal && (
       <button
         type="button"
         onClick={onOpenCreateOrderModal}
@@ -77,6 +80,7 @@ export const OrderFilterBar: React.FC<OrderFilterBarProps> = ({
       >
         <Plus className="w-4 h-4" /> Create Order
       </button>
+      )}
     </div>
   );
 };

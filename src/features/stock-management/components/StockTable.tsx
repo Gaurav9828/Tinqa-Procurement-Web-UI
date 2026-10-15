@@ -2,7 +2,7 @@ import React from 'react';
 import { Edit3, CheckSquare, Eye, PackageSearch } from 'lucide-react';
 import { StockStatusBadge } from './StockStatusBadge';
 import type { StockResponse } from '../types/stock.types';
-import { useAuthStore } from '../../../store/useAuthStore';
+import { useAccess } from '../../../hooks/useAccess';
 
 interface StockTableProps {
     stocks: StockResponse[];
@@ -19,10 +19,8 @@ export const StockTable: React.FC<StockTableProps> = ({
     onEdit,
     onApproval,
 }) => {
-    const { user } = useAuthStore();
-    const userRole = user?.role || 'ADMIN_L1';
-
-    const isL2User = userRole === 'ADMIN_L2';
+    const { can } = useAccess();
+    const canDecide = can('STOCK_APPROVE');
     if (isLoading) {
         return (
             <div className="apple-card p-12 text-center text-gray-500 dark:text-neutral-400">
@@ -113,9 +111,9 @@ export const StockTable: React.FC<StockTableProps> = ({
                                         {stock.approvalStatus === 'PENDING' && (
                                             <button
                                                 type="button"
-                                                disabled={!isL2User}
+                                                disabled={!canDecide}
                                                 onClick={() => onApproval(stock)}
-                                                title={isL2User ? "Admin L2 Decision" : "Requires Admin L2 Access"}
+                                                title={canDecide ? 'Approve or reject' : 'Waiting for a stock approver'}
                                                 className="p-2 rounded-lg transition-colors cursor-pointer text-amber-600 hover:bg-amber-500/10 disabled:text-gray-400 disabled:hover:bg-transparent disabled:opacity-40 disabled:cursor-not-allowed"
                                             >
                                                 <CheckSquare className="w-4 h-4" />

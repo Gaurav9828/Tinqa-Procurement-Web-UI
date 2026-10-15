@@ -7,7 +7,8 @@ interface StockFilterBarProps {
   selectedStatus?: ApprovalStatus;
   onSearchChange: (val: string) => void;
   onStatusChange: (status?: ApprovalStatus) => void;
-  onOpenCreateModal: () => void;
+  /** Hidden when absent (the user can't record stock). */
+  onOpenCreateModal?: () => void;
 }
 
 export const StockFilterBar: React.FC<StockFilterBarProps> = ({
@@ -41,6 +42,7 @@ export const StockFilterBar: React.FC<StockFilterBarProps> = ({
           <option value="REJECTED">REJECTED</option>
         </select>
       </div>
+      {onOpenCreateModal && (
       <button
         type="button"
         onClick={onOpenCreateModal}
@@ -49,6 +51,7 @@ export const StockFilterBar: React.FC<StockFilterBarProps> = ({
         <Plus className="w-4 h-4" />
         <span>Add Stock</span>
       </button>
+      )}
     </div>
   );
 };

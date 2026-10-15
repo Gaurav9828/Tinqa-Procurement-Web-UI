@@ -248,7 +248,7 @@ export const ProductApprovalReviewModal: React.FC<Props> = ({ request, isSubmitt
           </button>
           <button
             type="button"
-            disabled={!decision || isSubmitting || (touched && !!reasonError)}
+            disabled={!decision || isSubmitting || (needsReason && !reason.trim()) || (touched && !!reasonError)}
             onClick={submit}
             className={`flex items-center gap-1.5 px-4 py-2 text-white rounded-xl font-semibold disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed ${decision ? DECISIONS[decision].tone : 'bg-[#0071e3]'}`}
           >

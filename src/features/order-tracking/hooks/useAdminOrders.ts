@@ -7,6 +7,7 @@ import { useDebouncedValue } from '../../../hooks/useDebouncedValue';
 import { useLatestRequest } from '../../../hooks/useLatestRequest';
 import { useNotify } from '../../../hooks/useNotify';
 import { getApiErrorKind, type ApiErrorKind } from '../../../utils/apiErrorKind';
+import { PAYMENT_STATUS_FILTER_OPTIONS } from '../utils/payment.utils';
 
 export const ADMIN_ORDERS_PAGE_SIZE = 20;
 export const ADMIN_ORDERS_SEARCH_MAX_LENGTH = 100;
@@ -14,6 +15,8 @@ export const ADMIN_ORDERS_SEARCH_MAX_LENGTH = 100;
 export interface AdminOrderFilters {
   search: string;
   status: string;
+  /** '' = any payment status. */
+  paymentStatus: string;
   fromDate: string;
   toDate: string;
   sort: AdminOrderSort;
@@ -33,13 +36,16 @@ const SORTS: readonly AdminOrderSort[] = [
 
 // URL keys. The URL is the source of truth for list state, so it survives opening an
 // order, the browser Back button and page refreshes.
-const Q = { search: 'q', status: 'status', fromDate: 'from', toDate: 'to', sort: 'sort', page: 'page' } as const;
+const Q = { search: 'q', status: 'status', paymentStatus: 'payment', fromDate: 'from', toDate: 'to', sort: 'sort', page: 'page' } as const;
 
 const readFilters = (params: URLSearchParams): AdminOrderFilters => {
   const sort = params.get(Q.sort) as AdminOrderSort | null;
+  const payment = (params.get(Q.paymentStatus) ?? '').toUpperCase();
   return {
     search: (params.get(Q.search) ?? '').slice(0, ADMIN_ORDERS_SEARCH_MAX_LENGTH),
     status: params.get(Q.status) ?? '',
+    // Unknown values in a hand-edited URL are ignored rather than sent.
+    paymentStatus: PAYMENT_STATUS_FILTER_OPTIONS.includes(payment) ? payment : '',
     fromDate: params.get(Q.fromDate) ?? '',
     toDate: params.get(Q.toDate) ?? '',
     sort: sort && SORTS.includes(sort) ? sort : DEFAULT_SORT,
@@ -80,10 +86,11 @@ export const useAdminOrders = () => {
       sort: filters.sort,
       search: debouncedSearch,
       status: filters.status,
+      paymentStatus: filters.paymentStatus,
       fromDate: filters.fromDate,
       toDate: filters.toDate,
     }),
-    [page, filters.sort, debouncedSearch, filters.status, filters.fromDate, filters.toDate]
+    [page, filters.sort, debouncedSearch, filters.status, filters.paymentStatus, filters.fromDate, filters.toDate]
   );
   const cacheKey = JSON.stringify(requestParams);
   const cached = listCache.get(cacheKey);
@@ -165,7 +172,7 @@ export const useAdminOrders = () => {
 
   const resetFilters = useCallback(() => writeParams((next) => Object.values(Q).forEach((key) => next.delete(key))), [writeParams]);
 
-  const hasActiveFilters = !!filters.search.trim() || !!filters.status || !!filters.fromDate || !!filters.toDate;
+  const hasActiveFilters = !!filters.search.trim() || !!filters.status || !!filters.paymentStatus || !!filters.fromDate || !!filters.toDate;
 
   return {
     orders: data?.content ?? [],

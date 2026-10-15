@@ -3,9 +3,9 @@ import { Lock, Briefcase } from 'lucide-react';
 import { CommonInput, CommonSelect } from '../ui/FormInputs';
 import { Validator } from '../../utils/validator';
 import type { ProfileFormState } from '../../hooks/useProfile';
-import { HasAccess } from '../../auth/HasAccess';
+import { useAccess } from '../../hooks/useAccess';
 import { ConfirmationModal } from '../ui/ConfirmationModal';
-import { DEPARTMENTS, DESIGNATIONS, GENDERS } from '../../types/common.types';
+import { GENDERS } from '../../types/common.types';
 
 interface ProfileTabProps {
     employeeData: ProfileFormState;
@@ -23,6 +23,7 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({
     onValidationChange,
     isSubmitting = false,
 }) => {
+    const { can } = useAccess();
     const [isConfirmOpen, setIsConfirmOpen] = useState<boolean>(false);
     const [pendingEvent, setPendingEvent] = useState<React.FormEvent | null>(null);
 
@@ -75,17 +76,6 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({
         });
         if (dobErr) errs.date_of_birth = dobErr;
 
-        const departmentErr = Validator.validateField(employeeData.department, {
-            required: true,
-            customMessage: 'Please select a department.',
-        });
-        if (departmentErr) errs.department = departmentErr;
-
-        const designationErr = Validator.validateField(employeeData.designation, {
-            required: true,
-            customMessage: 'Please select a designation.',
-        });
-        if (designationErr) errs.designation = designationErr;
 
         const genderErr = Validator.validateField(employeeData.gender, {
             required: true,
@@ -183,34 +173,29 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({
                             Organizational & System Identity
                         </h3>
 
-                        <HasAccess roles='ADMIN_L1'>
+                        {/* Approvers apply their own changes directly; everyone else's wait for one */}
+                        {!can('EMPLOYEE_PROFILE_CHANGE_APPROVE') && (
                             <span className="text-xs font-semibold text-amber-500 flex items-center gap-1.5 uppercase tracking-wider">
-                                <Lock className="w-3.5 h-3.5" /> Requires Admin II Approval
+                                <Lock className="w-3.5 h-3.5" /> Changes require approval
                             </span>
-                        </HasAccess>
+                        )}
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-1">
-                        <CommonSelect
+                        {/* Read-only: the department follows the designation */}
+                        <CommonInput
                             label="Assigned Department"
-                            required
-                            value={employeeData.department}
-                            error={errors.department}
-                            onChange={(e) =>
-                                setEmployeeData({ ...employeeData, department: e.target.value })
-                            }
-                            options={DEPARTMENTS}
+                            value={employeeData.department || 'Not assigned'}
+                            disabled
+                            readOnly
                         />
 
-                        <CommonSelect
+                        {/* Read-only: it decides what this admin can access, so only Employee Management changes it */}
+                        <CommonInput
                             label="Designation"
-                            required
-                            value={employeeData.designation}
-                            error={errors.designation}
-                            onChange={(e) =>
-                                setEmployeeData({ ...employeeData, designation: e.target.value })
-                            }
-                            options={DESIGNATIONS}
+                            value={employeeData.designation_label || 'Not assigned'}
+                            disabled
+                            readOnly
                         />
 
                         <CommonInput

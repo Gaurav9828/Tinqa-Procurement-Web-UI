@@ -4,7 +4,7 @@ import { companyProfileApi } from '../api/companyProfileApi';
 import type { AssetPurpose } from '../types/companyProfile.types';
 import { parseApiError } from '../../../utils/apiError';
 import { isHttpsUrl, LIMITS } from '../utils/companyProfileForm';
-import { ProfileImage, type ImageVariant } from './ProfileDisplay';
+import { ProfileImage, YouTubePreview, type ImageVariant } from './ProfileDisplay';
 import { BUTTON, precheckAsset } from '../utils/companyProfileUi';
 
 const inputClass = (error?: string) =>
@@ -25,6 +25,8 @@ interface TextFieldProps {
   onChange: (value: string) => void;
   error?: string;
   hint?: string | null;
+  /** Neutral help text under the input. */
+  description?: React.ReactNode;
   maxLength?: number;
   required?: boolean;
   /** Shows "12/40". */
@@ -32,8 +34,13 @@ interface TextFieldProps {
   type?: 'text' | 'email' | 'tel' | 'url';
   placeholder?: string;
   disabled?: boolean;
+  /** Shown greyed out but still focusable and announced (e.g. values filled from the PIN code). */
+  readOnly?: boolean;
   upperCase?: boolean;
   className?: string;
+  /** Extra content inside the input box, on the right (e.g. a spinner). */
+  adornment?: React.ReactNode;
+  inputMode?: React.HTMLAttributes<HTMLInputElement>['inputMode'];
 }
 
 export const TextField: React.FC<TextFieldProps> = ({
@@ -42,16 +49,21 @@ export const TextField: React.FC<TextFieldProps> = ({
   onChange,
   error,
   hint,
+  description,
   maxLength,
   required,
   counter,
   type = 'text',
   placeholder,
   disabled,
+  readOnly,
   upperCase,
   className = '',
+  adornment,
+  inputMode,
 }) => {
   const id = useId();
+  const describedBy = [error || hint ? `${id}-msg` : null, description ? `${id}-desc` : null].filter(Boolean).join(' ');
   return (
     <div className={`min-w-0 ${className}`}>
       <div className="flex items-end justify-between mb-1">
@@ -65,23 +77,78 @@ export const TextField: React.FC<TextFieldProps> = ({
           </span>
         )}
       </div>
+      <div className="relative">
       <input
         id={id}
         type={type}
         value={value}
         disabled={disabled}
+        readOnly={readOnly}
+        inputMode={inputMode}
         placeholder={placeholder}
         // Allow a little over the limit so the counter/validation explain it instead of silently truncating.
         maxLength={maxLength ? maxLength + 20 : undefined}
         aria-invalid={!!error}
-        aria-describedby={error || hint ? `${id}-msg` : undefined}
+        aria-describedby={describedBy || undefined}
         onChange={(e) => onChange(upperCase ? e.target.value.toUpperCase() : e.target.value)}
-        className={`${inputClass(error)} ${upperCase ? 'uppercase font-mono' : ''}`}
+        className={`${inputClass(error)} ${upperCase ? 'uppercase font-mono' : ''} ${readOnly ? 'bg-black/5 dark:bg-white/5 text-gray-600 dark:text-gray-300 cursor-not-allowed' : ''}`}
       />
+      {adornment && <span className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center">{adornment}</span>}
+      </div>
       <FieldError id={`${id}-msg`} message={error ?? hint} tone={error ? 'error' : 'hint'} />
+      {description && (
+        <div id={`${id}-desc`} className="text-[11px] text-gray-500 mt-1 space-y-0.5">
+          {description}
+        </div>
+      )}
     </div>
   );
 };
+
+interface HomeVideoFieldsProps {
+  enabled: boolean;
+  url: string;
+  onEnabledChange: (enabled: boolean) => void;
+  onUrlChange: (url: string) => void;
+  error?: string;
+  disabled?: boolean;
+}
+
+/** Switch + YouTube link + thumbnail preview. The link stays editable while off, so it survives toggling. */
+export const HomeVideoFields: React.FC<HomeVideoFieldsProps> = ({ enabled, url, onEnabledChange, onUrlChange, error, disabled }) => (
+  <div className="space-y-4">
+    <label className="inline-flex items-center gap-2 font-semibold text-gray-700 dark:text-gray-300 cursor-pointer">
+      <input
+        type="checkbox"
+        role="switch"
+        checked={enabled}
+        disabled={disabled}
+        onChange={(e) => onEnabledChange(e.target.checked)}
+        className="w-4 h-4 rounded border-black/15 text-[#0071e3] focus:ring-2 focus:ring-[#0071e3] cursor-pointer"
+      />
+      Show background video on the home page
+    </label>
+    <div className={`space-y-3 transition-opacity ${enabled ? '' : 'opacity-60'}`}>
+      <TextField
+        label="YouTube link"
+        type="url"
+        placeholder="https://www.youtube.com/watch?v=…"
+        maxLength={LIMITS.homeVideoUrl}
+        value={url}
+        onChange={onUrlChange}
+        error={error}
+        disabled={disabled}
+        description={
+          <>
+            <p>Plays muted and on loop behind the storefront home page. Visitors can't pause or control it.</p>
+            {!enabled && url.trim() && <p className="italic">Saved, but not shown while the video is off.</p>}
+          </>
+        }
+      />
+      <YouTubePreview url={url} />
+    </div>
+  </div>
+);
 
 const ACCEPTED: Record<AssetPurpose, { accept: string; hint: string }> = {
   LOGO: { accept: '.png,.svg,.webp,image/png,image/svg+xml,image/webp', hint: 'PNG, SVG or WEBP, up to 1 MB.' },

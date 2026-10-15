@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { X, Save, AlertCircle } from 'lucide-react';
+import { X, Save } from 'lucide-react';
 import type { CreateCategoryRequest } from '../types/dealer.types';
 
 interface DealerCategoryFormModalProps {
@@ -69,13 +69,6 @@ export const DealerCategoryFormModal: React.FC<DealerCategoryFormModalProps> = (
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
-
-          {!isValid && Object.keys(touched).length > 0 && (
-            <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center gap-2 text-xs text-red-600 dark:text-red-400">
-              <AlertCircle className="w-4 h-4 shrink-0" />
-              <span>Please fill in all required category fields.</span>
-            </div>
-          )}
 
           <div>
             <label className="block text-xs font-medium mb-1 text-gray-700 dark:text-neutral-300">

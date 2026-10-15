@@ -3,7 +3,9 @@ import { useLatestRequest } from '../../../hooks/useLatestRequest';
 import { approvalService } from '../services/approvalService';
 import type { ProcessApprovalPayload, UnifiedApprovalItem } from '../types/approval.types';
 
+import { useAccess } from '../../../hooks/useAccess';
 import { useAuthStore } from '../../../store/useAuthStore';
+import type { Permission } from '../../../config/access';
 import { stockApi } from '../../stock-management/api/stockApi';
 import { orderApi } from '../../order-management/api/orderApi';
 import { productApprovalApi } from '../../products-management/api/productApprovalApi';
@@ -16,24 +18,31 @@ export const useApprovals = () => {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isDownloading, setIsDownloading] = useState<boolean>(false);
 
-  const { user } = useAuthStore();
+  const { can, canAny } = useAccess();
+  const userId = useAuthStore((state) => state.user?.userId);
   const beginRequest = useLatestRequest();
   const notify = useNotify();
 
   const fetchAllApprovals = useCallback(async () => {
-    if (user?.role !== 'ADMIN_L2') return;
+    if (!canAny('DOCUMENT_APPROVE', 'EMPLOYEE_PROFILE_CHANGE_APPROVE', 'STOCK_APPROVE', 'PROCUREMENT_ORDER_APPROVE',
+      'PRODUCT_APPROVAL_DECIDE', 'EMPLOYEE_APPROVE')) return;
+    // Each queue loads only for someone who can decide it; the rest stay empty
+    const ifAllowed = <T,>(permission: Permission, load: () => Promise<T[]>): Promise<T[]> =>
+      can(permission) ? load() : Promise.resolve([]);
 
     const isCurrent = beginRequest();
     setIsLoading(true);
 
     try {
       const [documentsResult, profilesResult, stocksResult, orderResult, productResult, employeeResult] = await Promise.allSettled([
-        approvalService.getPendingDocuments(),
-        approvalService.getProfileApprovals(),
-        approvalService.getStocksApprovals(),
-        approvalService.getOrdersApprovals(),
-        productApprovalApi.getPending().then((res) => (res.success && Array.isArray(res.data) ? res.data : [])),
-        approvalService.getEmployeeApprovals(),
+        ifAllowed('DOCUMENT_APPROVE', () => approvalService.getPendingDocuments()),
+        ifAllowed('EMPLOYEE_PROFILE_CHANGE_APPROVE', () => approvalService.getProfileApprovals()),
+        ifAllowed('STOCK_APPROVE', () => approvalService.getStocksApprovals()),
+        ifAllowed('PROCUREMENT_ORDER_APPROVE', () => approvalService.getOrdersApprovals()),
+        ifAllowed('PRODUCT_APPROVAL_DECIDE', () =>
+          productApprovalApi.getPending().then((res) => (res.success && Array.isArray(res.data) ? res.data : []))
+        ),
+        ifAllowed('EMPLOYEE_APPROVE', () => approvalService.getEmployeeApprovals()),
       ]);
       if (!isCurrent()) return;
 
@@ -107,7 +116,7 @@ export const useApprovals = () => {
     } finally {
       if (isCurrent()) setIsLoading(false);
     }
-  }, [user?.role, beginRequest, notify]);
+  }, [can, canAny, beginRequest, notify]);
 
   useEffect(() => {
     fetchAllApprovals();
@@ -126,8 +135,8 @@ export const useApprovals = () => {
 
     // The backend refuses this too; checking here saves a round trip and gives the same message.
     const employeeCreatedBy = item.approvalType === 'EMPLOYEE' ? (item as EmployeeResponse).createdBy : null;
-    if (employeeCreatedBy != null && employeeCreatedBy === user?.userId) {
-      notify.error('You created this employee, so another Admin L2 has to review them.');
+    if (employeeCreatedBy != null && employeeCreatedBy === userId) {
+      notify.error('You created this employee, so another employee approver has to review them.');
       return false;
     }
 
@@ -135,7 +144,7 @@ export const useApprovals = () => {
       if (item.approvalType === 'DOCUMENT') {
         const res = await approvalService.processDocumentApproval(targetId, payload);
         if (res.success) {
-          notify.success(res.message || 'Document L2 approval status updated.');
+          notify.success(res.message || 'Document approval status updated.');
         } else {
           notify.error(res, 'Failed to process document approval.');
           return false;

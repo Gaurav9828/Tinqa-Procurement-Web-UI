@@ -95,8 +95,11 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
     setFormData((prev) => ({ ...prev, specifications: updated }));
   };
 
+  const isFormComplete = !!formData.title.trim() && formData.price > 0 && formData.stockQuantity >= 0;
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!isFormComplete) return;
     const success = await onSubmit(formData);
     if (success) {
       onClose();
@@ -274,8 +277,8 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
             </button>
             <button
               type="submit"
-              disabled={isSubmitting}
-              className="px-4 py-2 bg-[#0071e3] hover:bg-[#0077ed] text-white rounded-xl font-medium disabled:opacity-50"
+              disabled={isSubmitting || !isFormComplete}
+              className="px-4 py-2 bg-[#0071e3] hover:bg-[#0077ed] text-white rounded-xl font-medium disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isSubmitting ? 'Saving...' : initialData ? 'Update Product' : 'Create Product'}
             </button>

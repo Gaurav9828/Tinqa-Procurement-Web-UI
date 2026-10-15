@@ -11,6 +11,7 @@ export interface CompanyAddress {
   line1: string | null;
   line2: string | null;
   city: string | null;
+  district: string | null;
   state: string | null;
   stateCode: string | null;
   postalCode: string | null;
@@ -35,6 +36,10 @@ export interface CompanyProfileFields {
   careersEmail: string | null;
   website: string | null;
   invoiceTerms: string[] | null;
+  /** Master switch for the storefront's background video; off = no video, whatever the URL. */
+  homeVideoEnabled: boolean | null;
+  /** YouTube link of the home page background video. */
+  homeVideoUrl: string | null;
 }
 
 /** One field that differs from the live profile, e.g. "address.city" or "invoiceTerms". */

@@ -131,6 +131,8 @@ export interface AdminOrderListParams {
   /** Matches order number, item title, customer email or name. Max 100 chars. */
   search?: string;
   status?: string;
+  /** Order-level payment status, e.g. PAID or REFUND_REQUESTED. */
+  paymentStatus?: string;
   /** yyyy-MM-dd, inclusive */
   fromDate?: string;
   /** yyyy-MM-dd, inclusive */
@@ -142,20 +144,3 @@ export interface UpdateTrackingRequest {
   status: string;
   notes: string | null;
 }
-
-/** Customer-facing OrderResponseDTO, returned by PATCH /orders/{orderNumber}/status. */
-export interface OrderStatusUpdateResponse {
-  id: number;
-  orderNumber: string;
-  orderStatus: string;
-  updatedBy: string | null;
-  createdAt: string;
-  items: OrderItemSummary[] | null;
-  tracking: OrderTrackingEntry[] | null;
-}
-
-/**
- * The two ways an admin can change status. Each user action sends exactly one request;
- * both append one history event and update orderStatus on the server.
- */
-export type StatusUpdateMode = 'tracking' | 'manual';

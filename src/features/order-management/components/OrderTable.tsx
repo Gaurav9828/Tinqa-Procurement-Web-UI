@@ -1,84 +1,22 @@
-import React, { useState } from 'react';
-import { Eye, Pencil, RefreshCw, AlertTriangle, X } from 'lucide-react';
+import React from 'react';
+import { Eye, ListChecks, Lock, Pencil, RefreshCw } from 'lucide-react';
 import { OrderStatusBadge } from './OrderStatusBadge';
-import type { OrderResponse, UpdateOrderStatusRequest } from '../types/order.types';
-import { useAuthStore } from '../../../store/useAuthStore';
-import { ORDER_STATUS, type OrderStatus } from '../../../types/common.types';
-import { todayLocalIsoDate } from '../validator/orderValidator';
+import type { OrderResponse } from '../types/order.types';
+import { ORDER_STATUS_INFO, canEditOrder, getNextOrderStatuses, getOrderBlockReason, orderAccessFrom } from '../utils/orderWorkflow';
+import { useAccess } from '../../../hooks/useAccess';
 
 interface OrderTableProps {
     orders: OrderResponse[];
     isLoading: boolean;
     onPreview: (order: OrderResponse) => void;
     onEdit: (order: OrderResponse) => void;
-    onStatusUpdate: (order: OrderResponse, payload: UpdateOrderStatusRequest) => void;
+    /** Opens the status dialog, which offers only the allowed next steps. */
+    onOpenStatus: (order: OrderResponse) => void;
 }
 
-export const OrderTable: React.FC<OrderTableProps> = ({
-    orders,
-    isLoading,
-    onPreview,
-    onEdit,
-    onStatusUpdate,
-}) => {
-    const { user } = useAuthStore();
-    const userRole = user?.role || 'ADMIN_L1';
-    const isL2User = userRole === 'ADMIN_L2';
-
-    // State for managing the confirmation modal
-    const [pendingChange, setPendingChange] = useState<{
-        order: OrderResponse;
-        newStatus: OrderStatus;
-    } | null>(null);
-    const [actualDeliveryDate, setActualDeliveryDate] = useState<string>('');
-
-    const handleSelectChange = (order: OrderResponse, newStatus: OrderStatus) => {
-        if (order.orderStatus === newStatus) return;
-
-        setPendingChange({ order, newStatus });
-        
-        // Pre-fill delivery date if available and updating to DELIVERED, otherwise default to today
-        if (newStatus === 'DELIVERED') {
-            // Default to today in the user's timezone (toISOString() would give the UTC day).
-            setActualDeliveryDate(order.actualDelivery || todayLocalIsoDate());
-        } else {
-            setActualDeliveryDate('');
-        }
-    };
-
-    // Delivery has happened, so the date can't be in the future (or before the order was placed).
-    const today = todayLocalIsoDate();
-    const deliveryDateError =
-        pendingChange?.newStatus !== 'DELIVERED'
-            ? null
-            : !actualDeliveryDate
-              ? 'Actual delivery date is required.'
-              : actualDeliveryDate > today
-                ? 'Actual delivery date cannot be in the future.'
-                : pendingChange.order.orderDate && actualDeliveryDate < pendingChange.order.orderDate
-                  ? `Actual delivery date cannot be before the order date (${pendingChange.order.orderDate}).`
-                  : null;
-
-    const handleConfirmStatusChange = () => {
-        if (!pendingChange || deliveryDateError) return;
-
-        const { order, newStatus } = pendingChange;
-
-        // If status is not DELIVERED, set actualDelivery to null/empty
-        const payload: UpdateOrderStatusRequest = {
-            status: newStatus,
-            actualDelivery: newStatus === 'DELIVERED' ? actualDeliveryDate || undefined : undefined,
-        };
-
-        onStatusUpdate(order, payload);
-        setPendingChange(null);
-        setActualDeliveryDate('');
-    };
-
-    const handleCancelModal = () => {
-        setPendingChange(null);
-        setActualDeliveryDate('');
-    };
+export const OrderTable: React.FC<OrderTableProps> = ({ orders, isLoading, onPreview, onEdit, onOpenStatus }) => {
+    const { can } = useAccess();
+    const access = orderAccessFrom(can);
 
     if (isLoading) {
         return (
@@ -97,157 +35,87 @@ export const OrderTable: React.FC<OrderTableProps> = ({
     }
 
     return (
-        <>
-            <div className="overflow-x-auto border border-black/10 dark:border-white/10 rounded-2xl">
-                <table className="w-full text-left border-collapse text-xs">
-                    <thead>
-                        <tr className="border-b border-black/10 dark:border-white/10 bg-black/[0.02] dark:bg-white/[0.02] text-gray-500">
-                            <th className="p-3 font-semibold">Order Number</th>
-                            <th className="p-3 font-semibold">Dealer</th>
-                            <th className="p-3 font-semibold">Item</th>
-                            <th className="p-3 font-semibold">Quantity</th>
-                            <th className="p-3 font-semibold">Total Price</th>
-                            <th className="p-3 font-semibold">Status</th>
-                            <th className="p-3 font-semibold">Order Date</th>
-                            <th className="p-3 font-semibold text-right">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-black/10 dark:divide-white/10">
-                        {orders.map((order) => {
-                            const isSelectDisabled = !isL2User && (order.orderStatus === 'PENDING' || order.orderStatus === 'DEALER_LEVEL_PENDING' || order.orderStatus === 'CANCELLED');
+        <div className="overflow-x-auto border border-black/10 dark:border-white/10 rounded-2xl">
+            <table className="w-full text-left border-collapse text-xs">
+                <thead>
+                    <tr className="border-b border-black/10 dark:border-white/10 bg-black/[0.02] dark:bg-white/[0.02] text-gray-500">
+                        <th className="p-3 font-semibold">Order Number</th>
+                        <th className="p-3 font-semibold">Dealer</th>
+                        <th className="p-3 font-semibold">Item</th>
+                        <th className="p-3 font-semibold">Quantity</th>
+                        <th className="p-3 font-semibold">Total Price</th>
+                        <th className="p-3 font-semibold">Status</th>
+                        <th className="p-3 font-semibold">Order Date</th>
+                        <th className="p-3 font-semibold text-right">Actions</th>
+                    </tr>
+                </thead>
+                <tbody className="divide-y divide-black/10 dark:divide-white/10">
+                    {orders.map((order) => {
+                        const editable = canEditOrder(order.orderStatus, access);
+                        const next = getNextOrderStatuses(order.orderStatus, access);
+                        const blockReason = next.length ? null : getOrderBlockReason(order.orderStatus, access);
 
-                            return (
-                                <tr key={order.id} className="hover:bg-black/[0.01] dark:hover:bg-white/[0.01]">
-                                    <td className="p-3 font-mono font-medium text-black dark:text-white">{order.orderNumber}</td>
-                                    <td className="p-3 font-medium text-black dark:text-white">{order.dealerName}</td>
-                                    <td className="p-3 text-gray-600 dark:text-gray-300">{order.itemName}</td>
-                                    <td className="p-3 text-gray-600 dark:text-gray-300">
-                                        {order.orderQuantity} {order.unitType}
-                                    </td>
-                                    <td className="p-3 font-semibold text-black dark:text-white">
-                                        ₹{order.totalPrice?.toLocaleString('en-IN')}
-                                    </td>
-                                    <td className="p-3">
-                                        <OrderStatusBadge status={order.orderStatus} />
-                                    </td>
-                                    <td className="p-3 text-gray-500">{order.orderDate}</td>
-                                    <td className="p-3 text-right">
-                                        <div className="flex items-center justify-end gap-1.5">
-                                            <button
-                                                onClick={() => onPreview(order)}
-                                                className="p-1.5 hover:bg-black/5 dark:hover:bg-white/10 rounded-lg text-gray-500 hover:text-black dark:hover:text-white cursor-pointer"
-                                                title="View Details"
-                                            >
-                                                <Eye className="w-3.5 h-3.5" />
-                                            </button>
-                                            <button
-                                                disabled={isSelectDisabled}
-                                                onClick={() => !isSelectDisabled && onEdit(order)}
-                                                className={`p-1.5 rounded-lg text-gray-500 transition-colors ${
-                                                    isSelectDisabled
-                                                        ? 'cursor-not-allowed opacity-60 hover:bg-transparent hover:text-gray-500'
-                                                        : 'hover:bg-black/5 dark:hover:bg-white/10 hover:text-black dark:hover:text-white cursor-pointer'
-                                                }`}
-                                                title={isSelectDisabled ? 'Cannot edit cancelled order' : 'Edit Order'}
-                                            >
-                                                <Pencil className="w-3.5 h-3.5" />
-                                            </button>
-                                            <select
-                                                value={order.orderStatus}
-                                                disabled={isSelectDisabled}
-                                                onChange={(e) => handleSelectChange(order, e.target.value as OrderStatus)}
-                                                className={`px-2 py-1 bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-lg text-[11px] focus:outline-none ${
-                                                    isSelectDisabled
-                                                        ? 'text-gray-400 dark:text-neutral-500 cursor-not-allowed opacity-60'
-                                                        : 'text-black dark:text-white cursor-pointer'
-                                                }`}
-                                            >
-                                                {(!isL2User ? ORDER_STATUS.filter((status) => status !== 'PENDING' && status !== 'DEALER_LEVEL_PENDING') : 
-                                                    ORDER_STATUS).map((s) => (
-                                                    <option key={s} value={s}>
-                                                        {s}
-                                                    </option>
-                                                ))}
-                                            </select>
-                                        </div>
-                                    </td>
-                                </tr>
-                            );
-                        })}
-                    </tbody>
-                </table>
-            </div>
-
-            {/* Status Change Confirmation Modal */}
-            {pendingChange && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
-                    <div className="w-full max-w-sm rounded-2xl bg-white dark:bg-neutral-900 border border-black/10 dark:border-white/10 p-5 shadow-2xl space-y-4">
-                        <div className="flex items-center justify-between border-b border-black/10 dark:border-white/10 pb-3">
-                            <div className="flex items-center gap-2 text-amber-500">
-                                <AlertTriangle className="w-4 h-4" />
-                                <h3 className="text-xs font-bold text-black dark:text-white">
-                                    Confirm Status Change
-                                </h3>
-                            </div>
-                            <button
-                                onClick={handleCancelModal}
-                                className="p-1 text-gray-400 hover:text-black dark:hover:text-white rounded-lg cursor-pointer"
-                            >
-                                <X className="w-4 h-4" />
-                            </button>
-                        </div>
-
-                        <p className="text-xs text-gray-600 dark:text-neutral-300 leading-relaxed">
-                            Are you sure you want to change the status of order{' '}
-                            <span className="font-mono font-semibold text-black dark:text-white">
-                                {pendingChange.order.orderNumber}
-                            </span>{' '}
-                            from <span className="font-semibold">{pendingChange.order.orderStatus}</span> to{' '}
-                            <span className="font-semibold text-[#0071e3]">{pendingChange.newStatus}</span>?
-                        </p>
-
-                        {/* Input Actual Delivery Date if new status is DELIVERED */}
-                        {pendingChange.newStatus === 'DELIVERED' && (
-                            <div className="space-y-1">
-                                <label className="block text-[11px] font-semibold text-gray-700 dark:text-neutral-300">
-                                    Actual Delivery Date <span className="text-red-500">*</span>
-                                </label>
-                                <input
-                                    type="date"
-                                    aria-label="Actual Delivery Date"
-                                    value={actualDeliveryDate}
-                                    min={pendingChange.order.orderDate}
-                                    max={today}
-                                    aria-invalid={!!deliveryDateError}
-                                    onChange={(e) => setActualDeliveryDate(e.target.value)}
-                                    className="w-full px-3 py-1.5 text-xs rounded-xl bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 text-black dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0071e3]"
-                                />
-                                {deliveryDateError && actualDeliveryDate && (
-                                    <p role="alert" className="text-[11px] text-red-500">{deliveryDateError}</p>
-                                )}
-                            </div>
-                        )}
-
-                        <div className="flex justify-end gap-2 pt-2 border-t border-black/10 dark:border-white/10">
-                            <button
-                                type="button"
-                                onClick={handleCancelModal}
-                                className="px-3 py-1.5 text-xs font-medium rounded-xl border border-black/10 dark:border-white/10 text-gray-700 dark:text-neutral-300 hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer"
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                type="button"
-                                onClick={handleConfirmStatusChange}
-                                disabled={!!deliveryDateError}
-                                className="px-3 py-1.5 text-xs font-semibold rounded-xl bg-[#0071e3] text-white hover:bg-[#0071e3]/90 disabled:opacity-50 transition-colors cursor-pointer"
-                            >
-                                Confirm
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
-        </>
+                        return (
+                            <tr key={order.id} data-testid={`order-row-${order.id}`} className="hover:bg-black/[0.01] dark:hover:bg-white/[0.01]">
+                                <td className="p-3 font-mono font-medium text-black dark:text-white">{order.orderNumber}</td>
+                                <td className="p-3 font-medium text-black dark:text-white">{order.dealerName}</td>
+                                <td className="p-3 text-gray-600 dark:text-gray-300">{order.itemName}</td>
+                                <td className="p-3 text-gray-600 dark:text-gray-300">
+                                    {order.orderQuantity} {order.unitType}
+                                </td>
+                                <td className="p-3 font-semibold text-black dark:text-white">₹{order.totalPrice?.toLocaleString('en-IN')}</td>
+                                <td className="p-3">
+                                    <OrderStatusBadge status={order.orderStatus} />
+                                    <p className="mt-1 text-[10px] text-gray-400 max-w-[180px] truncate" title={blockReason ?? undefined}>
+                                        {next.length ? `Next: ${next.map((s) => ORDER_STATUS_INFO[s].action).join(' / ')}` : blockReason}
+                                    </p>
+                                </td>
+                                <td className="p-3 text-gray-500">{order.orderDate}</td>
+                                <td className="p-3 text-right">
+                                    <div className="flex items-center justify-end gap-1.5">
+                                        <button
+                                            type="button"
+                                            onClick={() => onPreview(order)}
+                                            className="p-1.5 hover:bg-black/5 dark:hover:bg-white/10 rounded-lg text-gray-500 hover:text-black dark:hover:text-white cursor-pointer"
+                                            title="View Details"
+                                            aria-label={`View ${order.orderNumber}`}
+                                        >
+                                            <Eye className="w-3.5 h-3.5" />
+                                        </button>
+                                        <button
+                                            type="button"
+                                            disabled={!editable}
+                                            onClick={() => editable && onEdit(order)}
+                                            className={`p-1.5 rounded-lg text-gray-500 transition-colors ${
+                                                editable
+                                                    ? 'hover:bg-black/5 dark:hover:bg-white/10 hover:text-black dark:hover:text-white cursor-pointer'
+                                                    : 'cursor-not-allowed opacity-40'
+                                            }`}
+                                            title={editable ? 'Edit Order' : 'Only quotations (and, for order approvers, orders pending approval) can be edited'}
+                                            aria-label={`Edit ${order.orderNumber}`}
+                                        >
+                                            <Pencil className="w-3.5 h-3.5" />
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => onOpenStatus(order)}
+                                            className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-colors cursor-pointer ${
+                                                next.length
+                                                    ? 'bg-[#0071e3] hover:bg-[#0071e3]/90 text-white'
+                                                    : 'bg-black/5 dark:bg-white/10 text-gray-500 hover:text-black dark:hover:text-white'
+                                            }`}
+                                            aria-label={`Update status of ${order.orderNumber}`}
+                                        >
+                                            {next.length ? <ListChecks className="w-3.5 h-3.5" /> : <Lock className="w-3.5 h-3.5" />}
+                                            {next.length ? 'Update status' : 'Progress'}
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        );
+                    })}
+                </tbody>
+            </table>
+        </div>
     );
 };

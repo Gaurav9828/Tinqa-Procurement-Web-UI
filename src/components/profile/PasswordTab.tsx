@@ -3,7 +3,8 @@ import { Loader2 } from 'lucide-react';
 import { CommonInput } from '../ui/FormInputs';
 import { authService } from '../../api/services/authService';
 import { ConfirmationModal } from '../ui/ConfirmationModal';
-import { PASSWORD_POLICY_MESSAGE, validatePasswordChange } from '../../utils/passwordPolicy';
+import { validatePasswordChange } from '../../utils/passwordPolicy';
+import { PasswordRequirements } from '../auth/PasswordRequirements';
 import { useNotify } from '../../hooks/useNotify';
 import { useAuthStore } from '../../store/useAuthStore';
 
@@ -90,9 +91,7 @@ export const PasswordTab: React.FC = () => {
             value={passwords.newPassword}
             onChange={(e) => setPasswords({ ...passwords, newPassword: e.target.value })}
           />
-          <p className="text-[11px] text-gray-500 dark:text-neutral-400 pt-1">
-            {PASSWORD_POLICY_MESSAGE}
-          </p>
+          <PasswordRequirements password={passwords.newPassword} />
         </div>
 
         <CommonInput

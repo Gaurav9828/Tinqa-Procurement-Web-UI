@@ -59,9 +59,9 @@ export interface ApprovalPermissions {
 const APPROVED_STATES: ProductApprovalState[] = ['APPROVED', 'LEGACY', 'UPDATE_PENDING', 'UPDATE_REJECTED', 'UPDATE_NOT_APPLIED'];
 
 const EDIT_BLOCKED_REASONS: Partial<Record<ProductApprovalState, string>> = {
-  PENDING: 'Waiting for Admin L2 approval — it can be edited again if the request is rejected.',
-  CANCELLED: 'Cancelled by Admin L2 — this product can no longer be edited.',
-  UPDATE_PENDING: 'Changes are waiting for Admin L2 approval — edit again once they are approved or rejected.',
+  PENDING: 'Waiting for a catalog approver — it can be edited again if the request is rejected.',
+  CANCELLED: 'Cancelled by an approver — this product can no longer be edited.',
+  UPDATE_PENDING: 'Changes are waiting for a catalog approver — edit again once they are approved or rejected.',
   UPDATE_NOT_APPLIED: 'Approved changes have not been applied yet — apply them first.',
   UNKNOWN: 'Approval status is not loaded yet.',
 };

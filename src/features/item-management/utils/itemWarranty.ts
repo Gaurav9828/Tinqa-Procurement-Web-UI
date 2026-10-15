@@ -227,6 +227,10 @@ export const validateWarrantyForms = (items: WarrantyFormItem[], options: Warran
   return errors;
 };
 
+/** True when every card has its required fields filled in (format checks still run on save). */
+export const warrantiesComplete = (items: WarrantyFormItem[]): boolean =>
+  items.every((w) => !!w.warrantyType && !!w.title.trim() && !!w.durationValue.trim() && !!w.durationUnit);
+
 /** Errors for card `index` (field name → message), including card-level ones under ''. */
 export const errorsForCard = (errors: Record<string, string>, index: number): Record<string, string> => {
   const prefix = warrantyErrorKey(index);

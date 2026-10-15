@@ -76,9 +76,10 @@ describe('Create stock entry from order', () => {
 
   it('requires choosing the passed units', async () => {
     const { user } = renderForm('ORD-1');
-    await user.click(screen.getByRole('button', { name: /Submit Entry/ }));
+    expect(screen.getByRole('button', { name: /Submit Entry/ })).toBeDisabled();
+    await user.selectOptions(passed(), '5');
+    expect(screen.getByRole('button', { name: /Submit Entry/ })).toBeEnabled();
     expect(onRequestSubmit).not.toHaveBeenCalled();
-    expect(screen.getByText('Select how many units passed the test.')).toBeInTheDocument();
   });
 
   it('resets the passed units when a different order is picked', async () => {

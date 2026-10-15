@@ -42,9 +42,8 @@ export const DocumentsTab: React.FC = () => {
   const username = user?.username || '';
   // Never fall back to another user's id; without a session there is nothing to load.
   const userId = user?.userId;
+  // Recorded as the uploader type; who may do what is decided by permissions on the server
   const userRole = user?.role;
-
-  const isL2User = userRole === 'ADMIN_L2';
 
   const {
     uploadedDocuments,
@@ -216,16 +215,15 @@ export const DocumentsTab: React.FC = () => {
                   </button>
                 )}
 
-                {isL2User && (
-                  <button
-                    type="button"
-                    onClick={() => handlePromptDelete(doc)}
-                    className="p-2 hover:bg-red-500/10 rounded-lg text-gray-400 hover:text-red-600 transition-colors"
-                    title="Delete Document (L2 Permission)"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                )}
+                {/* Everyone may delete their own documents */}
+                <button
+                  type="button"
+                  onClick={() => handlePromptDelete(doc)}
+                  className="p-2 hover:bg-red-500/10 rounded-lg text-gray-400 hover:text-red-600 transition-colors"
+                  title="Delete document"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
               </div>
             </div>
           ))

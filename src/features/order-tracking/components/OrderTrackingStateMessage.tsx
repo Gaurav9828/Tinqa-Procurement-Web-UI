@@ -18,7 +18,7 @@ const CONTENT: Record<StateVariant, { icon: React.ElementType; title: string; bo
   forbidden: {
     icon: ShieldAlert,
     title: 'Permission denied',
-    body: 'Your account is not allowed to view this information. Contact an Admin L2 if you need access.',
+    body: 'Your account is not allowed to view this information. Ask an administrator if you need access.',
   },
   notFound: {
     icon: PackageSearch,

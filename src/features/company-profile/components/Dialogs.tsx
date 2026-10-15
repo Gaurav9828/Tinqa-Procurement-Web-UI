@@ -31,6 +31,8 @@ const Backdrop: React.FC<{ label: string; onClose: () => void; children: React.R
 interface ConfirmDialogProps {
   title: string;
   body: string;
+  /** Highlighted extra line under the body. */
+  note?: string | null;
   confirmLabel: string;
   tone?: 'primary' | 'approve' | 'danger';
   busy: boolean;
@@ -38,10 +40,15 @@ interface ConfirmDialogProps {
   onClose: () => void;
 }
 
-export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({ title, body, confirmLabel, tone = 'primary', busy, onConfirm, onClose }) => (
+export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({ title, body, note, confirmLabel, tone = 'primary', busy, onConfirm, onClose }) => (
   <Backdrop label={title} onClose={onClose}>
     <h2 className="text-sm font-bold text-black dark:text-white">{title}</h2>
     <p className="text-gray-600 dark:text-gray-300">{body}</p>
+    {note && (
+      <p role="note" className="p-2.5 rounded-xl bg-amber-500/10 text-amber-800 dark:text-amber-300 font-semibold">
+        {note}
+      </p>
+    )}
     <div className="flex justify-end gap-2">
       <button type="button" onClick={onClose} className={BUTTON.secondary}>
         Cancel
@@ -102,7 +109,7 @@ export const RejectDialog: React.FC<{
         </button>
         <button
           type="button"
-          disabled={busy}
+          disabled={busy || !comment.trim()}
           onClick={() => {
             setTouched(true);
             if (!error) onReject(comment.trim());

@@ -98,7 +98,7 @@ export const ApprovalPreviewModal: React.FC<PreviewModalProps> = ({
           icon: <UserPlus className="w-5 h-5" />,
           iconClass: 'bg-indigo-500/10 text-indigo-500',
           title: 'New Employee Details',
-          subtitle: 'Employee account waiting for Admin L2 approval',
+          subtitle: 'Employee account waiting for approval',
         };
 
       // Products are reviewed in ProductApprovalReviewModal; this is only a fallback header.
@@ -342,29 +342,7 @@ export const ApprovalPreviewModal: React.FC<PreviewModalProps> = ({
                   </div>
                 </div>
 
-                <div className="p-3 rounded-xl border border-black/10 dark:border-white/10 flex items-center gap-2.5">
-                  <Building className="w-4 h-4 text-amber-500 shrink-0" />
-                  <div>
-                    <span className="text-gray-400 block text-[10px]">
-                      Department
-                    </span>
-                    <span className="font-medium text-black dark:text-white">
-                      {request.department || 'N/A'}
-                    </span>
-                  </div>
-                </div>
 
-                <div className="p-3 rounded-xl border border-black/10 dark:border-white/10 flex items-center gap-2.5">
-                  <Briefcase className="w-4 h-4 text-purple-500 shrink-0" />
-                  <div>
-                    <span className="text-gray-400 block text-[10px]">
-                      Designation
-                    </span>
-                    <span className="font-medium text-black dark:text-white">
-                      {request.designation || 'N/A'}
-                    </span>
-                  </div>
-                </div>
 
                 <div className="p-3 rounded-xl border border-black/10 dark:border-white/10 flex items-center gap-2.5">
                   <User className="w-4 h-4 text-rose-500 shrink-0" />
@@ -448,7 +426,7 @@ export const ApprovalPreviewModal: React.FC<PreviewModalProps> = ({
                   { icon: <Phone className="w-4 h-4 text-emerald-500 shrink-0" />, label: 'Phone', value: request.phone },
                   { icon: <Phone className="w-4 h-4 text-teal-500 shrink-0" />, label: 'Alternate Phone', value: request.alternatePhone },
                   { icon: <Building className="w-4 h-4 text-amber-500 shrink-0" />, label: 'Department', value: request.department },
-                  { icon: <Briefcase className="w-4 h-4 text-purple-500 shrink-0" />, label: 'Designation', value: request.designation },
+                  { icon: <Briefcase className="w-4 h-4 text-purple-500 shrink-0" />, label: 'Designation', value: request.designationLabel || request.designation },
                   { icon: <User className="w-4 h-4 text-rose-500 shrink-0" />, label: 'Gender', value: request.gender },
                   { icon: <Calendar className="w-4 h-4 text-cyan-500 shrink-0" />, label: 'Date of Birth', value: request.dateOfBirth },
                   { icon: <Calendar className="w-4 h-4 text-indigo-500 shrink-0" />, label: 'Joining Date', value: request.joiningDate },

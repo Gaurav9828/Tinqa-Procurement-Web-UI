@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom';
 import { ChevronRight } from 'lucide-react';
 import type { AdminOrderSummary } from '../types/orderTracking.types';
 import { TrackingStatusBadge } from './TrackingStatusBadge';
+import { PaymentStatusBadge } from './PaymentStatusBadge';
+import { formatPaymentMethod } from '../utils/payment.utils';
 import { formatCurrency, formatDateTime, formatUpdater, summarizeItems } from '../utils/orderTracking.utils';
 
 interface Props {
@@ -53,10 +55,11 @@ export const OrderTrackingTable: React.FC<Props> = ({ orders, isLoading = false,
             <th className="p-3 font-semibold">Customer</th>
             <th className="p-3 font-semibold">Items</th>
             <th className="p-3 font-semibold text-right">Total</th>
+            <th className="p-3 font-semibold">Payment</th>
             <th className="p-3 font-semibold">Order Status</th>
             <th className="p-3 font-semibold">Tracking Status</th>
             <th className="p-3 font-semibold">Last Update</th>
-            <th className="p-3" aria-label="Open" />
+            <th className="p-0" aria-label="Open" />
           </tr>
         </thead>
         <tbody className="divide-y divide-black/10 dark:divide-white/10">
@@ -91,6 +94,10 @@ export const OrderTrackingTable: React.FC<Props> = ({ orders, isLoading = false,
                 <td className="p-3 text-right font-semibold text-black dark:text-white whitespace-nowrap">
                   {formatCurrency(order.totalAmount)}
                 </td>
+                <td className="p-3" data-testid="payment-status">
+                  <PaymentStatusBadge status={order.paymentStatus} />
+                  {order.paymentMethod?.trim() && <div className="text-[10px] text-gray-400 mt-0.5">{formatPaymentMethod(order.paymentMethod)}</div>}
+                </td>
                 <td className="p-3">
                   <TrackingStatusBadge status={order.orderStatus} />
                 </td>
@@ -103,7 +110,7 @@ export const OrderTrackingTable: React.FC<Props> = ({ orders, isLoading = false,
                     by {formatUpdater(order.updatedBy)}
                   </div>
                 </td>
-                <td className="p-3 text-right text-gray-400">
+                <td className="text-right text-gray-400">
                   <ChevronRight className="w-4 h-4 inline" />
                 </td>
               </tr>
@@ -127,6 +134,9 @@ export const OrderTrackingTable: React.FC<Props> = ({ orders, isLoading = false,
               </div>
               <div className="flex items-center gap-1.5 text-[11px] text-gray-500">
                 Tracking: <TrackingCell order={order} />
+              </div>
+              <div className="flex items-center gap-1.5 text-[11px] text-gray-500">
+                Payment: <PaymentStatusBadge status={order.paymentStatus} />
               </div>
               <p className="text-gray-600 dark:text-gray-300 truncate">
                 {customerLabel(order)} · {formatCurrency(order.totalAmount)}

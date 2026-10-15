@@ -77,3 +77,16 @@ export const redirectToLogin = (reason?: 'expired') => {
   if (window.location.pathname === '/login') return;
   window.location.assign(reason ? `/login?${reason}=true` : '/login');
 };
+
+export const FIRST_LOGIN_PATH = '/reset-password';
+
+/**
+ * The backend refused a call because the password is still the temporary one: remember that and
+ * send the user to set a new password (used outside React, from the axios interceptor).
+ */
+export const redirectToPasswordSetup = () => {
+  const user = getStoredUser();
+  if (user && !user.isFirstLogin) saveUser({ ...user, isFirstLogin: true });
+  if (window.location.pathname === FIRST_LOGIN_PATH) return;
+  window.location.assign(FIRST_LOGIN_PATH);
+};

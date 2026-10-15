@@ -1,30 +1,52 @@
 import { describe, it, expect } from 'vitest';
 import {
+  FINAL_STATUSES,
+  MAIN_STAGES,
   NEXT_STATUSES,
+  RETURN_TRACK,
   START_STATUSES,
-  STATUS_STAGE,
+  STATUS_INFO,
   getAllowedStatuses,
+  getDeliveryOutcomes,
   getLockReason,
   getPaymentBlockReason,
+  getRefundHint,
+  getStage,
   isConfirmBlockedByPayment,
-  isCorrection,
   isFullyPaid,
+  needsConfirmation,
+  SYSTEM_ONLY_STATUSES,
+  DELIVERY_OUTCOMES,
 } from './statusWorkflow';
 
-/** Paid by default: these tests are about the status table; the payment rule has its own block below. */
-const ctx = (currentStatus: string | null, previousStatus: string | null = null, paymentStatus: string | null = 'PAID') => ({
-  currentStatus,
-  previousStatus,
-  paymentStatus,
-});
-const both = ['tracking', 'manual'] as const;
+/** Paid by default: most tests are about the status table; payment rules have their own block. */
+const ctx = (currentStatus: string | null, paymentStatus: string | null = 'PAID') => ({ currentStatus, paymentStatus });
 
-describe('status workflow rules', () => {
-  it('covers exactly the 14 backend statuses, each mapped to a stage', () => {
-    expect(Object.keys(NEXT_STATUSES).sort()).toEqual(Object.keys(STATUS_STAGE).sort());
-    expect(Object.keys(NEXT_STATUSES)).toHaveLength(14);
-    for (const targets of Object.values(NEXT_STATUSES)) {
-      for (const target of targets) expect(NEXT_STATUSES).toHaveProperty(target);
+/** Position along the journey, to prove every move goes forward. Re-attempts are the only loops. */
+const JOURNEY = [
+  'ORDER_RECEIVED', 'ORDER_PENDING', 'PRE_ORDER_RECEIVED', 'PRE_ORDER_PENDING', 'CONFIRMED', 'PRE_ORDER_CONFIRMED',
+  'PROCESSING', 'PACKED', 'SHIPPED', 'IN_TRANSIT', 'OUT_FOR_DELIVERY', 'DELIVERY_FAILED', 'CUSTOMER_UNAVAILABLE',
+  'INVALID_ADDRESS', 'CUSTOMER_CANCELLED_DELIVERY', 'DELIVERY_REATTEMPT', 'DELIVERED',
+  'RETURN_REQUESTED', 'RETURN_APPROVED', 'OUT_FOR_PICKUP', 'RETURN_PICKED_UP', 'RETURN_IN_TRANSIT', 'RETURN_RECEIVED',
+  'RETURN_INSPECTION', 'REFUND_REQUESTED', 'REFUND_INITIATED', 'REFUND_FAILED',
+];
+const ALLOWED_LOOPS = new Set(['DELIVERY_FAILED→OUT_FOR_DELIVERY', 'DELIVERY_REATTEMPT→OUT_FOR_DELIVERY', 'REFUND_FAILED→REFUND_INITIATED']);
+
+describe('customer order workflow table', () => {
+  it('describes every status and only points at statuses it knows', () => {
+    expect(Object.keys(NEXT_STATUSES).sort()).toEqual(Object.keys(STATUS_INFO).sort());
+    expect(Object.keys(NEXT_STATUSES)).toHaveLength(33);
+    for (const targets of Object.values(NEXT_STATUSES)) for (const target of targets) expect(NEXT_STATUSES).toHaveProperty(target);
+  });
+
+  it('never moves backwards (only re-attempting a delivery or a refund repeats a step)', () => {
+    for (const [from, targets] of Object.entries(NEXT_STATUSES)) {
+      for (const to of targets) {
+        if (ALLOWED_LOOPS.has(`${from}→${to}`)) continue;
+        const a = JOURNEY.indexOf(from);
+        const b = JOURNEY.indexOf(to);
+        if (a >= 0 && b >= 0) expect(b, `${from} → ${to}`).toBeGreaterThan(a);
+      }
     }
   });
 
@@ -32,76 +54,131 @@ describe('status workflow rules', () => {
     for (const [status, targets] of Object.entries(NEXT_STATUSES)) expect(targets).not.toContain(status);
   });
 
-  it.each(both)('locks CANCELLED orders completely (%s)', (mode) => {
-    expect(getAllowedStatuses(mode, ctx('CANCELLED', 'CONFIRMED'))).toEqual([]);
-    expect(getLockReason('CANCELLED')).toMatch(/cancelled/i);
+  it('ships through Shipped → (In transit) → Out for delivery → Delivered', () => {
+    expect(getAllowedStatuses(ctx('PACKED'))).toEqual(['SHIPPED', 'CANCELLED']);
+    expect(getAllowedStatuses(ctx('SHIPPED'))).toEqual(['IN_TRANSIT', 'OUT_FOR_DELIVERY']);
+    expect(getAllowedStatuses(ctx('IN_TRANSIT'))).toEqual(['OUT_FOR_DELIVERY']);
+    expect(getAllowedStatuses(ctx('OUT_FOR_DELIVERY'))).toEqual([
+      'DELIVERED',
+      'DELIVERY_FAILED',
+      'CUSTOMER_UNAVAILABLE',
+      'INVALID_ADDRESS',
+      'CUSTOMER_CANCELLED_DELIVERY',
+    ]);
+    expect(getAllowedStatuses(ctx('DELIVERY_FAILED'))).toEqual(['OUT_FOR_DELIVERY', 'DELIVERY_REATTEMPT', 'RETURN_IN_TRANSIT']);
   });
 
-  it.each(both)('locks RETURN_COMPLETED orders completely (%s)', (mode) => {
-    expect(getAllowedStatuses(mode, ctx('RETURN_COMPLETED', 'RETURN_IN_TRANSIT'))).toEqual([]);
+  it('re-attempts a missed delivery, or sends the parcel back; a refused one can only go back', () => {
+    expect(getAllowedStatuses(ctx('CUSTOMER_UNAVAILABLE'))).toEqual(['DELIVERY_REATTEMPT', 'RETURN_IN_TRANSIT']);
+    expect(getAllowedStatuses(ctx('INVALID_ADDRESS'))).toEqual(['DELIVERY_REATTEMPT', 'RETURN_IN_TRANSIT']);
+    expect(getAllowedStatuses(ctx('DELIVERY_REATTEMPT'))).toEqual(['OUT_FOR_DELIVERY', 'RETURN_IN_TRANSIT']);
+    expect(getAllowedStatuses(ctx('CUSTOMER_CANCELLED_DELIVERY'))).toEqual(['RETURN_IN_TRANSIT']);
   });
 
-  it('allows cancelling before shipment but not after', () => {
+  it('allows cancelling before shipment but never after', () => {
     for (const status of ['ORDER_RECEIVED', 'ORDER_PENDING', 'CONFIRMED', 'PRE_ORDER_CONFIRMED', 'PROCESSING', 'PACKED']) {
-      expect(getAllowedStatuses('tracking', ctx(status))).toContain('CANCELLED');
+      expect(getAllowedStatuses(ctx(status))).toContain('CANCELLED');
     }
-    for (const status of ['OUT_FOR_DELIVERY', 'DELIVERED', 'RETURN_REQUESTED', 'RETURN_IN_TRANSIT']) {
-      for (const mode of both) expect(getAllowedStatuses(mode, ctx(status, 'PACKED'))).not.toContain('CANCELLED');
+    for (const status of ['SHIPPED', 'IN_TRANSIT', 'OUT_FOR_DELIVERY', 'DELIVERY_FAILED', 'DELIVERED', 'RETURN_REQUESTED']) {
+      expect(getAllowedStatuses(ctx(status))).not.toContain('CANCELLED');
     }
   });
 
-  it('cannot move a shipped order back into an earlier stage, even manually', () => {
-    expect(getAllowedStatuses('manual', ctx('OUT_FOR_DELIVERY', 'PACKED'))).toEqual(['DELIVERED', 'RETURN_IN_TRANSIT']);
-    expect(getAllowedStatuses('manual', ctx('DELIVERED', 'OUT_FOR_DELIVERY'))).toEqual(['RETURN_REQUESTED']);
+  it('runs a return through approval, pickup, warehouse, inspection and refund', () => {
+    expect(getAllowedStatuses(ctx('DELIVERED'))).toEqual(['RETURN_REQUESTED']);
+    expect(getAllowedStatuses(ctx('RETURN_REQUESTED'))).toEqual(['RETURN_APPROVED', 'RETURN_REJECTED']);
+    expect(getAllowedStatuses(ctx('RETURN_APPROVED'))).toEqual(['OUT_FOR_PICKUP', 'RETURN_CANCELLED']);
+    expect(getAllowedStatuses(ctx('OUT_FOR_PICKUP'))).toEqual(['RETURN_PICKED_UP', 'RETURN_CANCELLED']);
+    expect(getAllowedStatuses(ctx('RETURN_PICKED_UP'))).toEqual(['RETURN_IN_TRANSIT']);
+    expect(getAllowedStatuses(ctx('RETURN_IN_TRANSIT'))).toEqual(['RETURN_RECEIVED']);
+    expect(getAllowedStatuses(ctx('RETURN_RECEIVED'))).toEqual(['RETURN_INSPECTION']);
+    // A paid return is refunded through the refund flow, not the status form.
+    expect(getAllowedStatuses(ctx('RETURN_INSPECTION'))).toEqual(['RETURN_INSPECTION_FAILED']);
+    expect(getRefundHint(ctx('RETURN_INSPECTION'))).toMatch(/Request refund/);
+    expect(getAllowedStatuses(ctx('REFUND_INITIATED'))).toEqual([]);
+    expect(getAllowedStatuses(ctx('REFUND_FAILED', 'REFUND_FAILED'))).toEqual([]);
   });
 
-  it('follows the delivery and return path forwards only', () => {
-    expect(getAllowedStatuses('tracking', ctx('PACKED'))).toEqual(['OUT_FOR_DELIVERY', 'CANCELLED']);
-    expect(getAllowedStatuses('tracking', ctx('DELIVERED'))).toEqual(['RETURN_REQUESTED']);
-    expect(getAllowedStatuses('tracking', ctx('RETURN_REQUESTED'))).toEqual(['RETURN_IN_TRANSIT', 'DELIVERED']);
-    expect(getAllowedStatuses('tracking', ctx('RETURN_IN_TRANSIT'))).toEqual(['RETURN_COMPLETED']);
+  it('closes unpaid returns without a refund, and refunds paid ones', () => {
+    expect(getAllowedStatuses(ctx('RETURN_INSPECTION', 'PENDING'))).toEqual(['RETURN_COMPLETED', 'RETURN_INSPECTION_FAILED']);
+    expect(getAllowedStatuses(ctx('RETURN_INSPECTION', 'PAID'))).not.toContain('RETURN_COMPLETED');
+    // A requested refund must be approved or rejected first (backend: 409 REFUND_REQUIRED).
+    expect(getAllowedStatuses(ctx('RETURN_INSPECTION', 'REFUND_REQUESTED'))).toEqual(['RETURN_INSPECTION_FAILED']);
+    expect(getAllowedStatuses(ctx('RETURN_INSPECTION', 'refund_requested'))).not.toContain('RETURN_COMPLETED');
+    expect(getRefundHint(ctx('RETURN_INSPECTION', 'REFUND_REQUESTED'))).toMatch(/refund has been requested/);
+  });
+
+  it('never offers a refund status in the status form — the refund flow sets them', () => {
+    expect([...SYSTEM_ONLY_STATUSES].sort()).toEqual(['REFUND_COMPLETED', 'REFUND_FAILED', 'REFUND_INITIATED', 'REFUND_REQUESTED']);
+    for (const current of [...Object.keys(NEXT_STATUSES), null]) {
+      for (const payment of ['PAID', 'PENDING', 'REFUND_REQUESTED']) {
+        for (const status of getAllowedStatuses(ctx(current, payment))) expect(SYSTEM_ONLY_STATUSES.has(status), `${current} → ${status}`).toBe(false);
+      }
+    }
+  });
+
+  it('a paid cancelled order is locked in the form and pointed to Request refund; an unpaid one is simply final', () => {
+    expect(getAllowedStatuses(ctx('CANCELLED', 'PAID'))).toEqual([]);
+    expect(getLockReason(ctx('CANCELLED', 'PAID'))).toBe(
+      'This order is cancelled and was paid. To refund the customer, use Request refund in the Refunds section.'
+    );
+    expect(getAllowedStatuses(ctx('CANCELLED', 'PENDING'))).toEqual([]);
+    expect(getLockReason(ctx('CANCELLED', 'PENDING'))).toBe('This order is cancelled. Its status is final and can no longer be changed.');
+    expect(getRefundHint(ctx('CANCELLED', 'PENDING'))).toBeNull();
+  });
+
+  it('points orders in the middle of a refund to the Refunds section', () => {
+    for (const payment of ['PAID', 'REFUND_REQUESTED']) {
+      expect(getLockReason(ctx('REFUND_REQUESTED', payment))).toMatch(/An approver approves or rejects it in the Refunds section/);
+    }
+    expect(getLockReason(ctx('REFUND_INITIATED', 'REFUND_REQUESTED'))).toMatch(/with Razorpay.*Refresh status/);
+    expect(getLockReason(ctx('REFUND_FAILED', 'REFUND_FAILED'))).toMatch(/It can be requested again/);
+    expect(getLockReason(ctx('REFUND_COMPLETED', 'REFUNDED'))).toMatch(/refund for this order is completed/);
+  });
+
+  it.each([...FINAL_STATUSES])('locks %s for good', (status) => {
+    expect(getAllowedStatuses(ctx(status))).toEqual([]);
+    expect(getAllowedStatuses(ctx(status, 'PENDING'))).toEqual([]);
+    expect(getLockReason(ctx(status))).toMatch(/final/);
   });
 
   it('keeps regular and pre-order flows separate until confirmation', () => {
-    expect(getAllowedStatuses('tracking', ctx('ORDER_RECEIVED'))).not.toContain('PRE_ORDER_CONFIRMED');
-    expect(getAllowedStatuses('tracking', ctx('PRE_ORDER_RECEIVED'))).not.toContain('CONFIRMED');
+    expect(getAllowedStatuses(ctx('ORDER_RECEIVED'))).not.toContain('PRE_ORDER_CONFIRMED');
+    expect(getAllowedStatuses(ctx('PRE_ORDER_RECEIVED'))).not.toContain('CONFIRMED');
   });
 
   it('only lets an order with no or a legacy status be started, not shipped or returned', () => {
-    for (const current of [null, 'PENDING', 'SHIPPED']) {
-      const allowed = getAllowedStatuses('tracking', ctx(current));
+    for (const current of [null, 'PENDING', 'SOMETHING_OLD']) {
+      const allowed = getAllowedStatuses(ctx(current));
       expect(allowed).toEqual([...START_STATUSES]);
       expect(allowed).not.toContain('OUT_FOR_DELIVERY');
       expect(allowed).not.toContain('DELIVERED');
     }
   });
 
-  it('manual mode may undo the last step before shipment; tracking mode may not', () => {
-    expect(getAllowedStatuses('manual', ctx('PACKED', 'PROCESSING'))).toContain('PROCESSING');
-    expect(getAllowedStatuses('tracking', ctx('PACKED', 'PROCESSING'))).not.toContain('PROCESSING');
-    expect(isCorrection('PROCESSING', ctx('PACKED', 'PROCESSING'))).toBe(true);
-    expect(isCorrection('OUT_FOR_DELIVERY', ctx('PACKED', 'PROCESSING'))).toBe(false);
-  });
-
-  it('never offers a locked status as an "undo" target', () => {
-    // Inconsistent legacy history must never let "undo" reopen a closed state.
-    expect(getAllowedStatuses('manual', ctx('CONFIRMED', 'RETURN_COMPLETED'))).not.toContain('RETURN_COMPLETED');
-  });
-
   it('never offers PRE_ORDER_CONFIRMED in the generic form — it is reached only via the approval endpoint', () => {
     for (const status of [...Object.keys(NEXT_STATUSES), null, 'PENDING']) {
-      for (const mode of both) {
-        expect(getAllowedStatuses(mode, ctx(status, 'PRE_ORDER_PENDING'))).not.toContain('PRE_ORDER_CONFIRMED');
-      }
+      expect(getAllowedStatuses(ctx(status))).not.toContain('PRE_ORDER_CONFIRMED');
     }
+    expect(getAllowedStatuses(ctx('PRE_ORDER_PENDING'))).toEqual(['CANCELLED']);
+    expect(getAllowedStatuses(ctx('PRE_ORDER_CONFIRMED'))).toEqual(['PROCESSING', 'CANCELLED']);
   });
 
-  it('a waiting pre-order can only be cancelled from the generic form', () => {
-    for (const mode of both) expect(getAllowedStatuses(mode, ctx('PRE_ORDER_PENDING', 'PRE_ORDER_RECEIVED'))).toEqual(['CANCELLED']);
+  it('asks for confirmation on delivery, final, cancel and failure steps only', () => {
+    for (const status of ['DELIVERED', 'CANCELLED', 'REFUND_COMPLETED', 'RETURN_REJECTED', 'DELIVERY_FAILED', 'REFUND_FAILED']) {
+      expect(needsConfirmation(status)).toBe(true);
+    }
+    for (const status of ['PROCESSING', 'SHIPPED', 'RETURN_APPROVED', 'REFUND_INITIATED']) expect(needsConfirmation(status)).toBe(false);
   });
 
-  it('an approved pre-order continues to fulfilment and cannot be "undone" back to pending', () => {
-    expect(getAllowedStatuses('manual', ctx('PRE_ORDER_CONFIRMED', 'PRE_ORDER_PENDING'))).toEqual(['PROCESSING', 'CANCELLED']);
+  it('maps statuses to the main track and the return track', () => {
+    expect(MAIN_STAGES).toEqual(['PLACED', 'CONFIRMED', 'FULFILMENT', 'SHIPPING', 'DELIVERY', 'DELIVERED']);
+    expect(getStage('IN_TRANSIT')).toBe('SHIPPING');
+    expect(getStage('DELIVERY_FAILED')).toBe('DELIVERY');
+    const returnStatuses = RETURN_TRACK.flatMap((step) => step.statuses);
+    for (const status of ['RETURN_REQUESTED', 'OUT_FOR_PICKUP', 'RETURN_RECEIVED', 'RETURN_INSPECTION', 'REFUND_COMPLETED']) {
+      expect(returnStatuses).toContain(status);
+    }
   });
 });
 
@@ -115,27 +192,52 @@ describe('confirmation requires a fully paid order', () => {
   });
 
   it.each(['PENDING', 'FAILED', null])('never offers Confirmed for an order whose payment is %s', (payment) => {
-    for (const mode of both) {
-      expect(getAllowedStatuses(mode, ctx('ORDER_RECEIVED', null, payment))).toEqual(['ORDER_PENDING', 'CANCELLED']);
-      expect(getAllowedStatuses(mode, ctx('ORDER_PENDING', 'ORDER_RECEIVED', payment))).not.toContain('CONFIRMED');
-      expect(getAllowedStatuses(mode, ctx(null, null, payment))).not.toContain('CONFIRMED'); // legacy / no status
-      expect(isConfirmBlockedByPayment(mode, ctx('ORDER_RECEIVED', null, payment))).toBe(true);
-    }
+    expect(getAllowedStatuses(ctx('ORDER_RECEIVED', payment))).toEqual(['ORDER_PENDING', 'CANCELLED']);
+    expect(getAllowedStatuses(ctx('ORDER_PENDING', payment))).not.toContain('CONFIRMED');
+    expect(getAllowedStatuses(ctx(null, payment))).not.toContain('CONFIRMED');
+    expect(isConfirmBlockedByPayment(ctx('ORDER_RECEIVED', payment))).toBe(true);
   });
 
   it('offers Confirmed once the order is paid', () => {
-    expect(getAllowedStatuses('tracking', ctx('ORDER_RECEIVED'))).toContain('CONFIRMED');
-    expect(isConfirmBlockedByPayment('tracking', ctx('ORDER_RECEIVED'))).toBe(false);
+    expect(getAllowedStatuses(ctx('ORDER_RECEIVED'))).toContain('CONFIRMED');
+    expect(isConfirmBlockedByPayment(ctx('ORDER_RECEIVED'))).toBe(false);
   });
 
   it('does not report a payment block where confirming is not a next step anyway', () => {
-    expect(isConfirmBlockedByPayment('tracking', ctx('PACKED', null, 'PENDING'))).toBe(false);
-    expect(getAllowedStatuses('tracking', ctx('PACKED', null, 'PENDING'))).toEqual(['OUT_FOR_DELIVERY', 'CANCELLED']);
+    expect(isConfirmBlockedByPayment(ctx('PACKED', 'PENDING'))).toBe(false);
   });
 
   it('explains the block with the current payment status', () => {
     expect(getPaymentBlockReason('PAID')).toBeNull();
     expect(getPaymentBlockReason('REFUND_REQUESTED')).toBe("This order can't be confirmed until it is fully paid (payment status: refund requested).");
     expect(getPaymentBlockReason(null)).toMatch(/not recorded/);
+  });
+});
+
+describe('delivery riders', () => {
+  it('may record exactly the six delivery outcomes', () => {
+    expect([...DELIVERY_OUTCOMES].sort()).toEqual(
+      ['CUSTOMER_CANCELLED_DELIVERY', 'CUSTOMER_UNAVAILABLE', 'DELIVERED', 'DELIVERY_REATTEMPT', 'INVALID_ADDRESS', 'OUT_FOR_DELIVERY'].sort()
+    );
+  });
+
+  it('are offered only delivery outcomes that are valid next steps', () => {
+    expect(getDeliveryOutcomes(ctx('SHIPPED'))).toEqual(['OUT_FOR_DELIVERY']);
+    expect(getDeliveryOutcomes(ctx('OUT_FOR_DELIVERY'))).toEqual(['DELIVERED', 'CUSTOMER_UNAVAILABLE', 'INVALID_ADDRESS', 'CUSTOMER_CANCELLED_DELIVERY']);
+    expect(getDeliveryOutcomes(ctx('CUSTOMER_UNAVAILABLE'))).toEqual(['DELIVERY_REATTEMPT']);
+    expect(getDeliveryOutcomes(ctx('DELIVERY_FAILED'))).toEqual(['OUT_FOR_DELIVERY', 'DELIVERY_REATTEMPT']);
+    expect(getDeliveryOutcomes(ctx('DELIVERY_REATTEMPT'))).toEqual(['OUT_FOR_DELIVERY']);
+    // Return to origin, fulfilment and returns stay with the store team
+    expect(getDeliveryOutcomes(ctx('CUSTOMER_CANCELLED_DELIVERY'))).toEqual([]);
+    expect(getDeliveryOutcomes(ctx('PACKED'))).toEqual([]);
+    expect(getDeliveryOutcomes(ctx('DELIVERED'))).toEqual([]);
+  });
+
+  it('confirm the outcomes that end or interrupt a delivery', () => {
+    for (const status of ['DELIVERED', 'CUSTOMER_UNAVAILABLE', 'INVALID_ADDRESS', 'CUSTOMER_CANCELLED_DELIVERY']) {
+      expect(needsConfirmation(status), status).toBe(true);
+    }
+    expect(needsConfirmation('DELIVERY_REATTEMPT')).toBe(false);
+    expect(needsConfirmation('OUT_FOR_DELIVERY')).toBe(false);
   });
 });

@@ -1,18 +1,21 @@
 import React, { useMemo, useState } from 'react';
-import { ClipboardEdit, CreditCard, Loader2, Lock, MapPinned, RefreshCw, Send } from 'lucide-react';
-import { CommonSelect, CommonTextArea } from '../../../components/ui/FormInputs';
+import { CreditCard, Loader2, Lock, RefreshCw, Send, Truck, Undo2 } from 'lucide-react';
+import { CommonTextArea } from '../../../components/ui/FormInputs';
 import { ConfirmationModal } from '../../../components/ui/ConfirmationModal';
-import type { StatusUpdateMode, TrackingStatusOption } from '../types/orderTracking.types';
-import { TERMINAL_STATUSES, formatStatusLabel } from '../utils/orderTracking.utils';
+import { NextStepPicker } from '../../../components/ui/NextStepPicker';
+import type { TrackingStatusOption } from '../types/orderTracking.types';
+import { formatStatusLabel } from '../utils/orderTracking.utils';
 import { STATUS_NOTES_MAX_LENGTH, type StatusUpdateResult } from '../hooks/useStatusUpdate';
 import {
-  STAGE_LABELS,
+  FINAL_STATUSES,
+  STATUS_INFO,
   getAllowedStatuses,
+  getDeliveryOutcomes,
   getLockReason,
   getPaymentBlockReason,
-  getStage,
+  getRefundHint,
   isConfirmBlockedByPayment,
-  isCorrection,
+  needsConfirmation,
   type WorkflowContext,
 } from '../utils/statusWorkflow';
 
@@ -23,33 +26,18 @@ interface Props {
   statusesLoading: boolean;
   statusesError: boolean;
   onRetryStatuses: () => void;
-  /** Current and previous status, which decide the allowed next steps. */
+  /** Current status and payment, which decide the allowed next steps. */
   workflow: WorkflowContext;
   isSubmitting: boolean;
-  onSubmit: (mode: StatusUpdateMode, orderNumber: string, status: string, notes: string) => Promise<StatusUpdateResult>;
+  onSubmit: (orderNumber: string, status: string, notes: string) => Promise<StatusUpdateResult>;
+  /** Delivery riders: only delivery outcomes are offered; payment and refund guidance is not theirs to act on. */
+  deliveryOnly?: boolean;
 }
 
-const MODES: Record<StatusUpdateMode, { label: string; icon: React.ElementType; help: string; button: string; notesHint: string }> = {
-  tracking: {
-    label: 'Update tracking',
-    icon: MapPinned,
-    help: 'Record the next step in the order\'s journey. Only the steps that can follow the current stage are offered.',
-    button: 'Add tracking event',
-    notesHint: 'Optional — shown in the tracking history.',
-  },
-  manual: {
-    label: 'Manually update order status',
-    icon: ClipboardEdit,
-    help: 'Administrative change for corrections. Offers the same next steps, plus undoing the last step while the order has not shipped. Recorded in the history under your name.',
-    button: 'Set order status',
-    notesHint: 'Optional reason. If left blank the server records "Order status manually updated by admin."',
-  },
-};
-
 /**
- * One form, two clearly separated actions. Each submit sends exactly one request
- * (tracking OR manual) — never both. Choices follow the status workflow, final statuses
- * and corrections require confirmation, and closed orders are locked.
+ * Moves the order one step forward. Only the steps that may follow the current status are offered
+ * (as cards, never a list of every status); there is no undo. Final, exceptional and delivery steps
+ * ask for confirmation, and closed orders are locked. Delivery riders see only the delivery outcomes.
  */
 export const StatusUpdateForm: React.FC<Props> = ({
   orderNumber,
@@ -60,38 +48,37 @@ export const StatusUpdateForm: React.FC<Props> = ({
   workflow,
   isSubmitting,
   onSubmit,
+  deliveryOnly = false,
 }) => {
-  const [mode, setMode] = useState<StatusUpdateMode>('tracking');
   const [status, setStatus] = useState('');
   const [notes, setNotes] = useState('');
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [confirmOpen, setConfirmOpen] = useState(false);
 
-  const config = MODES[mode];
-  const lockReason = getLockReason(workflow.currentStatus);
+  const lockReason = getLockReason(workflow);
 
-  // API list (authoritative set and order) ∩ workflow rules for the selected mode.
+  // Workflow rules ∩ statuses the server knows (a step the backend doesn't support yet is never offered).
   const options = useMemo(() => {
-    const allowed = new Set(getAllowedStatuses(mode, workflow));
-    return statuses
-      .filter((option) => allowed.has(option.status))
-      .map((option) => {
-        const stage = getStage(option.status);
-        const label = isCorrection(option.status, workflow)
-          ? `↩ ${formatStatusLabel(option.status)} (undo last step)`
-          : `${formatStatusLabel(option.status)}${stage ? ` — ${STAGE_LABELS[stage]}` : ''}`;
-        return { label, value: option.status };
-      });
-  }, [statuses, mode, workflow]);
+    const known = new Set(statuses.map((option) => option.status));
+    return (deliveryOnly ? getDeliveryOutcomes(workflow) : getAllowedStatuses(workflow))
+      .filter((next) => known.has(next))
+      .map((next) => ({
+        value: next,
+        label: STATUS_INFO[next]?.action ?? formatStatusLabel(next),
+        description: STATUS_INFO[next]?.description,
+        tone: STATUS_INFO[next]?.tone,
+      }));
+  }, [statuses, workflow, deliveryOnly]);
 
   const noOptions = !statusesLoading && !statusesError && options.length === 0;
   const controlsDisabled = isSubmitting || statusesLoading || statusesError || noOptions;
-  const correctionSelected = !!status && isCorrection(status, workflow);
   // Confirming would be the next step, but the order isn't fully paid: explain why it's missing.
-  const paymentBlockReason = isConfirmBlockedByPayment(mode, workflow) ? getPaymentBlockReason(workflow.paymentStatus) : null;
+  const paymentBlockReason = !deliveryOnly && isConfirmBlockedByPayment(workflow) ? getPaymentBlockReason(workflow.paymentStatus) : null;
+  // Refunds never go through this form (e.g. a paid return after inspection is refunded from the Refunds section).
+  const refundHint = deliveryOnly ? null : getRefundHint(workflow);
 
   const send = async () => {
-    const result = await onSubmit(mode, orderNumber, status, notes);
+    const result = await onSubmit(orderNumber, status, notes);
     setConfirmOpen(false);
     setFieldErrors(result.fieldErrors);
     if (result.ok) {
@@ -102,8 +89,8 @@ export const StatusUpdateForm: React.FC<Props> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (controlsDisabled) return;
-    if (TERMINAL_STATUSES.has(status) || correctionSelected) {
+    if (controlsDisabled || !status) return;
+    if (status && needsConfirmation(status)) {
       setConfirmOpen(true);
       return;
     }
@@ -111,19 +98,34 @@ export const StatusUpdateForm: React.FC<Props> = ({
   };
 
   const statusLabel = formatStatusLabel(status);
-
   const confirmDescription = (() => {
-    if (correctionSelected) {
-      return `This undoes the last step: order ${orderNumber} goes back to ${statusLabel}. The correction is recorded in the history.`;
-    }
     if (status === 'CANCELLED') {
-      return `Order ${orderNumber} will be cancelled. This is final: the order can never be moved to any other status afterwards.`;
+      return `Order ${orderNumber} will be cancelled. It can never move forward to fulfilment afterwards${
+        workflow.paymentStatus && workflow.paymentStatus.toUpperCase() === 'PAID' ? '; the payment will then be refunded' : ''
+      }.`;
     }
-    if (status === 'RETURN_COMPLETED') {
-      return `The return for order ${orderNumber} will be closed. This is final: no further status changes will be possible.`;
+    if (status === 'DELIVERED') return `Order ${orderNumber} will be marked Delivered. After this, only a return can be requested.`;
+    if (status === 'CUSTOMER_CANCELLED_DELIVERY') {
+      return `Order ${orderNumber} will be recorded as refused by the customer. It can't be delivered again and goes back to the warehouse.`;
     }
-    return `Order ${orderNumber} will be marked ${statusLabel}. After this, only a return can be requested.`;
+    if (FINAL_STATUSES.has(status)) return `Order ${orderNumber} will be closed as "${statusLabel}". This is final: no further status changes will be possible.`;
+    return `Order ${orderNumber} will move to "${statusLabel}". Status changes can't be undone.`;
   })();
+
+  // A rider has nothing to record until the order is on its delivery leg; say so instead of locking the order.
+  if (deliveryOnly && !lockReason && !statusesLoading && !statusesError && options.length === 0) {
+    return (
+      <div role="status" aria-label="No delivery update" className="p-3 rounded-xl bg-black/[0.03] dark:bg-white/[0.04] text-[11px] text-gray-600 dark:text-gray-300 space-y-1">
+        <p className="flex items-center gap-1.5 font-semibold text-black dark:text-white">
+          <Truck className="w-3.5 h-3.5" /> Nothing to record yet
+        </p>
+        <p>
+          Delivery updates open once the order has shipped. Until then, and for returns, cancellations and refunds, the
+          store team updates this order.
+        </p>
+      </div>
+    );
+  }
 
   if (lockReason) {
     return (
@@ -132,9 +134,6 @@ export const StatusUpdateForm: React.FC<Props> = ({
           <Lock className="w-3.5 h-3.5" /> Status locked
         </p>
         <p>{lockReason}</p>
-        <p className="text-gray-400">
-          Payment and refund updates for closed orders are not supported by the backend yet.
-        </p>
       </div>
     );
   }
@@ -151,35 +150,23 @@ export const StatusUpdateForm: React.FC<Props> = ({
           <span>{paymentBlockReason} Confirmed is not offered until then.</span>
         </p>
       )}
-      <div role="radiogroup" aria-label="Update type" className="grid grid-cols-2 gap-1 p-1 rounded-xl bg-black/5 dark:bg-white/5 mb-3">
-        {(Object.keys(MODES) as StatusUpdateMode[]).map((key) => {
-          const { label, icon: Icon } = MODES[key];
-          const active = key === mode;
-          return (
-            <button
-              key={key}
-              type="button"
-              role="radio"
-              aria-checked={active}
-              disabled={isSubmitting}
-              onClick={() => {
-                setMode(key);
-                setFieldErrors({});
-                // A correction offered only in manual mode is not valid in tracking mode.
-                if (status && !getAllowedStatuses(key, workflow).includes(status)) setStatus('');
-              }}
-              className={`flex items-center justify-center gap-1.5 px-2 py-2 rounded-lg text-[11px] font-semibold leading-tight transition-colors cursor-pointer ${
-                active ? 'bg-white dark:bg-neutral-800 text-[#0071e3] shadow-sm' : 'text-gray-500 hover:text-black dark:hover:text-white'
-              }`}
-            >
-              <Icon className="w-3.5 h-3.5 shrink-0" />
-              {label}
-            </button>
-          );
-        })}
-      </div>
 
-      <p className="text-[11px] text-gray-500 dark:text-neutral-400 mb-3">{config.help}</p>
+      {refundHint && (
+        <p
+          role="note"
+          aria-label="Refund handled separately"
+          className="flex items-start gap-1.5 p-3 mb-3 rounded-xl bg-purple-500/10 border border-purple-500/20 text-[11px] text-purple-700 dark:text-purple-300"
+        >
+          <Undo2 className="w-3.5 h-3.5 mt-px shrink-0" />
+          <span>{refundHint}</span>
+        </p>
+      )}
+
+      <p className="text-[11px] text-gray-500 dark:text-neutral-400 mb-3">
+        {deliveryOnly
+          ? 'Record what happened with this delivery. Only delivery updates are shown; other changes are made by the store team.'
+          : "Choose the next step in the order's journey. Only steps that can follow the current status are shown, and a step can't be undone."}
+      </p>
 
       {statusesError ? (
         <div role="alert" className="mb-3 p-3 rounded-xl bg-red-500/10 text-red-600 dark:text-red-400 text-[11px] flex items-center justify-between gap-2">
@@ -190,26 +177,27 @@ export const StatusUpdateForm: React.FC<Props> = ({
         </div>
       ) : null}
 
-      <form
-        onSubmit={handleSubmit}
-        aria-label={config.label}
-        className="space-y-3"
-        noValidate
-      >
-        <CommonSelect
-          label="Status"
-          aria-label="Status"
-          required
-          options={options}
-          placeholder={statusesLoading ? 'Loading statuses…' : noOptions ? 'No status change available' : 'Select the next status'}
-          value={status}
-          error={fieldErrors.status}
-          disabled={controlsDisabled}
-          onChange={(e) => {
-            setStatus(e.target.value);
-            setFieldErrors((prev) => ({ ...prev, status: '' }));
-          }}
-        />
+      <form onSubmit={handleSubmit} aria-label="Update order status" className="space-y-3" noValidate>
+        {statusesLoading ? (
+          <p className="text-[11px] text-gray-400 flex items-center gap-1.5" role="status">
+            <Loader2 className="w-3.5 h-3.5 animate-spin" /> Loading next steps…
+          </p>
+        ) : noOptions ? (
+          <p className="text-[11px] text-gray-500" role="status">
+            No status change is available right now.
+          </p>
+        ) : (
+          <NextStepPicker
+            options={options}
+            value={status}
+            disabled={isSubmitting || statusesError}
+            error={fieldErrors.status}
+            onChange={(value) => {
+              setStatus(value);
+              setFieldErrors((prev) => ({ ...prev, status: '' }));
+            }}
+          />
+        )}
         <div>
           <CommonTextArea
             label="Notes (optional)"
@@ -222,7 +210,7 @@ export const StatusUpdateForm: React.FC<Props> = ({
             onChange={(e) => setNotes(e.target.value)}
           />
           <p className="text-[10px] text-gray-400 px-1 mt-1 flex justify-between gap-2">
-            <span>{config.notesHint}</span>
+            <span>Shown in the tracking history.</span>
             <span className="shrink-0">
               {notes.length}/{STATUS_NOTES_MAX_LENGTH}
             </span>
@@ -230,11 +218,11 @@ export const StatusUpdateForm: React.FC<Props> = ({
         </div>
         <button
           type="submit"
-          disabled={controlsDisabled}
+          disabled={controlsDisabled || !status}
           className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-[#0071e3] hover:bg-[#0077ed] text-white rounded-xl text-xs font-semibold transition-colors disabled:opacity-60 cursor-pointer disabled:cursor-not-allowed"
         >
           {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-          {isSubmitting ? 'Saving…' : config.button}
+          {isSubmitting ? 'Saving…' : 'Update status'}
         </button>
       </form>
 
@@ -242,11 +230,7 @@ export const StatusUpdateForm: React.FC<Props> = ({
         isOpen={confirmOpen}
         actionType={status === 'CANCELLED' ? 'CANCELLED' : 'CONFIRM'}
         requestId={orderNumber}
-        title={
-          correctionSelected
-            ? `Undo last step and revert to "${statusLabel}"?`
-            : `${mode === 'manual' ? 'Manually set' : 'Update tracking to'} "${statusLabel}"?`
-        }
+        title={`Move order to "${statusLabel}"?`}
         description={confirmDescription}
         isSubmitting={isSubmitting}
         onClose={() => setConfirmOpen(false)}

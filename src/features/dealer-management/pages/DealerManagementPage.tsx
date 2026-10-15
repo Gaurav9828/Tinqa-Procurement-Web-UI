@@ -23,6 +23,7 @@ import { DealerStatusBadge } from '../components/DealerStatusBadge';
 import { DealerFilterBar } from '../components/DealerFilterBar';
 import { DealerCategoryFormModal } from '../components/DealerCategoryFormModal';
 import { DealerFormModal } from '../components/DealerFormModal';
+import { useAccess } from '../../../hooks/useAccess';
 
 import type {
   CategoryResponse,
@@ -32,6 +33,7 @@ import type {
 } from '../types/dealer.types';
 
 export const DealerManagementPage: React.FC = () => {
+    const { can } = useAccess();
   const {
     dealers,
     totalElements,
@@ -150,7 +152,7 @@ export const DealerManagementPage: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-black dark:text-white flex items-center gap-2">
-            <Users className="w-6 h-6 text-[#0071e3]" /> Dealer Network
+            <Users className="w-6 h-6 text-[#0071e3]" /> Dealer Management
           </h1>
           <p className="text-sm text-gray-500 dark:text-neutral-400 mt-1">
             Manage authorized dealers, partner contact details, GSTIN, and categories.
@@ -176,8 +178,8 @@ export const DealerManagementPage: React.FC = () => {
         categories={categories}
         onSearchChange={updateSearch}
         onCategoryChange={updateCategoryFilter}
-        onOpenCreateDealerModal={handleOpenCreateDealer}
-        onOpenCreateCategoryModal={() => setIsCategoryModalOpen(true)}
+        onOpenCreateDealerModal={can('DEALER_CREATE') ? handleOpenCreateDealer : undefined}
+        onOpenCreateCategoryModal={can('DEALER_CATEGORY_MANAGE') ? () => setIsCategoryModalOpen(true) : undefined}
       />
 
       {isLoading ? (
@@ -305,6 +307,7 @@ export const DealerManagementPage: React.FC = () => {
                         >
                           <Eye className="w-4 h-4" />
                         </button>
+                        {can('DEALER_UPDATE') && (
                         <button
                           onClick={() => handleOpenEditDealer(dealer)}
                           className="p-1.5 hover:bg-black/5 dark:hover:bg-white/10 rounded-lg text-gray-500 hover:text-[#0071e3] transition-colors cursor-pointer"
@@ -312,6 +315,8 @@ export const DealerManagementPage: React.FC = () => {
                         >
                           <Edit3 className="w-4 h-4" />
                         </button>
+                        )}
+                        {can('DEALER_TOGGLE_STATUS') && (
                         <button
                           onClick={() => setTargetDealerStatusToggle(dealer)}
                           className={`p-1.5 hover:bg-black/5 dark:hover:bg-white/10 rounded-lg transition-colors cursor-pointer ${
@@ -323,6 +328,7 @@ export const DealerManagementPage: React.FC = () => {
                         >
                           <Power className="w-4 h-4" />
                         </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -395,7 +401,9 @@ export const DealerManagementPage: React.FC = () => {
                   <p>{previewDealer.street}</p>
                   {previewDealer.landmark && <p className="text-gray-400">Landmark: {previewDealer.landmark}</p>}
                   <p>
-                    {previewDealer.city}, {previewDealer.state} - {previewDealer.pincode},{' '}
+                    {previewDealer.city}
+                    {previewDealer.district && previewDealer.district !== previewDealer.city ? `, ${previewDealer.district}` : ''},{' '}
+                    {previewDealer.state} - {previewDealer.pincode},{' '}
                     {previewDealer.country}
                   </p>
                 </div>

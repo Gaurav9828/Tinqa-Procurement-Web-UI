@@ -16,6 +16,7 @@ import {
   toWarrantyForms,
   toWarrantyRequests,
   validateWarrantyForms,
+  warrantiesComplete,
   type WarrantyFormItem,
 } from '../utils/itemWarranty';
 
@@ -122,6 +123,14 @@ export const ItemFormModal: React.FC<Props> = ({
   if (!isOpen) return null;
 
   const isEdit = !!initialData;
+  const isFormComplete =
+    !!formData.categoryId &&
+    !!formData.name.trim() &&
+    (isEdit || !!formData.sku.trim()) &&
+    !!formData.unitOfMeasure.trim() &&
+    Number(formData.mrp) > 0 &&
+    !!formData.countryOfOrigin.trim() &&
+    warrantiesComplete(warranties);
 
   const handleWarrantiesChange: WarrantyEditorChange = (items, edited) => {
     setWarranties(items);
@@ -130,6 +139,7 @@ export const ItemFormModal: React.FC<Props> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!isFormComplete) return;
 
     const basePayload = {
       categoryId: Number(formData.categoryId),
@@ -379,8 +389,8 @@ export const ItemFormModal: React.FC<Props> = ({
             </button>
             <button
               type="submit"
-              disabled={isSubmitting}
-              className="px-5 py-2 bg-[#0071e3] hover:bg-[#0077ed] text-white rounded-xl text-xs font-semibold disabled:opacity-50 cursor-pointer"
+              disabled={isSubmitting || !isFormComplete}
+              className="px-5 py-2 bg-[#0071e3] hover:bg-[#0077ed] text-white rounded-xl text-xs font-semibold disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
             >
               {isSubmitting
                 ? 'Saving...'

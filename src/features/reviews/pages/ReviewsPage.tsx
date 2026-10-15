@@ -9,6 +9,7 @@ import { ReviewDetailDrawer } from '../components/ReviewDetailDrawer';
 import { ReviewStatusDialog } from '../components/ReviewStatusDialog';
 import type { AdminReview } from '../types/review.types';
 import { isRetryableErrorKind, type ApiErrorKind } from '../../../utils/apiErrorKind';
+import { useAccess } from '../../../hooks/useAccess';
 
 const StateMessage: React.FC<{ variant: 'empty' | 'noResults' | ApiErrorKind; onRetry?: () => void }> = ({ variant, onRetry }) => {
   const isInfo = variant === 'empty' || variant === 'noResults';
@@ -52,6 +53,7 @@ const StateMessage: React.FC<{ variant: 'empty' | 'noResults' | ApiErrorKind; on
  * there is intentionally no way to create, edit or delete review content here.
  */
 export const ReviewsPage: React.FC = () => {
+  const canModerate = useAccess().can('REVIEW_MODERATE');
   const list = useAdminReviews();
   const products = useReviewProductOptions();
 
@@ -97,7 +99,7 @@ export const ReviewsPage: React.FC = () => {
 
     return (
       <>
-        <ReviewTable reviews={list.reviews} isLoading={list.isLoading} onOpen={setOpenReview} onToggleStatus={setStatusTarget} />
+        <ReviewTable reviews={list.reviews} isLoading={list.isLoading} onOpen={setOpenReview} onToggleStatus={canModerate ? setStatusTarget : undefined} />
         <nav aria-label="Pagination" className="flex flex-wrap items-center justify-between gap-2 pt-3 text-xs text-gray-500">
           <span>
             {list.totalElements} review{list.totalElements === 1 ? '' : 's'}
@@ -169,7 +171,7 @@ export const ReviewsPage: React.FC = () => {
           onClose={closeDrawer}
           onLoaded={applyReview}
           onNotFound={handleNotFound}
-          onToggleStatus={setStatusTarget}
+          onToggleStatus={canModerate ? setStatusTarget : undefined}
           closeOnEscape={!statusTarget}
         />
       )}

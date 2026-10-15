@@ -1,29 +1,19 @@
 import React from 'react';
 import { useAccess } from '../hooks/useAccess';
-import type { FeatureKey, UserRole } from '../config/permissions.config';
+import type { Permission } from '../config/access';
 
 interface HasAccessProps {
-  feature?: FeatureKey;
-  roles?: UserRole | UserRole[];
+  /** Shown when the user holds this permission. */
+  permission?: Permission;
+  /** Shown when the user holds any of these. */
+  anyOf?: readonly Permission[];
   children: React.ReactNode;
   fallback?: React.ReactNode;
 }
 
-export const HasAccess: React.FC<HasAccessProps> = ({
-  feature,
-  roles,
-  children,
-  fallback = null,
-}) => {
-  const { hasFeature, hasRole } = useAccess();
-
-  let isAllowed = true;
-
-  if (feature) {
-    isAllowed = hasFeature(feature);
-  } else if (roles) {
-    isAllowed = hasRole(roles);
-  }
-
-  return isAllowed ? <>{children}</> : <>{fallback}</>;
+/** Renders children only for users with the permission. UX only: the backend still refuses the action. */
+export const HasAccess: React.FC<HasAccessProps> = ({ permission, anyOf, children, fallback = null }) => {
+  const { can, canAny } = useAccess();
+  const allowed = (!permission || can(permission)) && (!anyOf || canAny(...anyOf));
+  return allowed ? <>{children}</> : <>{fallback}</>;
 };

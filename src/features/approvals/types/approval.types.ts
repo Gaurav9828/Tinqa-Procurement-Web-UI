@@ -18,7 +18,9 @@ export interface ProfileApprovalRequest {
   firstName: string | null;
   middleName: string | null;
   lastName: string | null;
+  /** Always null: department follows the designation and is no longer requested here. */
   department: string | null;
+  /** Always null: designation is no longer changed through profile change requests. */
   designation: string | null;
   gender: string | null;
 }

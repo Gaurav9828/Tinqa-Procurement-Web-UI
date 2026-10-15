@@ -1,27 +1,37 @@
 import React from 'react';
-import { Eye, Edit3, Trash2, ShieldAlert } from 'lucide-react';
+import { Eye, Edit3, Trash2, ShieldAlert, KeyRound } from 'lucide-react';
+import { useAccess } from '../../../hooks/useAccess';
 import { EmployeeStatusBadge } from './EmployeeStatusBadge';
+import { EmployeeRoleBadge } from './EmployeeRoleBadge';
 import { EmployeeConstants } from '../types/employee.types';
 import type { EmployeeResponse } from '../types/employee.types';
 
 interface Props {
   employees: EmployeeResponse[];
   isLoading: boolean;
-  userRole: string;
+  /** The row is the signed-in admin's own record — they cannot delete themselves. */
+  isSelf: (employee: EmployeeResponse) => boolean;
   onView: (id: number) => void;
   onEdit: (employee: EmployeeResponse) => void;
   onDelete: (employee: EmployeeResponse) => void;
+  /** Opens the designation / level editor. */
+  onManageAccess: (employee: EmployeeResponse) => void;
 }
 
 export const EmployeeTable: React.FC<Props> = ({
   employees,
   isLoading,
-  userRole,
+  isSelf,
   onView,
   onEdit,
   onDelete,
+  onManageAccess,
 }) => {
-  const isL2User = userRole === 'ADMIN_L2';
+  const { can, canAny } = useAccess();
+  const canFinalize = can('EMPLOYEE_DELETE');
+  const canEdit = can('EMPLOYEE_UPDATE');
+  const canManageAccess = canAny('EMPLOYEE_UPDATE', 'EMPLOYEE_APPROVE');
+  const canOpenLifecycle = canAny('EMPLOYEE_REQUEST_DELETION', 'EMPLOYEE_DELETE', 'EMPLOYEE_UPDATE');
 
   if (isLoading) {
     return (
@@ -32,9 +42,9 @@ export const EmployeeTable: React.FC<Props> = ({
     );
   }
 
-  // Filter out employees waiting for deletion if current user isn't L2
+  // Records waiting for deletion are only shown to those who can finalize it
   const visibleEmployees = employees.filter(
-    (emp) => !(emp.status === EmployeeConstants.WAITING_FOR_DELETION && !isL2User)
+    (emp) => !(emp.status === EmployeeConstants.WAITING_FOR_DELETION && !canFinalize)
   );
 
   if (visibleEmployees.length === 0) {
@@ -55,7 +65,7 @@ export const EmployeeTable: React.FC<Props> = ({
             <tr>
               <th className="p-4">Employee</th>
               <th className="p-4">Code</th>
-              <th className="p-4">Department & Role</th>
+              <th className="p-4">Designation &amp; Level</th>
               <th className="p-4">Contact</th>
               <th className="p-4">Status</th>
               <th className="p-4 text-right">Actions</th>
@@ -76,8 +86,11 @@ export const EmployeeTable: React.FC<Props> = ({
                   {emp.employeeCode}
                 </td>
                 <td className="p-4">
-                  <div className="font-medium text-black dark:text-white">{emp.designation}</div>
+                  <div className="font-medium text-black dark:text-white">{emp.designationLabel || emp.designation || 'Not assigned'}</div>
                   <div className="text-[11px] text-gray-400">{emp.department}</div>
+                  <div className="mt-1">
+                    <EmployeeRoleBadge role={emp.role} />
+                  </div>
                 </td>
                 <td className="p-4">
                   <div className="text-black dark:text-white">{emp.phone}</div>
@@ -96,32 +109,50 @@ export const EmployeeTable: React.FC<Props> = ({
                     >
                       <Eye className="w-4 h-4" />
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => onEdit(emp)}
-                      className="p-2 hover:bg-black/5 dark:hover:bg-white/10 rounded-lg text-gray-500 transition-colors"
-                      title="Edit Employee"
-                    >
-                      <Edit3 className="w-4 h-4" />
-                    </button>
+                    {canManageAccess && (
+                      <button
+                        type="button"
+                        onClick={() => onManageAccess(emp)}
+                        className="p-2 hover:bg-blue-500/10 rounded-lg text-gray-500 hover:text-[#0071e3] transition-colors"
+                        title={isSelf(emp) ? 'View your access' : 'Manage access'}
+                        aria-label={`Manage access for ${emp.displayName}`}
+                      >
+                        <KeyRound className="w-4 h-4" />
+                      </button>
+                    )}
+                    {canEdit && (
+                      <button
+                        type="button"
+                        onClick={() => onEdit(emp)}
+                        className="p-2 hover:bg-black/5 dark:hover:bg-white/10 rounded-lg text-gray-500 transition-colors"
+                        title="Edit Employee"
+                      >
+                        <Edit3 className="w-4 h-4" />
+                      </button>
+                    )}
+                    {canOpenLifecycle && (
                     <button
                       type="button"
                       onClick={() => onDelete(emp)}
-                      className={`p-2 rounded-lg transition-colors ${
-                        emp.status === EmployeeConstants.WAITING_FOR_DELETION && isL2User
+                      disabled={isSelf(emp)}
+                      className={`p-2 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
+                        emp.status === EmployeeConstants.WAITING_FOR_DELETION && canFinalize
                           ? 'text-red-600 bg-red-500/10 hover:bg-red-500/20'
                           : 'text-gray-500 hover:bg-black/5 dark:hover:bg-white/10'
                       }`}
                       title={
-                        emp.status === EmployeeConstants.WAITING_FOR_DELETION
-                          ? isL2User
+                        isSelf(emp)
+                          ? 'You cannot delete your own record'
+                          : emp.status === EmployeeConstants.WAITING_FOR_DELETION
+                          ? canFinalize
                             ? 'Finalize Deletion (Permanent)'
-                            : 'Pending L2 Deletion Approval'
+                            : 'Waiting for an employee approver'
                           : 'Request Deletion'
                       }
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
+                    )}
                   </div>
                 </td>
               </tr>

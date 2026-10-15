@@ -1,4 +1,4 @@
-import type { TrademarkMark, VersionStatus } from '../types/companyProfile.types';
+import type { CompanyProfileVersion, TrademarkMark, VersionStatus } from '../types/companyProfile.types';
 
 export const COMPANY_PROFILE_PATH = '/settings/company-profile';
 export const companyHistoryPath = `${COMPANY_PROFILE_PATH}/history`;
@@ -38,6 +38,7 @@ export const FIELD_LABELS: Record<string, string> = {
   'address.line1': 'Address line 1',
   'address.line2': 'Address line 2',
   'address.city': 'City',
+  'address.district': 'District',
   'address.state': 'State',
   'address.stateCode': 'State code',
   'address.postalCode': 'Postal code',
@@ -47,6 +48,8 @@ export const FIELD_LABELS: Record<string, string> = {
   careersEmail: 'Careers email',
   website: 'Website',
   invoiceTerms: 'Invoice terms',
+  homeVideoEnabled: 'Home page video',
+  homeVideoUrl: 'Home page video link',
 };
 
 export const IMAGE_FIELDS = new Set(['logoUrl', 'logoDarkUrl', 'faviconUrl']);
@@ -56,6 +59,24 @@ export const fieldLabel = (field: string) => {
   if (term) return `Invoice term ${Number(term[1]) + 1}`;
   return FIELD_LABELS[field] ?? field;
 };
+
+/**
+ * Whether approving this version changes the video on the live home page: the switch flips, or the
+ * link changes while it's on. Compares with `live` when given, otherwise uses the version's `changes`.
+ */
+export const changesLiveHomeVideo = (version: CompanyProfileVersion, live?: CompanyProfileVersion | null): boolean => {
+  const on = version.homeVideoEnabled === true;
+  if (live !== undefined) {
+    const wasOn = live?.homeVideoEnabled === true;
+    return on !== wasOn || (on && (version.homeVideoUrl ?? null) !== (live?.homeVideoUrl ?? null));
+  }
+  return !!version.changes?.some((c) => c.field === 'homeVideoEnabled' || (c.field === 'homeVideoUrl' && on));
+};
+
+/** Booleans in read-only views and change rows; null (never set) reads as off. */
+export const onOff = (value: unknown) => (value === true ? 'On' : 'Off');
+
+export const HOME_VIDEO_APPROVAL_NOTE = 'Approving changes the video on the live home page.';
 
 /**
  * Server timestamps are IST local date-times without an offset ("2026-10-13T10:00:00").
@@ -82,7 +103,7 @@ export const PENDING_SUBMIT_BLOCKED = 'A change is waiting for approval. Submit 
 
 /** Fallback texts for the backend's error codes (its own `message` wins when present). */
 export const ERROR_MESSAGES: Record<string, string> = {
-  APPROVAL_SELF_NOT_ALLOWED: 'You created or submitted this change; another Level 2 admin must approve it.',
+  APPROVAL_SELF_NOT_ALLOWED: 'You created or submitted this change; another approver must approve it.',
   NOT_VERSION_OWNER: 'Only the admin who created this draft can edit or submit it, and only the submitter can withdraw it.',
   FORBIDDEN: 'Your admin level is not allowed to do this.',
   VERSION_NOT_FOUND: 'This version no longer exists.',

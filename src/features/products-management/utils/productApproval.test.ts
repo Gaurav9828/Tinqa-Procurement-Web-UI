@@ -49,7 +49,7 @@ describe('what each state allows', () => {
   });
 
   it('explains why editing is blocked', () => {
-    expect(getApprovalPermissions('PENDING').editBlockedReason).toMatch(/Waiting for Admin L2 approval/);
+    expect(getApprovalPermissions('PENDING').editBlockedReason).toMatch(/Waiting for a catalog approver/);
     expect(getApprovalPermissions('CANCELLED').editBlockedReason).toMatch(/no longer be edited/);
     expect(getApprovalPermissions('REJECTED').editBlockedReason).toBeNull();
   });

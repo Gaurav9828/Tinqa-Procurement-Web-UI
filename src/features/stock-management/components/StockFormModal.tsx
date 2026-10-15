@@ -427,7 +427,7 @@ export const StockFormModal: React.FC<StockFormModalProps> = ({
                         <button
                             type="submit"
                             form="stock-form"
-                            disabled={isSubmitting || !isOrderSelected}
+                            disabled={isSubmitting || !isOrderSelected || !isValid}
                             className="flex items-center gap-1.5 px-4 py-2 text-xs font-medium text-white bg-[#0071e3] hover:bg-[#0071e3]/90 rounded-xl transition-colors disabled:opacity-50 cursor-pointer"
                         >
                             <Save className="w-4 h-4" />

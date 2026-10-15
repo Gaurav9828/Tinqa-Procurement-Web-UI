@@ -1,11 +1,13 @@
 import React, { useMemo, useState } from 'react';
 import { Navigate, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { AlertTriangle, ArrowLeft, Loader2, RefreshCw, Save, Send, XCircle } from 'lucide-react';
+import { usePincodeLookup } from '../../../hooks/usePincodeLookup';
+import { PINCODE_MESSAGES, applyPincodeLocation } from '../../../utils/pincode';
 import { useCompanyProfileOverview, useCompanyProfileVersion } from '../hooks/useCompanyProfileData';
 import { useCompanyProfileAccess } from '../hooks/useCompanyProfileAccess';
 import { useCompanyProfileActions, type ActionResult } from '../hooks/useCompanyProfileActions';
 import { useUnsavedChangesGuard } from '../hooks/useUnsavedChangesGuard';
-import { AssetField, InvoiceTermsEditor, TextField } from '../components/EditorFields';
+import { AssetField, HomeVideoFields, InvoiceTermsEditor, TextField } from '../components/EditorFields';
 import { BrandName, VersionStatusBadge } from '../components/ProfileDisplay';
 import { Skeleton, StateMessage } from '../components/Dialogs';
 import { BUTTON } from '../utils/companyProfileUi';
@@ -81,12 +83,26 @@ export const CompanyProfileEditorPage: React.FC = () => {
   const dirty = !!form && !!baseline && !sameForm(form, baseline);
   const confirmLeave = useUnsavedChangesGuard(dirty);
 
+  // City, district and state follow the PIN code for Indian addresses.
+  const country = form?.address.country.trim().toLowerCase() ?? '';
+  const pincode = usePincodeLookup(form?.address.postalCode ?? '', {
+    enabled: !!form && (!country || country === 'india'),
+    onFound: (location, pin) => {
+      // The PIN the version was saved with only fills blanks, in the baseline too, so opening a draft doesn't dirty it.
+      const keepExisting = pin === (baseline?.address.postalCode ?? '').trim();
+      const apply = (f: CompanyProfileForm | null) => (f ? { ...f, address: { ...f.address, ...applyPincodeLocation(f.address, location, keepExisting) } } : f);
+      setForm(apply);
+      if (keepExisting) setBaseline(apply);
+    },
+  });
+  const pincodeError = pincode.status === 'notFound' ? PINCODE_MESSAGES.notFound : undefined;
+
   const knownImageUrls = useMemo(() => new Set([...imageUrlsOf(version), ...uploadedUrls]), [version, uploadedUrls]);
   const clientErrors = useMemo<FormErrors>(() => {
     if (!form || !attempt) return {};
     return attempt === 'submit' ? validateForSubmit(form, { knownImageUrls }) : validateForSave(form, { knownImageUrls });
   }, [form, attempt, knownImageUrls]);
-  const errors: FormErrors = { ...serverErrors, ...clientErrors };
+  const errors: FormErrors = { ...serverErrors, ...(pincodeError ? { 'address.postalCode': pincodeError } : {}), ...clientErrors };
 
   // Gate: only the maker's own DRAFT / REJECTED version is editable; anything else opens read-only.
   if (!isNew && !id) return <StateMessage variant="notFound" />;
@@ -99,7 +115,7 @@ export const CompanyProfileEditorPage: React.FC = () => {
   if (!form) return <Skeleton lines={10} label="Loading draft" />;
 
   const pendingElsewhere = !!overview?.pending && overview.pending.id !== version?.id;
-  const busy = !!actions.busy || uploads > 0;
+  const busy = !!actions.busy || uploads > 0 || pincode.status === 'loading';
 
   const update = (patch: Partial<CompanyProfileForm>) => setForm((f) => (f ? { ...f, ...patch } : f));
   const updateAddress = (patch: Partial<CompanyProfileForm['address']>) =>
@@ -129,6 +145,7 @@ export const CompanyProfileEditorPage: React.FC = () => {
     setAttempt(mode);
     setServerErrors({});
     const found = thenSubmit ? validateForSubmit(form, { knownImageUrls }) : validateForSave(form, { knownImageUrls });
+    if (pincodeError) found['address.postalCode'] ??= pincodeError;
     if (Object.keys(found).length) {
       requestAnimationFrame(() => document.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus());
       return;
@@ -161,6 +178,7 @@ export const CompanyProfileEditorPage: React.FC = () => {
   };
 
   const missing = attempt === 'submit' ? missingForSubmit(form) : [];
+  const submitReady = missingForSubmit(form).length === 0 && !(form.homeVideoEnabled && !form.homeVideoUrl.trim());
   const otherErrors = Object.keys(errors).filter((key) => !missing.some((m) => m.key === key));
   const panHint = panMismatch(form.gstin, form.pan);
   const stateCodeHint = stateCodeMismatch(form.gstin, form.address.stateCode);
@@ -199,7 +217,7 @@ export const CompanyProfileEditorPage: React.FC = () => {
       {version?.status === 'REJECTED' && (
         <div role="note" className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-800 dark:text-rose-300 space-y-1">
           <p className="font-semibold flex items-center gap-1.5">
-            <XCircle className="w-4 h-4" /> Rejected by {version.reviewedBy ?? 'a Level 2 admin'} on {formatServerTime(version.reviewedAt)}
+            <XCircle className="w-4 h-4" /> Rejected by {version.reviewedBy ?? 'an approver'} on {formatServerTime(version.reviewedAt)}
           </p>
           {version.reviewComment && <p className="break-words whitespace-pre-line">{version.reviewComment}</p>}
           <p>Make the requested changes, then save and submit again.</p>
@@ -301,11 +319,36 @@ export const CompanyProfileEditorPage: React.FC = () => {
           <TextField className="md:col-span-2" label="Headquarters name" counter maxLength={LIMITS.headquartersName} value={form.headquartersName} onChange={(headquartersName) => update({ headquartersName })} error={errors.headquartersName} />
           <TextField className="md:col-span-2" label="Address line 1" maxLength={LIMITS.addressLine} value={form.address.line1} onChange={(line1) => updateAddress({ line1 })} error={errors['address.line1']} />
           <TextField className="md:col-span-2" label="Address line 2" maxLength={LIMITS.addressLine} value={form.address.line2} onChange={(line2) => updateAddress({ line2 })} error={errors['address.line2']} />
-          <TextField label="City" maxLength={LIMITS.place} value={form.address.city} onChange={(city) => updateAddress({ city })} error={errors['address.city']} />
-          <TextField label="State" maxLength={LIMITS.place} value={form.address.state} onChange={(state) => updateAddress({ state })} error={errors['address.state']} />
-          <TextField label="State code" maxLength={2} placeholder="27" value={form.address.stateCode} onChange={(stateCode) => updateAddress({ stateCode })} error={errors['address.stateCode']} hint={stateCodeHint} />
-          <TextField label="Postal code" maxLength={10} value={form.address.postalCode} onChange={(postalCode) => updateAddress({ postalCode })} error={errors['address.postalCode']} />
+          <TextField
+            label="Postal code"
+            maxLength={10}
+            inputMode="numeric"
+            value={form.address.postalCode}
+            onChange={(postalCode) => updateAddress({ postalCode })}
+            error={errors['address.postalCode']}
+            adornment={pincode.status === 'loading' ? <Loader2 className="w-3.5 h-3.5 animate-spin text-gray-400" aria-hidden /> : null}
+            description={
+              pincode.status === 'error' ? (
+                <p className="text-amber-700 dark:text-amber-400">
+                  {PINCODE_MESSAGES.error}{' '}
+                  <button type="button" onClick={pincode.retry} className="font-semibold underline cursor-pointer">
+                    Retry
+                  </button>
+                </p>
+              ) : pincode.status === 'loading' ? (
+                PINCODE_MESSAGES.loading
+              ) : pincode.location?.areas.length ? (
+                `Areas: ${pincode.location.areas.slice(0, 4).join(', ')}${pincode.location.areas.length > 4 ? '…' : ''}`
+              ) : pincode.locked ? (
+                'City, district and state are filled from the PIN code.'
+              ) : null
+            }
+          />
           <TextField label="Country" maxLength={LIMITS.place} value={form.address.country} onChange={(country) => updateAddress({ country })} error={errors['address.country']} />
+          <TextField label="City" maxLength={LIMITS.place} readOnly={pincode.locked} value={form.address.city} onChange={(city) => updateAddress({ city })} error={errors['address.city']} />
+          <TextField label="District" maxLength={LIMITS.place} readOnly={pincode.locked} value={form.address.district} onChange={(district) => updateAddress({ district })} error={errors['address.district']} />
+          <TextField label="State" maxLength={LIMITS.place} readOnly={pincode.locked} value={form.address.state} onChange={(state) => updateAddress({ state })} error={errors['address.state']} />
+          <TextField label="State code" maxLength={2} placeholder="27" value={form.address.stateCode} onChange={(stateCode) => updateAddress({ stateCode })} error={errors['address.stateCode']} hint={stateCodeHint} />
         </div>
       </Section>
 
@@ -316,6 +359,18 @@ export const CompanyProfileEditorPage: React.FC = () => {
           <TextField label="Careers email" type="email" value={form.careersEmail} onChange={(careersEmail) => update({ careersEmail })} error={errors.careersEmail} />
           <TextField label="Website" type="url" placeholder="https://" value={form.website} onChange={(website) => update({ website })} error={errors.website} />
         </div>
+      </Section>
+
+      <Section title="Home page video">
+        <HomeVideoFields
+          enabled={form.homeVideoEnabled}
+          url={form.homeVideoUrl}
+          onEnabledChange={(homeVideoEnabled) => update({ homeVideoEnabled })}
+          onUrlChange={(homeVideoUrl) => update({ homeVideoUrl })}
+          error={errors.homeVideoUrl}
+          disabled={!!actions.busy}
+        />
+        <p className="text-gray-500">Goes live on the storefront only after an approver approves this change.</p>
       </Section>
 
       <Section title="Invoice terms">
@@ -329,8 +384,8 @@ export const CompanyProfileEditorPage: React.FC = () => {
         </button>
         <button
           type="button"
-          disabled={busy || pendingElsewhere}
-          title={pendingElsewhere ? PENDING_SUBMIT_BLOCKED : undefined}
+          disabled={busy || pendingElsewhere || !submitReady}
+          title={pendingElsewhere ? PENDING_SUBMIT_BLOCKED : !submitReady ? 'Fill in all required fields to submit.' : undefined}
           onClick={() => void save(true)}
           className={BUTTON.primary}
         >

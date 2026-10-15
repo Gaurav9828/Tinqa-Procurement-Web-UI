@@ -1,46 +1,5 @@
 import type { UnifiedApprovalItem } from "../features/approvals/types/approval.types";
 
-  // In your abc.type.ts file
-  export type Department = 
-    | 'Procurement'
-    | 'Procurement Logistics'
-    | 'Inventory Management'
-    | 'Vendor Operations'
-    | 'Finance & Accounts'
-    | 'Legal & Compliance'
-    | 'IT & Infrastructure';
-
-  // This is now a mutable array of your specific type
-  export const DEPARTMENTS: Department[] = [
-    'Procurement',
-    'Procurement Logistics',
-    'Inventory Management',
-    'Vendor Operations',
-    'Finance & Accounts',
-    'Legal & Compliance',
-    'IT & Infrastructure',
-  ];
-
-  export type Designation =
-    | 'Administrator Level 1'
-    | 'Administrator Level 2'
-    | 'Junior Procurement Specialist'
-    | 'Senior Procurement Manager'
-    | 'Logistics Coordinator'
-    | 'Operations Lead'
-    | 'Regional Director';
-
-  // This is now a mutable array that matches your specific type
-  export const DESIGNATIONS: Designation[] = [
-    'Administrator Level 1',
-    'Administrator Level 2',
-    'Junior Procurement Specialist',
-    'Senior Procurement Manager',
-    'Logistics Coordinator',
-    'Operations Lead',
-    'Regional Director',
-  ];
-
   export type ApprovalStatus = 
     | 'APPROVED'
     | 'PENDING'
@@ -54,21 +13,44 @@ import type { UnifiedApprovalItem } from "../features/approvals/types/approval.t
     'ACTIVE'
   ];
 
+  /**
+   * Procurement (dealer) order lifecycle. Moves are forward-only; see
+   * features/order-management/utils/orderWorkflow.ts for the allowed transitions.
+   */
   export type OrderStatus =
+    | 'QUOTATION'
     | 'PENDING'
     | 'DEALER_LEVEL_PENDING'
     | 'CONFIRMED'
     | 'SHIPPED'
     | 'DELIVERED'
-    | 'CANCELLED';
+    | 'CANCELLED'
+    | 'RETURN_REQUESTED'
+    | 'RETURN_APPROVED'
+    | 'RETURN_REJECTED'
+    | 'RETURN_PICKED_UP'
+    | 'RETURN_RECEIVED'
+    | 'REFUND_INITIATED'
+    | 'REFUND_FAILED'
+    | 'REFUND_COMPLETED';
 
+  /** Every procurement status, in lifecycle order (filters, labels). */
   export const ORDER_STATUS: OrderStatus[] = [
+    'QUOTATION',
     'PENDING',
     'DEALER_LEVEL_PENDING',
     'CONFIRMED',
     'SHIPPED',
     'DELIVERED',
-    'CANCELLED'
+    'RETURN_REQUESTED',
+    'RETURN_APPROVED',
+    'RETURN_PICKED_UP',
+    'RETURN_RECEIVED',
+    'REFUND_INITIATED',
+    'REFUND_FAILED',
+    'REFUND_COMPLETED',
+    'RETURN_REJECTED',
+    'CANCELLED',
   ];
 
   export type Gender = 'MALE' | 'FEMALE' | 'OTHER';

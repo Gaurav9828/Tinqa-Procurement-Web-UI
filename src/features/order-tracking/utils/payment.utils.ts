@@ -9,6 +9,9 @@ const PAYMENT_STATUS_LABELS: Record<string, string> = {
   PAID: 'Paid',
   FAILED: 'Failed',
   REFUND_REQUESTED: 'Refund requested',
+  // Approved by an L2 admin and accepted by Razorpay; becomes REFUNDED or REFUND_FAILED.
+  REFUND_INITIATED: 'Refund initiated',
+  REFUND_FAILED: 'Refund failed',
   REFUNDED: 'Refunded',
   CANCELLED: 'Cancelled',
 };
@@ -18,6 +21,18 @@ const PAYMENT_METHOD_LABELS: Record<string, string> = {
   UPI: 'UPI',
   CARD: 'Card',
 };
+
+/** Order-level payment statuses offered in the list filter (GET /admin/orders?paymentStatus=…). */
+export const PAYMENT_STATUS_FILTER_OPTIONS: readonly string[] = [
+  'PENDING',
+  'PAID',
+  'FAILED',
+  'REFUND_REQUESTED',
+  'REFUND_INITIATED',
+  'REFUND_FAILED',
+  'REFUNDED',
+  'CANCELLED',
+];
 
 /** Friendly label; unknown/legacy values still render ("PARTIALLY_PAID" → "Partially Paid"). */
 export const formatPaymentStatus = (status: string | null | undefined): string => {
@@ -42,8 +57,10 @@ export const paymentStatusTone = (status: string | null | undefined): PaymentTon
     case 'ATTEMPTED':
       return 'amber';
     case 'FAILED':
+    case 'REFUND_FAILED':
       return 'rose';
     case 'REFUND_REQUESTED':
+    case 'REFUND_INITIATED':
     case 'REFUNDED':
       return 'purple';
     default:

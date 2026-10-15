@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import type { EmployeeResponse } from '../types/employee.types';
 import { EmployeeStatusBadge } from './EmployeeStatusBadge';
+import { EmployeeRoleBadge } from './EmployeeRoleBadge';
 
 interface Props {
   employee: EmployeeResponse | null;
@@ -61,6 +62,7 @@ export const EmployeeDetailsModal: React.FC<Props> = ({ employee, isLoading, onC
                   <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-blue-500/10 text-[#0071e3] border border-blue-500/20">
                     {employee.employeeCode}
                   </span>
+                  <EmployeeRoleBadge role={employee.role} />
                 </div>
                 <p className="text-xs text-gray-500 dark:text-neutral-400 mt-0.5">
                   Full Name: {employee.firstName} {employee.middleName ? `${employee.middleName} ` : ''}
@@ -164,8 +166,8 @@ export const EmployeeDetailsModal: React.FC<Props> = ({ employee, isLoading, onC
                 <div className="p-3 bg-black/5 dark:bg-white/5 rounded-xl flex items-center gap-2.5">
                   <UserCheck className="w-4 h-4 text-gray-400 shrink-0" />
                   <div>
-                    <p className="text-[10px] text-gray-400">Designation</p>
-                    <p className="font-medium text-black dark:text-white">{employee.designation}</p>
+                    <p className="text-[10px] text-gray-400">Designation (Job Title)</p>
+                    <p className="font-medium text-black dark:text-white">{employee.designationLabel || employee.designation || 'Not assigned'}</p>
                   </div>
                 </div>
 

@@ -1,5 +1,5 @@
-import axios, { type AxiosError, type AxiosInstance } from 'axios';
-import { clearSession, getToken, isSessionExpired, redirectToLogin } from '../auth/session';
+import axios, { type AxiosAdapter, type AxiosError, type AxiosInstance, type AxiosResponse } from 'axios';
+import { clearSession, getToken, isSessionExpired, redirectToLogin, redirectToPasswordSetup } from '../auth/session';
 import { METHOD_NOT_ALLOWED_MESSAGE } from '../utils/apiError';
 
 declare module 'axios' {
@@ -35,12 +35,36 @@ const describeError = (error: AxiosError): string => {
   return STATUS_MESSAGES[status] || error.message;
 };
 
+/**
+ * Identical GETs that are already in flight share one network call: StrictMode's double effect,
+ * or two components loading the same list at once, no longer hit the server twice. Nothing is
+ * cached once the response lands, so later reads are always fresh. Requests with an abort
+ * signal are left alone so one caller cancelling can't cancel the other.
+ */
+export const dedupeInFlightGets = (adapter: AxiosAdapter): AxiosAdapter => {
+  const inFlight = new Map<string, Promise<AxiosResponse>>();
+
+  return (config) => {
+    if ((config.method ?? 'get').toLowerCase() !== 'get' || config.signal) return adapter(config);
+
+    // The token is part of the key so two sessions never share a response.
+    const key = `${axios.getUri(config)}|${String(config.headers?.Authorization ?? '')}|${config.responseType ?? ''}`;
+    const pending = inFlight.get(key);
+    if (pending) return pending.then((response) => ({ ...response, config }));
+
+    const request = adapter(config).finally(() => inFlight.delete(key));
+    inFlight.set(key, request);
+    return request;
+  };
+};
+
 export const createApiClient = (baseURL: string, label: string): AxiosInstance => {
   const client = axios.create({
     baseURL,
     timeout: 30000,
     headers: { 'Content-Type': 'application/json' },
   });
+  client.defaults.adapter = dedupeInFlightGets(axios.getAdapter(client.defaults.adapter));
 
   client.interceptors.request.use((config) => {
     const token = getToken();
@@ -75,6 +99,12 @@ export const createApiClient = (baseURL: string, label: string): AxiosInstance =
       if (status === 401 && !error.config?.skipAuthRedirect) {
         clearSession();
         redirectToLogin('expired');
+      }
+
+      // A temporary password only allows setting a new one; the backend blocks everything else.
+      const errorCode = (error.response?.data as { errorCode?: unknown } | undefined)?.errorCode;
+      if (status === 403 && errorCode === 'PASSWORD_CHANGE_REQUIRED') {
+        redirectToPasswordSetup();
       }
 
       error.message = describeError(error);

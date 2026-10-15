@@ -4,11 +4,14 @@ import userEvent from '@testing-library/user-event';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import { AxiosError, AxiosHeaders, type AxiosResponse } from 'axios';
+import { MemoryRouter } from 'react-router-dom';
 import alertReducer from '../../../store/alertSlice';
 import { GlobalAlertContainer } from '../../../components/ui/GlobalAlertContainer';
 import { ItemManagementPage } from './ItemManagementPage';
 import { axiosClient } from '../../../api/axiosClient';
 import type { ItemResponse, ItemWarrantyRequest, ItemWarrantyResponse } from '../types/item.types';
+import { APP_NAVIGATION } from '../../../config/permissions.config';
+import { signInAsSuperAdmin } from '../../../test/access';
 
 /**
  * Only the HTTP client is mocked, with a small fake of the Procurement BE ItemAdminController /
@@ -137,10 +140,12 @@ const renderPage = () => {
   const store = configureStore({ reducer: { alert: alertReducer } });
   const user = userEvent.setup();
   render(
-    <Provider store={store}>
-      <GlobalAlertContainer />
-      <ItemManagementPage />
-    </Provider>
+    <MemoryRouter initialEntries={['/item']}>
+      <Provider store={store}>
+        <GlobalAlertContainer />
+        <ItemManagementPage />
+      </Provider>
+    </MemoryRouter>
   );
   return { user };
 };
@@ -193,6 +198,7 @@ const openPreview = async (user: User, name = 'Zenbook 14') => {
 };
 
 beforeEach(() => {
+  signInAsSuperAdmin('ADMIN_L1');
   vi.clearAllMocks();
   db = [structuredClone(LAPTOP), structuredClone(CABLE)];
   nextWarrantyId = 500;
@@ -251,21 +257,22 @@ describe('Create item with warranties', () => {
     await user.click(within(section()).getByRole('button', { name: 'Add warranty' }));
     await user.click(within(section()).getByRole('button', { name: 'Add warranty' }));
     await fillCard(user, 2, { type: 'SELLER', duration: '0', title: 'x'.repeat(256), provider: 'p'.repeat(256) });
+
+    // Card 1 is still missing its required fields, so saving stays disabled.
+    expect(screen.getByRole('button', { name: 'Create Item' })).toBeDisabled();
+    await fillCard(user, 1, { type: 'PARTS', duration: '6', title: 'Parts cover' });
     await submitCreate(user);
 
-    expect(within(card(1)).getByText('Select a warranty type.')).toBeInTheDocument();
-    expect(within(card(1)).getByText('Title is required.')).toBeInTheDocument();
-    expect(within(card(1)).getByText('Duration is required.')).toBeInTheDocument();
     expect(within(card(2)).getByText('Duration must be a whole number greater than 0.')).toBeInTheDocument();
     expect(within(card(2)).getByText('Title cannot exceed 255 characters.')).toBeInTheDocument();
     expect(within(card(2)).getByText('Provider cannot exceed 255 characters.')).toBeInTheDocument();
-    expect(within(card(1)).getByLabelText('Type *')).toHaveAttribute('aria-invalid', 'true');
+    expect(within(card(2)).getByLabelText('Duration')).toHaveAttribute('aria-invalid', 'true');
     expect(await screen.findByText('Please fix the highlighted warranty fields.')).toBeInTheDocument();
     expect(http.post).not.toHaveBeenCalled();
 
     // Fixing a field clears its error.
-    await fillCard(user, 1, { type: 'PARTS' });
-    expect(within(card(1)).queryByText('Select a warranty type.')).not.toBeInTheDocument();
+    await fillCard(user, 2, { duration: '3' });
+    expect(within(card(2)).queryByText('Duration must be a whole number greater than 0.')).not.toBeInTheDocument();
   });
 
   it.each(['1.5', '-2'])('rejects a non-integer/negative duration %s', async (duration) => {
@@ -425,6 +432,15 @@ describe('Edit item warranties', () => {
     expect(lastBody('put')).not.toHaveProperty('warranties');
     expect(lastBody('put')).not.toHaveProperty('warrantyMonths');
     expect(db[0].warranties).toHaveLength(2);
+  });
+});
+
+describe('Stock management entry point', () => {
+  it('opens from the Item Management toolbar instead of the sidebar', async () => {
+    renderPage();
+    await screen.findByText('Zenbook 14');
+    expect(screen.getByRole('link', { name: 'Stock Management' })).toHaveAttribute('href', '/item/stocks');
+    expect(APP_NAVIGATION.map((nav) => nav.id)).not.toContain('stocks');
   });
 });
 

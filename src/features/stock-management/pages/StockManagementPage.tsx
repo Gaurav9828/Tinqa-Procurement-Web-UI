@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Package, RefreshCw } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { ArrowLeft, Package, RefreshCw } from 'lucide-react';
 import { useStockList } from '../hooks/useStockList';
 import { useStockActions } from '../hooks/useStockActions';
 import type {
@@ -16,8 +17,10 @@ import { StockPreviewModal } from '../components/StockPreviewModal';
 import { StockEditModal } from '../components/StockEditModal'; // <--- Import Edit Modal
 import { StockApprovalModal } from '../components/StockApprovalModal';
 import { ActionConfirmationModal } from '../components/ActionConfirmationModal';
+import { useAccess } from '../../../hooks/useAccess';
 
 export const StockManagementPage: React.FC = () => {
+  const { can } = useAccess();
   const {
     stocks,
     isLoading,
@@ -115,6 +118,14 @@ export const StockManagementPage: React.FC = () => {
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
+          <Link
+            to="/item"
+            className="p-2 rounded-xl bg-black/5 dark:bg-white/10 hover:bg-black/10 dark:hover:bg-white/20 text-gray-600 dark:text-gray-300"
+            aria-label="Back to Item Management"
+            title="Back to Item Management"
+          >
+            <ArrowLeft className="w-4 h-4" />
+          </Link>
           <div className="p-2.5 bg-[#0071e3]/10 text-[#0071e3] rounded-2xl">
             <Package className="w-6 h-6" />
           </div>
@@ -138,14 +149,14 @@ export const StockManagementPage: React.FC = () => {
         selectedStatus={approvalStatusFilter}
         onSearchChange={updateSearch}
         onStatusChange={updateApprovalStatusFilter}
-        onOpenCreateModal={() => setIsFormModalOpen(true)}
+        onOpenCreateModal={can('STOCK_CREATE') ? () => setIsFormModalOpen(true) : undefined}
       />
 
       <StockTable
         stocks={stocks}
         isLoading={isLoading}
         onView={(stock) => setPreviewState({ isOpen: true, stock })}
-        onEdit={(stock) => setEditState({ isOpen: true, stock })} // <--- Wired Table Edit button if available
+        onEdit={can('STOCK_UPDATE') ? (stock) => setEditState({ isOpen: true, stock }) : undefined}
         onApproval={(stock) => setApprovalModalState({ isOpen: true, stock })}
       />
 
@@ -188,7 +199,7 @@ export const StockManagementPage: React.FC = () => {
       <ActionConfirmationModal
         isOpen={isConfirmFormOpen}
         title="Confirm Stock Creation"
-        description="Are you sure you want to submit this stock entry from order for Admin L2 approval?"
+        description="Are you sure you want to submit this stock entry from order for approval?"
         isSubmitting={isSubmitting}
         onClose={() => setIsConfirmFormOpen(false)}
         onConfirm={executeFormSubmit}

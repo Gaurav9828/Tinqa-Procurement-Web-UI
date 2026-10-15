@@ -16,6 +16,7 @@ import { orderTrackingApi } from '../../order-tracking/api/orderTrackingApi';
 import type { AdminOrderDetail } from '../../order-tracking/types/orderTracking.types';
 import type { ApiResponse, PageResponse } from '../../../types/common.types';
 import type { TicketDetail, TicketMessage, TicketSummary } from '../types/supportTicket.types';
+import { superAdminPermissions } from '../../../test/access';
 
 // Only the network layer is mocked.
 vi.mock('../api/supportTicketsApi', () => ({
@@ -24,7 +25,7 @@ vi.mock('../api/supportTicketsApi', () => ({
 const api = vi.mocked(supportTicketsApi);
 // The real admin order page is mounted for the navigation test; only its API is mocked.
 vi.mock('../../order-tracking/api/orderTrackingApi', () => ({
-  orderTrackingApi: { getOrder: vi.fn(), getTrackingStatuses: vi.fn(), listOrders: vi.fn(), updateTracking: vi.fn(), setOrderStatus: vi.fn() },
+  orderTrackingApi: { getOrder: vi.fn(), getTrackingStatuses: vi.fn(), listOrders: vi.fn(), updateTracking: vi.fn() },
 }));
 const orderApi = vi.mocked(orderTrackingApi);
 
@@ -156,7 +157,7 @@ beforeEach(() => {
   useAuthStore.setState({
     token: 'test-token',
     isAuthenticated: true,
-    user: { userId: 7, username: 'admin1', email: 'a@tinqa.com', role: 'ADMIN_L1', authClient: 'web', isFirstLogin: false },
+    user: { userId: 7, username: 'admin1', email: 'a@tinqa.com', role: 'ADMIN_L1', authClient: 'web', isFirstLogin: false, permissions: superAdminPermissions('ADMIN_L1') },
   });
 });
 
@@ -330,8 +331,8 @@ describe('Support ticket actions', () => {
   it('does not send an empty reply', async () => {
     const { user } = await openDetail();
     await user.type(screen.getByLabelText('Reply'), '    ');
-    await user.click(screen.getByRole('button', { name: 'Send reply' }));
-    expect(screen.getByText('Write a reply before sending.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Send reply' })).toBeDisabled();
+    await user.keyboard('{Control>}{Enter}{/Control}');
     expect(api.reply).not.toHaveBeenCalled();
   });
 
@@ -350,7 +351,9 @@ describe('Support ticket actions', () => {
     await user.click(screen.getByRole('button', { name: /Sending/ }));
     expect(api.reply).toHaveBeenCalledTimes(1);
     resolve(ok(DETAIL, 'Support reply was added.'));
-    expect(await screen.findByRole('button', { name: 'Send reply' })).toBeEnabled();
+    // The draft is cleared, so the button is disabled until something new is typed.
+    expect(await screen.findByRole('button', { name: 'Send reply' })).toBeDisabled();
+    expect(screen.getByLabelText('Reply')).toHaveValue('');
   });
 
   it('shows field errors for VALIDATION_FAILED and keeps the draft', async () => {
@@ -668,7 +671,7 @@ describe('Order-linked tickets', () => {
 
   it('shows the number without a link when the role cannot open order tracking', async () => {
     useAuthStore.setState({
-      user: { userId: 9, username: 'viewer', email: 'v@tinqa.com', role: 'VIEWER', authClient: 'web', isFirstLogin: false },
+      user: { userId: 9, username: 'viewer', email: 'v@tinqa.com', role: 'VIEWER', authClient: 'web', isFirstLogin: false, permissions: [] },
     });
     await openDetail({ ...DETAIL, orderNumber: 'ORD-1001', order: ORDER_CONTEXT });
     const card = linkedOrder()!;

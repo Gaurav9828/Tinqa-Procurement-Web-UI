@@ -63,7 +63,7 @@ export const ApprovalTable = <T extends ApprovalItem>({
       const name = item.displayName || `${item.firstName || ''} ${item.lastName || ''}`.trim();
       return {
         title: `New Employee: ${name || item.employeeCode}`,
-        subtitle: `${item.employeeCode} · ${item.designation}${item.createdByUsername ? ` · by @${item.createdByUsername}` : ''}`,
+        subtitle: `${item.employeeCode} · ${item.designationLabel || item.designation}${item.createdByUsername ? ` · by @${item.createdByUsername}` : ''}`,
       };
     }
     if ('batchNumber' in item && 'orderNumber' in item && item?.approvalType == 'STOCKS') {

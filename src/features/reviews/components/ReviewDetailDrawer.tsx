@@ -20,7 +20,8 @@ interface Props {
   /** Fresh copy from GET /admin/reviews/{id}. */
   onLoaded: (review: AdminReview) => void;
   onNotFound: (reviewId: number) => void;
-  onToggleStatus: (review: AdminReview) => void;
+  /** Absent when the user can't moderate reviews (REVIEW_MODERATE): the buttons are hidden. */
+  onToggleStatus?: (review: AdminReview) => void;
   /** False while the status dialog is open above the drawer, so Escape only closes that dialog. */
   closeOnEscape: boolean;
 }
@@ -183,10 +184,10 @@ export const ReviewDetailDrawer: React.FC<Props> = ({ review, onClose, onLoaded,
         </div>
 
         <footer className="px-5 py-4 border-t border-black/10 dark:border-white/10 flex justify-end">
-          {review.active ? (
+          {onToggleStatus && (review.active ? (
             <button
               type="button"
-              onClick={() => onToggleStatus(review)}
+              onClick={() => onToggleStatus?.(review)}
               className="flex items-center gap-1.5 px-4 py-2 rounded-xl font-semibold bg-rose-500 hover:bg-rose-600 text-white cursor-pointer"
             >
               <EyeOff className="w-3.5 h-3.5" /> Deactivate
@@ -194,12 +195,12 @@ export const ReviewDetailDrawer: React.FC<Props> = ({ review, onClose, onLoaded,
           ) : (
             <button
               type="button"
-              onClick={() => onToggleStatus(review)}
+              onClick={() => onToggleStatus?.(review)}
               className="flex items-center gap-1.5 px-4 py-2 rounded-xl font-semibold bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer"
             >
               <Eye className="w-3.5 h-3.5" /> Activate
             </button>
-          )}
+          ))}
         </footer>
       </aside>
     </div>

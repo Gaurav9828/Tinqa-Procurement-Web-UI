@@ -28,8 +28,10 @@ import { ItemStatusBadge } from '../components/ItemStatusBadge';
 import { ItemPreviewModal } from '../components/ItemPreviewModal';
 import { HeaderColumnFilter } from '../components/HeaderColumnFilter';
 import { WarrantySummary } from '../components/WarrantyBadge';
+import { useAccess } from '../../../hooks/useAccess';
 
 export const ItemManagementPage: React.FC = () => {
+    const { can } = useAccess();
     const {
         items,
         totalElements,
@@ -153,7 +155,7 @@ export const ItemManagementPage: React.FC = () => {
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
                     <h1 className="text-2xl font-bold tracking-tight text-black dark:text-white flex items-center gap-2">
-                        <Boxes className="w-6 h-6 text-[#0071e3]" /> Item Catalog
+                        <Boxes className="w-6 h-6 text-[#0071e3]" /> Item Management
                     </h1>
                     <p className="text-sm text-gray-500 dark:text-neutral-400 mt-1">
                         Manage product items, MRP pricing details, and categories.
@@ -180,8 +182,8 @@ export const ItemManagementPage: React.FC = () => {
                 categories={categories}
                 onSearchChange={updateSearch}
                 onCategoryChange={updateCategoryFilter}
-                onOpenCreateItemModal={handleOpenCreateItem}
-                onOpenCreateCategoryModal={() => setIsCategoryModalOpen(true)}
+                onOpenCreateItemModal={can('ITEM_CREATE') ? handleOpenCreateItem : undefined}
+                onOpenCreateCategoryModal={can('ITEM_CATEGORY_MANAGE') ? () => setIsCategoryModalOpen(true) : undefined}
             />
 
             {/* Item Table */}
@@ -301,7 +303,9 @@ export const ItemManagementPage: React.FC = () => {
                                                     <Eye className="w-4 h-4" />
                                                 </button>
 
-                                                {/* Edit Button */}
+                                                {/* Edit and activate/inactivate need ITEM_UPDATE */}
+                                                {can('ITEM_UPDATE') && (
+                                                <>
                                                 <button
                                                     type="button"
                                                     onClick={(e) => {
@@ -339,6 +343,8 @@ export const ItemManagementPage: React.FC = () => {
                                                     >
                                                         <CheckCircle className="w-4 h-4" />
                                                     </button>
+                                                )}
+                                                </>
                                                 )}
                                             </div>
                                         </td>

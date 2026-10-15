@@ -5,7 +5,7 @@ import { useNotify } from '../../../hooks/useNotify';
 import { getApiErrorKind } from '../../../utils/apiErrorKind';
 import { getApiErrorCode, getApiFieldErrors } from '../../../utils/apiError';
 
-export const REVIEW_NO_ACCESS_MESSAGE = 'You do not have access to moderate reviews. Contact an Admin L2 if you need it.';
+export const REVIEW_NO_ACCESS_MESSAGE = 'You do not have access to moderate reviews. Ask an administrator if you need it.';
 
 export type ModerationResult =
   | { ok: true; review: AdminReview }

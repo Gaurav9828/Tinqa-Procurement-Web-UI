@@ -14,8 +14,12 @@ export interface CreateOrderRequest {
 }
 
 export interface UpdateOrderStatusRequest {
+  /** Must be an allowed next status of the order's current one (see utils/orderWorkflow). */
   status: OrderStatus;
+  /** Required when moving to DELIVERED. */
   actualDelivery?: string;
+  /** Required for cancel, return request/rejection and failed refunds; optional otherwise. */
+  reason?: string;
 }
 
 export interface OrderResponse {

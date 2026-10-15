@@ -1,58 +1,81 @@
 import React from 'react';
-import { Check, RotateCcw, XCircle } from 'lucide-react';
-import { MAIN_STAGES, STAGE_LABELS, getStage } from '../utils/statusWorkflow';
+import { RotateCcw, XCircle } from 'lucide-react';
+import { StatusStepper } from '../../../components/ui/StatusStepper';
+import { CANCELLATION_REFUND_TRACK, MAIN_STAGES, RETURN_TRACK, STAGE_LABELS, getStage } from '../utils/statusWorkflow';
 import { formatStatusLabel } from '../utils/orderTracking.utils';
 
 interface Props {
   currentStatus: string | null;
+  /** A cancelled order that was paid: its refund is shown step by step. */
+  paid?: boolean;
+  /** Every status the order has had (oldest first), to tell a cancelled-then-refunded order from a returned one. */
+  history?: string[];
 }
 
+const WARNING_STATUSES = new Set(['DELIVERY_FAILED', 'CUSTOMER_UNAVAILABLE', 'INVALID_ADDRESS', 'CUSTOMER_CANCELLED_DELIVERY', 'REFUND_FAILED']);
+const CLOSED_RETURN_STATUSES = new Set(['RETURN_REJECTED', 'RETURN_CANCELLED', 'RETURN_INSPECTION_FAILED']);
+
 /**
- * Stage-wise view of where the order is: Placed → Confirmed → Fulfilment → Out for delivery → Delivered,
- * with a distinct banner when the order is in returns or closed.
+ * Stage-wise view of where the order is: Placed → Confirmed → Fulfilment → Shipped → Out for delivery
+ * → Delivered, then a separate return / refund track once a return (or a refund after cancelling) starts.
  */
-export const StageProgress: React.FC<Props> = ({ currentStatus }) => {
+export const StageProgress: React.FC<Props> = ({ currentStatus, paid = false, history = [] }) => {
   const stage = getStage(currentStatus);
-  const isCancelled = currentStatus === 'CANCELLED';
-  const isReturn = stage === 'RETURNS' || currentStatus === 'RETURN_COMPLETED';
-  // Returns happen after delivery, so the main track is complete for them.
-  const activeIndex = isReturn ? MAIN_STAGES.length - 1 : stage ? MAIN_STAGES.indexOf(stage) : -1;
+  const status = currentStatus ?? '';
+  const wasCancelled = status === 'CANCELLED' || (stage === 'REFUND' || status === 'REFUND_COMPLETED' ? history.includes('CANCELLED') && !history.includes('DELIVERED') : false);
+  const returnIndex = RETURN_TRACK.findIndex((step) => step.statuses.includes(status));
+  const inReturn = !wasCancelled && returnIndex >= 0;
+  // Cancelled and paid (refund still due), or a refund under way after cancelling.
+  const refunding = wasCancelled && (status !== 'CANCELLED' || paid);
+  const activeIndex = inReturn ? MAIN_STAGES.length - 1 : stage ? MAIN_STAGES.indexOf(stage) : -1;
 
   return (
-    <div aria-label="Order stage" data-stage={isCancelled ? 'CANCELLED' : isReturn ? 'RETURNS' : stage ?? 'UNKNOWN'} className="space-y-2">
-      <ol className="flex items-center gap-1">
-        {MAIN_STAGES.map((s, index) => {
-          const done = !isCancelled && activeIndex > index;
-          const current = !isCancelled && activeIndex === index;
-          return (
-            <li key={s} aria-current={current ? 'step' : undefined} className="flex-1 min-w-0">
-              <div
-                className={`h-1.5 rounded-full ${
-                  isCancelled ? 'bg-gray-200 dark:bg-neutral-700' : done || current ? 'bg-[#0071e3]' : 'bg-gray-200 dark:bg-neutral-700'
-                }`}
-              />
-              <span
-                className={`mt-1 flex items-center gap-0.5 text-[10px] truncate ${
-                  current ? 'font-bold text-[#0071e3]' : done ? 'text-gray-600 dark:text-gray-300' : 'text-gray-400'
-                }`}
-              >
-                {done && <Check className="w-2.5 h-2.5 shrink-0" />}
-                {STAGE_LABELS[s]}
-              </span>
-            </li>
-          );
-        })}
-      </ol>
+    <div aria-label="Order stage" data-stage={wasCancelled ? 'CANCELLED' : inReturn ? 'RETURNS' : stage ?? 'UNKNOWN'} className="space-y-3">
+      <StatusStepper
+        label="Order stages"
+        steps={MAIN_STAGES.map((s) => ({ key: s, label: STAGE_LABELS[s] }))}
+        currentIndex={activeIndex}
+        muted={wasCancelled}
+        warning={WARNING_STATUSES.has(status)}
+        complete={status === 'DELIVERED' || inReturn}
+      />
 
-      {isCancelled && (
+      {wasCancelled && !refunding && (
         <p className="flex items-center gap-1.5 text-[11px] font-semibold text-rose-600 dark:text-rose-400">
           <XCircle className="w-3.5 h-3.5" /> Cancelled — order closed
         </p>
       )}
-      {isReturn && (
-        <p className="flex items-center gap-1.5 text-[11px] font-semibold text-purple-600 dark:text-purple-400">
-          <RotateCcw className="w-3.5 h-3.5" /> Return: {formatStatusLabel(currentStatus)}
-        </p>
+
+      {refunding && (
+        <div className="space-y-2 p-3 rounded-xl bg-rose-500/5 border border-rose-500/15">
+          <p className="flex items-center gap-1.5 text-[11px] font-semibold text-rose-600 dark:text-rose-400">
+            <XCircle className="w-3.5 h-3.5" /> Cancelled — {status === 'CANCELLED' ? 'refund due' : formatStatusLabel(status)}
+          </p>
+          <StatusStepper
+            label="Refund stages"
+            steps={CANCELLATION_REFUND_TRACK.map((step) => ({ key: step.key, label: step.label }))}
+            currentIndex={CANCELLATION_REFUND_TRACK.findIndex((step) => step.statuses.includes(status))}
+            warning={status === 'REFUND_FAILED'}
+            complete={status === 'REFUND_COMPLETED'}
+          />
+        </div>
+      )}
+
+      {inReturn && (
+        <div className="space-y-2 p-3 rounded-xl bg-purple-500/5 border border-purple-500/15">
+          <p className="flex items-center gap-1.5 text-[11px] font-semibold text-purple-600 dark:text-purple-400">
+            <RotateCcw className="w-3.5 h-3.5" /> Return: {formatStatusLabel(status)}
+          </p>
+          <StatusStepper
+            label="Return stages"
+            tone="purple"
+            steps={RETURN_TRACK.map((step) => ({ key: step.key, label: step.label }))}
+            currentIndex={returnIndex}
+            warning={WARNING_STATUSES.has(status)}
+            muted={CLOSED_RETURN_STATUSES.has(status)}
+            complete={status === 'REFUND_COMPLETED' || status === 'RETURN_COMPLETED'}
+          />
+        </div>
       )}
     </div>
   );

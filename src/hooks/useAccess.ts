@@ -1,43 +1,40 @@
-import { useAuthStore } from '../store/useAuthStore'
-import { FEATURE_PERMISSIONS, APP_NAVIGATION, } from '../config/permissions.config';
-import type { FeatureKey, UserRole, NavigationItem } from '../config/permissions.config';
+import { useCallback, useMemo } from 'react';
+import { useAuthStore } from '../store/useAuthStore';
+import { APP_NAVIGATION, type NavigationItem } from '../config/permissions.config';
+import type { Permission } from '../config/access';
 
+/**
+ * What the signed-in user may do, from the permissions the server sent (login, GET /v1/access/me).
+ * Gate every screen and button with `can(...)`, never with the role or designation. UX only: the backends enforce it.
+ */
 export const useAccess = () => {
-  const { user } = useAuthStore();
-  const userRole = user?.role as UserRole | undefined;
+  const user = useAuthStore((state) => state.user);
+  const permissions = user?.permissions;
+  const groups = user?.permissionGroups;
 
-  /**
-   * Check if current user has access to a specific feature key
-   */
-  const hasFeature = (feature: FeatureKey): boolean => {
-    if (!userRole) return false;
-    const allowedRoles = FEATURE_PERMISSIONS[feature];
-    return allowedRoles ? allowedRoles.includes(userRole) : false;
-  };
+  const granted = useMemo(() => new Set(permissions ?? []), [permissions]);
+  const heldGroups = useMemo(() => new Set(groups ?? []), [groups]);
 
-  /**
-   * Check if current user explicitly holds a specific role or set of roles
-   */
-  const hasRole = (roles: UserRole | UserRole[]): boolean => {
-    if (!userRole) return false;
-    if (Array.isArray(roles)) {
-      return roles.includes(userRole);
-    }
-    return userRole === roles;
-  };
+  const can = useCallback((permission: Permission): boolean => granted.has(permission), [granted]);
+  const canAny = useCallback((...required: Permission[]): boolean => required.some((p) => granted.has(p)), [granted]);
+  const canAll = useCallback((...required: Permission[]): boolean => required.every((p) => granted.has(p)), [granted]);
+  const inGroup = useCallback((group: string): boolean => heldGroups.has(group), [heldGroups]);
 
-  /**
-   * Returns filtered list of navigation menus user is authorized to see
-   */
-  const authorizedNavigation = (): NavigationItem[] => {
-    if (!userRole) return [];
-    return APP_NAVIGATION.filter((nav) => nav.allowedRoles.includes(userRole));
-  };
+  const canOpen = useCallback((item: NavigationItem): boolean => canAny(...item.requires), [canAny]);
+  const authorizedNavigation = useCallback((): NavigationItem[] => APP_NAVIGATION.filter(canOpen), [canOpen]);
 
   return {
-    userRole,
-    hasFeature,
-    hasRole,
+    /** Admin level (ADMIN_L1 / ADMIN_L2); for display, not for gating. */
+    level: user?.role ?? null,
+    designation: user?.designation ?? null,
+    designationLabel: user?.designationLabel ?? null,
+    /** False for a session saved before permissions existed, until the next refresh. */
+    accessLoaded: permissions !== undefined,
+    can,
+    canAny,
+    canAll,
+    inGroup,
+    canOpen,
     authorizedNavigation,
   };
 };

@@ -1,6 +1,7 @@
 import React from 'react';
 import { X, Calendar, Truck, User, Package, IndianRupee } from 'lucide-react';
 import { OrderStatusBadge } from './OrderStatusBadge';
+import { OrderProgress } from './OrderProgress';
 import type { OrderResponse } from '../types/order.types';
 
 interface OrderPreviewModalProps {
@@ -29,6 +30,7 @@ export const OrderPreviewModal: React.FC<OrderPreviewModalProps> = ({ order, onC
             <span className="text-gray-500 font-medium">Status</span>
             <OrderStatusBadge status={order.orderStatus} />
           </div>
+          <OrderProgress status={order.orderStatus} />
 
           <div className="grid grid-cols-2 gap-3">
             <div className="p-3 border border-black/10 dark:border-white/10 rounded-xl space-y-1">

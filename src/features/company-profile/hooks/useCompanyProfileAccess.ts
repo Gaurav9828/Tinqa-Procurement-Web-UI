@@ -6,17 +6,19 @@ import { sameUser } from '../utils/companyProfile.utils';
 
 /**
  * Maker-checker rules for the current admin (UX only; the backend answers 403 otherwise).
- *  - Maker (ADMIN_L1): create / edit own DRAFT or REJECTED versions, upload, submit, withdraw what they submitted.
- *  - Checker (ADMIN_L2): approve / reject a pending change — never one they created or submitted.
+ *  - Maker (COMPANY_PROFILE_EDIT): create / edit own DRAFT or REJECTED versions, upload, submit, withdraw what they submitted.
+ *  - Checker (COMPANY_PROFILE_APPROVE): approve / reject a pending change — never one they created or submitted.
+ * One admin may hold both; the "not your own change" rule still applies.
  */
 export const useCompanyProfileAccess = () => {
   const token = useAuthStore((state) => state.token);
   const user = useAuthStore((state) => state.user);
 
   return useMemo(() => {
-    const { username, roles } = getAdminIdentity(token, user);
-    const isMaker = roles.includes('ADMIN_L1');
-    const isChecker = roles.includes('ADMIN_L2');
+    const { username } = getAdminIdentity(token, user);
+    const permissions = user?.permissions ?? [];
+    const isMaker = permissions.includes('COMPANY_PROFILE_EDIT');
+    const isChecker = permissions.includes('COMPANY_PROFILE_APPROVE');
     const isMine = (v: Pick<CompanyProfileVersion, 'createdBy' | 'submittedBy'>) =>
       sameUser(v.createdBy, username) || sameUser(v.submittedBy, username);
 

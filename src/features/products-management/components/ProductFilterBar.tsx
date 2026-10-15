@@ -6,7 +6,8 @@ interface ProductFilterBarProps {
   onSearchChange: (value: string) => void;
   statusFilter: string;
   onStatusFilterChange: (status: string) => void;
-  onOpenCreateModal: () => void;
+  /** Hidden when absent (the user can't create products). */
+  onOpenCreateModal?: () => void;
 }
 
 export const ProductFilterBar: React.FC<ProductFilterBarProps> = ({
@@ -38,12 +39,14 @@ export const ProductFilterBar: React.FC<ProductFilterBarProps> = ({
           <option value="ENABLED">Enabled</option>
           <option value="DISABLED">Disabled</option>
         </select>
+        {onOpenCreateModal && (
         <button
           onClick={onOpenCreateModal}
           className="flex items-center gap-1.5 px-4 py-2 bg-[#0071e3] hover:bg-[#0077ed] text-white rounded-xl font-medium transition-colors cursor-pointer shrink-0"
         >
           <Plus className="w-4 h-4" /> Create Product
         </button>
+        )}
       </div>
     </div>
   );

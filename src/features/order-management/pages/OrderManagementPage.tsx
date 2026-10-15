@@ -8,6 +8,9 @@ import { OrderTable } from '../components/OrderTable';
 import { CreateOrderModal } from '../components/CreateOrderModal';
 import { EditOrderModal } from '../components/EditOrderModal';
 import { OrderPreviewModal } from '../components/OrderPreviewModal';
+import { OrderStatusDialog } from '../components/OrderStatusDialog';
+import { useAccess } from '../../../hooks/useAccess';
+import { orderAccessFrom } from '../utils/orderWorkflow';
 import type { CreateOrderRequest, OrderResponse, UpdateOrderRequest, UpdateOrderStatusRequest } from '../types/order.types';
 
 export const OrderManagementPage: React.FC = () => {
@@ -38,13 +41,11 @@ export const OrderManagementPage: React.FC = () => {
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
     const [editingOrder, setEditingOrder] = useState<OrderResponse | null>(null);
     const [selectedPreviewOrder, setSelectedPreviewOrder] = useState<OrderResponse | null>(null);
+    const [statusOrder, setStatusOrder] = useState<OrderResponse | null>(null);
+    const { can } = useAccess();
+    const orderAccess = orderAccessFrom(can);
 
-    const handleStatusChange = async (
-        order: OrderResponse,
-        payload: UpdateOrderStatusRequest
-    ) => {
-        await updateOrderStatus(order.id, payload);
-    };
+    const handleStatusChange = (order: OrderResponse, payload: UpdateOrderStatusRequest) => updateOrderStatus(order.id, payload);
 
     const handleCreateOrderSubmit = async (formData: CreateOrderRequest) => {
         const success = await createOrder(formData);
@@ -90,7 +91,7 @@ export const OrderManagementPage: React.FC = () => {
                 onSearchChange={updateSearch}
                 onStatusChange={updateStatusFilter}
                 onDealerChange={updateDealerFilter}
-                onOpenCreateOrderModal={() => setIsCreateModalOpen(true)}
+                onOpenCreateOrderModal={can('PROCUREMENT_ORDER_CREATE') ? () => setIsCreateModalOpen(true) : undefined}
             />
 
             {/* Table */}
@@ -99,7 +100,7 @@ export const OrderManagementPage: React.FC = () => {
                 isLoading={isLoading || isSubmitting}
                 onPreview={(order) => setSelectedPreviewOrder(order)}
                 onEdit={(order) => setEditingOrder(order)}
-                onStatusUpdate={handleStatusChange}
+                onOpenStatus={(order) => setStatusOrder(order)}
             />
 
             {/* Modals */}
@@ -120,6 +121,14 @@ export const OrderManagementPage: React.FC = () => {
                 dealers={dealers}
                 onClose={() => setEditingOrder(null)}
                 onSubmit={handleEditOrderSubmit}
+            />
+
+            <OrderStatusDialog
+                order={statusOrder}
+                access={orderAccess}
+                isSubmitting={isSubmitting}
+                onClose={() => setStatusOrder(null)}
+                onSubmit={handleStatusChange}
             />
 
             <OrderPreviewModal

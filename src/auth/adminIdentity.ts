@@ -53,3 +53,12 @@ export const getAdminIdentity = (token: string | null, user: { username?: string
   const subject = typeof payload?.sub === 'string' && payload.sub ? payload.sub : null;
   return { username: subject ?? user?.username ?? null, roles };
 };
+
+/**
+ * The permissions signed into the access token (`perms` claim), or null when the token has none. The Ecommerce
+ * backend authorizes from these, so they can lag behind GET /v1/access/me until the user signs in again.
+ */
+export const getTokenPermissions = (token: string | null): string[] | null => {
+  const perms = decodePayload(token)?.perms;
+  return Array.isArray(perms) ? perms.filter((entry): entry is string => typeof entry === 'string') : null;
+};

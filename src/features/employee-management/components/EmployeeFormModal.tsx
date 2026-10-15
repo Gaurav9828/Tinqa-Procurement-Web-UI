@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { X, Save, AlertCircle } from 'lucide-react';
+import { X, Save, AlertCircle, Lock } from 'lucide-react';
 import { CommonInput, CommonSelect } from '../../../components/ui/FormInputs';
 import { ConfirmationModal } from '../../../components/ui/ConfirmationModal';
 import type {
@@ -9,41 +9,27 @@ import type {
   UpdateEmployeeRequest,
 } from '../types/employee.types';
 
-import { EmployeeConstants } from '../types/employee.types';
-import { DEPARTMENTS, DESIGNATIONS, GENDERS } from '../../../types/common.types';
+import { EmployeeConstants, SELF_LOCKED_FIELDS } from '../types/employee.types';
+import type { EmployeeSaveResult } from '../hooks/useEmployeeActions';
+import { EmployeeAccessFields } from './EmployeeAccessFields';
+import { useAccess } from '../../../hooks/useAccess';
+import { useAccessCatalog } from '../../../hooks/useAccessCatalog';
+import { GENDERS } from '../../../types/common.types';
 import { Validator, type ValidationRule } from '../../../utils/validator';
+import { DEFAULT_EMPLOYEE_ROLE, designationHasApprovalLevel, isEmployeeRole, validateDesignation } from '../utils/employeeRole';
 
 interface Props {
   isOpen: boolean;
   employeeToEdit: EmployeeResponse | null;
   existingEmployees?: EmployeeResponse[];
-  userRole: string;
+  /** The record being edited belongs to the signed-in admin: level/designation/salary/employment fields are locked. */
+  isSelfEdit?: boolean;
   isSubmitting: boolean;
   onClose: () => void;
-  onSubmitCreate: (data: CreateEmployeeRequest) => Promise<boolean>;
-  onSubmitUpdate: (id: number, data: UpdateEmployeeRequest) => Promise<boolean>;
+  onSubmitCreate: (data: CreateEmployeeRequest) => Promise<EmployeeSaveResult>;
+  onSubmitUpdate: (id: number, data: UpdateEmployeeRequest) => Promise<EmployeeSaveResult>;
 }
 
-const mapDesignationForDb = (designation: string): string => {
-  if (designation === 'Administrator Level 1') return 'ADMIN_L1';
-  if (designation === 'Administrator Level 2') return 'ADMIN_L2';
-  return designation;
-};
-
-// Helper to determine accurate status based on User Role and Selected Designation
-const getComputedEmployeeStatus = (
-  isL2User: boolean,
-  designation: string,
-  selectedStatus: EmployeeStatus
-): EmployeeStatus => {
-  const isAdminRole = designation === 'Administrator Level 1' || designation === 'Administrator Level 2';
-  
-  if (isAdminRole && !isL2User) {
-    return EmployeeConstants.APPROVAL_PENDING as EmployeeStatus;
-  }
-  
-  return selectedStatus;
-};
 
 // Custom validator function for email with restricted TLDs (.com, .co.in, .net, .org)
 const isValidEmailTLD = (email: string): boolean => {
@@ -72,14 +58,20 @@ export const EmployeeFormModal: React.FC<Props> = ({
   isOpen,
   employeeToEdit,
   existingEmployees = [],
-  userRole,
+  isSelfEdit = false,
   isSubmitting,
   onClose,
   onSubmitCreate,
   onSubmitUpdate,
 }) => {
   const isEditMode = Boolean(employeeToEdit);
-  const isL2User = userRole === 'ADMIN_L2';
+  const isSelfLocked = isEditMode && isSelfEdit;
+  const { can } = useAccess();
+  const canApproveEmployees = can('EMPLOYEE_APPROVE');
+  const { catalog, error: catalogError, retry: retryCatalog } = useAccessCatalog();
+  // The level is set only by an employee approver, never on their own record, and only for admin accounts.
+  const canChooseRole =
+    canApproveEmployees && !isSelfLocked && (!isEditMode || isEmployeeRole(employeeToEdit?.role));
 
   const maxDobDate = useMemo(() => {
     const today = new Date();
@@ -97,8 +89,9 @@ export const EmployeeFormModal: React.FC<Props> = ({
     displayName: '',
     dateOfBirth: '',
     gender: GENDERS[0] || 'MALE',
-    designation: DESIGNATIONS[0] || '',
-    department: DEPARTMENTS[0] || '',
+    designation: '',
+    // '' only when editing a record the backend returned without a role.
+    role: DEFAULT_EMPLOYEE_ROLE as string,
     employmentType: 'FULL_TIME',
     joiningDate: new Date().toISOString().split('T')[0],
     salaryAmount: '',
@@ -113,12 +106,31 @@ export const EmployeeFormModal: React.FC<Props> = ({
   const [initialFormData, setInitialFormData] = useState(formData);
 
   const [validationError, setValidationError] = useState<string | null>(null);
+  // 400 field errors from the API, keyed by the error item's `field`.
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
 
   // Compute if any field in the form has changed
   const isFormDirty = useMemo(() => {
     return JSON.stringify(formData) !== JSON.stringify(initialFormData);
   }, [formData, initialFormData]);
+
+  const requiredFilled =
+    (isEditMode || !!String(formData.username).trim()) &&
+    [
+      formData.firstName,
+      formData.lastName,
+      formData.gender,
+      formData.phone,
+      formData.alternatePhone,
+      formData.dateOfBirth,
+      formData.joiningDate,
+    ].every((value) => !!String(value ?? '').trim()) &&
+    (isEditMode || !!formData.designation) &&
+    (!canChooseRole || isEditMode || isEmployeeRole(formData.role));
+
+  // Shown once something is picked, so a fresh form isn't covered in errors.
+  const designationError = formData.designation ? validateDesignation(formData.designation, !isEditMode) : null;
 
   const computedWorkEmail = isEditMode
     ? undefined
@@ -201,8 +213,8 @@ export const EmployeeFormModal: React.FC<Props> = ({
         displayName: employeeToEdit.displayName,
         dateOfBirth: employeeToEdit.dateOfBirth,
         gender: employeeToEdit.gender,
-        designation: employeeToEdit.designation,
-        department: employeeToEdit.department,
+        designation: employeeToEdit.designation || '',
+        role: isEmployeeRole(employeeToEdit.role) ? employeeToEdit.role : '',
         employmentType: employeeToEdit.employmentType,
         joiningDate: employeeToEdit.joiningDate,
         salaryAmount: employeeToEdit.salaryAmount ? String(employeeToEdit.salaryAmount) : '',
@@ -222,8 +234,8 @@ export const EmployeeFormModal: React.FC<Props> = ({
         displayName: '',
         dateOfBirth: '',
         gender: GENDERS[0] || 'MALE',
-        designation: DESIGNATIONS[0] || '',
-        department: DEPARTMENTS[0] || '',
+        designation: '',
+        role: DEFAULT_EMPLOYEE_ROLE,
         employmentType: 'FULL_TIME',
         joiningDate: new Date().toISOString().split('T')[0],
         salaryAmount: '',
@@ -237,19 +249,27 @@ export const EmployeeFormModal: React.FC<Props> = ({
     setFormData(initialValues);
     setInitialFormData(initialValues);
     setValidationError(null);
+    setFieldErrors({});
     setIsConfirmModalOpen(false);
   }, [employeeToEdit, isOpen]);
 
   if (!isOpen) return null;
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    const { name, value } = e.target;
+  const setField = (name: string, value: string) => {
     setValidationError(null);
+    setFieldErrors((prev) => {
+      if (!(name in prev)) return prev;
+      const next = { ...prev };
+      delete next[name];
+      return next;
+    });
     setFormData((prev) => ({
       ...prev,
       [name]: name === 'status' ? (value as EmployeeStatus) : value,
     }));
   };
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setField(e.target.name, e.target.value);
 
   // 1. Validation Step
   const handleSubmit = (e: React.FormEvent) => {
@@ -270,6 +290,13 @@ export const EmployeeFormModal: React.FC<Props> = ({
 
     const lastNameErr = Validator.validateField(formData.lastName, FORM_RULES.lastName);
     if (lastNameErr) return setValidationError(lastNameErr);
+
+    const designationErr = validateDesignation(formData.designation, !isEditMode);
+    if (designationErr) return setValidationError(designationErr);
+
+    if (!isEditMode && canChooseRole && !isEmployeeRole(formData.role)) {
+      return setValidationError('Please select a role.');
+    }
 
     const phoneErr = Validator.validateField(formData.phone, FORM_RULES.phone);
     if (phoneErr) return setValidationError(phoneErr);
@@ -315,64 +342,73 @@ export const EmployeeFormModal: React.FC<Props> = ({
   };
 
   // 2. Submission Step
-  const executeSubmit = async () => {
-    const finalWorkEmail = computedWorkEmail?.trim().toLowerCase();
-    const finalDesignation = mapDesignationForDb(formData.designation);
-    const computedStatus = getComputedEmployeeStatus(isL2User, formData.designation, formData.status);
-
-    if (isEditMode && employeeToEdit) {
-      const success = await onSubmitUpdate(employeeToEdit.id, {
-        firstName: formData.firstName,
-        middleName: formData.middleName,
-        lastName: formData.lastName,
-        displayName: formData.displayName,
-        dateOfBirth: formData.dateOfBirth,
-        gender: formData.gender,
-        designation: formData.designation,
-        department: formData.department,
-        employmentType: formData.employmentType,
-        joiningDate: formData.joiningDate,
-        salaryAmount: formData.salaryAmount ? Number(formData.salaryAmount) : undefined,
-        salaryCurrency: formData.salaryCurrency,
-        phone: formData.phone,
-        alternatePhone: formData.alternatePhone,
-        personalEmail: formData.personalEmail,
-        status: computedStatus,
-      });
-      if (success) {
-        setIsConfirmModalOpen(false);
-        onClose();
-      }
-    } else {
-      const success = await onSubmitCreate({
-        username: formData.username.trim().toLowerCase(),
-        email: finalWorkEmail ?? '',
-        firstName: formData.firstName,
-        middleName: formData.middleName,
-        lastName: formData.lastName,
-        displayName: formData.displayName || `${formData.firstName} ${formData.lastName}`.trim(),
-        dateOfBirth: formData.dateOfBirth,
-        gender: formData.gender,
-        designation: formData.designation,
-        department: formData.department,
-        employmentType: formData.employmentType,
-        joiningDate: formData.joiningDate,
-        salaryAmount: formData.salaryAmount ? Number(formData.salaryAmount) : undefined,
-        salaryCurrency: formData.salaryCurrency,
-        phone: formData.phone,
-        alternatePhone: formData.alternatePhone,
-        personalEmail: formData.personalEmail,
-        role: finalDesignation,
-      });
-      if (success) {
-        setIsConfirmModalOpen(false);
-        onClose();
-      }
+  const handleResult = (result: EmployeeSaveResult) => {
+    if (result.ok) {
+      setIsConfirmModalOpen(false);
+      onClose();
+      return;
     }
+    setFieldErrors(result.fieldErrors);
+    setIsConfirmModalOpen(false);
   };
 
-  const isSelectedAdminRole =
-    formData.designation === 'Administrator Level 1' || formData.designation === 'Administrator Level 2';
+  /** Edit: only the fields that changed are sent. */
+  const buildUpdatePayload = (): UpdateEmployeeRequest => {
+    const changed = (key: keyof typeof formData) => formData[key] !== initialFormData[key];
+    const payload: UpdateEmployeeRequest = {};
+
+    if (changed('firstName')) payload.firstName = formData.firstName;
+    if (changed('middleName')) payload.middleName = formData.middleName;
+    if (changed('lastName')) payload.lastName = formData.lastName;
+    if (changed('displayName')) payload.displayName = formData.displayName;
+    if (changed('dateOfBirth')) payload.dateOfBirth = formData.dateOfBirth;
+    if (changed('gender')) payload.gender = formData.gender;
+    if (changed('phone')) payload.phone = formData.phone;
+    if (changed('alternatePhone')) payload.alternatePhone = formData.alternatePhone;
+    if (changed('personalEmail')) payload.personalEmail = formData.personalEmail;
+    if (changed('designation') && formData.designation) payload.designation = formData.designation;
+    if (changed('employmentType')) payload.employmentType = formData.employmentType;
+    if (changed('joiningDate')) payload.joiningDate = formData.joiningDate;
+    if (changed('salaryAmount')) payload.salaryAmount = formData.salaryAmount ? Number(formData.salaryAmount) : undefined;
+    if (changed('salaryCurrency')) payload.salaryCurrency = formData.salaryCurrency;
+    if (changed('status')) payload.status = formData.status;
+    if (canChooseRole && changed('role') && isEmployeeRole(formData.role)) payload.role = formData.role;
+
+    // Own record: level, designation, salary and employment terms are never sent.
+    if (isSelfLocked) SELF_LOCKED_FIELDS.forEach((field) => delete payload[field]);
+    return payload;
+  };
+
+  const executeSubmit = async () => {
+    const finalWorkEmail = computedWorkEmail?.trim().toLowerCase();
+
+    if (isEditMode && employeeToEdit) {
+      handleResult(await onSubmitUpdate(employeeToEdit.id, buildUpdatePayload()));
+    } else {
+      handleResult(
+        await onSubmitCreate({
+          username: formData.username.trim().toLowerCase(),
+          email: finalWorkEmail ?? '',
+          firstName: formData.firstName,
+          middleName: formData.middleName,
+          lastName: formData.lastName,
+          displayName: formData.displayName || `${formData.firstName} ${formData.lastName}`.trim(),
+          dateOfBirth: formData.dateOfBirth,
+          gender: formData.gender,
+          designation: formData.designation,
+          employmentType: formData.employmentType,
+          joiningDate: formData.joiningDate,
+          salaryAmount: formData.salaryAmount ? Number(formData.salaryAmount) : undefined,
+          salaryCurrency: formData.salaryCurrency,
+          phone: formData.phone,
+          alternatePhone: formData.alternatePhone,
+          personalEmail: formData.personalEmail,
+          // Always the enum value, never a label. Only an employee approver picks the level; others create Level 1.
+          role: canChooseRole && isEmployeeRole(formData.role) ? formData.role : DEFAULT_EMPLOYEE_ROLE,
+        })
+      );
+    }
+  };
 
   return (
     <>
@@ -386,6 +422,16 @@ export const EmployeeFormModal: React.FC<Props> = ({
               <X className="w-5 h-5" />
             </button>
           </div>
+
+          {isSelfLocked && (
+            <div className="p-3 bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-400 rounded-xl text-xs flex items-center gap-2">
+              <Lock className="w-4 h-4 shrink-0" />
+              <span>
+                This is your own record. Admin level, designation, department, salary, employment type, joining date and
+                status can only be changed by another administrator.
+              </span>
+            </div>
+          )}
 
           {validationError && (
             <div className="p-3 bg-red-500/10 border border-red-500/20 text-red-600 rounded-xl text-xs flex items-center gap-2">
@@ -444,25 +490,6 @@ export const EmployeeFormModal: React.FC<Props> = ({
               <CommonInput label="Display Name" name="displayName" placeholder="e.g. Johnny Doe" value={formData.displayName} onChange={handleChange} />
 
               <CommonSelect
-                label="Department"
-                name="department"
-                required
-                options={DEPARTMENTS}
-                value={formData.department}
-                onChange={handleChange}
-              />
-
-              <CommonSelect
-                label="Designation"
-                name="designation"
-                required
-                options={DESIGNATIONS}
-                value={formData.designation}
-                onChange={handleChange}
-                disabled={formData.status === EmployeeConstants.FIRST_LOGIN}
-              />
-
-              <CommonSelect
                 label="Gender"
                 name="gender"
                 required
@@ -505,8 +532,24 @@ export const EmployeeFormModal: React.FC<Props> = ({
               </div>
 
               <CommonInput label="Date of Birth (At least 18 yrs old)" name="dateOfBirth" type="date" required max={maxDobDate} value={formData.dateOfBirth} onChange={handleChange} />
-              <CommonInput label="Joining Date" name="joiningDate" type="date" required value={formData.joiningDate} onChange={handleChange} />
-              <CommonInput label="Salary Amount" name="salaryAmount" type="number" placeholder="e.g. 50000" value={formData.salaryAmount} onChange={handleChange} />
+              <CommonInput
+                label="Joining Date"
+                name="joiningDate"
+                type="date"
+                required
+                value={formData.joiningDate}
+                onChange={handleChange}
+                disabled={isSelfLocked}
+              />
+              <CommonInput
+                label="Salary Amount"
+                name="salaryAmount"
+                type="number"
+                placeholder="e.g. 50000"
+                value={formData.salaryAmount}
+                onChange={handleChange}
+                disabled={isSelfLocked}
+              />
 
               <CommonSelect
                 label="Employment Type"
@@ -514,11 +557,12 @@ export const EmployeeFormModal: React.FC<Props> = ({
                 options={['FULL_TIME', 'PART_TIME', 'CONTRACT', 'INTERN']}
                 value={formData.employmentType}
                 onChange={handleChange}
+                disabled={isSelfLocked}
               />
 
               {isEditMode && (
                 <CommonSelect
-                  label={isL2User ? 'Employee Status (L2 Override)' : 'Employee Status'}
+                  label="Employee Status"
                   name="status"
                   options={[
                     EmployeeConstants.ACTIVE,
@@ -528,11 +572,34 @@ export const EmployeeFormModal: React.FC<Props> = ({
                     EmployeeConstants.WAITING_FOR_DELETION,
                     EmployeeConstants.APPROVAL_PENDING,
                   ]}
-                  value={getComputedEmployeeStatus(isL2User, formData.designation, formData.status)}
+                  value={formData.status}
                   onChange={handleChange}
-                  disabled={!isL2User && isSelectedAdminRole}
+                  // Only an employee approver changes the status of a Level 2 account.
+                  disabled={isSelfLocked || (!canApproveEmployees && employeeToEdit?.role === 'ADMIN_L2')}
                 />
               )}
+
+              <EmployeeAccessFields
+                catalog={catalog}
+                catalogError={catalogError}
+                onRetryCatalog={retryCatalog}
+                designation={formData.designation}
+                role={formData.role}
+                savedRole={employeeToEdit?.role ?? null}
+                savedDesignation={employeeToEdit?.designation ?? null}
+                savedDepartment={employeeToEdit?.department ?? null}
+                isEditMode={isEditMode}
+                isSelfLocked={isSelfLocked}
+                canApproveEmployees={canApproveEmployees}
+                canEditDesignation={!isEditMode || can('EMPLOYEE_UPDATE')}
+                errors={{ designation: fieldErrors.designation ?? designationError ?? undefined, role: fieldErrors.role }}
+                onDesignationChange={(code) => {
+                  setField('designation', code);
+                  // No approval powers means Level 1 only
+                  if (!designationHasApprovalLevel(catalog, code)) setField('role', 'ADMIN_L1');
+                }}
+                onRoleChange={(value) => setField('role', value)}
+              />
             </div>
 
             <div className="flex justify-end gap-3 pt-3 border-t border-black/10 dark:border-white/10">
@@ -547,10 +614,12 @@ export const EmployeeFormModal: React.FC<Props> = ({
                 type="submit"
                 disabled={
                   !isFormDirty ||
+                  !requiredFilled ||
                   isUsernameTaken ||
                   isPersonalEmailTaken ||
                   Boolean(phoneUniquenessError) ||
                   Boolean(alternatePhoneFormatError) ||
+                  Boolean(designationError) ||
                   (!isEditMode && !Validator.isAlphanumeric(formData.username))
                 }
                 className="px-5 py-2.5 bg-[#0071e3] hover:bg-[#0077ed] text-white rounded-xl text-xs font-semibold flex items-center gap-2 cursor-pointer shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"

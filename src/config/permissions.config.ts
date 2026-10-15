@@ -1,66 +1,15 @@
-export type UserRole = 'ADMIN_L1' | 'ADMIN_L2';
+import { APPROVAL_PERMISSIONS, type AdminLevel, type Permission } from './access';
 
-export type FeatureKey =
-  | 'VIEW_PROFILE'
-  | 'EDIT_PROFILE_DIRECT'
-  | 'APPROVE_PROFILE_CHANGES'
-  | 'VIEW_DOCUMENTS'
-  | 'UPLOAD_DOCUMENTS'
-  | 'MANAGE_SYSTEM_SETTINGS'
-  | 'VIEW_AUDIT_LOGS'
-  | 'MANAGE_ORDERS'
-  | 'MANAGE_AUCTIONS'
-  | 'MANAGE_DEALERS'
-  | 'VIEW_DEALERS'
-  | 'CREATE_DEALER'
-  | 'EDIT_DEALER'
-  | 'DELETE_DEALER'
-  | 'MANAGE_DEALER_CATEGORIES'
-  | 'MANAGE_PAYMENTS'
-  | 'MANAGE_COMPLAINTS'
-  | 'VIEW_ANALYTICS'
-  | 'MANAGE_EMPLOYEES'
-  | 'FINALIZE_EMPLOYEE_DELETE'
-  | 'MANAGE_ITEMS'
-  | 'MANAGE_STOCKS'
-  | 'MANAGE_ORDER_TRACKING'
-  | 'MANAGE_SUPPORT_TICKETS';
-
-export const FEATURE_PERMISSIONS: Record<FeatureKey, UserRole[]> = {
-  VIEW_PROFILE: ['ADMIN_L1', 'ADMIN_L2'],
-  EDIT_PROFILE_DIRECT: ['ADMIN_L1', 'ADMIN_L2'],
-  APPROVE_PROFILE_CHANGES: ['ADMIN_L2'],
-  VIEW_DOCUMENTS: ['ADMIN_L1', 'ADMIN_L2'],
-  UPLOAD_DOCUMENTS: ['ADMIN_L1'],
-  MANAGE_SYSTEM_SETTINGS: ['ADMIN_L2'],
-  VIEW_AUDIT_LOGS: ['ADMIN_L2'],
-  MANAGE_ORDERS: ['ADMIN_L1', 'ADMIN_L2'],
-  MANAGE_AUCTIONS: ['ADMIN_L1', 'ADMIN_L2'],
-  MANAGE_DEALERS: ['ADMIN_L1', 'ADMIN_L2'],
-  VIEW_DEALERS: ['ADMIN_L1', 'ADMIN_L2'],
-  CREATE_DEALER: ['ADMIN_L1', 'ADMIN_L2'],
-  EDIT_DEALER: ['ADMIN_L1', 'ADMIN_L2'],
-  DELETE_DEALER: ['ADMIN_L2'],
-  MANAGE_DEALER_CATEGORIES: ['ADMIN_L1', 'ADMIN_L2'],
-  MANAGE_PAYMENTS: ['ADMIN_L1', 'ADMIN_L2'],
-  MANAGE_COMPLAINTS: ['ADMIN_L1', 'ADMIN_L2'],
-  VIEW_ANALYTICS: ['ADMIN_L1', 'ADMIN_L2'],
-  MANAGE_EMPLOYEES: ['ADMIN_L1', 'ADMIN_L2'],
-  FINALIZE_EMPLOYEE_DELETE: ['ADMIN_L2'],
-  MANAGE_ITEMS: ['ADMIN_L1', 'ADMIN_L2'],
-  MANAGE_STOCKS: ['ADMIN_L1', 'ADMIN_L2'],
-  // UX gating only; PATCH /orders/{orderNumber}/tracking is authorized by the Ecommerce BE.
-  MANAGE_ORDER_TRACKING: ['ADMIN_L1', 'ADMIN_L2'],
-  // UX gating only; /api/admin/support/** is authorized by the Ecommerce BE.
-  MANAGE_SUPPORT_TICKETS: ['ADMIN_L1', 'ADMIN_L2'],
-};
+/** Admin level carried by the account. Display and maker-checker identity only; gate features with permissions. */
+export type UserRole = AdminLevel;
 
 export interface NavigationItem {
   id: string;
   label: string;
   path: string;
   iconName: string;
-  allowedRoles: UserRole[];
+  /** Opens for a user holding any of these. The sidebar and the router both use it, so they never disagree. */
+  requires: readonly Permission[];
 }
 
 export const APP_NAVIGATION: NavigationItem[] = [
@@ -69,120 +18,113 @@ export const APP_NAVIGATION: NavigationItem[] = [
     label: 'Analytics',
     path: '/analytics',
     iconName: 'BarChart3',
-    allowedRoles: ['ADMIN_L1', 'ADMIN_L2'],
+    requires: ['ANALYTICS_VIEW'],
   },
   {
     id: 'approvals',
     label: 'Approvals Hub',
     path: '/approvals',
     iconName: 'CheckCircle2',
-    allowedRoles: ['ADMIN_L1', 'ADMIN_L2'],
+    requires: APPROVAL_PERMISSIONS,
   },
   {
     id: 'orders',
     label: 'Orders Management',
     path: '/orders',
     iconName: 'ShoppingCart',
-    allowedRoles: ['ADMIN_L1', 'ADMIN_L2'],
+    requires: ['PROCUREMENT_ORDER_VIEW'],
   },
   {
     id: 'order-tracking',
     label: 'Customer Order Tracking',
     path: '/order-tracking',
     iconName: 'Truck',
-    allowedRoles: ['ADMIN_L1', 'ADMIN_L2'],
+    requires: ['CUSTOMER_ORDER_VIEW'],
   },
   {
     id: 'support-tickets',
     label: 'Support Tickets',
     path: '/support-tickets',
     iconName: 'LifeBuoy',
-    allowedRoles: ['ADMIN_L1', 'ADMIN_L2'],
+    requires: ['SUPPORT_TICKET_VIEW'],
   },
   {
     id: 'reviews',
     label: 'Reviews',
     path: '/reviews',
     iconName: 'Star',
-    // UX gating only; /api/admin/reviews/** is authorized by the Ecommerce BE.
-    allowedRoles: ['ADMIN_L1', 'ADMIN_L2'],
+    requires: ['REVIEW_VIEW'],
   },
   {
     id: 'employees',
     label: 'Employee Management',
     path: '/employees',
     iconName: 'UserCheck',
-    allowedRoles: ['ADMIN_L1', 'ADMIN_L2'],
+    requires: ['EMPLOYEE_VIEW'],
   },
   {
+    // Stock Management lives inside Item Management (/item/stocks), not in the sidebar; either view opens the module.
     id: 'items',
     label: 'Item Management',
     path: '/item',
     iconName: 'Tag',
-    allowedRoles: ['ADMIN_L1', 'ADMIN_L2'],
-  },
-  {
-    id: 'stocks',
-    label: 'Stocks Management',
-    path: '/stocks',
-    iconName: 'Boxes',
-    allowedRoles: ['ADMIN_L1', 'ADMIN_L2'],
+    requires: ['ITEM_VIEW', 'STOCK_VIEW'],
   },
   {
     id: 'products',
     label: 'Products Management',
     path: '/products',
     iconName: 'Package',
-    allowedRoles: ['ADMIN_L1', 'ADMIN_L2'],
+    requires: ['PRODUCT_VIEW'],
   },
   {
     id: 'dealers',
     label: 'Dealer Management',
     path: '/dealers',
     iconName: 'Users',
-    allowedRoles: ['ADMIN_L1', 'ADMIN_L2'],
+    requires: ['DEALER_VIEW'],
   },
   // {
   //   id: 'auctions',
   //   label: 'Auctions Control',
   //   path: '/auctions',
   //   iconName: 'Gavel',
-  //   allowedRoles: ['ADMIN_L1', 'ADMIN_L2'],
+  //   requires: [],
   // },
   {
     id: 'payments',
     label: 'Payments & Chalans',
     path: '/payments',
     iconName: 'CreditCard',
-    allowedRoles: ['ADMIN_L1', 'ADMIN_L2'],
+    requires: ['PAYMENT_VIEW'],
   },
   // {
   //   id: 'complaints',
   //   label: 'Complaints & Claims',
   //   path: '/complaints',
   //   iconName: 'AlertCircle',
-  //   allowedRoles: ['ADMIN_L1', 'ADMIN_L2'],
+  //   requires: [],
   // },
   // {
   //   id: 'documents',
   //   label: 'Document Library',
   //   path: '/documents',
   //   iconName: 'Folder',
-  //   allowedRoles: ['ADMIN_L1', 'ADMIN_L2'],
+  //   requires: ['DOCUMENT_VIEW'],
   // },
   {
-    // Settings → Company profile. L1 proposes changes, L2 approves them (enforced by the Ecommerce BE).
+    // Settings → Company profile. COMPANY_PROFILE_EDIT drafts changes, COMPANY_PROFILE_APPROVE approves them.
     id: 'company-profile',
     label: 'Company Profile',
     path: '/settings/company-profile',
     iconName: 'Building2',
-    allowedRoles: ['ADMIN_L1', 'ADMIN_L2'],
+    requires: ['COMPANY_PROFILE_VIEW'],
   },
   // {
   //   id: 'system-settings',
   //   label: 'System Configuration',
   //   path: '/settings',
   //   iconName: 'Settings',
-  //   allowedRoles: ['ADMIN_L2'],
+  //   requires: ['SYSTEM_SETTINGS_MANAGE'],
   // },
 ];

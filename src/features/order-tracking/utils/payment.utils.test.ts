@@ -8,6 +8,8 @@ describe('payment labels', () => {
     ['PAID', 'Paid'],
     ['FAILED', 'Failed'],
     ['REFUND_REQUESTED', 'Refund requested'],
+    ['REFUND_INITIATED', 'Refund initiated'],
+    ['REFUND_FAILED', 'Refund failed'],
     ['REFUNDED', 'Refunded'],
     ['CANCELLED', 'Cancelled'],
     ['paid', 'Paid'],

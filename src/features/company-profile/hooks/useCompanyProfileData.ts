@@ -1,15 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
-import { create } from 'zustand';
 import { companyProfileApi } from '../api/companyProfileApi';
-import type { CompanyProfileOverview, CompanyProfileVersion } from '../types/companyProfile.types';
+import type { CompanyProfileVersion } from '../types/companyProfile.types';
+import { useAppDispatch, useAppSelector } from '../../../store/store';
+import { fetchCompanyOverview } from '../../../store/companyProfileSlice';
 import type { PageResponse } from '../../../types/common.types';
 import { getApiErrorKind, type ApiErrorKind } from '../../../utils/apiErrorKind';
-
-/** Whether a change is waiting for approval — drives the "1" badge in the navigation. */
-export const useCompanyPendingStore = create<{ hasPending: boolean; setHasPending: (value: boolean) => void }>((set) => ({
-  hasPending: false,
-  setHasPending: (hasPending) => set({ hasPending }),
-}));
 
 /** Re-runs `reload` when the tab regains focus (another admin may have acted). */
 const useRefreshOnFocus = (reload: () => void) => {
@@ -80,18 +75,18 @@ const useLoader = <T,>(fetcher: (() => Promise<{ success: boolean; data?: T | nu
   };
 };
 
-/** GET /admin/company/profile — live, pending and my drafts. */
+/** GET /admin/company/profile — live, pending and my drafts. Shared through Redux with the navigation badge. */
 export const useCompanyProfileOverview = () => {
-  const loader = useLoader<CompanyProfileOverview>(companyProfileApi.getOverview);
-  const setHasPending = useCompanyPendingStore((s) => s.setHasPending);
-  useRefreshOnFocus(loader.reload);
+  const dispatch = useAppDispatch();
+  const { overview, status, errorKind } = useAppSelector((state) => state.companyProfile);
 
-  const pending = loader.data?.pending ?? null;
-  useEffect(() => {
-    if (loader.data) setHasPending(!!pending);
-  }, [loader.data, pending, setHasPending]);
+  // Mount and focus reuse a fresh overview; reload() (refresh button, after a change) always refetches.
+  const refresh = useCallback(() => void dispatch(fetchCompanyOverview()), [dispatch]);
+  const reload = useCallback(() => void dispatch(fetchCompanyOverview({ force: true })), [dispatch]);
+  useEffect(refresh, [refresh]);
+  useRefreshOnFocus(refresh);
 
-  return { overview: loader.data, isLoading: loader.isLoading, errorKind: loader.errorKind, reload: loader.reload };
+  return { overview, isLoading: status === 'idle' || status === 'loading', errorKind, reload };
 };
 
 /** GET /versions/{id} — with changes vs live and the audit trail. Pass null to skip loading. */
@@ -112,21 +107,13 @@ export const useCompanyProfileHistory = () => {
   return { page, setPage, result: loader.data, isLoading: loader.isLoading, errorKind: loader.errorKind, reload: loader.reload };
 };
 
-/** Navigation badge: loads the overview once (and on focus) so the menu can show a pending change. */
+/** Navigation badge: reads the shared overview (loaded once, refreshed on focus when stale) for a pending change. */
 export const usePendingCompanyChangeBadge = (enabled: boolean) => {
-  const setHasPending = useCompanyPendingStore((s) => s.setHasPending);
-  const hasPending = useCompanyPendingStore((s) => s.hasPending);
+  const dispatch = useAppDispatch();
+  const hasPending = useAppSelector((state) => !!state.companyProfile.overview?.pending);
   const refresh = useCallback(() => {
-    if (!enabled) return;
-    companyProfileApi
-      .getOverview()
-      .then((res) => {
-        if (res.success && res.data) setHasPending(!!res.data.pending);
-      })
-      .catch(() => {
-        // The badge is a hint only; the page itself reports errors.
-      });
-  }, [enabled, setHasPending]);
+    if (enabled) void dispatch(fetchCompanyOverview());
+  }, [enabled, dispatch]);
   useEffect(refresh, [refresh]);
   useRefreshOnFocus(refresh);
   return enabled && hasPending;

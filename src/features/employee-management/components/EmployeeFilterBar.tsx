@@ -8,7 +8,8 @@ interface Props {
   selectedStatus: EmployeeStatus | '';
   onSearchChange: (value: string) => void;
   onStatusChange: (status: EmployeeStatus | '') => void;
-  onOpenCreateModal: () => void;
+  /** Hidden when absent (the user can't create employees). */
+  onOpenCreateModal?: () => void;
 }
 
 export const EmployeeFilterBar: React.FC<Props> = ({
@@ -54,12 +55,14 @@ export const EmployeeFilterBar: React.FC<Props> = ({
       </div>
 
       {/* Action Button */}
+      {onOpenCreateModal && (
       <button
         onClick={onOpenCreateModal}
         className="w-full md:w-auto px-4 py-2 bg-[#0071e3] hover:bg-[#0077ed] text-white rounded-xl text-sm font-semibold transition-colors flex items-center justify-center gap-2 cursor-pointer shrink-0 shadow-sm"
       >
         <Plus className="w-4 h-4" /> Add Employee
       </button>
+      )}
     </div>
   );
 };

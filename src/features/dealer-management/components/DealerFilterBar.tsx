@@ -8,8 +8,10 @@ export interface DealerFilterBarProps {
   categories: CategoryResponse[];
   onSearchChange: (value: string) => void;
   onCategoryChange: (categoryId: number | undefined) => void;
-  onOpenCreateDealerModal: () => void;
-  onOpenCreateCategoryModal: () => void;
+  /** Hidden when absent (no permission). */
+  onOpenCreateDealerModal?: () => void;
+  /** Hidden when absent (no permission). */
+  onOpenCreateCategoryModal?: () => void;
 }
 
 export const DealerFilterBar: React.FC<DealerFilterBarProps> = ({
@@ -49,6 +51,7 @@ export const DealerFilterBar: React.FC<DealerFilterBarProps> = ({
       </select>
     </div>
     <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+      {onOpenCreateCategoryModal && (
       <button
         type="button"
         onClick={onOpenCreateCategoryModal}
@@ -56,6 +59,8 @@ export const DealerFilterBar: React.FC<DealerFilterBarProps> = ({
       >
         + Category
       </button>
+      )}
+      {onOpenCreateDealerModal && (
       <button
         type="button"
         onClick={onOpenCreateDealerModal}
@@ -63,6 +68,7 @@ export const DealerFilterBar: React.FC<DealerFilterBarProps> = ({
       >
         <Plus className="w-3.5 h-3.5" /> Add Dealer
       </button>
+      )}
     </div>
   </div>
 );
