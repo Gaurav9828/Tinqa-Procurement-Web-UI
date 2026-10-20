@@ -65,7 +65,7 @@ export const LoginPage: React.FC = () => {
           </div>
           <h1 className="text-2xl font-bold tracking-tight">TinQa Procurement</h1>
           <p className="text-xs text-gray-500 dark:text-neutral-400 mt-1 font-mono uppercase tracking-wider">
-            Admin Portal Access
+            Staff &amp; Dealer Sign-in
           </p>
         </div>
 

@@ -26,19 +26,20 @@ export const useApprovals = () => {
   const fetchAllApprovals = useCallback(async () => {
     if (!canAny('DOCUMENT_APPROVE', 'EMPLOYEE_PROFILE_CHANGE_APPROVE', 'STOCK_APPROVE', 'PROCUREMENT_ORDER_APPROVE',
       'PRODUCT_APPROVAL_DECIDE', 'EMPLOYEE_APPROVE')) return;
-    // Each queue loads only for someone who can decide it; the rest stay empty
-    const ifAllowed = <T,>(permission: Permission, load: () => Promise<T[]>): Promise<T[]> =>
-      can(permission) ? load() : Promise.resolve([]);
+    // Each queue loads only for someone who can decide it and read the list it comes from (the endpoint's own
+    // permission); the rest stay empty
+    const ifAllowed = <T,>(permission: Permission | Permission[], load: () => Promise<T[]>): Promise<T[]> =>
+      (Array.isArray(permission) ? permission.every(can) : can(permission)) ? load() : Promise.resolve([]);
 
     const isCurrent = beginRequest();
     setIsLoading(true);
 
     try {
       const [documentsResult, profilesResult, stocksResult, orderResult, productResult, employeeResult] = await Promise.allSettled([
-        ifAllowed('DOCUMENT_APPROVE', () => approvalService.getPendingDocuments()),
+        ifAllowed(['DOCUMENT_APPROVE', 'DOCUMENT_VIEW'], () => approvalService.getPendingDocuments()),
         ifAllowed('EMPLOYEE_PROFILE_CHANGE_APPROVE', () => approvalService.getProfileApprovals()),
-        ifAllowed('STOCK_APPROVE', () => approvalService.getStocksApprovals()),
-        ifAllowed('PROCUREMENT_ORDER_APPROVE', () => approvalService.getOrdersApprovals()),
+        ifAllowed(['STOCK_APPROVE', 'STOCK_VIEW'], () => approvalService.getStocksApprovals()),
+        ifAllowed(['PROCUREMENT_ORDER_APPROVE', 'PROCUREMENT_ORDER_VIEW'], () => approvalService.getOrdersApprovals()),
         ifAllowed('PRODUCT_APPROVAL_DECIDE', () =>
           productApprovalApi.getPending().then((res) => (res.success && Array.isArray(res.data) ? res.data : []))
         ),

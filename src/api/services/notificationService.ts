@@ -4,6 +4,8 @@ export interface NotificationItem {
   id: number;
   title: string;
   message: string;
+  /** In-app route the notification is about (e.g. /approvals); null when there is nowhere to go */
+  link?: string | null;
   read: boolean;
   broadcast: boolean;
   createdAt: string;

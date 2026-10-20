@@ -81,6 +81,11 @@ export const StockTable: React.FC<StockTableProps> = ({
 
                                 <td className="p-4">
                                     <StockStatusBadge status={stock.approvalStatus} />
+                                    {stock.changeAwaitingApproval && (
+                                        <div className="text-[11px] text-amber-600 dark:text-amber-400 mt-1">
+                                            Change awaiting Admin L2{stock.heldUnits ? ` · ${stock.heldUnits} ${stock.unitType} held` : ''}
+                                        </div>
+                                    )}
                                 </td>
 
                                 <td className="p-4 text-right">
@@ -108,7 +113,7 @@ export const StockTable: React.FC<StockTableProps> = ({
                                         {/* No add/reduce: a stock entry's units come from its order and can't be adjusted.
                                             More stock is added by creating a new stock entry. */}
 
-                                        {stock.approvalStatus === 'PENDING' && (
+                                        {(stock.approvalStatus === 'PENDING' || stock.changeAwaitingApproval) && (
                                             <button
                                                 type="button"
                                                 disabled={!canDecide}

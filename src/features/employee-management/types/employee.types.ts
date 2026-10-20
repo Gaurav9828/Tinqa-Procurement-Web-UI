@@ -6,7 +6,9 @@ export const EmployeeConstants = {
   BLOCKED: 'BLOCKED',
   IN_ACTIVE: 'IN_ACTIVE',
   WAITING_FOR_DELETION: 'WAITING_FOR_DELETION',
-  APPROVAL_PENDING: 'APPROVAL_PENDING'
+  APPROVAL_PENDING: 'APPROVAL_PENDING',
+  /** Deleted by an employee approver: the record is kept read-only and only listed under this filter. */
+  DELETED: 'DELETED',
 } as const;
 
 export type EmployeeStatus = (typeof EmployeeConstants)[keyof typeof EmployeeConstants];
@@ -46,6 +48,15 @@ export interface EmployeeResponse {
   alternatePhone?: string;
   personalEmail?: string;
   workEmail?: string
+  /** Required for new employees; older records may not have them. */
+  panNumber?: string | null;
+  houseNumber?: string | null;
+  street?: string | null;
+  landmark?: string | null;
+  district?: string | null;
+  state?: string | null;
+  pincode?: string | null;
+  googleMapsUrl?: string | null;
   status: EmployeeStatus;
   // Who created the employee and, for employees that needed approval, the approver's decision
   createdBy?: number | null;
@@ -54,6 +65,10 @@ export interface EmployeeResponse {
   approvalDecidedByUsername?: string | null;
   approvalDecidedAt?: string | null;
   approvalRejectionReason?: string | null;
+  /** Set once the employee is DELETED. */
+  deletedBy?: number | null;
+  deletedByUsername?: string | null;
+  deletedAt?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -77,6 +92,14 @@ export interface CreateEmployeeRequest {
   phone: string;
   alternatePhone?: string;
   personalEmail?: string;
+  panNumber: string;
+  houseNumber: string;
+  street: string;
+  landmark?: string;
+  district: string;
+  state: string;
+  pincode: string;
+  googleMapsUrl?: string;
   role: EmployeeRole;
 }
 
@@ -97,6 +120,15 @@ export interface UpdateEmployeeRequest {
   phone?: string;
   alternatePhone?: string;
   personalEmail?: string;
+  /** PAN and the main address lines can be changed but not cleared; a blank landmark / map link removes it. */
+  panNumber?: string;
+  houseNumber?: string;
+  street?: string;
+  landmark?: string;
+  district?: string;
+  state?: string;
+  pincode?: string;
+  googleMapsUrl?: string;
   status?: EmployeeStatus;
   /** Changes the admin level; only an employee approver may, and never on their own record. Send only when changed. */
   role?: EmployeeRole;

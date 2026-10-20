@@ -121,6 +121,7 @@ export const OrderTrackingPage: React.FC = () => {
           <OrderSearchField
             value={list.filters.search}
             onChange={(value) => list.updateFilter('search', value)}
+            onSubmit={list.searchNow}
             className="flex-1 lg:flex-none lg:w-[28rem]"
           />
           <button

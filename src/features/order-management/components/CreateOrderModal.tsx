@@ -7,6 +7,8 @@ import { ORDER_LIMITS, todayLocalIsoDate } from '../validator/orderValidator';
 import { useAccess } from '../../../hooks/useAccess';
 import { CommonInput, CommonSelect } from '../../../components/ui/FormInputs'; // Adjust import path as needed
 import { unitSelectOptions } from '../../../constants/unitsOfMeasure';
+import { QuotationTaxFields } from './QuotationTaxFields';
+import { emptyTaxForm, taxPayload, validateTaxForm, type TaxForm } from '../utils/quotationTax';
 
 interface CreateOrderModalProps {
   isOpen: boolean;
@@ -46,6 +48,7 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
   const [unitOfMeasure, setUnitOfMeasure] = useState<string>('PCS');
   const [shipmentPrice, setShipmentPrice] = useState<number | ''>(0);
   const [isUnitDisabled, setIsUnitDisabled] = useState<boolean>(false);
+  const [tax, setTax] = useState<TaxForm>(emptyTaxForm);
 
   const selectedItem = items.find((item) => item.id === Number(selectedItemId));
 
@@ -78,10 +81,14 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
     !!unitOfMeasure.trim() &&
     shipmentPrice !== '' &&
     Number(shipmentPrice) >= 0;
+  const taxable = isFormComplete ? Number(quantity) * currentPrice + Number(shipmentPrice) : null;
+  const taxErrors = validateTaxForm(tax, taxable === null ? null : Math.round(taxable * 100));
+  const taxValid = Object.keys(taxErrors).length === 0;
+  const selectedDealer = dealers.find((dealer) => dealer.id === Number(selectedDealerId));
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!isFormComplete) return;
+    if (!isFormComplete || !taxValid) return;
     onSubmit({
       itemId: Number(selectedItemId),
       dealerId: Number(selectedDealerId),
@@ -91,7 +98,7 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
       unitType: unitOfMeasure.trim(),
       shipmentPrice: Number(shipmentPrice),
       orderDate: todayLocalIsoDate(),
-      taxBreakup: {},
+      taxBreakup: taxPayload(tax),
       additionalInfo: {},
     });
   };
@@ -108,7 +115,7 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-      <div className="w-full max-w-lg bg-white dark:bg-neutral-900 border border-black/10 dark:border-white/10 rounded-2xl shadow-xl overflow-hidden">
+      <div className="w-full max-w-lg max-h-[92vh] overflow-y-auto bg-white dark:bg-neutral-900 border border-black/10 dark:border-white/10 rounded-2xl shadow-xl">
         {/* Header */}
         <div className="flex items-center justify-between p-5 border-b border-black/10 dark:border-white/10">
           <div>
@@ -228,6 +235,9 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
             />
           </div>
 
+          <QuotationTaxFields value={tax} onChange={setTax} taxable={taxable} errors={taxErrors} disabled={isSubmitting}
+            dealerState={selectedDealer?.state} />
+
           {/* Actions */}
           <div className="flex items-center justify-end gap-3 pt-3 border-t border-black/10 dark:border-white/10">
             <button
@@ -239,7 +249,7 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
             </button>
             <button
               type="submit"
-              disabled={isSubmitting || !isFormComplete}
+              disabled={isSubmitting || !isFormComplete || !taxValid}
               className="px-4 py-2 text-xs font-medium text-white bg-[#0071e3] hover:bg-[#0071e3]/90 rounded-xl transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isSubmitting ? 'Submitting...' : 'Create Order'}

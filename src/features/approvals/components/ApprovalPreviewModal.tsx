@@ -431,6 +431,15 @@ export const ApprovalPreviewModal: React.FC<PreviewModalProps> = ({
                   { icon: <Calendar className="w-4 h-4 text-cyan-500 shrink-0" />, label: 'Date of Birth', value: request.dateOfBirth },
                   { icon: <Calendar className="w-4 h-4 text-indigo-500 shrink-0" />, label: 'Joining Date', value: request.joiningDate },
                   { icon: <Briefcase className="w-4 h-4 text-gray-500 shrink-0" />, label: 'Employment Type', value: request.employmentType },
+                  { icon: <User className="w-4 h-4 text-orange-500 shrink-0" />, label: 'PAN', value: request.panNumber },
+                  {
+                    icon: <Building className="w-4 h-4 text-lime-600 shrink-0" />,
+                    label: 'Address',
+                    value:
+                      [request.houseNumber, request.street, request.landmark, request.district, request.state]
+                        .filter((part) => part?.trim())
+                        .join(', ') + (request.pincode ? ` - ${request.pincode}` : ''),
+                  },
                 ].map(({ icon, label, value }) => (
                   <div key={label} className="p-3 rounded-xl border border-black/10 dark:border-white/10 flex items-center gap-2.5">
                     {icon}
@@ -461,6 +470,22 @@ export const ApprovalPreviewModal: React.FC<PreviewModalProps> = ({
           ========================================================== */}
           {request.approvalType === 'STOCKS' && (
             <div className="space-y-4">
+
+              <div role="note" className="p-3 rounded-xl bg-amber-500/10 text-amber-800 dark:text-amber-200 text-xs space-y-1">
+                {request.changeAwaitingApproval ? (
+                  <>
+                    <p className="font-semibold">Change to an approved stock entry</p>
+                    <p>
+                      Passed {request.approvedUnitsPassed ?? '—'} → {request.unitsPassedTest ?? '—'} {request.unitType}, defected{' '}
+                      {request.approvedDefectedUnits ?? '—'} → {request.defectedUnits ?? '—'} {request.unitType}.
+                      {request.heldUnits ? ` ${request.heldUnits} ${request.unitType} added are held back from use until you approve.` : ''}
+                    </p>
+                    <p>Approving books the difference to the company account (with its GST as input tax). Rejecting puts the approved counts back.</p>
+                  </>
+                ) : (
+                  <p>Nothing is bought until you approve: approving books the passed units to the company account, with the quotation's GST as input tax.</p>
+                )}
+              </div>
 
               {/* Stock Summary */}
               <div className="p-4 rounded-xl bg-black/5 dark:bg-white/5">

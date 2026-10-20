@@ -7,9 +7,10 @@ import { useCompanyProfileOverview, useCompanyProfileVersion } from '../hooks/us
 import { useCompanyProfileAccess } from '../hooks/useCompanyProfileAccess';
 import { useCompanyProfileActions, type ActionResult } from '../hooks/useCompanyProfileActions';
 import { useUnsavedChangesGuard } from '../hooks/useUnsavedChangesGuard';
-import { AssetField, HomeVideoFields, InvoiceTermsEditor, TextField } from '../components/EditorFields';
+import { AssetField, HomeVideoFields, InvoiceTermsEditor, ShippingRulesEditor, TextField } from '../components/EditorFields';
 import { BrandName, VersionStatusBadge } from '../components/ProfileDisplay';
 import { Skeleton, StateMessage } from '../components/Dialogs';
+import { DeleteDraftButton } from '../components/DeleteDraftButton';
 import { BUTTON } from '../utils/companyProfileUi';
 import type { CompanyProfileVersion } from '../types/companyProfile.types';
 import {
@@ -140,7 +141,8 @@ export const CompanyProfileEditorPage: React.FC = () => {
   };
 
   const save = async (thenSubmit: boolean) => {
-    if (busy) return;
+    // Saving a draft needs an edit; "Save & submit" may submit an unchanged draft.
+    if (busy || (!thenSubmit && !dirty)) return;
     const mode = thenSubmit ? 'submit' : 'save';
     setAttempt(mode);
     setServerErrors({});
@@ -373,12 +375,24 @@ export const CompanyProfileEditorPage: React.FC = () => {
         <p className="text-gray-500">Goes live on the storefront only after an approver approves this change.</p>
       </Section>
 
+      <Section title="Shipping charges">
+        <p className="text-gray-500">
+          The shipping fee customers pay, by order value (the bag's subtotal). Add a rule for each price band; the last rule covers every larger order.
+          Goes live only after an approver approves this change.
+        </p>
+        <ShippingRulesEditor rows={form.shippingRules} onChange={(shippingRules) => update({ shippingRules })} errors={errors} disabled={!!actions.busy} />
+      </Section>
+
       <Section title="Invoice terms">
         <InvoiceTermsEditor terms={form.invoiceTerms} onChange={(invoiceTerms) => update({ invoiceTerms })} errors={errors} disabled={!!actions.busy} />
       </Section>
 
       <div className="sticky bottom-0 py-3 bg-[#f5f5f7]/90 dark:bg-black/90 backdrop-blur flex flex-wrap justify-end gap-2">
-        <button type="submit" disabled={busy} className={BUTTON.secondary}>
+        {version && (
+          // Unsaved edits go with the draft; the dialog says it can't be undone.
+          <DeleteDraftButton version={version} access={access} onStale={reload} onDeleted={() => navigate(COMPANY_PROFILE_PATH)} className="mr-auto" />
+        )}
+        <button type="submit" disabled={busy || !dirty} title={!dirty ? 'No changes to save.' : undefined} className={BUTTON.secondary}>
           {actions.busy === 'save' || actions.busy === 'create' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
           Save draft
         </button>

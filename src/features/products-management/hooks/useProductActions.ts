@@ -79,7 +79,9 @@ export const useProductActions = (onSuccessCallback?: () => void) => {
 
   const updateProduct = async (id: number, payload: UpdateProductRequest): Promise<boolean> => {
     setFieldErrors({});
-    const validationError = validateProductPayload(payload);
+    // Stock changes re-send the product as it is; one created before GST was recorded may still have none
+    // (the edit form always requires GST, and the backend refuses removing it)
+    const validationError = validateProductPayload(payload, { allowWithoutGst: true });
     if (validationError) return reject(validationError);
     return run(() => productApi.updateProduct(id, payload), {
       success: 'Product updated successfully!',

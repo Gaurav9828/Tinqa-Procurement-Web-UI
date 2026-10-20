@@ -8,6 +8,9 @@ import { CommonInput, CommonTextArea } from '../../../components/ui/FormInputs';
 import { OrderStatusBadge } from './OrderStatusBadge';
 import { OrderProgress } from './OrderProgress';
 import { todayLocalIsoDate } from '../validator/orderValidator';
+import { useOrderInvoice } from '../hooks/useOrderInvoice';
+import { InvoiceVerificationPanel } from './InvoiceVerificationPanel';
+import { TaxBreakupSummary } from './TaxBreakupSummary';
 import {
   FINAL_ORDER_STATUSES,
   ORDER_STATUS_INFO,
@@ -15,6 +18,8 @@ import {
   REASON_REQUIRED_STATUSES,
   getNextOrderStatuses,
   getOrderBlockReason,
+  isFrozenByDealerChange,
+  DEALER_CHANGE_BLOCK_REASON,
   validateMove,
   type OrderAccess,
 } from '../utils/orderWorkflow';
@@ -28,16 +33,23 @@ interface Props {
   onSubmit: (order: OrderResponse, payload: UpdateOrderStatusRequest) => Promise<boolean>;
 }
 
+/** Backend limit for the reason an approver gives to accept a mismatched invoice. */
+const INVOICE_OVERRIDE_MAX_LENGTH = 400;
+
 /**
  * Status changes for a procurement order: shows where the order is and offers only the steps that
- * may follow, with whatever each step needs (delivery date, reason). There is no way to pick an
- * arbitrary status or go back.
+ * may follow, with whatever each step needs (delivery date, reason, and for a delivery the dealer's
+ * invoice checked against the quotation). There is no way to pick an arbitrary status or go back.
  */
 export const OrderStatusDialog: React.FC<Props> = ({ order, access, isSubmitting, onClose, onSubmit }) => {
   const [next, setNext] = useState<OrderStatus | ''>('');
   const [reason, setReason] = useState('');
   const [actualDelivery, setActualDelivery] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [overrideReason, setOverrideReason] = useState('');
+  // The invoice is loaded only once the Delivered step is chosen
+  const invoiceState = useOrderInvoice(order?.id ?? null, !!order && next === 'DELIVERED');
+  const { invoice } = invoiceState;
 
   useEffect(() => {
     if (!order) return;
@@ -48,12 +60,18 @@ export const OrderStatusDialog: React.FC<Props> = ({ order, access, isSubmitting
 
   if (!order) return null;
 
-  const options = getNextOrderStatuses(order.orderStatus, access);
-  const blockReason = options.length ? null : getOrderBlockReason(order.orderStatus, access);
+  const frozen = isFrozenByDealerChange(order);
+  const options = frozen ? [] : getNextOrderStatuses(order.orderStatus, access);
+  const blockReason = frozen ? DEALER_CHANGE_BLOCK_REASON : options.length ? null : getOrderBlockReason(order.orderStatus, access);
   const today = todayLocalIsoDate();
   const reasonRequired = !!next && REASON_REQUIRED_STATUSES.has(next);
+  const needsOverride = !!invoice && !invoice.matched;
+  // A delivery needs the dealer's invoice: matching the quotation, or accepted by an approver with a reason
+  const invoiceAccepted = !!invoice && (invoice.matched || (access.canApprove && !!overrideReason.trim()));
   const requiredFilled =
-    !!next && (!reasonRequired || !!reason.trim()) && (next !== 'DELIVERED' || !!actualDelivery);
+    !!next &&
+    (!reasonRequired || !!reason.trim()) &&
+    (next !== 'DELIVERED' || (!!actualDelivery && invoiceAccepted));
 
   const choose = (value: string) => {
     const status = value as OrderStatus;
@@ -72,6 +90,7 @@ export const OrderStatusDialog: React.FC<Props> = ({ order, access, isSubmitting
       status: next,
       ...(next === 'DELIVERED' ? { actualDelivery } : {}),
       ...(reason.trim() ? { reason: reason.trim() } : {}),
+      ...(next === 'DELIVERED' && needsOverride && overrideReason.trim() ? { invoiceOverrideReason: overrideReason.trim() } : {}),
     });
     if (ok) onClose();
   };
@@ -143,6 +162,40 @@ export const OrderStatusDialog: React.FC<Props> = ({ order, access, isSubmitting
                 />
               )}
 
+              {next === 'DELIVERED' && (
+                <>
+                  <div className="p-3 rounded-xl bg-black/[0.03] dark:bg-white/[0.04] space-y-1">
+                    <p className="font-semibold text-black dark:text-white">What the invoice should show</p>
+                    <TaxBreakupSummary taxBreakup={order.taxBreakup} totalPrice={order.totalPrice} />
+                  </div>
+                  <InvoiceVerificationPanel
+                    invoice={invoice}
+                    loading={invoiceState.loading}
+                    uploading={invoiceState.uploading}
+                    canUpload={invoiceState.canUpload}
+                    onUpload={(file) => void invoiceState.upload(file)}
+                    onDownload={() => void invoiceState.download()}
+                  />
+                  {needsOverride &&
+                    (access.canApprove ? (
+                      <CommonTextArea
+                        label="Reason to accept this invoice anyway"
+                        aria-label="Reason to accept this invoice"
+                        required
+                        rows={2}
+                        maxLength={INVOICE_OVERRIDE_MAX_LENGTH}
+                        placeholder="e.g. Rounding on the dealer's bill; credit note promised for the difference"
+                        value={overrideReason}
+                        onChange={(e) => setOverrideReason(e.target.value)}
+                      />
+                    ) : (
+                      <p role="note" className="flex items-start gap-1.5 p-2.5 rounded-xl bg-amber-500/10 text-amber-700 dark:text-amber-400">
+                        <Info className="w-3.5 h-3.5 mt-px shrink-0" /> Upload a correct invoice from the dealer, or ask a Level 2 order approver to accept this one with a reason.
+                      </p>
+                    ))}
+                </>
+              )}
+
               {next && (
                 <CommonTextArea
                   label={reasonRequired ? 'Reason' : 'Note (optional)'}
@@ -174,7 +227,7 @@ export const OrderStatusDialog: React.FC<Props> = ({ order, access, isSubmitting
                   type="submit"
                   disabled={isSubmitting || !requiredFilled}
                   className={`flex items-center gap-1.5 px-3.5 py-1.5 font-semibold rounded-xl text-white disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed ${
-                    next && ORDER_STATUS_INFO[next].tone === 'exception' ? 'bg-rose-600 hover:bg-rose-700' : 'bg-[#0071e3] hover:bg-[#0071e3]/90'
+                    !next ? 'bg-[#0071e3] hover:bg-[#0071e3]/90' : ORDER_STATUS_INFO[next].tone === 'exception' ? 'bg-rose-600 hover:bg-rose-700' : 'bg-emerald-600 hover:bg-emerald-700'
                   }`}
                 >
                   {isSubmitting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}

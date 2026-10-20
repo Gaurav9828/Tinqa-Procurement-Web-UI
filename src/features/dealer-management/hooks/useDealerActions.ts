@@ -3,7 +3,6 @@ import { useNotify } from '../../../hooks/useNotify';
 import { invalidateDealerOptions } from '../../../hooks/useLookupOptions';
 import { dealerApi } from '../api/dealerApi';
 import type {
-  CreateCategoryRequest,
   CreateDealerRequest,
   UpdateDealerRequest,
   DealerResponse,
@@ -12,21 +11,6 @@ import type {
 export const useDealerActions = (onSuccess?: () => void) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const notify = useNotify();
-
-  const createCategory = async (payload: CreateCategoryRequest): Promise<boolean> => {
-    setIsSubmitting(true);
-    try {
-      const res = await dealerApi.createCategory(payload);
-      notify.success(res.message || 'Category created successfully');
-      if (onSuccess) onSuccess();
-      return true;
-    } catch (err: unknown) {
-      notify.error(err, 'Failed to create category');
-      return false;
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
 
   const createDealer = async (payload: CreateDealerRequest): Promise<boolean> => {
     setIsSubmitting(true);
@@ -81,7 +65,6 @@ export const useDealerActions = (onSuccess?: () => void) => {
 
   return {
     isSubmitting,
-    createCategory,
     createDealer,
     updateDealer,
     toggleDealerStatus,

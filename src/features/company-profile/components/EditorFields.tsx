@@ -3,9 +3,10 @@ import { AlertCircle, ArrowDown, ArrowUp, Link2, Loader2, Plus, Trash2, Upload, 
 import { companyProfileApi } from '../api/companyProfileApi';
 import type { AssetPurpose } from '../types/companyProfile.types';
 import { parseApiError } from '../../../utils/apiError';
-import { isHttpsUrl, LIMITS } from '../utils/companyProfileForm';
+import { isHttpsUrl, LIMITS, shippingRowStarts, type ShippingRuleRow } from '../utils/companyProfileForm';
 import { ProfileImage, YouTubePreview, type ImageVariant } from './ProfileDisplay';
 import { BUTTON, precheckAsset } from '../utils/companyProfileUi';
+import { rupees } from '../utils/companyProfile.utils';
 
 const inputClass = (error?: string) =>
   `w-full px-3 py-2 rounded-xl border bg-transparent text-black dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0071e3] disabled:opacity-60 ${
@@ -240,7 +241,7 @@ export const AssetField: React.FC<AssetFieldProps> = ({ label, purpose, variant,
               <Link2 className="w-3.5 h-3.5" /> Paste URL
             </button>
             {value && (
-              <button type="button" disabled={disabled || uploading} onClick={() => onChange('')} className={BUTTON.secondary} aria-label={`Remove ${label.toLowerCase()}`}>
+              <button type="button" disabled={disabled || uploading} onClick={() => onChange('')} className={`${BUTTON.secondary} text-rose-600 dark:text-rose-400`} aria-label={`Remove ${label.toLowerCase()}`}>
                 <X className="w-3.5 h-3.5" /> Remove
               </button>
             )}
@@ -279,6 +280,111 @@ export const AssetField: React.FC<AssetFieldProps> = ({ label, purpose, variant,
         </div>
       )}
       <FieldError message={uploadError ?? error} />
+    </div>
+  );
+};
+
+interface ShippingRulesEditorProps {
+  rows: ShippingRuleRow[];
+  onChange: (rows: ShippingRuleRow[]) => void;
+  errors: Record<string, string>;
+  disabled?: boolean;
+}
+
+/**
+ * Shipping fee by order value. Each row starts where the previous one ends (the first at ₹0) and the last row
+ * covers every larger order, so the admin only enters "up to" values and fees.
+ */
+export const ShippingRulesEditor: React.FC<ShippingRulesEditorProps> = ({ rows, onChange, errors, disabled }) => {
+  const starts = shippingRowStarts(rows);
+  const update = (index: number, patch: Partial<ShippingRuleRow>) => onChange(rows.map((row, i) => (i === index ? { ...row, ...patch } : row)));
+  const full = rows.length >= LIMITS.shippingRules;
+  // A new row goes last; the previous last row now needs an upper limit
+  const add = () => onChange([...rows, { upTo: '', fee: '' }]);
+  const remove = (index: number) => {
+    const next = rows.filter((_, j) => j !== index);
+    // Removing the last row makes the one before it open-ended
+    if (index === rows.length - 1 && next.length > 0) next[next.length - 1] = { ...next[next.length - 1], upTo: '' };
+    onChange(next);
+  };
+
+  return (
+    <div className="space-y-2">
+      {rows.length === 0 && <p className="text-gray-500">No rules: every order ships free.</p>}
+      {rows.length > 0 && (
+        <ol aria-label="Shipping rules editor" className="space-y-2">
+          {rows.map((row, i) => {
+            const last = i === rows.length - 1;
+            const start = starts[i];
+            const upToError = errors[`shippingRules[${i}].maxOrderValue`];
+            const feeError = errors[`shippingRules[${i}].fee`] ?? errors[`shippingRules[${i}].minOrderValue`];
+            return (
+              <li key={i} className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_1fr_auto] gap-2 items-start rounded-xl border border-black/10 dark:border-white/10 p-3">
+                <div>
+                  <span className="block text-[11px] text-gray-500 mb-1">From order value</span>
+                  <span className="block py-2 font-mono">{start === null ? '—' : rupees(start)}</span>
+                </div>
+                <div>
+                  <label htmlFor={`shipping-upto-${i}`} className="block text-[11px] text-gray-500 mb-1">
+                    Up to (not including)
+                  </label>
+                  {last ? (
+                    <span className="block py-2 text-gray-500">and above</span>
+                  ) : (
+                    <input
+                      id={`shipping-upto-${i}`}
+                      inputMode="decimal"
+                      value={row.upTo}
+                      disabled={disabled}
+                      aria-label={`Rule ${i + 1} up to`}
+                      aria-invalid={!!upToError}
+                      placeholder="e.g. 10000"
+                      onChange={(e) => update(i, { upTo: e.target.value })}
+                      className={inputClass(upToError)}
+                    />
+                  )}
+                  <FieldError message={upToError} />
+                </div>
+                <div>
+                  <label htmlFor={`shipping-fee-${i}`} className="block text-[11px] text-gray-500 mb-1">
+                    Shipping fee (₹)
+                  </label>
+                  <input
+                    id={`shipping-fee-${i}`}
+                    inputMode="decimal"
+                    value={row.fee}
+                    disabled={disabled}
+                    aria-label={`Rule ${i + 1} fee`}
+                    aria-invalid={!!feeError}
+                    placeholder="0 = free"
+                    onChange={(e) => update(i, { fee: e.target.value })}
+                    className={inputClass(feeError)}
+                  />
+                  <FieldError message={feeError} />
+                </div>
+                <button
+                  type="button"
+                  disabled={disabled}
+                  onClick={() => remove(i)}
+                  aria-label={`Remove shipping rule ${i + 1}`}
+                  className="self-center p-1.5 rounded-lg hover:bg-rose-500/10 text-rose-600 cursor-pointer disabled:opacity-30"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </li>
+            );
+          })}
+        </ol>
+      )}
+      <div className="flex items-center gap-3">
+        <button type="button" disabled={disabled || full} onClick={add} className={BUTTON.secondary}>
+          <Plus className="w-3.5 h-3.5" /> Add rule
+        </button>
+        <span className="text-[10px] text-gray-400">
+          {rows.length}/{LIMITS.shippingRules} rules
+        </span>
+      </div>
+      <FieldError message={errors.shippingRules} />
     </div>
   );
 };

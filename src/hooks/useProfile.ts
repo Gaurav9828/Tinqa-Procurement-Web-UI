@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { authService } from '../api/services/authService';
 import { useNotify } from './useNotify';
+import { hasFormChanges } from '../utils/formChanges';
 import { useAppDispatch, useAppSelector } from '../store/store';
 import { fetchProfile, profileSaved, type ProfileFormState } from '../store/profileSlice';
 
@@ -68,7 +69,11 @@ export const useProfile = () => {
         return payload;
     }, [employeeData, initialData]);
 
-    const hasChanges = useMemo(() => Object.keys(dirtyFields).length > 0, [dirtyFields]);
+    // Whitespace-only edits don't count as a change.
+    const hasChanges = useMemo(
+        () => Object.keys(dirtyFields).length > 0 && hasFormChanges(employeeData, initialData),
+        [dirtyFields, employeeData, initialData]
+    );
 
     const updateProfile = async () => {
         if (!hasChanges) return;

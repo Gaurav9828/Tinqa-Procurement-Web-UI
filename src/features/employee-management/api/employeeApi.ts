@@ -57,8 +57,9 @@ export const employeeApi = {
     return response.data;
   },
 
-  finalizeDeleteEmployee: async (id: number): Promise<ApiResponse<null>> => {
-    const response = await axiosClient.delete<ApiResponse<null>>(`${BASE_URL}/${id}`);
+  /** Soft delete: the record is kept with status DELETED. */
+  finalizeDeleteEmployee: async (id: number): Promise<ApiResponse<EmployeeResponse>> => {
+    const response = await axiosClient.delete<ApiResponse<EmployeeResponse>>(`${BASE_URL}/${id}`);
     return response.data;
   },
 };

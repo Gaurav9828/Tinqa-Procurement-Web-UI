@@ -65,11 +65,14 @@ describe('Stock quantities are never adjusted after creation', () => {
     passed.removeAttribute('disabled');
     await user.clear(passed);
     await user.type(passed, '10');
+    // ...and doesn't count as a change, so Save stays disabled until a real edit.
+    expect(screen.getByRole('button', { name: /Save|Update/ })).toBeDisabled();
+    await user.click(screen.getByRole('checkbox', { name: 'Is Active' }));
     await user.click(screen.getByRole('button', { name: /Save|Update/ }));
 
     expect(onRequestSubmit).toHaveBeenCalledWith(
       1,
-      expect.objectContaining({ dealerId: 3, itemId: 7, unitsPassedTest: 8, defectedUnits: 2, hasTested: false, batchNumber: 'BAT-1' })
+      expect.objectContaining({ dealerId: 3, itemId: 7, unitsPassedTest: 8, defectedUnits: 2, hasTested: false, batchNumber: 'BAT-1', isActive: false })
     );
   });
 });

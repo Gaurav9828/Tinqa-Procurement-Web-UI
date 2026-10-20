@@ -60,6 +60,9 @@ export const buildStockUpdatePayload = (product: ProductResponse, newStock: numb
   description: product.description ?? undefined,
   price: product.price,
   discountPercentage: product.discountPercentage ?? undefined,
+  // PUT replaces the product: keep its GST
+  hsnSac: product.hsnSac ?? null,
+  gstRate: product.gstRate ?? null,
   image1Url: product.image1Url ?? undefined,
   image2Url: product.image2Url ?? undefined,
   image3Url: product.image3Url ?? undefined,

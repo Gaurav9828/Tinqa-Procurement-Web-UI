@@ -7,7 +7,11 @@ interface Props {
   searchQuery: string;
   selectedStatus: EmployeeStatus | '';
   onSearchChange: (value: string) => void;
+  /** Enter in the search box: search now instead of waiting for typing to pause. */
+  onSearchSubmit?: () => void;
   onStatusChange: (status: EmployeeStatus | '') => void;
+  /** Deleted employees are listed only for those who can delete employees (the API refuses everyone else). */
+  canViewDeleted?: boolean;
   /** Hidden when absent (the user can't create employees). */
   onOpenCreateModal?: () => void;
 }
@@ -16,7 +20,9 @@ export const EmployeeFilterBar: React.FC<Props> = ({
   searchQuery,
   selectedStatus,
   onSearchChange,
+  onSearchSubmit,
   onStatusChange,
+  canViewDeleted = false,
   onOpenCreateModal,
 }) => {
   return (
@@ -29,6 +35,7 @@ export const EmployeeFilterBar: React.FC<Props> = ({
             type="text"
             value={searchQuery}
             onChange={(e) => onSearchChange(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && onSearchSubmit?.()}
             placeholder="Search by name, code, department, phone..."
             className="w-full pl-10 pr-4 py-2 bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl text-sm focus:outline-none focus:border-[#0071e3] transition-colors"
           />
@@ -50,6 +57,8 @@ export const EmployeeFilterBar: React.FC<Props> = ({
             <option value={EmployeeConstants.WAITING_FOR_DELETION}>
               WAITING_FOR_DELETION
             </option>
+            <option value={EmployeeConstants.APPROVAL_PENDING}>APPROVAL_PENDING</option>
+            {canViewDeleted && <option value={EmployeeConstants.DELETED}>DELETED</option>}
           </select>
         </div>
       </div>

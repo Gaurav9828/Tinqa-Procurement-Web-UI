@@ -143,4 +143,7 @@ export interface AdminOrderListParams {
 export interface UpdateTrackingRequest {
   status: string;
   notes: string | null;
+  /** Rupees this leg costs the company (courier); raised as an expense voucher for approval. */
+  shippingCost?: number | null;
+  shippingPartner?: string | null;
 }

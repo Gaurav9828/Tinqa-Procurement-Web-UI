@@ -28,6 +28,8 @@ export const toProduct = (dto: ProductResponseDto): ProductResponse => ({
   description: dto.description ?? null,
   price: dto.price,
   discountPercentage: dto.discountPercentage ?? null,
+  hsnSac: dto.hsnSac ?? null,
+  gstRate: dto.gstRate === null || dto.gstRate === undefined ? null : Number(dto.gstRate),
   image1Url: dto.image1Url ?? null,
   image2Url: dto.image2Url ?? null,
   image3Url: dto.image3Url ?? null,

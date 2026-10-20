@@ -1,6 +1,7 @@
 import { axiosClient } from '../../../api/axiosClient';
 import type { ApiResponse } from '../../../types/common.types';
 import type { ProcessApprovalPayload } from '../../approvals/types/approval.types';
+import type { OrderResponse } from '../../order-management/types/order.types';
 import type {
   CreateStockFromOrderRequest,
   ItemAvailabilityResponse,
@@ -15,6 +16,12 @@ export const stockApi = {
     payload: CreateStockFromOrderRequest
   ): Promise<ApiResponse<StockResponse>> => {
     const response = await axiosClient.post<ApiResponse<StockResponse>>(BASE_URL, payload);
+    return response.data;
+  },
+
+  /** Delivered purchase orders with no stock entry yet (needs STOCK_CREATE, not procurement-order access). */
+  getReceivableOrders: async (): Promise<ApiResponse<OrderResponse[]>> => {
+    const response = await axiosClient.get<ApiResponse<OrderResponse[]>>(`${BASE_URL}/receivable-orders`);
     return response.data;
   },
 

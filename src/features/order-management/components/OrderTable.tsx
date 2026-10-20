@@ -2,7 +2,15 @@ import React from 'react';
 import { Eye, ListChecks, Lock, Pencil, RefreshCw } from 'lucide-react';
 import { OrderStatusBadge } from './OrderStatusBadge';
 import type { OrderResponse } from '../types/order.types';
-import { ORDER_STATUS_INFO, canEditOrder, getNextOrderStatuses, getOrderBlockReason, orderAccessFrom } from '../utils/orderWorkflow';
+import {
+    DEALER_CHANGE_BLOCK_REASON,
+    ORDER_STATUS_INFO,
+    canEditOrder,
+    getNextOrderStatuses,
+    getOrderBlockReason,
+    isFrozenByDealerChange,
+    orderAccessFrom,
+} from '../utils/orderWorkflow';
 import { useAccess } from '../../../hooks/useAccess';
 
 interface OrderTableProps {
@@ -51,14 +59,22 @@ export const OrderTable: React.FC<OrderTableProps> = ({ orders, isLoading, onPre
                 </thead>
                 <tbody className="divide-y divide-black/10 dark:divide-white/10">
                     {orders.map((order) => {
-                        const editable = canEditOrder(order.orderStatus, access);
-                        const next = getNextOrderStatuses(order.orderStatus, access);
-                        const blockReason = next.length ? null : getOrderBlockReason(order.orderStatus, access);
+                        const frozen = isFrozenByDealerChange(order);
+                        const editable = !frozen && canEditOrder(order.orderStatus, access);
+                        const next = frozen ? [] : getNextOrderStatuses(order.orderStatus, access);
+                        const blockReason = frozen
+                            ? DEALER_CHANGE_BLOCK_REASON
+                            : next.length ? null : getOrderBlockReason(order.orderStatus, access);
 
                         return (
                             <tr key={order.id} data-testid={`order-row-${order.id}`} className="hover:bg-black/[0.01] dark:hover:bg-white/[0.01]">
                                 <td className="p-3 font-mono font-medium text-black dark:text-white">{order.orderNumber}</td>
-                                <td className="p-3 font-medium text-black dark:text-white">{order.dealerName}</td>
+                                <td className="p-3 font-medium text-black dark:text-white">
+                                    {order.dealerName}
+                                    {order.raisedByDealer && (
+                                        <span className="block mt-0.5 text-[10px] font-semibold text-[#0071e3] dark:text-blue-400">Raised by dealer</span>
+                                    )}
+                                </td>
                                 <td className="p-3 text-gray-600 dark:text-gray-300">{order.itemName}</td>
                                 <td className="p-3 text-gray-600 dark:text-gray-300">
                                     {order.orderQuantity} {order.unitType}
@@ -66,6 +82,11 @@ export const OrderTable: React.FC<OrderTableProps> = ({ orders, isLoading, onPre
                                 <td className="p-3 font-semibold text-black dark:text-white">₹{order.totalPrice?.toLocaleString('en-IN')}</td>
                                 <td className="p-3">
                                     <OrderStatusBadge status={order.orderStatus} />
+                                    {frozen && (
+                                        <span className="block mt-1 text-[10px] font-semibold text-amber-600 dark:text-amber-400">
+                                            Dealer change awaiting approval
+                                        </span>
+                                    )}
                                     <p className="mt-1 text-[10px] text-gray-400 max-w-[180px] truncate" title={blockReason ?? undefined}>
                                         {next.length ? `Next: ${next.map((s) => ORDER_STATUS_INFO[s].action).join(' / ')}` : blockReason}
                                     </p>
@@ -91,7 +112,13 @@ export const OrderTable: React.FC<OrderTableProps> = ({ orders, isLoading, onPre
                                                     ? 'hover:bg-black/5 dark:hover:bg-white/10 hover:text-black dark:hover:text-white cursor-pointer'
                                                     : 'cursor-not-allowed opacity-40'
                                             }`}
-                                            title={editable ? 'Edit Order' : 'Only quotations (and, for order approvers, orders pending approval) can be edited'}
+                                            title={
+                                                editable
+                                                    ? 'Edit Order'
+                                                    : frozen
+                                                    ? DEALER_CHANGE_BLOCK_REASON
+                                                    : 'Only quotations (and, for order approvers, orders pending approval) can be edited'
+                                            }
                                             aria-label={`Edit ${order.orderNumber}`}
                                         >
                                             <Pencil className="w-3.5 h-3.5" />

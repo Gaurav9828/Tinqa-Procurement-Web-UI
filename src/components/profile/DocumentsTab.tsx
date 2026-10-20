@@ -219,7 +219,7 @@ export const DocumentsTab: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => handlePromptDelete(doc)}
-                  className="p-2 hover:bg-red-500/10 rounded-lg text-gray-400 hover:text-red-600 transition-colors"
+                  className="p-2 hover:bg-rose-500/10 rounded-lg text-rose-500 hover:text-rose-600 dark:text-rose-400 transition-colors cursor-pointer"
                   title="Delete document"
                 >
                   <Trash2 className="w-4 h-4" />

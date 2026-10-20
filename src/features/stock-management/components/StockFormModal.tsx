@@ -3,13 +3,14 @@ import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { X, Save, ChevronDown, Check, Eye } from 'lucide-react';
 import { Validator, type ValidationRule } from '../../../utils/validator';
 import type { CreateStockFromOrderRequest } from '../types/stock.types';
-import { useOrderList } from '../../order-management/hooks/useOrderList';
+import { useReceivableOrders } from '../hooks/useReceivableOrders';
 import { useItemOptions, useStockOptions } from '../../../hooks/useLookupOptions';
 import { CommonInput, CommonCheckbox, CommonSelect } from '../../../components/ui/FormInputs';
 import { AttributeInputBuilder } from '../../../components/ui/AttributeInputBuilder'; // Adjust path if needed
 
 import type { OrderResponse } from '../../order-management/types/order.types';
 import { OrderPreviewModal } from '../../order-management/components/OrderPreviewModal';
+import { formatCurrency } from '../../order-tracking/utils/orderTracking.utils';
 
 interface StockFormModalProps {
     isOpen: boolean;
@@ -56,8 +57,9 @@ export const StockFormModal: React.FC<StockFormModalProps> = ({
     onRequestSubmit,
 }) => {
     // Only fetch once the modal is actually opened.
-    // Stock can only be created from delivered orders.
-    const { orders, isLoading } = useOrderList({ enabled: isOpen, initialStatus: 'DELIVERED' });
+    // Stock can only be created from delivered orders; this list needs only STOCK_CREATE, so warehouse staff
+    // without procurement-order access can receive deliveries too.
+    const { orders, isLoading } = useReceivableOrders(isOpen);
     const { options: items } = useItemOptions(isOpen);
     // One order, one stock entry: orders that already have one are not offered (the backend enforces it too).
     const { options: existingStocks } = useStockOptions(isOpen);
@@ -133,6 +135,13 @@ export const StockFormModal: React.FC<StockFormModalProps> = ({
     const passedUnits = formData.unitsPassedTest === '' ? null : Number(formData.unitsPassedTest);
     const defectedUnits = totalUnits !== null && passedUnits !== null ? roundUnits(totalUnits - passedUnits) : null;
     const hasTested = totalUnits !== null && totalUnits > 0 && passedUnits === totalUnits;
+    // Booked to the company account on save (same rule as Procurement): only passed units are bought, plus shipment
+    const purchaseValue =
+        selectedOrder && passedUnits !== null && !Number.isNaN(passedUnits)
+            ? passedUnits > 0
+                ? Math.round(Number(selectedOrder.unitPrice) * passedUnits * 100) / 100 + Number(selectedOrder.shipmentPrice || 0)
+                : 0
+            : null;
 
     const minDateOfArrival = useMemo(() => {
         if (!selectedOrder?.orderDate) return undefined;
@@ -404,6 +413,14 @@ export const StockFormModal: React.FC<StockFormModalProps> = ({
                                           : `${defectedUnits} unit${defectedUnits === 1 ? '' : 's'} failed the test.`}
                                 </p>
                             </div>
+
+                            {purchaseValue !== null && (
+                                <p className="sm:col-span-2 text-xs text-gray-600" data-testid="purchase-value">
+                                    Booked as a dealer purchase when saved: <span className="font-semibold">{formatCurrency(purchaseValue)}</span>
+                                    {passedUnits && passedUnits > 0 ? ' (passed units × unit price + shipment)' : ' (no unit passed)'}.
+                                    {defectedUnits ? ' Defected units go back to the dealer and are not paid for.' : ''}
+                                </p>
+                            )}
 
                             {/* Additional Info Attribute Builder */}
                             <div className="sm:col-span-2 pt-2">

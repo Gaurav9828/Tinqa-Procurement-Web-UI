@@ -7,6 +7,18 @@ import { getApiErrorKind } from '../../../utils/apiErrorKind';
 /** Backend limit for notes on both update endpoints. */
 export const STATUS_NOTES_MAX_LENGTH = 500;
 
+/**
+ * Moves that start a shipping leg: the cost of that leg is entered with the move (Ecommerce VoucherService
+ * SHIPPING_COST_STATUSES) and sent for approval as an expense. Shipping out requires it.
+ */
+export const SHIPPING_COST_STATUSES: ReadonlySet<string> = new Set(['SHIPPED', 'DELIVERY_REATTEMPT', 'OUT_FOR_PICKUP', 'RETURN_PICKED_UP']);
+export const SHIPPING_COST_REQUIRED: ReadonlySet<string> = new Set(['SHIPPED']);
+
+export interface ShippingCostInput {
+  cost: string;
+  partner: string;
+}
+
 export interface StatusUpdateResult {
   ok: boolean;
   /** Field-level errors (client validation or backend `errors[]`), keyed by field name. */
@@ -38,7 +50,7 @@ export const useStatusUpdate = (
   const notify = useNotify();
 
   const submit = useCallback(
-    async (orderNumber: string, status: string, notes: string): Promise<StatusUpdateResult> => {
+    async (orderNumber: string, status: string, notes: string, shipping?: ShippingCostInput): Promise<StatusUpdateResult> => {
       if (inFlight.current) return { ok: false, fieldErrors: {} };
 
       if (!status) {
@@ -53,11 +65,28 @@ export const useStatusUpdate = (
       }
       const finalNotes = trimmedNotes || null;
 
+      let shippingCost: number | null = null;
+      let shippingPartner: string | null = null;
+      if (!deliveryOnly && SHIPPING_COST_STATUSES.has(status) && shipping) {
+        const cost = shipping.cost.trim();
+        if (!cost && SHIPPING_COST_REQUIRED.has(status)) {
+          return { ok: false, fieldErrors: { shippingCost: 'Enter what this shipment costs (0 if nothing).' } };
+        }
+        if (cost) {
+          if (!/^\d+(\.\d{1,2})?$/.test(cost)) {
+            return { ok: false, fieldErrors: { shippingCost: 'Enter an amount in rupees with at most 2 decimals.' } };
+          }
+          shippingCost = Number(cost);
+          shippingPartner = shipping.partner.trim() || null;
+        }
+      }
+
       inFlight.current = true;
       setIsSubmitting(true);
       try {
         const update = deliveryOnly ? orderTrackingApi.updateDeliveryStatus : orderTrackingApi.updateTracking;
-        const res = await update(orderNumber, { status, notes: finalNotes });
+        const payload = shippingCost === null ? { status, notes: finalNotes } : { status, notes: finalNotes, shippingCost, shippingPartner };
+        const res = await update(orderNumber, payload);
 
         if (!res.success) {
           notify.error(res, 'Failed to update order status.');

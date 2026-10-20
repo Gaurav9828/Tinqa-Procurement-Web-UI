@@ -7,6 +7,7 @@ import { sameUser } from '../utils/companyProfile.utils';
 /**
  * Maker-checker rules for the current admin (UX only; the backend answers 403 otherwise).
  *  - Maker (COMPANY_PROFILE_EDIT): create / edit own DRAFT or REJECTED versions, upload, submit, withdraw what they submitted.
+ *  - Super Admin (COMPANY_PROFILE_DRAFT_DELETE_ANY, with COMPANY_PROFILE_EDIT): also delete anyone's DRAFT or REJECTED version.
  *  - Checker (COMPANY_PROFILE_APPROVE): approve / reject a pending change — never one they created or submitted.
  * One admin may hold both; the "not your own change" rule still applies.
  */
@@ -19,6 +20,8 @@ export const useCompanyProfileAccess = () => {
     const permissions = user?.permissions ?? [];
     const isMaker = permissions.includes('COMPANY_PROFILE_EDIT');
     const isChecker = permissions.includes('COMPANY_PROFILE_APPROVE');
+    const canDeleteAny = permissions.includes('COMPANY_PROFILE_DRAFT_DELETE_ANY');
+    const isDraft = (v: CompanyProfileVersion) => v.status === 'DRAFT' || v.status === 'REJECTED';
     const isMine = (v: Pick<CompanyProfileVersion, 'createdBy' | 'submittedBy'>) =>
       sameUser(v.createdBy, username) || sameUser(v.submittedBy, username);
 
@@ -27,8 +30,9 @@ export const useCompanyProfileAccess = () => {
       isMaker,
       isChecker,
       /** Own DRAFT / REJECTED version. */
-      canEdit: (v: CompanyProfileVersion) =>
-        isMaker && (v.status === 'DRAFT' || v.status === 'REJECTED') && sameUser(v.createdBy, username),
+      canEdit: (v: CompanyProfileVersion) => isMaker && isDraft(v) && sameUser(v.createdBy, username),
+      /** DRAFT / REJECTED version: your own, or anyone's for a Super Admin. */
+      canDelete: (v: CompanyProfileVersion) => isMaker && isDraft(v) && (canDeleteAny || sameUser(v.createdBy, username)),
       /** Pending change that someone else made. */
       canReview: (v: CompanyProfileVersion) => isChecker && v.status === 'PENDING_APPROVAL' && !isMine(v),
       /** The checker made this pending change themselves (shown instead of Approve). */

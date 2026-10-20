@@ -60,6 +60,8 @@ describe('snapshot', () => {
     const snapshot = snapshotFromRequest({
       title: 'Touch Panel',
       price: 2999,
+      hsnSac: '9405',
+      gstRate: 18,
       enabled: false,
       stockQuantity: 1,
       image1Url: 'https://cdn.tinqa.com/p.png',
@@ -72,6 +74,8 @@ describe('snapshot', () => {
       tagline: null,
       price: 2999,
       discountPercentage: null,
+      hsnSac: '9405',
+      gstRate: 18,
       stockQuantity: 1,
       image1Url: 'https://cdn.tinqa.com/p.png',
       components: [{ itemId: 7, itemName: 'Motherboard', quantity: 2 }],

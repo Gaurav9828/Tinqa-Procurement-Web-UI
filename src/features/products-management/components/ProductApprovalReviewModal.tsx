@@ -2,7 +2,10 @@ import React, { useState } from 'react';
 import { Ban, CheckCircle2, Loader2, ShieldCheck, X, XCircle } from 'lucide-react';
 import type { ProductApprovalDecision, ProductApprovalResponse } from '../types/productApproval.types';
 import { DECISION_REASON_MAX } from '../utils/productApproval';
+import { describeGst } from '../utils/productTax';
+import { ProductTaxBreakdown } from './ProductTaxBreakdown';
 import { formatWarrantyDuration, formatWarrantyType } from '../../item-management/utils/itemWarranty';
+import { CHOICE_TONE, SOLID_TONE, type ActionTone } from '../../../components/ui/actionTones';
 
 interface Props {
   request: ProductApprovalResponse | null;
@@ -11,25 +14,25 @@ interface Props {
   onDecide: (decision: ProductApprovalDecision, reason?: string) => Promise<boolean>;
 }
 
-const DECISIONS: Record<ProductApprovalDecision, { label: string; confirm: string; tone: string; icon: React.ElementType; help: string }> = {
+const DECISIONS: Record<ProductApprovalDecision, { label: string; confirm: string; tone: ActionTone; icon: React.ElementType; help: string }> = {
   APPROVED: {
     label: 'Approve',
     confirm: 'Approve & activate',
-    tone: 'bg-emerald-600 hover:bg-emerald-700',
+    tone: 'approve',
     icon: CheckCircle2,
     help: 'The product becomes active and visible in the store.',
   },
   REJECTED: {
     label: 'Reject',
     confirm: 'Reject',
-    tone: 'bg-rose-600 hover:bg-rose-700',
+    tone: 'danger',
     icon: XCircle,
     help: 'The product stays inactive. The creator can edit it and resubmit it for approval.',
   },
   CANCELLED: {
     label: 'Cancel product',
     confirm: 'Cancel product',
-    tone: 'bg-gray-700 hover:bg-gray-800',
+    tone: 'warning',
     icon: Ban,
     help: 'The product stays inactive permanently and can no longer be edited or resubmitted. It is not deleted.',
   },
@@ -151,9 +154,15 @@ export const ProductApprovalReviewModal: React.FC<Props> = ({ request, isSubmitt
           )}
 
           <div className="grid grid-cols-3 gap-3 p-3 rounded-xl bg-black/[0.03] dark:bg-white/[0.04]">
-            <Row label="Price">₹{Number(snapshot.price).toLocaleString('en-IN')}</Row>
+            <Row label="Price (incl. GST)">₹{Number(snapshot.price).toLocaleString('en-IN')}</Row>
             <Row label="Discount">{snapshot.discountPercentage ? `${snapshot.discountPercentage}%` : '—'}</Row>
             <Row label="Stock">{snapshot.stockQuantity}</Row>
+          </div>
+
+          <div className="space-y-1">
+            <span className="block font-semibold text-gray-500">GST</span>
+            <p className="text-black dark:text-white" data-testid="review-gst">{describeGst(snapshot)}</p>
+            <ProductTaxBreakdown price={snapshot.price} discountPercentage={snapshot.discountPercentage} gst={snapshot} />
           </div>
 
           <div>
@@ -193,9 +202,9 @@ export const ProductApprovalReviewModal: React.FC<Props> = ({ request, isSubmitt
 
           <div className="space-y-2 pt-2 border-t border-black/10 dark:border-white/10">
             <span className="block font-semibold text-gray-700 dark:text-gray-300">Decision</span>
-            <div role="radiogroup" aria-label="Decision" className={`grid ${isUpdate ? 'grid-cols-2' : 'grid-cols-3'} gap-1 p-1 rounded-xl bg-black/5 dark:bg-white/5`}>
+            <div role="radiogroup" aria-label="Decision" className={`grid ${isUpdate ? 'grid-cols-2' : 'grid-cols-3'} gap-2`}>
               {decisionKeys.map((key) => {
-                const { label, icon: Icon } = DECISIONS[key];
+                const { label, icon: Icon, tone } = DECISIONS[key];
                 const active = decision === key;
                 return (
                   <button
@@ -205,8 +214,8 @@ export const ProductApprovalReviewModal: React.FC<Props> = ({ request, isSubmitt
                     aria-checked={active}
                     disabled={isSubmitting}
                     onClick={() => setDecision(key)}
-                    className={`flex items-center justify-center gap-1 px-2 py-2 rounded-lg font-semibold cursor-pointer transition-colors ${
-                      active ? 'bg-white dark:bg-neutral-800 text-[#0071e3] shadow-sm' : 'text-gray-500 hover:text-black dark:hover:text-white'
+                    className={`flex items-center justify-center gap-1 px-2 py-2 rounded-lg border font-semibold cursor-pointer transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+                      active ? CHOICE_TONE[tone].active : CHOICE_TONE[tone].idle
                     }`}
                   >
                     <Icon className="w-3.5 h-3.5" /> {label}
@@ -250,7 +259,7 @@ export const ProductApprovalReviewModal: React.FC<Props> = ({ request, isSubmitt
             type="button"
             disabled={!decision || isSubmitting || (needsReason && !reason.trim()) || (touched && !!reasonError)}
             onClick={submit}
-            className={`flex items-center gap-1.5 px-4 py-2 text-white rounded-xl font-semibold disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed ${decision ? DECISIONS[decision].tone : 'bg-[#0071e3]'}`}
+            className={`flex items-center gap-1.5 px-4 py-2 rounded-xl font-semibold disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed ${decision ? SOLID_TONE[DECISIONS[decision].tone] : SOLID_TONE.primary}`}
           >
             {isSubmitting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
             {decision ? confirmFor(decision) : 'Choose a decision'}

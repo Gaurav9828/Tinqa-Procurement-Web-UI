@@ -6,6 +6,7 @@ import { useCompanyProfileAccess } from '../hooks/useCompanyProfileAccess';
 import { useCompanyProfileActions } from '../hooks/useCompanyProfileActions';
 import { ProfileDetails, VersionStatusBadge } from '../components/ProfileDisplay';
 import { ReviewActions } from '../components/ReviewActions';
+import { DeleteDraftButton } from '../components/DeleteDraftButton';
 import { Skeleton, StateMessage } from '../components/Dialogs';
 import { BUTTON } from '../utils/companyProfileUi';
 import type { CompanyProfileVersion } from '../types/companyProfile.types';
@@ -153,6 +154,7 @@ export const CompanyProfilePage: React.FC = () => {
                     >
                       <Send className="w-3.5 h-3.5" /> Submit
                     </button>
+                    <DeleteDraftButton version={draft} access={access} onStale={reload} onDeleted={() => void reload()} />
                   </div>
                 </li>
               ))}

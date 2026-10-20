@@ -93,7 +93,7 @@ export const PreOrderReviewCard: React.FC<Props> = ({ order, canAct, isApproving
             type="button"
             disabled={!canApprove || isApproving}
             onClick={() => setConfirming(true)}
-            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-[#0071e3] hover:bg-[#0077ed] text-white rounded-xl text-xs font-semibold transition-colors disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
+            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold transition-colors disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
           >
             {isApproving ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
             {isApproving ? 'Approving…' : 'Approve pre-order'}
@@ -111,6 +111,7 @@ export const PreOrderReviewCard: React.FC<Props> = ({ order, canAct, isApproving
       <ConfirmationModal
         isOpen={confirming}
         actionType="CONFIRM"
+        tone="approve"
         title="Approve this pre-order?"
         description={`Stock for order ${order.orderNumber} will be reserved and the order moves to Pre-order Confirmed. Normal fulfilment can then continue.`}
         isSubmitting={isApproving}

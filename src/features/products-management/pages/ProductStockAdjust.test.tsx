@@ -66,6 +66,8 @@ const LAMP: StoredProduct = {
   description: 'A lamp',
   price: 1999,
   discountPercentage: 10,
+  hsnSac: '9405',
+  gstRate: 18,
   image1Url: 'https://cdn.tinqa.com/1.png',
   image2Url: null,
   image3Url: null,
@@ -182,6 +184,9 @@ describe('Product stock add/reduce', () => {
       title: 'SummitX',
       price: 1999,
       discountPercentage: 10,
+      // PUT replaces the product: its GST is kept
+      hsnSac: '9405',
+      gstRate: 18,
       enabled: true,
       stockQuantity: 20,
       lastUpdateDescription: 'Stock added: +5 (15 → 20) — Supplier delivery',

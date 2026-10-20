@@ -28,6 +28,7 @@ vi.mock('../api/companyProfileApi', () => ({
     createDraft: vi.fn(),
     saveDraft: vi.fn(),
     submitDraft: vi.fn(),
+    deleteDraft: vi.fn(),
     withdraw: vi.fn(),
     approve: vi.fn(),
     reject: vi.fn(),
@@ -65,6 +66,10 @@ const FIELDS: CompanyProfileFields = {
   careersEmail: null,
   website: 'https://tinqa.com',
   invoiceTerms: ['Goods once sold are not returnable.', 'Subject to Pune jurisdiction.'],
+  shippingRules: [
+    { minOrderValue: 0, maxOrderValue: 50000, fee: 500 },
+    { minOrderValue: 50000, maxOrderValue: null, fee: 0 },
+  ],
   homeVideoEnabled: false,
   homeVideoUrl: null,
 };
@@ -165,6 +170,13 @@ const installBackend = () => {
     return transition(v, 'APPROVED', { reviewedBy: me, reviewedAt: '2026-10-13T11:00:00' });
   });
   api.reject.mockImplementation(async (id, comment) => transition(find(id), 'REJECTED', { reviewedBy: me, reviewedAt: '2026-10-13T11:00:00', reviewComment: comment }));
+  api.deleteDraft.mockImplementation(async (id) => {
+    const v = find(id);
+    const deleteAny = useAuthStore.getState().user?.permissions?.includes('COMPANY_PROFILE_DRAFT_DELETE_ANY');
+    if (v.createdBy !== me && !deleteAny) throw apiError(403, 'NOT_VERSION_OWNER', 'Only the admin who created this draft or a Super Admin can delete it.');
+    if (v.status !== 'DRAFT' && v.status !== 'REJECTED') throw apiError(409, 'INVALID_STATE_TRANSITION', 'Only DRAFT or REJECTED versions can be deleted.');
+    return transition(v, 'DELETED', { updatedBy: me });
+  });
   api.withdraw.mockImplementation(async (id) => transition(find(id), 'WITHDRAWN'));
   api.uploadAsset.mockImplementation(async (file, purpose, onProgress) => {
     onProgress?.(100);
@@ -236,7 +248,7 @@ describe('Maker proposes a change (acceptance 1)', () => {
     await waitFor(() => expect(api.submitDraft).toHaveBeenCalledWith(2));
     const body = api.saveDraft.mock.calls[0][1];
     expect(body).toMatchObject({ brandName: 'TinQa Plus', logoUrl: 'https://assets.tinqa.com/company/new-logo.png', lockVersion: 0, legalName: FIELDS.legalName });
-    expect(Object.keys(body)).toHaveLength(19); // every field + lockVersion (PUT is a full replacement)
+    expect(Object.keys(body)).toHaveLength(20); // every field + lockVersion (PUT is a full replacement)
 
     const panel = await screen.findByRole('region', { name: 'Pending change' });
     expect(within(panel).getByText(/Version 2 submitted by maker1/)).toBeInTheDocument();
@@ -323,6 +335,11 @@ describe('Only one pending change (acceptance 4)', () => {
     const { user } = renderAt('/settings/company-profile/drafts/3');
     await waitFor(() => expect(brandInput()).toHaveValue('TinQa'));
     await waitFor(() => expect(screen.getByRole('button', { name: 'Save & submit for approval' })).toBeDisabled());
+    // Nothing to save until something is edited.
+    expect(screen.getByRole('button', { name: 'Save draft' })).toBeDisabled();
+    await user.type(brandInput(), ' ');
+    expect(screen.getByRole('button', { name: 'Save draft' })).toBeDisabled(); // whitespace alone isn't a change
+    await user.type(brandInput(), 'X');
     await user.click(screen.getByRole('button', { name: 'Save draft' }));
     expect(await screen.findByText('Draft saved.')).toBeInTheDocument();
     expect(api.saveDraft).toHaveBeenCalledWith(3, expect.objectContaining({ lockVersion: 0 }));
@@ -454,6 +471,106 @@ describe('Withdraw and history (acceptance 11)', () => {
   });
 });
 
+describe('Deleting a draft', () => {
+  it("the creator deletes their own draft from My drafts after confirming", async () => {
+    versions.push(version(2, 'DRAFT'));
+    const { user } = renderAt(OVERVIEW);
+    const row = await screen.findByTestId('draft-2');
+    await user.click(within(row).getByRole('button', { name: 'Delete version 2' }));
+    const dialog = screen.getByRole('dialog', { name: 'Delete version 2?' });
+    await user.click(within(dialog).getByRole('button', { name: 'Delete draft' }));
+
+    await waitFor(() => expect(api.deleteDraft).toHaveBeenCalledWith(2));
+    expect(await screen.findByText('Draft deleted.')).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByTestId('draft-2')).not.toBeInTheDocument());
+    expect(screen.getByText('No drafts yet.')).toBeInTheDocument();
+  });
+
+  it('the creator can delete from the editor and lands back on the overview', async () => {
+    versions.push(version(2, 'REJECTED', { reviewComment: 'Wrong GSTIN' }));
+    const { user } = renderAt('/settings/company-profile/drafts/2');
+    await user.click(await screen.findByRole('button', { name: 'Delete version 2' }));
+    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Delete draft' }));
+    expect(await screen.findByRole('region', { name: 'Live profile' })).toBeInTheDocument();
+    expect(versions.find((v) => v.id === 2)?.status).toBe('DELETED');
+  });
+
+  it("another maker can't delete someone else's draft", async () => {
+    versions.push(version(2, 'DRAFT'));
+    signIn('maker2', ['ADMIN_L1']);
+    renderAt('/settings/company-profile/history');
+    await screen.findByTestId('version-row-2');
+    expect(screen.queryByRole('button', { name: 'Delete version 2' })).not.toBeInTheDocument();
+  });
+
+  it("a Super Admin deletes another admin's draft from the history; it stays listed as Deleted", async () => {
+    versions.push(version(2, 'DRAFT'), version(3, 'PENDING_APPROVAL'));
+    signIn('admin', ['ADMIN_L2']);
+    const { user } = renderAt('/settings/company-profile/history');
+    const row = await screen.findByTestId('version-row-2');
+    // Pending and live versions can't be deleted
+    expect(within(screen.getByTestId('version-row-3')).queryByRole('button', { name: /Delete/ })).not.toBeInTheDocument();
+    expect(within(screen.getByTestId('version-row-1')).queryByRole('button', { name: /Delete/ })).not.toBeInTheDocument();
+
+    await user.click(within(row).getByRole('button', { name: 'Delete version 2' }));
+    const dialog = screen.getByRole('dialog', { name: 'Delete version 2?' });
+    expect(dialog).toHaveTextContent('This draft was created by maker1.');
+    await user.click(within(dialog).getByRole('button', { name: 'Delete draft' }));
+
+    await waitFor(() => expect(within(screen.getByTestId('version-row-2')).getByText('Deleted')).toBeInTheDocument());
+    expect(api.deleteDraft).toHaveBeenCalledWith(2);
+    expect(screen.getByRole('heading', { name: 'Company profile history' })).toBeInTheDocument(); // the dialog's clicks didn't open the row
+  });
+});
+
+describe('Shipping charges', () => {
+  it('edits price bands: each starts where the previous ends and the last covers larger orders', async () => {
+    versions.push(version(2, 'DRAFT'));
+    const { user } = renderAt('/settings/company-profile/drafts/2');
+    const editor = await screen.findByRole('list', { name: 'Shipping rules editor' });
+    expect(within(editor).getByText('₹50,000')).toBeInTheDocument();
+    expect(within(editor).getByText('and above')).toBeInTheDocument();
+
+    // Below 10,000 → 1,000; 10,000 to below 15,000 → 800; 15,000 and above → free
+    await user.clear(screen.getByLabelText('Rule 1 up to'));
+    await user.type(screen.getByLabelText('Rule 1 up to'), '10000');
+    await user.clear(screen.getByLabelText('Rule 1 fee'));
+    await user.type(screen.getByLabelText('Rule 1 fee'), '1000');
+    await user.click(screen.getByRole('button', { name: 'Add rule' }));
+    await user.type(screen.getByLabelText('Rule 2 up to'), '9000');
+    await user.type(screen.getByLabelText('Rule 2 fee'), '800');
+    await user.type(screen.getByLabelText('Rule 3 fee'), '0');
+    await user.click(screen.getByRole('button', { name: 'Save draft' }));
+    expect(await screen.findByText('Must be more than 10000, where this rule starts.')).toBeInTheDocument();
+    expect(api.saveDraft).not.toHaveBeenCalled();
+
+    await user.clear(screen.getByLabelText('Rule 2 up to'));
+    await user.type(screen.getByLabelText('Rule 2 up to'), '15000');
+    await user.click(screen.getByRole('button', { name: 'Save draft' }));
+    await waitFor(() =>
+      expect(api.saveDraft).toHaveBeenCalledWith(
+        2,
+        expect.objectContaining({
+          shippingRules: [
+            { minOrderValue: 0, maxOrderValue: 10000, fee: 1000 },
+            { minOrderValue: 10000, maxOrderValue: 15000, fee: 800 },
+            { minOrderValue: 15000, maxOrderValue: null, fee: 0 },
+          ],
+        })
+      )
+    );
+  });
+
+  it('the live profile lists the price bands', async () => {
+    renderAt(OVERVIEW);
+    const table = await screen.findByRole('table', { name: 'Shipping charges' });
+    expect(within(table).getByText('Below ₹50,000')).toBeInTheDocument();
+    expect(within(table).getByText('₹500')).toBeInTheDocument();
+    expect(within(table).getByText('₹50,000 and above')).toBeInTheDocument();
+    expect(within(table).getByText('Free')).toBeInTheDocument();
+  });
+});
+
 describe('Home page video', () => {
   const LINK = 'https://youtu.be/dQw4w9WgXcQ';
 
@@ -580,6 +697,7 @@ describe('Permission errors are not logouts', () => {
     api.saveDraft.mockRejectedValueOnce(apiError(403, 'NOT_VERSION_OWNER', 'Only the creator can edit this draft.'));
     const { user } = renderAt('/settings/company-profile/drafts/2');
     await waitFor(() => expect(brandInput()).toHaveValue('TinQa'));
+    await user.type(brandInput(), ' Mine');
     await user.click(screen.getByRole('button', { name: 'Save draft' }));
     expect(await screen.findByText('Only the creator can edit this draft.')).toBeInTheDocument();
     expect(brandInput()).toBeInTheDocument();

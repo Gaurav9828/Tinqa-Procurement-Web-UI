@@ -3,12 +3,16 @@ import { refundApi } from '../api/refundApi';
 import type { OrderRefundSummary } from '../types/refund.types';
 import { useLatestRequest } from '../../../hooks/useLatestRequest';
 import { useNotify } from '../../../hooks/useNotify';
+import { useAccess } from '../../../hooks/useAccess';
 
 /**
  * Refund summary of one order (GET /admin/orders/{orderNumber}/refunds). `refresh()` reloads it in the
- * background after any refund or status change, keeping the last data on failure.
+ * background after any refund or status change, keeping the last data on failure. Loads nothing without
+ * REFUND_VIEW (delivery riders, fleet coordinators…), so the refund panel stays hidden for them.
  */
-export const useOrderRefunds = (orderNumber: string | null) => {
+export const useOrderRefunds = (requestedOrderNumber: string | null) => {
+  const { can } = useAccess();
+  const orderNumber = can('REFUND_VIEW') ? requestedOrderNumber : null;
   const [summary, setSummary] = useState<OrderRefundSummary | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [loadFailed, setLoadFailed] = useState(false);

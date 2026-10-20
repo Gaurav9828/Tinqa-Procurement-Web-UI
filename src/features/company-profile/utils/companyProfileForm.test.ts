@@ -100,12 +100,42 @@ describe('toBody', () => {
       invoiceTerms: ['Pay in 30 days'],
       address: { city: null, stateCode: '27', country: 'India' },
     });
-    expect(Object.keys(body)).toHaveLength(18);
+    expect(Object.keys(body)).toHaveLength(19);
   });
 
   it('round-trips a version', () => {
     const fields = toBody(form({ legalName: 'TinQa Pvt Ltd' }, { line1: 'Plot 1' }));
     expect(toBody(toForm(fields))).toEqual(fields);
+  });
+});
+
+describe('shipping rules', () => {
+  const rows = (...pairs: [string, string][]) => pairs.map(([upTo, fee]) => ({ upTo, fee }));
+
+  it('derives each rule\'s start from the previous one and leaves the last open-ended', () => {
+    expect(toBody(form({ shippingRules: rows(['10000', '1000'], ['15,000', '800'], ['ignored', '0']) })).shippingRules).toEqual([
+      { minOrderValue: 0, maxOrderValue: 10000, fee: 1000 },
+      { minOrderValue: 10000, maxOrderValue: 15000, fee: 800 },
+      { minOrderValue: 15000, maxOrderValue: null, fee: 0 },
+    ]);
+    expect(validateForSave(form({ shippingRules: rows(['10000', '1000'], ['15000', '800'], ['', '0']) }))).toEqual({});
+  });
+
+  it('needs increasing limits and a fee on every rule', () => {
+    const errors = validateForSave(form({ shippingRules: rows(['', '10'], ['5000', ''], ['', '1.234']) }));
+    expect(errors['shippingRules[0].maxOrderValue']).toMatch(/Enter the order value/);
+    expect(errors['shippingRules[1].fee']).toMatch(/Enter the shipping fee/);
+    expect(errors['shippingRules[2].fee']).toMatch(/at most 2 decimals/);
+    expect(validateForSave(form({ shippingRules: rows(['5000', '10'], ['5000', '5'], ['', '0']) }))['shippingRules[1].maxOrderValue']).toBe(
+      'Must be more than 5000, where this rule starts.'
+    );
+  });
+
+  it('round-trips through the form and labels server errors', () => {
+    const fields = toBody(form({ shippingRules: rows(['50000', '500'], ['', '0']) }));
+    expect(toBody(toForm(fields)).shippingRules).toEqual(fields.shippingRules);
+    expect(fieldLabel('shippingRules[1].fee')).toBe('Shipping rule 2 fee');
+    expect(fieldLabel('shippingRules')).toBe('Shipping charges');
   });
 });
 

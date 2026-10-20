@@ -45,7 +45,20 @@ export const HomeRedirect: React.FC = () => {
 };
 
 export const AccessDenied: React.FC = () => {
-  const { designationLabel } = useAccess();
+  const { designationLabel, can } = useAccess();
+  if (can('DEALER_PORTAL_VIEW')) {
+    return (
+      <div className="apple-card p-10 flex flex-col items-center text-center gap-3">
+        <div className="w-12 h-12 rounded-2xl bg-red-500/10 text-red-500 flex items-center justify-center">
+          <ShieldAlert className="w-6 h-6" />
+        </div>
+        <h2 className="text-lg font-semibold">Access restricted</h2>
+        <p className="text-sm text-gray-500 dark:text-neutral-400 max-w-sm">
+          This area isn't part of the dealer portal. Use My Quotations and My Orders.
+        </p>
+      </div>
+    );
+  }
   return (
     <div className="apple-card p-10 flex flex-col items-center text-center gap-3">
       <div className="w-12 h-12 rounded-2xl bg-red-500/10 text-red-500 flex items-center justify-center">

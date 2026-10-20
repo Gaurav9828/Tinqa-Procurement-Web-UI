@@ -44,6 +44,16 @@ const ProductManagementPage = lazy(() =>
   import('./features/products-management/pages/ProductManagementPage').then((m) => ({ default: m.ProductManagementPage }))
 );
 
+const DealerQuotationsPage = lazy(() =>
+  import('./features/dealer-portal/pages/DealerQuotationsPage').then((m) => ({ default: m.DealerQuotationsPage }))
+);
+const DealerOrdersPage = lazy(() =>
+  import('./features/dealer-portal/pages/DealerOrdersPage').then((m) => ({ default: m.DealerOrdersPage }))
+);
+const PrintOrderPage = lazy(() => import('./features/printing/pages/PrintOrderPage').then((m) => ({ default: m.PrintOrderPage })));
+
+const FinancePage = lazy(() => import('./features/finance/pages/FinancePage').then((m) => ({ default: m.FinancePage })));
+
 const CompanyProfilePage = lazy(() =>
   import('./features/company-profile/pages/CompanyProfilePage').then((m) => ({ default: m.CompanyProfilePage }))
 );
@@ -56,6 +66,8 @@ const CompanyProfileReviewPage = lazy(() =>
 const CompanyProfileHistoryPage = lazy(() =>
   import('./features/company-profile/pages/CompanyProfileHistoryPage').then((m) => ({ default: m.CompanyProfileHistoryPage }))
 );
+
+const UserGuidePage = lazy(() => import('./features/user-guide/pages/UserGuidePage').then((m) => ({ default: m.UserGuidePage })));
 
 const PageLoader: React.FC = () => (
   <div className="min-h-[300px] flex items-center justify-center text-gray-400">
@@ -88,14 +100,30 @@ export const App: React.FC = () => {
               <Route path="/reset-password" element={<ResetPasswordPage />} />
             </Route>
 
+            {/* Printable quotations, purchase orders and bills: no app chrome. The page loads only what the user may see. */}
+            <Route element={<RequireAuth />}>
+              <Route path="/print/orders/:orderId/:document" element={<PrintOrderPage />} />
+            </Route>
+
             {/* Protected Admin Routes */}
             <Route element={<RequireAuth />}>
               <Route path="/" element={<AdminLayout />}>
                 <Route index element={<HomeRedirect />} />
                 <Route path="profile" element={<ProfilePage />} />
 
+                {/* Dealer logins */}
+                <Route element={<RequireNavAccess navId="dealer-quotations" />}>
+                  <Route path="dealer/quotations" element={<DealerQuotationsPage />} />
+                </Route>
+                <Route element={<RequireNavAccess navId="dealer-orders" />}>
+                  <Route path="dealer/orders" element={<DealerOrdersPage />} />
+                </Route>
+
                 <Route element={<RequireNavAccess navId="analytics" />}>
                   <Route path="analytics" element={<Placeholder title="Analytics Container" />} />
+                </Route>
+                <Route element={<RequireNavAccess navId="finance" />}>
+                  <Route path="finance" element={<FinancePage />} />
                 </Route>
                 <Route element={<RequireNavAccess navId="approvals" />}>
                   <Route path="approvals" element={<ApprovalsHub />} />
@@ -148,6 +176,9 @@ export const App: React.FC = () => {
                   <Route path="settings/company-profile/history" element={<CompanyProfileHistoryPage />} />
                   <Route path="settings/company-profile/drafts/:id" element={<CompanyProfileEditorPage />} />
                   <Route path="settings/company-profile/versions/:id" element={<CompanyProfileReviewPage />} />
+                </Route>
+                <Route element={<RequireNavAccess navId="user-guide" />}>
+                  <Route path="user-guide" element={<UserGuidePage />} />
                 </Route>
                 <Route element={<RequireNavAccess navId="system-settings" />}>
                   <Route path="settings" element={<Placeholder title="System Configuration Container" />} />

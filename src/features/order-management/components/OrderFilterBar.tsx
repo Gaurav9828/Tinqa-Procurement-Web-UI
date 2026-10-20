@@ -10,7 +10,8 @@ interface OrderFilterBarProps {
   searchQuery: string;
   selectedStatus?: OrderStatus;
   selectedDealerId?: number;
-  dealers: DealerResponse[];
+  /** Hidden when absent (the user can't see dealers). */
+  dealers?: DealerResponse[];
   onSearchChange: (val: string) => void;
   onStatusChange: (status?: OrderStatus) => void;
   onDealerChange: (dealerId?: number) => void;
@@ -58,18 +59,20 @@ export const OrderFilterBar: React.FC<OrderFilterBarProps> = ({
         </select>
 
         {/* Dealer Dropdown */}
-        <select
-          value={selectedDealerId || ''}
-          onChange={(e) => onDealerChange(e.target.value ? Number(e.target.value) : undefined)}
-          className="px-3 py-2 bg-white dark:bg-neutral-900 border border-black/10 dark:border-white/10 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-[#0071e3] text-black dark:text-white cursor-pointer"
-        >
-          <option value="">All Dealers</option>
-          {dealers.map((d) => (
-            <option key={d.id} value={d.id}>
-              {d.name}
-            </option>
-          ))}
-        </select>
+        {dealers && (
+          <select
+            value={selectedDealerId || ''}
+            onChange={(e) => onDealerChange(e.target.value ? Number(e.target.value) : undefined)}
+            className="px-3 py-2 bg-white dark:bg-neutral-900 border border-black/10 dark:border-white/10 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-[#0071e3] text-black dark:text-white cursor-pointer"
+          >
+            <option value="">All Dealers</option>
+            {dealers.map((d) => (
+              <option key={d.id} value={d.id}>
+                {d.name}
+              </option>
+            ))}
+          </select>
+        )}
       </div>
 
       {onOpenCreateOrderModal && (

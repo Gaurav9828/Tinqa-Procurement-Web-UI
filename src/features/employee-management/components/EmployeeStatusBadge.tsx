@@ -1,7 +1,7 @@
 import React from 'react';
 import { EmployeeConstants } from '../types/employee.types';
 import type { EmployeeStatus } from '../types/employee.types';
-import { CheckCircle2, AlertOctagon, UserX, Clock, ShieldAlert } from 'lucide-react';
+import { CheckCircle2, AlertOctagon, UserX, Clock, ShieldAlert, Trash2 } from 'lucide-react';
 
 interface Props {
     status: EmployeeStatus;
@@ -43,6 +43,12 @@ export const EmployeeStatusBadge: React.FC<Props> = ({ status }) => {
             return (
                 <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 animate-pulse">
                     <AlertOctagon className="w-3.5 h-3.5" /> Waiting for Approval
+                </span>
+            );
+        case EmployeeConstants.DELETED:
+            return (
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20">
+                    <Trash2 className="w-3.5 h-3.5" /> Deleted
                 </span>
             );
         default:

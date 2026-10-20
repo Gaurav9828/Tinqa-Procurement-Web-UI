@@ -7,6 +7,8 @@ import type { DealerResponse } from '../../dealer-management/types/dealer.types'
 import { useAccess } from '../../../hooks/useAccess';
 import { CommonInput, CommonSelect } from '../../../components/ui/FormInputs';
 import { unitSelectOptions } from '../../../constants/unitsOfMeasure';
+import { QuotationTaxFields } from './QuotationTaxFields';
+import { emptyTaxForm, taxFormChanged, taxFormFrom, taxPayload, validateTaxForm, type TaxForm } from '../utils/quotationTax';
 
 interface EditOrderModalProps {
   order: OrderResponse | null;
@@ -50,6 +52,7 @@ export const EditOrderModal: React.FC<EditOrderModalProps> = ({
   const [expectedDelivery, setExpectedDelivery] = useState<string>('');
   const [isUnitDisabled, setIsUnitDisabled] = useState<boolean>(false);
   const [isConfirmOpen, setIsConfirmOpen] = useState<boolean>(false);
+  const [tax, setTax] = useState<TaxForm>(emptyTaxForm);
 
   useEffect(() => {
     if (order) {
@@ -60,6 +63,7 @@ export const EditOrderModal: React.FC<EditOrderModalProps> = ({
       setUnitOfMeasure(order.unitType || 'PCS');
       setShipmentPrice(order.shipmentPrice || 0);
       setExpectedDelivery(order.expectedDelivery || '');
+      setTax(taxFormFrom(order.taxBreakup));
     }
   }, [order]);
 
@@ -88,7 +92,8 @@ export const EditOrderModal: React.FC<EditOrderModalProps> = ({
     unitPrice !== (order.unitPrice || '') ||
     unitOfMeasure !== (order.unitType || 'PCS') ||
     shipmentPrice !== (order.shipmentPrice || 0) ||
-    expectedDelivery !== (order.expectedDelivery || '');
+    expectedDelivery !== (order.expectedDelivery || '') ||
+    taxFormChanged(tax, order.taxBreakup);
 
   const itemMrp = selectedItem?.mrp || 0;
   const currentPrice = Number(unitPrice) || 0;
@@ -101,6 +106,9 @@ export const EditOrderModal: React.FC<EditOrderModalProps> = ({
     !!unitOfMeasure.trim() &&
     shipmentPrice !== '' &&
     Number(shipmentPrice) >= 0;
+  const taxable = isFormComplete ? Number(quantity) * currentPrice + Number(shipmentPrice) : null;
+  const taxErrors = validateTaxForm(tax, taxable === null ? null : Math.round(taxable * 100));
+  const taxValid = Object.keys(taxErrors).length === 0;
   const minDeliveryDate = order.orderDate
     ? (() => {
         const d = new Date(order.orderDate);
@@ -111,7 +119,7 @@ export const EditOrderModal: React.FC<EditOrderModalProps> = ({
 
   const handleFormSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!isFormComplete) return;
+    if (!isFormComplete || !taxValid) return;
     setIsConfirmOpen(true);
   };
 
@@ -126,7 +134,8 @@ export const EditOrderModal: React.FC<EditOrderModalProps> = ({
       shipmentPrice: Number(shipmentPrice),
       orderDate: order.orderDate,
       expectedDelivery: expectedDelivery || null,
-      taxBreakup: order.taxBreakup || {},
+      // Sent only when changed; otherwise the server keeps the GST and follows a new total at the same rate
+      ...(taxFormChanged(tax, order.taxBreakup) ? { taxBreakup: taxPayload(tax) } : {}),
       additionalInfo: order.additionalInfo || {},
     });
   };
@@ -144,7 +153,7 @@ export const EditOrderModal: React.FC<EditOrderModalProps> = ({
   return (
     <>
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-        <div className="w-full max-w-lg bg-white dark:bg-neutral-900 border border-black/10 dark:border-white/10 rounded-2xl shadow-xl overflow-hidden">
+        <div className="w-full max-w-lg max-h-[92vh] overflow-y-auto bg-white dark:bg-neutral-900 border border-black/10 dark:border-white/10 rounded-2xl shadow-xl">
           {/* Header */}
           <div className="flex items-center justify-between p-5 border-b border-black/10 dark:border-white/10">
             <div>
@@ -267,6 +276,9 @@ export const EditOrderModal: React.FC<EditOrderModalProps> = ({
               onChange={(e) => setExpectedDelivery(e.target.value)}
             />
 
+            <QuotationTaxFields value={tax} onChange={setTax} taxable={taxable} errors={taxErrors} disabled={isSubmitting}
+              dealerState={dealers.find((dealer) => dealer.id === Number(selectedDealerId))?.state} />
+
             {/* Actions */}
             <div className="flex items-center justify-end gap-3 pt-3 border-t border-black/10 dark:border-white/10">
               <button
@@ -278,7 +290,7 @@ export const EditOrderModal: React.FC<EditOrderModalProps> = ({
               </button>
               <button
                 type="submit"
-                disabled={isSubmitting || !hasChanges || !isFormComplete}
+                disabled={isSubmitting || !hasChanges || !isFormComplete || !taxValid}
                 className="px-4 py-2 text-xs font-medium text-white bg-[#0071e3] hover:bg-[#0071e3]/90 rounded-xl transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isSubmitting ? 'Updating...' : 'Save Changes'}

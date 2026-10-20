@@ -139,6 +139,7 @@ export const ReplySuggestions: React.FC<Props> = ({ result, referenceNumber, isB
       <ConfirmationModal
         isOpen={!!pendingClose}
         actionType="CONFIRM"
+        tone="danger"
         title={pendingClose?.text ? 'Send this reply and close the ticket?' : 'Close this ticket?'}
         description={`${pendingClose?.text ? 'The reply will be sent to the customer, then ' : ''}ticket ${referenceNumber} will be closed. Closed tickets are read-only.`}
         isSubmitting={isBusy}

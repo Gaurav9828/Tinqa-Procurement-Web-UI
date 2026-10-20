@@ -8,10 +8,11 @@ import { GlobalAlertContainer } from '../../components/ui/GlobalAlertContainer';
 import { ApprovalsHub } from './ApprovalsHub';
 import { useAuthStore } from '../../store/useAuthStore';
 import { axiosClient } from '../../api/axiosClient';
+import { ecommerceAxiosClient } from '../../api/ecommerceAxiosClient';
 import { superAdminPermissions } from '../../test/access';
 
 vi.mock('../../api/axiosClient', () => ({ axiosClient: { get: vi.fn(), patch: vi.fn() } }));
-vi.mock('../../api/ecommerceAxiosClient', () => ({ ecommerceAxiosClient: { patch: vi.fn() } }));
+vi.mock('../../api/ecommerceAxiosClient', () => ({ ecommerceAxiosClient: { get: vi.fn(), patch: vi.fn() } }));
 const procurement = vi.mocked(axiosClient);
 const ok = <T,>(data: T) => ({ data: { success: true, message: 'OK', data } });
 
@@ -70,6 +71,27 @@ beforeEach(() => {
 });
 
 describe('Approvals hub: new employees', () => {
+  it('an employee approver only loads the employee queues: no refunds, stock, orders or documents', async () => {
+    // A Level 2 HR-style approver: employee groups only
+    useAuthStore.setState({
+      user: {
+        userId: 12,
+        username: 'hr_l2',
+        email: 'hr@tinqa.com',
+        role: 'ADMIN_L2',
+        authClient: 'web',
+        isFirstLogin: false,
+        permissions: ['EMPLOYEE_VIEW', 'EMPLOYEE_APPROVE', 'EMPLOYEE_DELETE', 'EMPLOYEE_PROFILE_CHANGE_APPROVE'],
+      },
+    });
+    renderHub();
+
+    expect(await screen.findByText('New Employee: Riya Sharma')).toBeInTheDocument();
+    const requested = procurement.get.mock.calls.map(([url]) => String(url));
+    expect(requested.every((url) => url.startsWith('/v1/admin/employees') || url.startsWith('/admin/profile-approvals'))).toBe(true);
+    expect(vi.mocked(ecommerceAxiosClient).get).not.toHaveBeenCalled();
+  });
+
   it('lists employees waiting for approval and approves them', async () => {
     const user = userEvent.setup();
     renderHub();

@@ -2,7 +2,7 @@ import React from 'react';
 import { ArrowRight } from 'lucide-react';
 import type { AuditEntry, FieldChange } from '../types/companyProfile.types';
 import { IMAGE_FIELDS, STATUS_LABELS, TRADEMARK_SYMBOLS, fieldLabel, formatServerTime, onOff } from '../utils/companyProfile.utils';
-import { InvoiceTermsList, ProfileImage, UrlLink, YouTubePreview } from './ProfileDisplay';
+import { InvoiceTermsList, ProfileImage, ShippingRulesList, UrlLink, YouTubePreview } from './ProfileDisplay';
 
 const asText = (value: unknown): string => {
   if (value === null || value === undefined || value === '') return '—';
@@ -23,6 +23,9 @@ const ChangeValue: React.FC<{ field: string; value: unknown; side: 'live' | 'pro
   }
   if (field === 'invoiceTerms') {
     return <InvoiceTermsList terms={Array.isArray(value) ? value.map(asText) : null} label={`${side === 'live' ? 'Live' : 'Proposed'} invoice terms`} />;
+  }
+  if (field === 'shippingRules') {
+    return <ShippingRulesList rules={value} label={`${side === 'live' ? 'Live' : 'Proposed'} shipping charges`} />;
   }
   if (field === 'homeVideoEnabled') return <>{onOff(value)}</>;
   if (field === 'homeVideoUrl') {

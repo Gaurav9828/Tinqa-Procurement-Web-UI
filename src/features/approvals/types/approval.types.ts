@@ -52,6 +52,13 @@ export interface StocksApprovalRequest {
   approvalStatus?: ApprovalStatus;
   createdBy: number;
   createdAt: string;
+  unitsPassedTest?: number;
+  defectedUnits?: number;
+  /** Set on an approved entry whose counts changed since: the change (and its money) waits for Admin L2. */
+  changeAwaitingApproval?: boolean;
+  approvedUnitsPassed?: number | null;
+  approvedDefectedUnits?: number | null;
+  heldUnits?: number;
 }
 
 export interface OrdersApprovalRequest {

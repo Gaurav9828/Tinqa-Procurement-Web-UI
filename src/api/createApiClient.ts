@@ -1,5 +1,6 @@
 import axios, { type AxiosAdapter, type AxiosError, type AxiosInstance, type AxiosResponse } from 'axios';
-import { clearSession, getToken, isSessionExpired, redirectToLogin, redirectToPasswordSetup } from '../auth/session';
+import { clearSession, getStoredUser, getToken, isSessionExpired, redirectToLogin, redirectToPasswordSetup } from '../auth/session';
+import { createEndpointMatcher, type EndpointRule } from '../config/endpointAccess';
 import { METHOD_NOT_ALLOWED_MESSAGE } from '../utils/apiError';
 
 declare module 'axios' {
@@ -58,7 +59,17 @@ export const dedupeInFlightGets = (adapter: AxiosAdapter): AxiosAdapter => {
   };
 };
 
-export const createApiClient = (baseURL: string, label: string): AxiosInstance => {
+/** Why a request was never sent: the signed-in user lacks the permission the endpoint requires. */
+export const NOT_PERMITTED_MESSAGE = 'Not sent: missing permission';
+
+/**
+ * `endpointRules` (config/endpointAccess.ts) say which permission each endpoint needs. A request the signed-in user
+ * isn't allowed to make is cancelled before it is sent, the same answer the backend would give, so it never reaches
+ * the server and shows no error (callers ignore cancelled requests). Screens should not try such calls at all; in
+ * development each one is logged so it can be fixed where it starts.
+ */
+export const createApiClient = (baseURL: string, label: string, endpointRules: readonly EndpointRule[] = []): AxiosInstance => {
+  const requiredPermission = createEndpointMatcher(endpointRules);
   const client = axios.create({
     baseURL,
     timeout: 30000,
@@ -75,6 +86,15 @@ export const createApiClient = (baseURL: string, label: string): AxiosInstance =
         return Promise.reject(new axios.CanceledError('Session expired'));
       }
       config.headers.Authorization = `Bearer ${token}`;
+    }
+    const required = requiredPermission(config.method, config.url);
+    // No stored permissions yet (a session from an older build): leave the decision to the backend
+    const permissions = getStoredUser()?.permissions;
+    if (required && permissions && !permissions.includes(required)) {
+      if (import.meta.env.DEV) {
+        console.warn(`[${label}] blocked ${config.method?.toUpperCase()} ${config.url}: needs ${required}`);
+      }
+      return Promise.reject(new axios.CanceledError(`${NOT_PERMITTED_MESSAGE} ${required}`));
     }
     // Let the browser set the multipart boundary itself.
     if (config.data instanceof FormData) {

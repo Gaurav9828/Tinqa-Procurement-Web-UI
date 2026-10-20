@@ -3,11 +3,12 @@ import { useSearchParams } from 'react-router-dom';
 import { orderTrackingApi } from '../api/orderTrackingApi';
 import type { AdminOrderListParams, AdminOrderSort, AdminOrderSummary } from '../types/orderTracking.types';
 import type { PageResponse } from '../../../types/common.types';
-import { useDebouncedValue } from '../../../hooks/useDebouncedValue';
+import { useSearchTerm } from '../../../hooks/useSearchTerm';
 import { useLatestRequest } from '../../../hooks/useLatestRequest';
 import { useNotify } from '../../../hooks/useNotify';
 import { getApiErrorKind, type ApiErrorKind } from '../../../utils/apiErrorKind';
 import { PAYMENT_STATUS_FILTER_OPTIONS } from '../utils/payment.utils';
+import { createSearchResultCache } from '../../../utils/searchResultCache';
 
 export const ADMIN_ORDERS_PAGE_SIZE = 20;
 export const ADMIN_ORDERS_SEARCH_MAX_LENGTH = 100;
@@ -57,7 +58,7 @@ const readPage = (params: URLSearchParams) => {
   return Number.isInteger(page) && page > 0 ? page : 0;
 };
 
-/** Small in-memory cache so returning from an order shows the list instantly. */
+/** Small in-memory cache so returning from an order shows the list instantly (then refreshed in the background). */
 const listCache = new Map<string, PageResponse<AdminOrderSummary>>();
 const CACHE_LIMIT = 10;
 const remember = (key: string, value: PageResponse<AdminOrderSummary>) => {
@@ -76,7 +77,9 @@ export const useAdminOrders = () => {
   const page = readPage(searchParams);
 
   // The input stays bound to `filters.search`; the API only sees the settled value.
-  const debouncedSearch = useDebouncedValue(filters.search.trim());
+  const { term: debouncedSearch, pending: searchPending, flush: searchNow } = useSearchTerm(filters.search);
+  // Queries already answered while this page is open are not asked again (cleared by Refresh / retry).
+  const [seen] = useState(() => createSearchResultCache<AdminOrderSummary, PageResponse<AdminOrderSummary>>());
   const dateRangeInvalid = !!filters.fromDate && !!filters.toDate && filters.fromDate > filters.toDate;
 
   const requestParams = useMemo<AdminOrderListParams>(
@@ -94,6 +97,10 @@ export const useAdminOrders = () => {
   );
   const cacheKey = JSON.stringify(requestParams);
   const cached = listCache.get(cacheKey);
+  const seenQuery = useMemo(
+    () => ({ scope: JSON.stringify({ ...requestParams, search: undefined, page: undefined }), term: debouncedSearch, page }),
+    [requestParams, debouncedSearch, page]
+  );
 
   const [data, setData] = useState<PageResponse<AdminOrderSummary> | null>(cached ?? null);
   const [isLoading, setIsLoading] = useState(!cached);
@@ -105,6 +112,13 @@ export const useAdminOrders = () => {
   const fetchOrders = useCallback(async () => {
     if (dateRangeInvalid) return;
     const isCurrent = beginRequest();
+    const answered = seen.get(seenQuery);
+    if (answered) {
+      setData(answered);
+      setIsLoading(false);
+      setErrorKind(null);
+      return;
+    }
     const hit = listCache.get(cacheKey);
     if (hit) setData(hit); // show cached rows immediately, refresh in the background
     setIsLoading(true);
@@ -114,6 +128,7 @@ export const useAdminOrders = () => {
       if (!isCurrent()) return;
       if (res.success && res.data) {
         remember(cacheKey, res.data);
+        seen.set(seenQuery, res.data);
         setData(res.data);
       } else {
         setErrorKind('unknown');
@@ -126,11 +141,17 @@ export const useAdminOrders = () => {
     } finally {
       if (isCurrent()) setIsLoading(false);
     }
-  }, [cacheKey, requestParams, dateRangeInvalid, beginRequest, notify]);
+  }, [cacheKey, requestParams, seen, seenQuery, dateRangeInvalid, beginRequest, notify]);
 
   useEffect(() => {
-    fetchOrders();
-  }, [fetchOrders]);
+    if (!searchPending) fetchOrders();
+  }, [fetchOrders, searchPending]);
+
+  /** Refresh / retry: ask the server again rather than reuse answered queries. */
+  const refetch = useCallback(() => {
+    seen.clear();
+    return fetchOrders();
+  }, [seen, fetchOrders]);
 
   const writeParams = useCallback(
     (mutate: (next: URLSearchParams) => void) => {
@@ -188,6 +209,7 @@ export const useAdminOrders = () => {
     hasLoaded: !!data,
     isLoading,
     errorKind,
-    refetch: fetchOrders,
+    searchNow,
+    refetch,
   };
 };

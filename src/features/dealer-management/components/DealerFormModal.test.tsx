@@ -88,6 +88,18 @@ describe('Dealer address from PIN code', () => {
     );
   });
 
+  it('keeps Update disabled until something changes; filling a missing district on open is not a change', async () => {
+    stubIndiaPost();
+    const { user } = renderForm(DEALER);
+    await waitFor(() => expect(screen.getByLabelText(/^District/)).toHaveValue('Pune'));
+    expect(screen.getByRole('button', { name: 'Update Dealer' })).toBeDisabled();
+
+    await user.type(screen.getByLabelText(/^Trade Name/), '  ');
+    expect(screen.getByRole('button', { name: 'Update Dealer' })).toBeDisabled(); // whitespace alone isn't a change
+    await user.type(screen.getByLabelText(/^Trade Name/), 'Acme');
+    expect(screen.getByRole('button', { name: 'Update Dealer' })).toBeEnabled();
+  });
+
   it('blocks saving with a PIN code India Post does not know', async () => {
     stubIndiaPost();
     const { user, onSubmit } = renderForm(DEALER);
@@ -112,5 +124,31 @@ describe('Dealer address from PIN code', () => {
     await user.click(screen.getByRole('button', { name: /Retry/ }));
     await waitFor(() => expect(city).toHaveValue('Gautam Buddha Nagar'));
     expect(city).toHaveAttribute('readonly');
+  });
+});
+
+describe('Assigning categories', () => {
+  it('offers the item categories to pick several of, with no way to create one here', async () => {
+    const onSubmit = vi.fn(async () => true);
+    render(
+      <DealerFormModal
+        isOpen
+        onClose={() => {}}
+        onSubmit={onSubmit}
+        dealer={DEALER}
+        isSubmitting={false}
+        categories={[{ id: 1, name: 'Laptops', code: 'LAP' }, { id: 2, name: 'Printers', code: 'PRN' }] as never}
+      />
+    );
+    const user = userEvent.setup();
+
+    expect(screen.queryByRole('button', { name: /New Category/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Laptops (LAP)' })).toHaveAttribute('aria-pressed', 'true');
+    await user.click(screen.getByRole('button', { name: 'Printers (PRN)' }));
+    expect(screen.getByRole('button', { name: 'Printers (PRN)' })).toHaveAttribute('aria-pressed', 'true');
+
+    await user.click(screen.getByRole('button', { name: 'Update Dealer' }));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
+    expect((onSubmit.mock.calls[0] as unknown[])[0]).toMatchObject({ categoryIds: [1, 2] });
   });
 });

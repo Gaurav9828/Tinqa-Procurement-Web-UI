@@ -1,7 +1,7 @@
 // Company profile with maker-checker approval (Ecommerce BE, /api/admin/company/**).
 // Timestamps are ISO local date-times without an offset, in server time (IST). Any profile field may be null.
 
-export const VERSION_STATUSES = ['DRAFT', 'PENDING_APPROVAL', 'APPROVED', 'REJECTED', 'SUPERSEDED', 'WITHDRAWN'] as const;
+export const VERSION_STATUSES = ['DRAFT', 'PENDING_APPROVAL', 'APPROVED', 'REJECTED', 'SUPERSEDED', 'WITHDRAWN', 'DELETED'] as const;
 export type VersionStatus = (typeof VERSION_STATUSES)[number];
 
 export const TRADEMARK_MARKS = ['', 'TM', 'R', 'SM'] as const;
@@ -16,6 +16,16 @@ export interface CompanyAddress {
   stateCode: string | null;
   postalCode: string | null;
   country: string | null;
+}
+
+/**
+ * One shipping charge rule: an order whose subtotal is from minOrderValue (inclusive) up to maxOrderValue
+ * (exclusive; null = no upper limit) pays `fee`. Rules start at 0 and follow each other without gaps.
+ */
+export interface ShippingRule {
+  minOrderValue: number;
+  maxOrderValue: number | null;
+  fee: number;
 }
 
 /** Every editable field: the create / edit body (PUT is a full replacement). */
@@ -36,6 +46,8 @@ export interface CompanyProfileFields {
   careersEmail: string | null;
   website: string | null;
   invoiceTerms: string[] | null;
+  /** Storefront shipping fee by order value; empty = every order ships free. */
+  shippingRules: ShippingRule[] | null;
   /** Master switch for the storefront's background video; off = no video, whatever the URL. */
   homeVideoEnabled: boolean | null;
   /** YouTube link of the home page background video. */

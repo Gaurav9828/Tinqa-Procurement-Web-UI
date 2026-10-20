@@ -84,7 +84,7 @@ export const useItemActions = (onSuccessCallback?: () => void) => {
     setIsSubmitting(true);
     try {
       const payload: UpdateItemRequest = {
-        categoryId: item.categoryId,
+        categoryIds: item.categories.map((c) => c.id),
         name: item.name,
         brand: item.brand,
         unitOfMeasure: item.unitOfMeasure,

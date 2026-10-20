@@ -28,11 +28,13 @@ const controlClass =
   'px-3 py-2 text-xs rounded-xl border bg-white dark:bg-[#1c1c1e] focus:outline-none focus:ring-2 focus:ring-[#0071e3] cursor-pointer';
 
 /** Order search, shown in the page header next to Refresh. */
-export const OrderSearchField: React.FC<{ value: string; onChange: (value: string) => void; className?: string }> = ({
-  value,
-  onChange,
-  className = '',
-}) => (
+export const OrderSearchField: React.FC<{
+  value: string;
+  onChange: (value: string) => void;
+  /** Enter in the box: search now instead of waiting for typing to pause. */
+  onSubmit?: () => void;
+  className?: string;
+}> = ({ value, onChange, onSubmit, className = '' }) => (
   <div className={`relative ${className}`}>
     <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
     <input
@@ -42,6 +44,7 @@ export const OrderSearchField: React.FC<{ value: string; onChange: (value: strin
       value={value}
       maxLength={ADMIN_ORDERS_SEARCH_MAX_LENGTH}
       onChange={(e) => onChange(e.target.value)}
+      onKeyDown={(e) => e.key === 'Enter' && onSubmit?.()}
       className={`${controlClass} w-full pl-9 border-black/10 dark:border-white/10 cursor-text`}
     />
   </div>

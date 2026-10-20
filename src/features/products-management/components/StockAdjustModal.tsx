@@ -4,6 +4,7 @@ import type { ProductResponse, UpdateProductRequest } from '../types/product.typ
 import { useStockAdjustment } from '../hooks/useStockAdjustment';
 import { MAX_STOCK_ADJUSTMENT, STOCK_NOTE_MAX_LENGTH, calculateNewStock, type StockAdjustMode } from '../utils/stockAdjustment';
 import { describeLimitingComponent, quantityOptions } from '../utils/componentStock';
+import { CHOICE_TONE, SOLID_TONE, type ActionTone } from '../../../components/ui/actionTones';
 
 interface Props {
   product: ProductResponse;
@@ -12,9 +13,9 @@ interface Props {
   onClose: () => void;
 }
 
-const MODES: Record<StockAdjustMode, { label: string; icon: React.ElementType; verb: string }> = {
-  add: { label: 'Add stock', icon: PackagePlus, verb: 'add' },
-  reduce: { label: 'Reduce stock', icon: PackageMinus, verb: 'remove' },
+const MODES: Record<StockAdjustMode, { label: string; icon: React.ElementType; verb: string; tone: ActionTone }> = {
+  add: { label: 'Add stock', icon: PackagePlus, verb: 'add', tone: 'approve' },
+  reduce: { label: 'Reduce stock', icon: PackageMinus, verb: 'remove', tone: 'danger' },
 };
 
 /** Pop-up to add or reduce a product's stock by a quantity. Saves through the normal product update. */
@@ -83,9 +84,9 @@ export const StockAdjustModal: React.FC<Props> = ({ product, initialMode, update
             </p>
           )}
 
-          <div role="radiogroup" aria-label="Adjustment type" className="grid grid-cols-2 gap-1 p-1 rounded-xl bg-black/5 dark:bg-white/5">
+          <div role="radiogroup" aria-label="Adjustment type" className="grid grid-cols-2 gap-2">
             {(Object.keys(MODES) as StockAdjustMode[]).map((key) => {
-              const { label, icon: Icon } = MODES[key];
+              const { label, icon: Icon, tone } = MODES[key];
               const active = key === mode;
               const disabled = isSaving || (key === 'reduce' && currentStock <= 0);
               return (
@@ -100,8 +101,8 @@ export const StockAdjustModal: React.FC<Props> = ({ product, initialMode, update
                     setQuantity('');
                     setServerError(null);
                   }}
-                  className={`flex items-center justify-center gap-1.5 px-2 py-2 rounded-lg font-semibold transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ${
-                    active ? 'bg-white dark:bg-neutral-800 text-[#0071e3] shadow-sm' : 'text-gray-500 hover:text-black dark:hover:text-white'
+                  className={`flex items-center justify-center gap-1.5 px-2 py-2 rounded-lg border font-semibold transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ${
+                    active ? CHOICE_TONE[tone].active : CHOICE_TONE[tone].idle
                   }`}
                 >
                   <Icon className="w-3.5 h-3.5" /> {label}
@@ -231,7 +232,7 @@ export const StockAdjustModal: React.FC<Props> = ({ product, initialMode, update
             <button
               type="submit"
               disabled={!canSave}
-              className="flex items-center gap-1.5 px-4 py-2 bg-[#0071e3] hover:bg-[#0077ed] text-white rounded-xl font-semibold transition-colors disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
+              className={`flex items-center gap-1.5 px-4 py-2 rounded-xl font-semibold transition-colors disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed ${SOLID_TONE[MODES[mode].tone]}`}
             >
               {isSaving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
               {isSaving ? 'Saving…' : mode === 'add' ? 'Add stock' : 'Reduce stock'}

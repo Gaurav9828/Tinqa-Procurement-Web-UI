@@ -3,6 +3,7 @@ import { X, Save, Loader2, RefreshCw } from 'lucide-react';
 import { Validator, type ValidationRule } from '../../../utils/validator';
 import { usePincodeLookup } from '../../../hooks/usePincodeLookup';
 import { PINCODE_MESSAGES, applyPincodeLocation } from '../../../utils/pincode';
+import { hasFormChanges } from '../../../utils/formChanges';
 import type {
   CategoryResponse,
   DealerResponse,
@@ -15,6 +16,7 @@ interface DealerFormModalProps {
   onClose: () => void;
   onSubmit: (data: CreateDealerRequest | UpdateDealerRequest) => Promise<boolean>;
   dealer?: DealerResponse | null;
+  /** The item categories; a dealer quotes only for items in the categories assigned here. */
   categories: CategoryResponse[];
   isSubmitting: boolean;
 }
@@ -80,13 +82,15 @@ export const DealerFormModal: React.FC<DealerFormModalProps> = ({
   isSubmitting,
 }) => {
   const [formData, setFormData] = useState<FormState>(INITIAL_FORM_STATE);
+  // What the form opened with; Save stays disabled until something differs from it.
+  const [baseline, setBaseline] = useState<FormState>(INITIAL_FORM_STATE);
   const [touched, setTouched] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     if (!isOpen) return;
 
     if (dealer) {
-      setFormData({
+      const initial: FormState = {
         name: dealer.name || '',
         tradeName: dealer.tradeName || '',
         email: dealer.email || '',
@@ -110,9 +114,12 @@ export const DealerFormModal: React.FC<DealerFormModalProps> = ({
         doesWholesaleDealing: dealer.doesWholesaleDealing ?? true,
         categoryIds: dealer.categories?.map((c) => c.id) || [],
         isActive: dealer.isActive ?? true,
-      });
+      };
+      setFormData(initial);
+      setBaseline(initial);
     } else {
       setFormData(INITIAL_FORM_STATE);
+      setBaseline(INITIAL_FORM_STATE);
     }
     setTouched({});
   }, [dealer, isOpen]);
@@ -121,8 +128,13 @@ export const DealerFormModal: React.FC<DealerFormModalProps> = ({
   const isIndia = !formData.country.trim() || formData.country.trim().toLowerCase() === 'india';
   const pincodeLookup = usePincodeLookup(formData.pincode, {
     enabled: isOpen && isIndia,
-    onFound: (location, pin) =>
-      setFormData((prev) => ({ ...prev, ...applyPincodeLocation(prev, location, pin === (dealer?.pincode ?? '').trim()) })),
+    onFound: (location, pin) => {
+      const keepExisting = pin === (dealer?.pincode ?? '').trim();
+      const apply = (prev: FormState) => ({ ...prev, ...applyPincodeLocation(prev, location, keepExisting) });
+      setFormData(apply);
+      // Filling blanks for the saved PIN isn't a user edit, so it doesn't enable Save on its own.
+      if (dealer && keepExisting) setBaseline(apply);
+    },
   });
   const placeLocked = pincodeLookup.locked;
 
@@ -179,6 +191,14 @@ export const DealerFormModal: React.FC<DealerFormModalProps> = ({
   }, [formData, pincodeLookup.status]);
 
   const isValid = Object.keys(validationErrors).length === 0;
+  const hasChanges = useMemo(
+    () =>
+      hasFormChanges(
+        { ...formData, categoryIds: [...formData.categoryIds].sort((a, b) => a - b) },
+        { ...baseline, categoryIds: [...baseline.categoryIds].sort((a, b) => a - b) }
+      ),
+    [formData, baseline]
+  );
 
   const handleBlur = useCallback((field: string) => {
     setTouched((prev) => ({ ...prev, [field]: true }));
@@ -202,7 +222,7 @@ export const DealerFormModal: React.FC<DealerFormModalProps> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (pincodeLookup.status === 'loading') return;
+    if (pincodeLookup.status === 'loading' || !hasChanges) return;
     if (!isValid) {
       // Mark all validated fields as touched to display validation messages
       const allTouched = Object.keys(validationErrors).reduce(
@@ -246,6 +266,7 @@ export const DealerFormModal: React.FC<DealerFormModalProps> = ({
   if (!isOpen) return null;
 
   return (
+    <>
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm overflow-y-auto">
       <div className="relative w-full max-w-3xl my-8 bg-white dark:bg-neutral-900 rounded-2xl shadow-2xl border border-black/10 dark:border-white/10 overflow-hidden flex flex-col max-h-[90vh]">
         {/* Header */}
@@ -646,16 +667,27 @@ export const DealerFormModal: React.FC<DealerFormModalProps> = ({
 
           {/* Category Selection */}
           <div className="space-y-2">
-            <span className="block text-xs font-semibold text-gray-400 uppercase tracking-wider">
-              Assigned Categories <span className="text-red-500">*</span>
-            </span>
+            <div>
+              <span className="block text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                Assigned Categories <span className="text-red-500">*</span>
+              </span>
+              <p className="text-[11px] text-gray-400 mt-0.5">
+                The dealer sees and quotes only for items in these categories.
+              </p>
+            </div>
             <div className="flex flex-wrap gap-2 p-3 rounded-xl border border-black/10 dark:border-white/10 bg-black/5 dark:bg-white/5 max-h-36 overflow-y-auto">
+              {categories.length === 0 && (
+                <span className="text-[11px] text-gray-400">
+                  No categories yet — create them under Item Management.
+                </span>
+              )}
               {categories.map((cat) => {
                 const isSelected = formData.categoryIds.includes(cat.id);
                 return (
                   <button
                     key={cat.id}
                     type="button"
+                    aria-pressed={isSelected}
                     onClick={() => toggleCategory(cat.id)}
                     className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
                       isSelected
@@ -686,7 +718,8 @@ export const DealerFormModal: React.FC<DealerFormModalProps> = ({
           <button
             type="submit"
             form="dealer-form"
-            disabled={isSubmitting || !isValid || pincodeLookup.status === 'loading'}
+            disabled={isSubmitting || !isValid || !hasChanges || pincodeLookup.status === 'loading'}
+            title={!hasChanges ? 'No changes to save.' : undefined}
             className="flex items-center gap-2 px-4 py-2 text-xs font-medium bg-[#0071e3] hover:bg-[#0071e3]/90 text-white rounded-xl shadow-sm transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Save className="w-4 h-4" />
@@ -695,5 +728,6 @@ export const DealerFormModal: React.FC<DealerFormModalProps> = ({
         </div>
       </div>
     </div>
+    </>
   );
 };

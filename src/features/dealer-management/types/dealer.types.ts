@@ -9,12 +9,6 @@ export interface CategoryResponse {
   updatedAt?: string;
 }
 
-export interface CreateCategoryRequest {
-  name: string;
-  code: string;
-  description?: string;
-}
-
 export interface CategorySummary {
   id: number;
   name: string;
@@ -104,9 +98,12 @@ export interface UpdateDealerRequest {
   isActive?: boolean;
 }
 
+/** Query of GET /v1/admin/dealers; every filter is applied by the backend. Empty lists mean "any". */
 export interface DealerFilterParams {
   search?: string;
-  categoryId?: number;
+  categoryIds?: number[];
+  cities?: string[];
+  isActive?: boolean;
   page?: number;
   size?: number;
   sort?: string;

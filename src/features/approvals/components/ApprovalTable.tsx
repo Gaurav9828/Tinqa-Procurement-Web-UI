@@ -66,6 +66,12 @@ export const ApprovalTable = <T extends ApprovalItem>({
         subtitle: `${item.employeeCode} · ${item.designationLabel || item.designation}${item.createdByUsername ? ` · by @${item.createdByUsername}` : ''}`,
       };
     }
+    if ('batchNumber' in item && 'orderNumber' in item && item?.approvalType == 'STOCKS' && item.changeAwaitingApproval) {
+      return {
+        title: `Stock change: ${item.batchNumber}`,
+        subtitle: `Passed ${item.approvedUnitsPassed ?? '—'} → ${item.unitsPassedTest ?? '—'} ${item.unitType} · finance waits for you`,
+      };
+    }
     if ('batchNumber' in item && 'orderNumber' in item && item?.approvalType == 'STOCKS') {
       return {
         title: `Batch: ${item.batchNumber}`,

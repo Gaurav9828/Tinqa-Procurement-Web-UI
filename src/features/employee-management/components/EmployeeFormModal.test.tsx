@@ -10,6 +10,15 @@ import { accessService } from '../../../api/services/accessService';
 import { useAuthStore } from '../../../store/useAuthStore';
 import { superAdminPermissions } from '../../../test/access';
 
+// The PIN code lookup answers from here instead of India Post
+vi.mock('../../../utils/pincode', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../utils/pincode')>()),
+  lookupPincode: vi.fn(async () => ({
+    status: 'found',
+    location: { city: 'Bengaluru Urban', district: 'Bengaluru Urban', state: 'Karnataka', country: 'India', areas: ['MG Road'] },
+  })),
+}));
+
 const CATALOG: AccessCatalog = {
   designations: [
     { code: 'SUPER_ADMIN', label: 'Super Admin', department: 'Administration', description: 'System owner.', groups: ['EMPLOYEE_MANAGEMENT', 'EMPLOYEE_APPROVAL'] },
@@ -93,12 +102,67 @@ const fillCreateForm = async (user: ReturnType<typeof userEvent.setup>, field: (
   await user.type(field('phone'), '9876543210');
   await user.type(field('alternatePhone'), '9876543211');
   fireEvent.change(field('dateOfBirth'), { target: { value: '1990-01-01' } });
+  await user.type(field('panNumber'), 'abcpk1234f');
+  await user.type(field('houseNumber'), 'Flat 4B');
+  await user.type(field('street'), '12 MG Road');
+  await user.type(field('pincode'), '560001');
+  // District and state are filled from the PIN code
+  await screen.findByDisplayValue('Karnataka');
 };
 
 const save = async (user: ReturnType<typeof userEvent.setup>, confirmText: string) => {
   await user.click(screen.getByRole('button', { name: /continue to save/i }));
   await user.click(await screen.findByRole('button', { name: confirmText }));
 };
+
+describe('EmployeeFormModal PAN and address', () => {
+  it('sends the PAN and address, with district and state from the PIN code', async () => {
+    const { user, field, onSubmitCreate } = renderForm();
+    await fillCreateForm(user, field);
+    await user.selectOptions(await designationSelect(), 'Catalog Specialist');
+    await user.type(field('googleMapsUrl'), 'https://maps.app.goo.gl/abc123');
+    expect(field<HTMLInputElement>('district')).toHaveAttribute('readonly');
+    await save(user, 'Yes, Submit');
+
+    expect(onSubmitCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        panNumber: 'ABCPK1234F',
+        houseNumber: 'Flat 4B',
+        street: '12 MG Road',
+        district: 'Bengaluru Urban',
+        state: 'Karnataka',
+        pincode: '560001',
+        googleMapsUrl: 'https://maps.app.goo.gl/abc123',
+      })
+    );
+  });
+
+  it("refuses a business PAN and a link that isn't Google Maps", async () => {
+    const { user, field } = renderForm();
+    await fillCreateForm(user, field);
+    await user.selectOptions(await designationSelect(), 'Catalog Specialist');
+    const saveButton = screen.getByRole('button', { name: /continue to save/i });
+    expect(saveButton).toBeEnabled();
+
+    await user.clear(field('panNumber'));
+    await user.type(field('panNumber'), 'ABCCK1234F');
+    expect(screen.getByText(/4th letter P/)).toBeInTheDocument();
+    expect(saveButton).toBeDisabled();
+
+    await user.clear(field('panNumber'));
+    await user.type(field('panNumber'), 'ABCPK1234F');
+    await user.type(field('googleMapsUrl'), 'https://evil.example.com/maps');
+    expect(saveButton).toBeDisabled();
+  });
+
+  it('needs the PAN for a new employee', async () => {
+    const { user, field } = renderForm();
+    await fillCreateForm(user, field);
+    await user.selectOptions(await designationSelect(), 'Catalog Specialist');
+    await user.clear(field('panNumber'));
+    expect(screen.getByRole('button', { name: /continue to save/i })).toBeDisabled();
+  });
+});
 
 describe('EmployeeFormModal access', () => {
   it('lets an employee approver pick a designation and level, and sends the codes', async () => {

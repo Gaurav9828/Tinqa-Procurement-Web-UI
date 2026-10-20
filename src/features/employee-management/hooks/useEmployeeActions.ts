@@ -113,21 +113,21 @@ export const useEmployeeActions = (onSuccessCallback?: () => void) => {
 
     const finalizeDelete = async (id: number): Promise<boolean> => {
         if (!can('EMPLOYEE_DELETE')) {
-            notify.error("Your designation doesn't include permanently deleting employee records.");
+            notify.error("Your designation doesn't include deleting employee records.");
             return false;
         }
         setIsSubmitting(true);
         try {
             const res = await employeeApi.finalizeDeleteEmployee(id);
             if (res.success) {
-                notify.success('Employee permanently deleted.');
+                notify.success(res.message || 'Employee deleted. The record is kept with status DELETED.');
                 if (onSuccessCallback) onSuccessCallback();
                 return true;
             }
-            notify.error(res, 'Failed to permanently delete employee');
+            notify.error(res, 'Failed to delete employee');
             return false;
         } catch (err: unknown) {
-            notify.error(err, 'Error executing permanent deletion.');
+            notify.error(err, 'Error deleting employee.');
             return false;
         } finally {
             setIsSubmitting(false);

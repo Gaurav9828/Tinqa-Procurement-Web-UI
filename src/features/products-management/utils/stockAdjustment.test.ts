@@ -9,6 +9,8 @@ const PRODUCT: ProductResponse = {
   description: 'A lamp',
   price: 1999,
   discountPercentage: null,
+  hsnSac: '9405',
+  gstRate: 18,
   image1Url: 'https://cdn.tinqa.com/1.png',
   image2Url: null,
   image3Url: null,
@@ -70,6 +72,8 @@ describe('buildStockUpdatePayload', () => {
       description: 'A lamp',
       price: 1999,
       discountPercentage: undefined,
+      hsnSac: '9405',
+      gstRate: 18,
       image1Url: 'https://cdn.tinqa.com/1.png',
       image2Url: undefined,
       image3Url: undefined,
@@ -80,6 +84,10 @@ describe('buildStockUpdatePayload', () => {
       lastUpdateDescription: 'Stock added: +5 (12 → 17)',
       specifications: [{ specKey: 'Power', specValue: '9W' }],
     });
+  });
+
+  it('keeps a product from before GST without GST (it is set through Edit)', () => {
+    expect(buildStockUpdatePayload({ ...PRODUCT, hsnSac: null, gstRate: null }, 13, 'x')).toMatchObject({ hsnSac: null, gstRate: null });
   });
 
   it('keeps a disabled product disabled', () => {

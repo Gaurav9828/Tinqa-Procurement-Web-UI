@@ -4,24 +4,27 @@ import type { CategoryResponse } from '../types/dealer.types';
 
 export interface DealerFilterBarProps {
   searchQuery: string;
-  selectedCategoryId?: number;
+  /** Shared with the table's Categories column filter, which can pick several. */
+  selectedCategoryIds: number[];
   categories: CategoryResponse[];
   onSearchChange: (value: string) => void;
-  onCategoryChange: (categoryId: number | undefined) => void;
+  /** Enter in the search box: search now instead of waiting for typing to pause. */
+  onSearchSubmit?: () => void;
+  onCategoryChange: (categoryIds: number[]) => void;
   /** Hidden when absent (no permission). */
   onOpenCreateDealerModal?: () => void;
-  /** Hidden when absent (no permission). */
-  onOpenCreateCategoryModal?: () => void;
 }
+
+const MULTIPLE = 'multiple';
 
 export const DealerFilterBar: React.FC<DealerFilterBarProps> = ({
   searchQuery,
-  selectedCategoryId,
+  selectedCategoryIds,
   categories,
   onSearchChange,
+  onSearchSubmit,
   onCategoryChange,
   onOpenCreateDealerModal,
-  onOpenCreateCategoryModal,
 }) => (
   <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-2 bg-black/[0.02] dark:bg-white/[0.02] border border-black/10 dark:border-white/10 rounded-2xl">
     <div className="flex flex-1 items-center gap-2 w-full">
@@ -31,18 +34,23 @@ export const DealerFilterBar: React.FC<DealerFilterBarProps> = ({
           type="text"
           value={searchQuery}
           onChange={(e) => onSearchChange(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && onSearchSubmit?.()}
           placeholder="Search dealers by name, GSTIN, phone, city..."
           className="w-full pl-9 pr-4 py-2 bg-white dark:bg-neutral-900 border border-black/10 dark:border-white/10 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-[#0071e3] text-black dark:text-white"
         />
       </div>
       <select
-        value={selectedCategoryId || ''}
-        onChange={(e) =>
-          onCategoryChange(e.target.value ? Number(e.target.value) : undefined)
-        }
+        aria-label="Category"
+        value={selectedCategoryIds.length > 1 ? MULTIPLE : String(selectedCategoryIds[0] ?? '')}
+        onChange={(e) => onCategoryChange(e.target.value ? [Number(e.target.value)] : [])}
         className="px-3 py-2 bg-white dark:bg-neutral-900 border border-black/10 dark:border-white/10 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-[#0071e3] text-black dark:text-white cursor-pointer"
       >
         <option value="">All Categories</option>
+        {selectedCategoryIds.length > 1 && (
+          <option value={MULTIPLE} disabled>
+            {selectedCategoryIds.length} categories
+          </option>
+        )}
         {categories.map((c) => (
           <option key={c.id} value={c.id}>
             {c.name}
@@ -51,15 +59,6 @@ export const DealerFilterBar: React.FC<DealerFilterBarProps> = ({
       </select>
     </div>
     <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
-      {onOpenCreateCategoryModal && (
-      <button
-        type="button"
-        onClick={onOpenCreateCategoryModal}
-        className="px-3 py-2 bg-black/5 dark:bg-white/10 hover:bg-black/10 dark:hover:bg-white/20 text-black dark:text-white rounded-xl text-xs font-medium transition-colors cursor-pointer"
-      >
-        + Category
-      </button>
-      )}
       {onOpenCreateDealerModal && (
       <button
         type="button"

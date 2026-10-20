@@ -122,7 +122,7 @@ export const ApprovalReviewModal: React.FC<ApprovalReviewModalProps> = ({
 
               <button
                 onClick={handleApprove}
-                className="px-5 py-2.5 rounded-apple-sm bg-apple-blue hover:bg-blue-600 text-white transition-all text-xs font-medium flex items-center gap-1.5 shadow-md"
+                className="px-5 py-2.5 rounded-apple-sm bg-emerald-600 hover:bg-emerald-700 text-white transition-all text-xs font-medium flex items-center gap-1.5 shadow-md"
               >
                 <CheckCircle2 className="w-4 h-4" />
                 <span>Approve & Verify</span>

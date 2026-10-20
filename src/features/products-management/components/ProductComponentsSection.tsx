@@ -2,6 +2,7 @@ import React, { useEffect, useId, useMemo, useRef } from 'react';
 import { Boxes, Loader2, Plus, RefreshCw, Trash2 } from 'lucide-react';
 import { useItemOptions, useStockOptions } from '../../../hooks/useLookupOptions';
 import { itemApi } from '../../item-management/api/itemApi';
+import { useAccess } from '../../../hooks/useAccess';
 import { getApiErrorMessage } from '../../../utils/apiError';
 import {
   componentErrorKey,
@@ -41,6 +42,9 @@ const NO_SAVED = new Map<number, number>();
 
 export const ProductComponentsSection: React.FC<Props> = ({ rows, setRows, errors, onClearErrors, productStock, savedPerUnit = NO_SAVED, disabled }) => {
   const baseId = useId();
+  // Stock figures need STOCK_VIEW (e.g. customer support views products but not stock): without it none are asked for
+  const { can } = useAccess();
+  const canSeeStock = can('STOCK_VIEW');
   const { options: items, isLoading: itemsLoading } = useItemOptions();
   const { options: stocks, isLoading: stocksLoading } = useStockOptions();
   const stockByItem = useMemo(() => availableUnitsByItem(stocks), [stocks]);
@@ -55,7 +59,7 @@ export const ProductComponentsSection: React.FC<Props> = ({ rows, setRows, error
    * (GET /stocks/items/{id}/availability) together; the row is usable once both are in.
    */
   const loadItemDetails = (uid: string, itemId: number, requestId: number) => {
-    Promise.all([itemApi.getItemWarranties(itemId), fetchItemAvailableUnits(itemId)])
+    Promise.all([itemApi.getItemWarranties(itemId), canSeeStock ? fetchItemAvailableUnits(itemId) : Promise.resolve(null)])
       .then(([res, availableUnits]) => {
         if (!res.success) throw new Error(res.message || 'Failed to load item warranties.');
         patchRow(uid, (row) =>
@@ -72,6 +76,7 @@ export const ProductComponentsSection: React.FC<Props> = ({ rows, setRows, error
   // Saved rows (edit) keep their warranty snapshot but still need the item's current stock for the quantity limit.
   const availabilityRequested = useRef(new Set<string>());
   useEffect(() => {
+    if (!canSeeStock) return;
     for (const row of rows) {
       if (row.itemId === null || row.status !== 'ready' || row.availableUnits !== null || availabilityRequested.current.has(row.uid)) continue;
       availabilityRequested.current.add(row.uid);
@@ -84,7 +89,7 @@ export const ProductComponentsSection: React.FC<Props> = ({ rows, setRows, error
     }
     // patchRow only wraps the stable setRows.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rows]);
+  }, [rows, canSeeStock]);
 
   const selectItem = (index: number, row: ComponentFormRow, value: string) => {
     onClearErrors([componentErrorKey(index), componentErrorKey(index, 'itemId')]);
@@ -210,7 +215,7 @@ export const ProductComponentsSection: React.FC<Props> = ({ rows, setRows, error
                     </option>
                   ))}
                 </select>
-                {row.itemId !== null && row.status === 'ready' && (
+                {canSeeStock && row.itemId !== null && row.status === 'ready' && (
                   <p className="mt-1 text-[11px] text-gray-500" data-testid="component-stock">
                     {row.availableUnits === null ? 'Checking stock…' : max !== null && max < 1 ? 'Out of stock' : `Max ${max} (${row.availableUnits} in stock)`}
                   </p>
@@ -223,7 +228,7 @@ export const ProductComponentsSection: React.FC<Props> = ({ rows, setRows, error
                 disabled={disabled}
                 aria-label={`Remove component ${index + 1}`}
                 title="Remove component and its warranties"
-                className="self-end sm:mt-6 p-2 text-gray-400 hover:text-rose-500 rounded-xl cursor-pointer"
+                className="self-end sm:mt-6 p-2 text-rose-500 hover:text-rose-600 hover:bg-rose-500/10 dark:text-rose-400 rounded-xl cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 <Trash2 className="w-4 h-4" />
               </button>

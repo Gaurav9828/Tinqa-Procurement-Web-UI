@@ -1,6 +1,7 @@
 import React from 'react';
 import { Loader2, CheckCircle2, AlertTriangle, KeyRound, Trash2, Send, RefreshCw, HelpCircle, Truck, PackageCheck, XCircle, Clock3 } from 'lucide-react';
 import type { ApprovalStatus, OrderStatus } from '../../types/common.types';
+import { SOLID_TONE, type ActionTone } from './actionTones';
 
 export type ConfirmationActionType =
   | 'APPROVED'
@@ -19,6 +20,10 @@ interface ConfirmationModalProps {
   title?: string;
   description?: string;
   rejectionReason?: string;
+  /** Overrides the confirm button colour, e.g. 'approve' (green) or 'danger' (red) on a generic CONFIRM. */
+  tone?: ActionTone;
+  /** Overrides the confirm button text. */
+  confirmLabel?: string;
   isSubmitting: boolean;
   onClose: () => void;
   onConfirm: () => void;
@@ -243,6 +248,8 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
   title,
   description,
   rejectionReason,
+  tone,
+  confirmLabel,
   isSubmitting,
   onClose,
   onConfirm,
@@ -293,14 +300,14 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
             type="button"
             onClick={onConfirm}
             disabled={isSubmitting}
-            className={`px-4 py-2 rounded-xl text-sm font-semibold text-white transition-all shadow-sm flex items-center justify-center gap-2 cursor-pointer ${config.confirmBtnBg} disabled:opacity-50`}
+            className={`px-4 py-2 rounded-xl text-sm font-semibold text-white transition-all shadow-sm flex items-center justify-center gap-2 cursor-pointer ${tone ? SOLID_TONE[tone] : config.confirmBtnBg} disabled:opacity-50`}
           >
             {isSubmitting ? (
               <>
                 <Loader2 className="w-4 h-4 animate-spin" /> Processing...
               </>
             ) : (
-              config.confirmBtnText
+              confirmLabel ?? config.confirmBtnText
             )}
           </button>
         </div>

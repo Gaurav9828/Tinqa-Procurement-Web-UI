@@ -11,6 +11,7 @@ import { ProductManagementPage } from './ProductManagementPage';
 import { ecommerceAxiosClient } from '../../../api/ecommerceAxiosClient';
 import { mockDirectEditApprovals } from './directEditApprovals.testUtil';
 import type { ProductResponseDto, WarrantyRequest, WarrantyResponse } from '../types/product.types';
+import { fillGst } from './gstTestUtil';
 import { signInAsSuperAdmin } from '../../../test/access';
 
 /**
@@ -97,6 +98,8 @@ const LAMP: ProductResponseDto = {
   description: 'A lamp',
   price: 1999,
   discountPercentage: 10,
+  hsnSac: '9405',
+  gstRate: 18,
   image1Url: 'https://cdn.tinqa.com/1.png',
   enabled: true,
   stockQuantity: 12,
@@ -190,6 +193,7 @@ const openCreate = async (user: User) => {
   await user.type(screen.getByPlaceholderText('Product Title'), 'Desk Fan');
   await user.type(screen.getByPlaceholderText('0.00'), '2499');
   await user.type(screen.getByPlaceholderText('Image Address'), 'https://cdn.tinqa.com/fan.png');
+  await fillGst(user);
   expect(screen.getByTestId('new-product-stock')).toHaveTextContent('1'); // stock is fixed at 1 on creation
 };
 /** The page header and the modal footer both have a "Create Product" button; the modal's is last. */

@@ -15,12 +15,21 @@ export const ProductStatusModal: React.FC<ProductStatusModalProps> = ({
   onSubmit,
   isSubmitting,
 }) => {
+  const [isEnabledState, setIsEnabledState] = useState<boolean>(product?.enabled ?? false);
+  // Start from the product's saved status each time a product is opened (adjusted during render, not in an effect).
+  const [shownProduct, setShownProduct] = useState(product);
+  if (product !== shownProduct) {
+    setShownProduct(product);
+    setIsEnabledState(product?.enabled ?? false);
+  }
+
   if (!product) return null;
 
-  const [isEnabledState, setIsEnabledState] = useState<boolean>(product.enabled);
+  const hasChanges = isEnabledState !== product.enabled;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!hasChanges) return;
     const success = await onSubmit(product.id, isEnabledState);
     if (success) {
       onClose();
@@ -67,7 +76,8 @@ export const ProductStatusModal: React.FC<ProductStatusModalProps> = ({
             </button>
             <button
               type="submit"
-              disabled={isSubmitting}
+              disabled={isSubmitting || !hasChanges}
+              title={!hasChanges ? 'No changes to save.' : undefined}
               className="px-4 py-2 bg-[#0071e3] hover:bg-[#0077ed] text-white rounded-xl font-medium disabled:opacity-50 cursor-pointer"
             >
               {isSubmitting ? 'Updating...' : 'Save Status'}

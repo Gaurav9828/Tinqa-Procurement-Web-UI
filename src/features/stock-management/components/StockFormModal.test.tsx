@@ -13,7 +13,7 @@ const ORDERS = [
   { id: 3, orderNumber: 'ORD-3', dealerName: 'Acme', itemName: 'Fan', orderQuantity: 4, orderDate: '2026-10-01', unitType: 'PCS' },
 ] as unknown as OrderResponse[];
 
-vi.mock('../../order-management/hooks/useOrderList', () => ({ useOrderList: () => ({ orders: ORDERS, isLoading: false }) }));
+vi.mock('../hooks/useReceivableOrders', () => ({ useReceivableOrders: () => ({ orders: ORDERS, isLoading: false }) }));
 // ORD-3 already has a stock entry, so it can't be used again.
 const EXISTING_STOCKS = [{ id: 9, orderNumber: 'ORD-3', stockIdentityNumber: 'STK-9' }];
 vi.mock('../../../hooks/useLookupOptions', () => ({

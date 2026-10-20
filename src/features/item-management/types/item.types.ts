@@ -60,10 +60,17 @@ export interface ItemWarrantyResponse {
   updatedBy?: number | null;
 }
 
+/** ItemDTOs.CategorySummary — one of `item.categories[]`. */
+export interface ItemCategorySummary {
+  id: number;
+  name: string;
+  code?: string;
+}
+
 export interface ItemResponse {
   id: number;
-  categoryId: number;
-  categoryName?: string;
+  /** Sorted by name; never empty. */
+  categories: ItemCategorySummary[];
   name: string;
   brand?: string;
   sku: string;
@@ -83,7 +90,8 @@ export interface ItemResponse {
 }
 
 export interface CreateItemRequest {
-  categoryId: number;
+  /** At least one, at most 20. */
+  categoryIds: number[];
   name: string;
   brand?: string;
   sku: string;
@@ -99,7 +107,8 @@ export interface CreateItemRequest {
 }
 
 export interface UpdateItemRequest {
-  categoryId: number;
+  /** The complete set: at least one, at most 20. */
+  categoryIds: number[];
   name: string;
   brand?: string;
   unitOfMeasure: string;
@@ -117,9 +126,12 @@ export interface UpdateItemRequest {
   isActive?: boolean;
 }
 
+/** Query of GET /v1/admin/items; every filter is applied by the backend. Empty lists mean "any". */
 export interface ItemFilterParams {
   search?: string;
-  categoryId?: number;
+  categoryIds?: number[];
+  unitsOfMeasure?: string[];
+  isActive?: boolean;
   page?: number;
   size?: number;
   sort?: string;

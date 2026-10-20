@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNotify } from './useNotify';
+import { useAccess } from './useAccess';
+import type { Permission } from '../config/access';
 import { itemApi } from '../features/item-management/api/itemApi';
 import { dealerApi } from '../features/dealer-management/api/dealerApi';
 import { stockApi } from '../features/stock-management/api/stockApi';
@@ -13,7 +15,8 @@ import type { DealerResponse } from '../features/dealer-management/types/dealer.
  * The paginated list hooks only return one page (10 rows), which is why the
  * order/stock dropdowns used to be truncated. These fetch the full list once,
  * dedupe concurrent callers and cache for a short TTL so several modals on the
- * same page share a single request.
+ * same page share a single request. Each list loads only for someone holding the permission its endpoint
+ * requires; everyone else gets an empty list without a request.
  */
 const TTL_MS = 60_000;
 // Upper bound for a dropdown. Replace with a dedicated `/lookup` endpoint once available.
@@ -25,7 +28,9 @@ interface CacheEntry<T> {
   inFlight: Promise<T[]> | null;
 }
 
-const createLookup = <T,>(loader: () => Promise<T[]>) => {
+const EMPTY: never[] = [];
+
+const createLookup = <T,>(requires: Permission, loader: () => Promise<T[]>) => {
   const entry: CacheEntry<T> = { data: null, fetchedAt: 0, inFlight: null };
 
   const load = (force = false): Promise<T[]> => {
@@ -49,8 +54,11 @@ const createLookup = <T,>(loader: () => Promise<T[]>) => {
     entry.fetchedAt = 0;
   };
 
-  const useOptions = (enabled = true) => {
-    const [options, setOptions] = useState<T[]>(entry.data ?? []);
+  const useOptions = (wanted = true) => {
+    const { can } = useAccess();
+    const allowed = can(requires);
+    const enabled = wanted && allowed;
+    const [options, setOptions] = useState<T[]>(allowed ? entry.data ?? [] : []);
     const [isLoading, setIsLoading] = useState(false);
     const notify = useNotify();
 
@@ -73,24 +81,24 @@ const createLookup = <T,>(loader: () => Promise<T[]>) => {
       };
     }, [enabled, notify]);
 
-    return { options, isLoading };
+    return { options: allowed ? options : EMPTY, isLoading, allowed };
   };
 
   return { load, invalidate, useOptions };
 };
 
-const itemLookup = createLookup<ItemResponse>(async () => {
+const itemLookup = createLookup<ItemResponse>('ITEM_VIEW', async () => {
   const res = await itemApi.getItems({ page: 0, size: LOOKUP_PAGE_SIZE, sort: 'name,asc' });
   return res.data?.content ?? [];
 });
 
-const dealerLookup = createLookup<DealerResponse>(async () => {
+const dealerLookup = createLookup<DealerResponse>('DEALER_VIEW', async () => {
   const res = await dealerApi.getAllDealers({ page: 0, size: LOOKUP_PAGE_SIZE, sort: 'name,asc' });
   return res.data?.content ?? [];
 });
 
 // All stock entries (used to narrow item pickers to items that have stock).
-const stockLookup = createLookup<StockResponse>(async () => {
+const stockLookup = createLookup<StockResponse>('STOCK_VIEW', async () => {
   const res = await stockApi.getAllStocks();
   return Array.isArray(res.data) ? res.data : [];
 });

@@ -21,9 +21,11 @@ import { dealerApi } from '../api/dealerApi';
 import { HeaderColumnFilter } from '../components/HeaderColumnFilter';
 import { DealerStatusBadge } from '../components/DealerStatusBadge';
 import { DealerFilterBar } from '../components/DealerFilterBar';
-import { DealerCategoryFormModal } from '../components/DealerCategoryFormModal';
 import { DealerFormModal } from '../components/DealerFormModal';
+import { DealerLoginPanel } from '../components/DealerLoginPanel';
 import { useAccess } from '../../../hooks/useAccess';
+import { Pager } from '../../../components/ui/Pager';
+import { ACTIVE_STATUS_OPTIONS } from '../../../utils/activeStatusFilter';
 
 import type {
   CategoryResponse,
@@ -32,46 +34,46 @@ import type {
   UpdateDealerRequest,
 } from '../types/dealer.types';
 
+const COLUMN_COUNT = 7;
+
 export const DealerManagementPage: React.FC = () => {
     const { can } = useAccess();
   const {
     dealers,
     totalElements,
+    totalPages,
     isLoading,
     filters,
-    updateSearch,
-    updateCategoryFilter,
+    cityOptions,
+    updateFilter,
+    setPage,
+    searchNow,
     refetch,
   } = useDealerList();
 
   const {
     isSubmitting,
-    createCategory,
     createDealer,
     updateDealer,
     toggleDealerStatus,
   } = useDealerActions(refetch);
 
   const [categories, setCategories] = useState<CategoryResponse[]>([]);
-  const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
   const [isDealerModalOpen, setIsDealerModalOpen] = useState(false);
   const [selectedDealer, setSelectedDealer] = useState<DealerResponse | null>(null);
   const [previewDealer, setPreviewDealer] = useState<DealerResponse | null>(null);
   const [targetDealerStatusToggle, setTargetDealerStatusToggle] =
     useState<DealerResponse | null>(null);
 
-  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
-  const [selectedCities, setSelectedCities] = useState<string[]>([]);
-  const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
-
   const notify = useNotify();
 
+  // Dealers are assigned item categories (created under Item Management)
   const loadCategories = useCallback(async () => {
     try {
       const res = await dealerApi.getAllCategories();
       if (res.data) setCategories(res.data);
     } catch (err: unknown) {
-      notify.error(err, 'Failed to load dealer categories.');
+      notify.error(err, 'Failed to load categories.');
     }
   }, [notify]);
 
@@ -79,48 +81,14 @@ export const DealerManagementPage: React.FC = () => {
     loadCategories();
   }, [loadCategories]);
 
-  const cityOptions = useMemo(() => {
-    return Array.from(
-      new Set(dealers.map((d) => d.city).filter((c): c is string => Boolean(c)))
-    );
-  }, [dealers]);
-
-  const categoryOptions = useMemo(() => {
-    const catSet = new Set<string>();
-    dealers.forEach((dealer) => {
-      dealer.categories?.forEach((cat) => {
-        if (cat.name) catSet.add(cat.name);
-      });
-    });
-    return Array.from(catSet);
-  }, [dealers]);
-
-  const statusOptions = ['Active', 'Inactive'];
-
-  const filteredDealers = useMemo(() => {
-    return dealers.filter((dealer) => {
-      const dealerCatNames = dealer.categories?.map((c) => c.name) || [];
-      const matchesCat =
-        selectedCategories.length === 0 ||
-        dealerCatNames.some((catName) => selectedCategories.includes(catName));
-
-      const matchesCity =
-        selectedCities.length === 0 ||
-        (dealer.city ? selectedCities.includes(dealer.city) : false);
-
-      const dealerStatus = dealer.isActive ? 'Active' : 'Inactive';
-      const matchesStatus =
-        selectedStatuses.length === 0 || selectedStatuses.includes(dealerStatus);
-
-      return matchesCat && matchesCity && matchesStatus;
-    });
-  }, [dealers, selectedCategories, selectedCities, selectedStatuses]);
-
-  const handleCreateCategory = async (data: any) => {
-    const success = await createCategory(data);
-    if (success) await loadCategories();
-    return success;
-  };
+  // Header filter options cover every dealer (not just the loaded page); the backend applies them.
+  const categoryOptions = useMemo(() => categories.map((c) => c.name), [categories]);
+  const selectedCategoryNames = useMemo(
+    () => categories.filter((c) => filters.categoryIds.includes(c.id)).map((c) => c.name),
+    [categories, filters.categoryIds]
+  );
+  const handleCategoryNamesChange = (names: string[]) =>
+    updateFilter('categoryIds', categories.filter((c) => names.includes(c.name)).map((c) => c.id));
 
   const handleOpenCreateDealer = () => {
     setSelectedDealer(null);
@@ -174,179 +142,182 @@ export const DealerManagementPage: React.FC = () => {
 
       <DealerFilterBar
         searchQuery={filters.search || ''}
-        selectedCategoryId={filters.categoryId}
+        selectedCategoryIds={filters.categoryIds}
         categories={categories}
-        onSearchChange={updateSearch}
-        onCategoryChange={updateCategoryFilter}
+        onSearchChange={(search) => updateFilter('search', search)}
+        onSearchSubmit={searchNow}
+        onCategoryChange={(ids) => updateFilter('categoryIds', ids)}
         onOpenCreateDealerModal={can('DEALER_CREATE') ? handleOpenCreateDealer : undefined}
-        onOpenCreateCategoryModal={can('DEALER_CATEGORY_MANAGE') ? () => setIsCategoryModalOpen(true) : undefined}
       />
 
-      {isLoading ? (
-        <div className="apple-card p-12 text-center text-gray-500 dark:text-neutral-400">
-          <div className="inline-block w-6 h-6 border-2 border-[#0071e3] border-t-transparent rounded-full animate-spin mb-2" />
-          <p className="text-sm">Loading dealer directory...</p>
-        </div>
-      ) : filteredDealers.length === 0 ? (
-        <div className="apple-card p-12 text-center space-y-2">
-          <UserSearch className="w-8 h-8 text-gray-400 mx-auto" />
-          <h3 className="text-sm font-semibold text-black dark:text-white">No Dealers Found</h3>
-          <p className="text-xs text-gray-500">
-            Try adjusting your search criteria or header column filter options.
-          </p>
-        </div>
-      ) : (
-        <div className="apple-card overflow-hidden border border-black/10 dark:border-white/10">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-black/5 dark:bg-white/5 border-b border-black/10 dark:border-white/10 font-semibold text-gray-500 uppercase tracking-wider">
+      {/* Dealer Table: stays mounted while loading or empty so the header filters stay open and can be cleared */}
+      <div className="apple-card overflow-hidden border border-black/10 dark:border-white/10">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs">
+            <thead className="bg-black/5 dark:bg-white/5 border-b border-black/10 dark:border-white/10 font-semibold text-gray-500 uppercase tracking-wider">
+              <tr>
+                <th className="p-4">Dealer Details</th>
+                <th className="p-4">GSTIN / PAN</th>
+                <th className="p-4">
+                  <HeaderColumnFilter
+                    title="Categories"
+                    options={categoryOptions}
+                    selectedValues={selectedCategoryNames}
+                    onChange={handleCategoryNamesChange}
+                  />
+                </th>
+                <th className="p-4">
+                  <HeaderColumnFilter
+                    title="City / State"
+                    options={cityOptions}
+                    selectedValues={filters.cities}
+                    onChange={(cities) => updateFilter('cities', cities)}
+                  />
+                </th>
+                <th className="p-4">Contact Info</th>
+                <th className="p-4">
+                  <HeaderColumnFilter
+                    title="Status"
+                    options={ACTIVE_STATUS_OPTIONS}
+                    selectedValues={filters.statuses}
+                    onChange={(statuses) => updateFilter('statuses', statuses)}
+                  />
+                </th>
+                <th className="p-4 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody
+              aria-busy={isLoading}
+              className={`divide-y divide-black/5 dark:divide-white/5 transition-opacity ${isLoading && dealers.length > 0 ? 'opacity-50' : ''}`}
+            >
+              {dealers.length === 0 && (
                 <tr>
-                  <th className="p-4">Dealer Details</th>
-                  <th className="p-4">GSTIN / PAN</th>
-                  <th className="p-4">
-                    <HeaderColumnFilter
-                      title="Categories"
-                      options={categoryOptions}
-                      selectedValues={selectedCategories}
-                      onChange={setSelectedCategories}
-                    />
-                  </th>
-                  <th className="p-4">
-                    <HeaderColumnFilter
-                      title="City / State"
-                      options={cityOptions}
-                      selectedValues={selectedCities}
-                      onChange={setSelectedCities}
-                    />
-                  </th>
-                  <th className="p-4">Contact Info</th>
-                  <th className="p-4">
-                    <HeaderColumnFilter
-                      title="Status"
-                      options={statusOptions}
-                      selectedValues={selectedStatuses}
-                      onChange={setSelectedStatuses}
-                    />
-                  </th>
-                  <th className="p-4 text-right">Actions</th>
+                  {/* Tall enough for an open header filter dropdown */}
+                  <td colSpan={COLUMN_COUNT} className="px-4 py-20 text-center text-gray-500 dark:text-neutral-400">
+                    {isLoading ? (
+                      <>
+                        <div className="inline-block w-6 h-6 border-2 border-[#0071e3] border-t-transparent rounded-full animate-spin mb-2" />
+                        <p className="text-sm">Loading dealer directory...</p>
+                      </>
+                    ) : (
+                      <div className="space-y-2">
+                        <UserSearch className="w-8 h-8 text-gray-400 mx-auto" />
+                        <h3 className="text-sm font-semibold text-black dark:text-white">No Dealers Found</h3>
+                        <p className="text-xs">Try adjusting your search criteria or header column filter options.</p>
+                      </div>
+                    )}
+                  </td>
                 </tr>
-              </thead>
-              <tbody className="divide-y divide-black/5 dark:divide-white/5">
-                {filteredDealers.map((dealer) => (
-                  <tr
-                    key={dealer.id}
-                    className="hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition-colors"
-                  >
-                    <td className="p-4 max-w-xs">
-                      <div>
-                        <span className="font-semibold text-sm text-black dark:text-white block">
-                          {dealer.name}
+              )}
+              {dealers.map((dealer) => (
+                <tr
+                  key={dealer.id}
+                  className="hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition-colors"
+                >
+                  <td className="p-4 max-w-xs">
+                    <div>
+                      <span className="font-semibold text-sm text-black dark:text-white block">
+                        {dealer.name}
+                      </span>
+                      {dealer.tradeName && (
+                        <span className="text-[11px] text-gray-400 block">
+                          Trade: {dealer.tradeName}
                         </span>
-                        {dealer.tradeName && (
-                          <span className="text-[11px] text-gray-400 block">
-                            Trade: {dealer.tradeName}
-                          </span>
-                        )}
-                        {dealer.street && (
-                          <div className="mt-0.5">
-                            <Tooltip
-                              title={dealer.name}
-                              content={`${dealer.street}${dealer.landmark ? `, ${dealer.landmark}` : ''} - ${dealer.pincode}`}
-                            >
-                              <span className="text-[11px] text-gray-400 truncate max-w-[200px] block cursor-help">
-                                {dealer.street}
-                              </span>
-                            </Tooltip>
-                          </div>
-                        )}
-                      </div>
-                    </td>
-                    <td className="p-4 font-mono font-medium text-[#0071e3]">
-                      <div>{dealer.gstin || '—'}</div>
-                      {dealer.panNumber && (
-                        <div className="text-[10px] text-gray-400">PAN: {dealer.panNumber}</div>
                       )}
-                    </td>
-                    <td className="p-4">
-                      <div className="flex flex-wrap gap-1 max-w-[180px]">
-                        {dealer.categories && dealer.categories.length > 0 ? (
-                          dealer.categories.map((cat) => (
-                            <span
-                              key={cat.id}
-                              className="px-2 py-0.5 rounded-md bg-black/5 dark:bg-white/10 text-[10px] font-medium text-gray-700 dark:text-neutral-300"
-                            >
-                              {cat.name}
+                      {dealer.street && (
+                        <div className="mt-0.5">
+                          <Tooltip
+                            title={dealer.name}
+                            content={`${dealer.street}${dealer.landmark ? `, ${dealer.landmark}` : ''} - ${dealer.pincode}`}
+                          >
+                            <span className="text-[11px] text-gray-400 truncate max-w-[200px] block cursor-help">
+                              {dealer.street}
                             </span>
-                          ))
-                        ) : (
-                          <span className="text-gray-400 text-[11px]">Uncategorized</span>
-                        )}
-                      </div>
-                    </td>
-                    <td className="p-4 text-gray-600 dark:text-neutral-300 font-medium">
-                      {dealer.city || '—'}
-                      {dealer.state ? `, ${dealer.state}` : ''}
-                    </td>
-                    <td className="p-4">
-                      <div className="text-black dark:text-white font-medium">
-                        {dealer.phoneNumber}
-                      </div>
-                      <div className="text-[11px] text-gray-400 truncate max-w-[150px]">
-                        {dealer.email}
-                      </div>
-                    </td>
-                    <td className="p-4">
-                      <DealerStatusBadge isActive={dealer.isActive} />
-                    </td>
-                    <td className="p-4 text-right">
-                      <div className="flex items-center justify-end gap-1">
-                        <button
-                          onClick={() => setPreviewDealer(dealer)}
-                          className="p-1.5 hover:bg-black/5 dark:hover:bg-white/10 rounded-lg text-gray-500 hover:text-black dark:hover:text-white transition-colors cursor-pointer"
-                          title="View Details"
-                        >
-                          <Eye className="w-4 h-4" />
-                        </button>
-                        {can('DEALER_UPDATE') && (
-                        <button
-                          onClick={() => handleOpenEditDealer(dealer)}
-                          className="p-1.5 hover:bg-black/5 dark:hover:bg-white/10 rounded-lg text-gray-500 hover:text-[#0071e3] transition-colors cursor-pointer"
-                          title="Edit Dealer"
-                        >
-                          <Edit3 className="w-4 h-4" />
-                        </button>
-                        )}
-                        {can('DEALER_TOGGLE_STATUS') && (
-                        <button
-                          onClick={() => setTargetDealerStatusToggle(dealer)}
-                          className={`p-1.5 hover:bg-black/5 dark:hover:bg-white/10 rounded-lg transition-colors cursor-pointer ${
-                            dealer.isActive
-                              ? 'text-red-500 hover:text-red-600'
-                              : 'text-emerald-500 hover:text-emerald-600'
-                          }`}
-                          title={dealer.isActive ? 'Deactivate Dealer' : 'Activate Dealer'}
-                        >
-                          <Power className="w-4 h-4" />
-                        </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                          </Tooltip>
+                        </div>
+                      )}
+                    </div>
+                  </td>
+                  <td className="p-4 font-mono font-medium text-[#0071e3]">
+                    <div>{dealer.gstin || '—'}</div>
+                    {dealer.panNumber && (
+                      <div className="text-[10px] text-gray-400">PAN: {dealer.panNumber}</div>
+                    )}
+                  </td>
+                  <td className="p-4">
+                    <div className="flex flex-wrap gap-1 max-w-[180px]">
+                      {dealer.categories && dealer.categories.length > 0 ? (
+                        dealer.categories.map((cat) => (
+                          <span
+                            key={cat.id}
+                            className="px-2 py-0.5 rounded-md bg-black/5 dark:bg-white/10 text-[10px] font-medium text-gray-700 dark:text-neutral-300"
+                          >
+                            {cat.name}
+                          </span>
+                        ))
+                      ) : (
+                        <span className="text-gray-400 text-[11px]">Uncategorized</span>
+                      )}
+                    </div>
+                  </td>
+                  <td className="p-4 text-gray-600 dark:text-neutral-300 font-medium">
+                    {dealer.city || '—'}
+                    {dealer.state ? `, ${dealer.state}` : ''}
+                  </td>
+                  <td className="p-4">
+                    <div className="text-black dark:text-white font-medium">
+                      {dealer.phoneNumber}
+                    </div>
+                    <div className="text-[11px] text-gray-400 truncate max-w-[150px]">
+                      {dealer.email}
+                    </div>
+                  </td>
+                  <td className="p-4">
+                    <DealerStatusBadge isActive={dealer.isActive} />
+                  </td>
+                  <td className="p-4 text-right">
+                    <div className="flex items-center justify-end gap-1">
+                      <button
+                        onClick={() => setPreviewDealer(dealer)}
+                        className="p-1.5 hover:bg-black/5 dark:hover:bg-white/10 rounded-lg text-gray-500 hover:text-black dark:hover:text-white transition-colors cursor-pointer"
+                        title="View Details"
+                      >
+                        <Eye className="w-4 h-4" />
+                      </button>
+                      {can('DEALER_UPDATE') && (
+                      <button
+                        onClick={() => handleOpenEditDealer(dealer)}
+                        className="p-1.5 hover:bg-black/5 dark:hover:bg-white/10 rounded-lg text-gray-500 hover:text-[#0071e3] transition-colors cursor-pointer"
+                        title="Edit Dealer"
+                      >
+                        <Edit3 className="w-4 h-4" />
+                      </button>
+                      )}
+                      {can('DEALER_TOGGLE_STATUS') && (
+                      <button
+                        onClick={() => setTargetDealerStatusToggle(dealer)}
+                        className={`p-1.5 hover:bg-black/5 dark:hover:bg-white/10 rounded-lg transition-colors cursor-pointer ${
+                          dealer.isActive
+                            ? 'text-red-500 hover:text-red-600'
+                            : 'text-emerald-500 hover:text-emerald-600'
+                        }`}
+                        title={dealer.isActive ? 'Deactivate Dealer' : 'Activate Dealer'}
+                      >
+                        <Power className="w-4 h-4" />
+                      </button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
-      )}
+      </div>
+
+      <Pager page={filters.page} totalPages={totalPages} disabled={isLoading} onPage={setPage} />
 
       {/* Modals */}
-      <DealerCategoryFormModal
-        isOpen={isCategoryModalOpen}
-        onClose={() => setIsCategoryModalOpen(false)}
-        onSubmit={handleCreateCategory}
-        isSubmitting={isSubmitting}
-      />
-
       <DealerFormModal
         isOpen={isDealerModalOpen}
         onClose={() => setIsDealerModalOpen(false)}
@@ -359,7 +330,7 @@ export const DealerManagementPage: React.FC = () => {
       {/* Preview Dealer Modal */}
       {previewDealer && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-          <div className="relative w-full max-w-lg bg-white dark:bg-neutral-900 rounded-2xl shadow-2xl border border-black/10 dark:border-white/10 overflow-hidden">
+          <div className="relative w-full max-w-lg bg-white dark:bg-neutral-900 rounded-2xl shadow-2xl border border-black/10 dark:border-white/10 max-h-[92vh] overflow-y-auto">
             <div className="flex items-center justify-between px-6 py-4 border-b border-black/10 dark:border-white/10">
               <h3 className="text-base font-semibold text-black dark:text-white">
                 Dealer Details Overview
@@ -437,6 +408,8 @@ export const DealerManagementPage: React.FC = () => {
                   ))}
                 </div>
               </div>
+
+              <DealerLoginPanel key={previewDealer.id} dealer={previewDealer} />
             </div>
           </div>
         </div>

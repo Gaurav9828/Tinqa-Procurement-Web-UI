@@ -13,6 +13,7 @@ import { mockDirectEditApprovals } from './directEditApprovals.testUtil';
 import { axiosClient } from '../../../api/axiosClient';
 import type { ItemResponse, ItemWarrantyResponse } from '../../item-management/types/item.types';
 import type { ProductComponentRequest, ProductComponentResponse, ProductResponseDto } from '../types/product.types';
+import { fillGst } from './gstTestUtil';
 import { signInAsSuperAdmin } from '../../../test/access';
 
 /**
@@ -52,7 +53,7 @@ const iw = (id: number, itemId: number, title: string, extra: Partial<ItemWarran
 });
 const item = (id: number, name: string, sku: string, isActive = true): ItemResponse => ({
   id,
-  categoryId: 1,
+  categories: [{ id: 1, name: 'Electronics' }],
   name,
   sku,
   unitOfMeasure: 'PCS',
@@ -91,6 +92,8 @@ const LAPTOP: ProductResponseDto = {
   id: 1,
   title: 'Laptop X',
   price: 59999,
+  hsnSac: '8471',
+  gstRate: 18,
   image1Url: 'https://cdn.tinqa.com/laptop.png',
   enabled: true,
   stockQuantity: 3,
@@ -187,6 +190,7 @@ const openCreate = async (user: User) => {
   await user.type(screen.getByPlaceholderText('0.00'), '64999');
   expect(screen.getByTestId('new-product-stock')).toHaveTextContent('1'); // fixed on creation
   await user.type(screen.getByPlaceholderText('Image Address'), 'https://cdn.tinqa.com/y.png');
+  await fillGst(user);
 };
 const submitCreate = (user: User) => user.click(screen.getAllByRole('button', { name: 'Create Product' }).at(-1)!);
 

@@ -7,6 +7,7 @@ export const APPROVAL_LEVEL_PERMISSIONS: readonly Permission[] = [
   'EMPLOYEE_DELETE',
   'EMPLOYEE_PROFILE_CHANGE_APPROVE',
   'DEALER_DELETE',
+  'DEALER_LOGIN_APPROVE',
   'PROCUREMENT_ORDER_APPROVE',
   'PRODUCT_APPROVAL_DECIDE',
   'STOCK_APPROVE',
@@ -14,11 +15,20 @@ export const APPROVAL_LEVEL_PERMISSIONS: readonly Permission[] = [
   'COMPANY_PROFILE_APPROVE',
   'DOCUMENT_APPROVE',
   'PAYMENT_APPROVE',
+  'EXPENSE_APPROVE',
   'SYSTEM_SETTINGS_MANAGE',
   'AUDIT_LOG_VIEW',
+  'COMPANY_PROFILE_DRAFT_DELETE_ANY',
 ];
 
-const DEALER_PORTAL: readonly Permission[] = ['DEALER_QUOTATION_SUBMIT', 'DEALER_ORDER_RESPOND'];
+/** What a dealer login holds (Procurement's DEALER_PORTAL group), and nothing else. */
+export const DEALER_PORTAL: readonly Permission[] = [
+  'DEALER_PORTAL_VIEW',
+  'DEALER_QUOTATION_SUBMIT',
+  'DEALER_QUOTATION_CHANGE_REQUEST',
+  'DEALER_ORDER_RESPOND',
+  'DEALER_ORDER_SHIP',
+];
 
 /**
  * What a Super Admin holds at the given level(s), as the backend would report it: everything internal at Level 2,
@@ -43,5 +53,24 @@ export const signInAsSuperAdmin = (level: AdminLevel = 'ADMIN_L1', username = 'a
       authClient: 'web',
       isFirstLogin: false,
       permissions: superAdminPermissions(level),
+    },
+  });
+
+/** Signs a test user in as a dealer with a dealer login. */
+export const signInAsDealer = (username = 'dealer') =>
+  useAuthStore.setState({
+    token: 'test-token',
+    isAuthenticated: true,
+    user: {
+      userId: 7,
+      username,
+      email: `${username}@dealer.test`,
+      role: 'DEALER',
+      authClient: 'WEB',
+      isFirstLogin: false,
+      designation: null,
+      designationLabel: 'Dealer',
+      permissionGroups: ['DEALER_PORTAL'],
+      permissions: [...DEALER_PORTAL],
     },
   });

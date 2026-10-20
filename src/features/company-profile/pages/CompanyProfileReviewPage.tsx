@@ -6,6 +6,7 @@ import { useCompanyProfileAccess } from '../hooks/useCompanyProfileAccess';
 import { ProfileDetails, VersionStatusBadge } from '../components/ProfileDisplay';
 import { AuditTrail, ChangesTable } from '../components/VersionHistoryParts';
 import { ReviewActions } from '../components/ReviewActions';
+import { DeleteDraftButton } from '../components/DeleteDraftButton';
 import { Skeleton, StateMessage } from '../components/Dialogs';
 import { BUTTON } from '../utils/companyProfileUi';
 import { COMPANY_PROFILE_PATH, HOME_VIDEO_APPROVAL_NOTE, changesLiveHomeVideo, companyDraftPath, formatServerTime } from '../utils/companyProfile.utils';
@@ -61,6 +62,7 @@ export const CompanyProfileReviewPage: React.FC = () => {
               <Pencil className="w-3.5 h-3.5" /> Edit draft
             </Link>
           )}
+          <DeleteDraftButton version={version} access={access} onStale={reload} onDeleted={() => void reload()} />
           <ReviewActions
             version={version}
             access={access}

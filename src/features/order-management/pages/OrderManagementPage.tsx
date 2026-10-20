@@ -28,7 +28,8 @@ export const OrderManagementPage: React.FC = () => {
     } = useOrderList();
 
     // Full (cached) lists for the filter bar and modal dropdowns — not a single 10-row page.
-    const { options: dealers } = useDealerOptions();
+    // Each list loads only with its view permission (a financial auditor sees orders, not dealers or items)
+    const { options: dealers, allowed: canSeeDealers } = useDealerOptions();
     const { options: items } = useItemOptions();
 
     const {
@@ -87,7 +88,7 @@ export const OrderManagementPage: React.FC = () => {
                 searchQuery={search}
                 selectedStatus={statusFilter}
                 selectedDealerId={dealerFilter}
-                dealers={dealers}
+                dealers={canSeeDealers ? dealers : undefined}
                 onSearchChange={updateSearch}
                 onStatusChange={updateStatusFilter}
                 onDealerChange={updateDealerFilter}

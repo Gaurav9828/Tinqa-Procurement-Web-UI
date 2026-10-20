@@ -35,6 +35,15 @@ export interface StockResponse {
   isActive: boolean;
   createdAt: string;
   createdBy: number;
+  /** The counts Admin L2 last approved (null until first approved): what finance has booked. */
+  approvedUnitsPassed?: number | null;
+  approvedDefectedUnits?: number | null;
+  /** The counts were changed after approval: the change, and its money, wait for Admin L2. */
+  changeAwaitingApproval?: boolean;
+  /** Passed units added since approval, not usable until Admin L2 approves them. */
+  heldUnits?: number;
+  /** Value of the approved passed units booked as bought from the dealer (before GST). */
+  bookedPurchaseValue?: number;
 }
 
 /** StockDTOs.ItemAvailabilityResponse — GET /v1/stocks/items/{itemId}/availability. */

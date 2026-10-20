@@ -13,12 +13,35 @@ export interface NavigationItem {
 }
 
 export const APP_NAVIGATION: NavigationItem[] = [
+  // Dealer logins: their own quotations, and their orders once a quotation is approved. Nothing else opens for them.
+  {
+    id: 'dealer-quotations',
+    label: 'My Quotations',
+    path: '/dealer/quotations',
+    iconName: 'FileText',
+    requires: ['DEALER_PORTAL_VIEW'],
+  },
+  {
+    id: 'dealer-orders',
+    label: 'My Orders',
+    path: '/dealer/orders',
+    iconName: 'ShoppingBag',
+    requires: ['DEALER_PORTAL_VIEW'],
+  },
   {
     id: 'analytics',
     label: 'Analytics',
     path: '/analytics',
     iconName: 'BarChart3',
     requires: ['ANALYTICS_VIEW'],
+  },
+  {
+    // Company account: Overview and Ledger need FINANCE_REPORT_VIEW, Expenses EXPENSE_VIEW / EXPENSE_SUBMIT
+    id: 'finance',
+    label: 'Accounts & Finance',
+    path: '/finance',
+    iconName: 'Wallet',
+    requires: ['FINANCE_REPORT_VIEW', 'EXPENSE_VIEW', 'EXPENSE_SUBMIT'],
   },
   {
     id: 'approvals',
@@ -127,4 +150,12 @@ export const APP_NAVIGATION: NavigationItem[] = [
   //   iconName: 'Settings',
   //   requires: ['SYSTEM_SETTINGS_MANAGE'],
   // },
+  {
+    // Always last: the sidebar pins it to the bottom, below a divider
+    id: 'user-guide',
+    label: 'User Guide',
+    path: '/user-guide',
+    iconName: 'BookOpen',
+    requires: ['USER_GUIDE_VIEW'],
+  },
 ];

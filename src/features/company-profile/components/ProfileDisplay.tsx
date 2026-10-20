@@ -1,7 +1,7 @@
 import React from 'react';
 import { ExternalLink, ImageOff } from 'lucide-react';
-import type { CompanyProfileFields, TrademarkMark, VersionStatus } from '../types/companyProfile.types';
-import { STATUS_LABELS, TRADEMARK_SYMBOLS, onOff } from '../utils/companyProfile.utils';
+import type { CompanyProfileFields, ShippingRule, TrademarkMark, VersionStatus } from '../types/companyProfile.types';
+import { STATUS_LABELS, TRADEMARK_SYMBOLS, onOff, rupees, shippingRuleRange } from '../utils/companyProfile.utils';
 import { isHttpsUrl, toYouTubeVideoId } from '../utils/companyProfileForm';
 
 const STATUS_TONES: Record<VersionStatus, string> = {
@@ -11,6 +11,7 @@ const STATUS_TONES: Record<VersionStatus, string> = {
   REJECTED: 'bg-rose-500/10 text-rose-700 dark:text-rose-400 border-rose-500/20',
   SUPERSEDED: 'bg-transparent text-gray-400 dark:text-neutral-500 border-black/10 dark:border-white/10',
   WITHDRAWN: 'bg-transparent text-gray-400 dark:text-neutral-500 border-black/10 dark:border-white/10',
+  DELETED: 'bg-transparent text-gray-400 dark:text-neutral-500 border-black/10 dark:border-white/10 line-through',
 };
 
 export const VersionStatusBadge: React.FC<{ status: VersionStatus; live?: boolean }> = ({ status, live }) => (
@@ -120,6 +121,34 @@ const Field: React.FC<{ label: string; children: React.ReactNode }> = ({ label, 
 
 const orDash = (value: string | null | undefined) => (value && value.trim() ? value : '—');
 
+/** Rules from the API, or from a change row (amounts there are strings such as "500.00"). */
+export const ShippingRulesList: React.FC<{ rules: unknown; label?: string }> = ({ rules, label = 'Shipping charges' }) => {
+  const list = Array.isArray(rules) ? (rules as Record<keyof ShippingRule, unknown>[]) : [];
+  if (list.length === 0) return <span className="text-gray-400">No rules: every order ships free</span>;
+  return (
+    <table aria-label={label} className="text-xs border-collapse">
+      <thead>
+        <tr className="text-gray-400 text-left">
+          <th className="pr-4 pb-1 font-semibold">Order value</th>
+          <th className="pb-1 font-semibold text-right">Shipping</th>
+        </tr>
+      </thead>
+      <tbody>
+        {list.map((rule, i) => {
+          const max = rule.maxOrderValue == null ? null : Number(rule.maxOrderValue);
+          const fee = Number(rule.fee);
+          return (
+            <tr key={i}>
+              <td className="pr-4 py-0.5">{shippingRuleRange(Number(rule.minOrderValue), max)}</td>
+              <td className="py-0.5 text-right font-mono">{fee === 0 ? 'Free' : rupees(fee)}</td>
+            </tr>
+          );
+        })}
+      </tbody>
+    </table>
+  );
+};
+
 export const InvoiceTermsList: React.FC<{ terms: string[] | null | undefined; label?: string }> = ({ terms, label = 'Invoice terms' }) =>
   terms && terms.length ? (
     <ol aria-label={label} className="list-decimal pl-5 space-y-0.5">
@@ -172,6 +201,13 @@ export const ProfileDetails: React.FC<{ profile: CompanyProfileFields }> = ({ pr
         <Field label="Support phone">{orDash(p.supportPhone)}</Field>
         <Field label="Careers email">{orDash(p.careersEmail)}</Field>
       </dl>
+
+      <div>
+        <span className="block text-[10px] uppercase tracking-wider text-gray-400 font-semibold mb-1">Shipping charges</span>
+        <div className="text-black dark:text-white">
+          <ShippingRulesList rules={p.shippingRules} />
+        </div>
+      </div>
 
       <div>
         <span className="block text-[10px] uppercase tracking-wider text-gray-400 font-semibold mb-1">Invoice terms</span>

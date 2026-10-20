@@ -1,4 +1,5 @@
-import type { CompanyProfileFields, CompanyProfileVersion, TrademarkMark } from '../types/companyProfile.types';
+import type { CompanyProfileFields, CompanyProfileVersion, ShippingRule, TrademarkMark } from '../types/companyProfile.types';
+import { hasFormChanges } from '../../../utils/formChanges';
 
 /**
  * Editor state: every field as a string ('' = empty). Error keys use the backend's field paths
@@ -30,8 +31,19 @@ export interface CompanyProfileForm {
   careersEmail: string;
   website: string;
   invoiceTerms: string[];
+  /**
+   * Shipping rules as edited: each row only has its upper limit and fee; it starts where the previous row ends
+   * (the first at 0) and the last row has no upper limit, so the ranges can't leave gaps or overlap.
+   */
+  shippingRules: ShippingRuleRow[];
   homeVideoEnabled: boolean;
   homeVideoUrl: string;
+}
+
+export interface ShippingRuleRow {
+  /** Ignored on the last row (it covers everything from its start). */
+  upTo: string;
+  fee: string;
 }
 
 export type FormErrors = Record<string, string>;
@@ -44,6 +56,7 @@ export const LIMITS = {
   place: 100,
   invoiceTerms: 10,
   invoiceTerm: 300,
+  shippingRules: 20,
   homeVideoUrl: 500,
   rejectComment: { min: 3, max: 500 },
 } as const;
@@ -80,6 +93,7 @@ export const emptyForm = (): CompanyProfileForm => ({
   careersEmail: '',
   website: '',
   invoiceTerms: [],
+  shippingRules: [],
   homeVideoEnabled: false,
   homeVideoUrl: '',
 });
@@ -111,6 +125,10 @@ export const toForm = (v: CompanyProfileFields): CompanyProfileForm => ({
   careersEmail: str(v.careersEmail),
   website: str(v.website),
   invoiceTerms: [...(v.invoiceTerms ?? [])],
+  shippingRules: (v.shippingRules ?? []).map((rule) => ({
+    upTo: rule.maxOrderValue == null ? '' : String(rule.maxOrderValue),
+    fee: String(rule.fee),
+  })),
   homeVideoEnabled: v.homeVideoEnabled === true,
   homeVideoUrl: str(v.homeVideoUrl),
 });
@@ -155,9 +173,35 @@ export const toBody = (form: CompanyProfileForm): CompanyProfileFields => {
     careersEmail: orNull(form.careersEmail),
     website: orNull(form.website),
     invoiceTerms: form.invoiceTerms.map((term) => term.trim()),
+    shippingRules: toShippingRules(form.shippingRules),
     homeVideoEnabled: form.homeVideoEnabled,
     homeVideoUrl: orNull(form.homeVideoUrl),
   };
+};
+
+const AMOUNT_PATTERN = /^\d+(\.\d{1,2})?$/;
+const MAX_AMOUNT = 9_999_999_999.99;
+
+const parseAmount = (value: string): number | null => {
+  const text = value.trim().replace(/,/g, '');
+  return AMOUNT_PATTERN.test(text) && Number(text) <= MAX_AMOUNT ? Number(text) : null;
+};
+
+/** Where each row starts: 0 for the first, the previous row's upper limit after that (null when it isn't valid yet). */
+export const shippingRowStarts = (rows: ShippingRuleRow[]): (number | null)[] => {
+  const starts: (number | null)[] = [];
+  rows.forEach((_, i) => starts.push(i === 0 ? 0 : parseAmount(rows[i - 1].upTo)));
+  return starts;
+};
+
+/** The rows as the API's rules; invalid values become NaN so validation (not this) reports them. */
+export const toShippingRules = (rows: ShippingRuleRow[]): ShippingRule[] => {
+  const starts = shippingRowStarts(rows);
+  return rows.map((row, i) => ({
+    minOrderValue: starts[i] ?? Number.NaN,
+    maxOrderValue: i === rows.length - 1 ? null : parseAmount(row.upTo) ?? Number.NaN,
+    fee: parseAmount(row.fee) ?? Number.NaN,
+  }));
 };
 
 /** Copies a version's field values (e.g. to start a new draft from an old version). */
@@ -303,6 +347,22 @@ export const validateForSave = (form: CompanyProfileForm, { knownImageUrls }: Sa
     else checkText(errors, key, t, `Term ${i + 1}`, LIMITS.invoiceTerm);
   });
 
+  if (form.shippingRules.length > LIMITS.shippingRules) errors.shippingRules = `At most ${LIMITS.shippingRules} shipping rules.`;
+  const starts = shippingRowStarts(form.shippingRules);
+  form.shippingRules.forEach((row, i) => {
+    const key = `shippingRules[${i}]`;
+    if (i < form.shippingRules.length - 1) {
+      const upTo = parseAmount(row.upTo);
+      if (!row.upTo.trim()) errors[`${key}.maxOrderValue`] = 'Enter the order value this rule goes up to.';
+      else if (upTo === null) errors[`${key}.maxOrderValue`] = 'Enter an amount in rupees, with at most 2 decimals.';
+      else if (starts[i] !== null && upTo <= (starts[i] as number)) {
+        errors[`${key}.maxOrderValue`] = `Must be more than ${starts[i]}, where this rule starts.`;
+      }
+    }
+    if (!row.fee.trim()) errors[`${key}.fee`] = 'Enter the shipping fee (0 for free shipping).';
+    else if (parseAmount(row.fee) === null) errors[`${key}.fee`] = 'Enter an amount in rupees, with at most 2 decimals.';
+  });
+
   // "On" without a link is a valid draft; submit requires the link (see validateForSubmit).
   const videoUrl = form.homeVideoUrl.trim();
   if (videoUrl.length > LIMITS.homeVideoUrl) errors.homeVideoUrl = `YouTube link can't be longer than ${LIMITS.homeVideoUrl} characters.`;
@@ -329,4 +389,5 @@ export const validateForSubmit = (form: CompanyProfileForm, options?: SaveRuleOp
   return errors;
 };
 
-export const sameForm = (a: CompanyProfileForm, b: CompanyProfileForm) => JSON.stringify(a) === JSON.stringify(b);
+// Whitespace-only edits don't count (see hasFormChanges).
+export const sameForm = (a: CompanyProfileForm, b: CompanyProfileForm) => !hasFormChanges(a, b);

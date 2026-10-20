@@ -13,10 +13,16 @@ import {
   Clock,
   Shield,
   Layers,
+  MapPin,
+  ExternalLink,
+  CreditCard,
+  Trash2,
 } from 'lucide-react';
 import type { EmployeeResponse } from '../types/employee.types';
 import { EmployeeStatusBadge } from './EmployeeStatusBadge';
 import { EmployeeRoleBadge } from './EmployeeRoleBadge';
+import { EmployeeConstants } from '../types/employee.types';
+import { Validator } from '../../../utils/validator';
 
 interface Props {
   employee: EmployeeResponse | null;
@@ -24,8 +30,20 @@ interface Props {
   onClose: () => void;
 }
 
+/** "House, Street, Landmark, District, State - PIN" from whichever parts are saved. */
+const formatAddress = (employee: EmployeeResponse): string | null => {
+  const parts = [employee.houseNumber, employee.street, employee.landmark, employee.district, employee.state]
+    .map((part) => part?.trim())
+    .filter(Boolean);
+  if (!parts.length && !employee.pincode) return null;
+  return `${parts.join(', ')}${employee.pincode ? ` - ${employee.pincode}` : ''}`;
+};
+
 export const EmployeeDetailsModal: React.FC<Props> = ({ employee, isLoading, onClose }) => {
   if (!employee && !isLoading) return null;
+  const address = employee ? formatAddress(employee) : null;
+  // Only links that pass the same Google Maps check as the form are made clickable
+  const mapsUrl = employee?.googleMapsUrl && Validator.isGoogleMapsUrl(employee.googleMapsUrl) ? employee.googleMapsUrl : null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
@@ -74,6 +92,17 @@ export const EmployeeDetailsModal: React.FC<Props> = ({ employee, isLoading, onC
               </div>
             </div>
 
+            {employee.status === EmployeeConstants.DELETED && (
+              <div className="p-3 bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 rounded-xl text-xs flex items-center gap-2">
+                <Trash2 className="w-4 h-4 shrink-0" />
+                <span>
+                  Deleted{employee.deletedByUsername ? ` by ${employee.deletedByUsername}` : ''}
+                  {employee.deletedAt ? ` on ${new Date(employee.deletedAt).toLocaleString()}` : ''}. The record is kept
+                  for history and can't be changed; this employee can no longer sign in.
+                </span>
+              </div>
+            )}
+
             {/* Section 1: System Credentials & Identity */}
             <div className="space-y-2">
               <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
@@ -100,6 +129,34 @@ export const EmployeeDetailsModal: React.FC<Props> = ({ employee, isLoading, onC
                     #{employee.id}
                   </p>
                 </div>
+
+                <div className="p-3 bg-black/5 dark:bg-white/5 rounded-xl flex items-center gap-2.5">
+                  <CreditCard className="w-4 h-4 text-gray-400 shrink-0" />
+                  <div>
+                    <p className="text-[10px] text-gray-400">PAN</p>
+                    <p className="font-mono font-semibold text-black dark:text-white">{employee.panNumber || 'Not provided'}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Residential Address */}
+            <div className="space-y-2">
+              <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
+                <MapPin className="w-3.5 h-3.5 text-[#0071e3]" /> Residential Address
+              </h4>
+              <div className="p-3 bg-black/5 dark:bg-white/5 rounded-xl text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <p className="font-medium text-black dark:text-white break-words">{address || 'Not provided'}</p>
+                {mapsUrl && (
+                  <a
+                    href={mapsUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 shrink-0 font-semibold text-[#0071e3] hover:underline"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5" /> Open in Google Maps
+                  </a>
+                )}
               </div>
             </div>
 

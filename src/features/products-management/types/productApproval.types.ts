@@ -2,13 +2,13 @@
 // the product itself lives in the Ecommerce backend and stays inactive until approved.
 // Contract: docs/backend-prompts/product-approval-workflow.md (create) and product-update-approval.md (updates)
 
-import type { UpdateProductRequest } from './product.types';
+import type { ProductGstFields, UpdateProductRequest } from './product.types';
 
 export type ProductApprovalStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED';
 export type ProductApprovalDecision = Exclude<ProductApprovalStatus, 'PENDING'>;
 
 /** What the reviewer sees: a copy of the product as submitted (the Ecommerce product may change later). */
-export interface ProductApprovalSnapshot {
+export interface ProductApprovalSnapshot extends Partial<ProductGstFields> {
   title: string;
   tagline?: string | null;
   price: number;

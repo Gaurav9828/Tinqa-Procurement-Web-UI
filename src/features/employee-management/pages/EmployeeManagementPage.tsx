@@ -21,6 +21,7 @@ export const EmployeeManagementPage: React.FC = () => {
         isLoading,
         filters,
         updateSearch,
+        searchNow,
         updateStatus,
         updatePage,
         refetch,
@@ -98,7 +99,9 @@ export const EmployeeManagementPage: React.FC = () => {
                 searchQuery={filters.search || ''}
                 selectedStatus={filters.status || ''}
                 onSearchChange={updateSearch}
+                onSearchSubmit={searchNow}
                 onStatusChange={updateStatus}
+                canViewDeleted={can('EMPLOYEE_DELETE')}
                 onOpenCreateModal={can('EMPLOYEE_CREATE') ? handleOpenCreate : undefined}
             />
 

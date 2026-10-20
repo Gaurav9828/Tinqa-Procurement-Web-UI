@@ -1,7 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Bell, ChevronDown, ChevronUp, Loader2 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { ArrowUpRight, Bell, ChevronDown, ChevronUp, Loader2 } from 'lucide-react';
 import { useNotifications } from '../../hooks/useNotifications';
 import type { NotificationItem } from '../../api/services/notificationService';
+
+// Only follow in-app routes; anything else (absolute or protocol-relative URLs) is ignored
+const inAppLink = (link?: string | null): string | null =>
+  link && link.startsWith('/') && !link.startsWith('//') ? link : null;
 
 export const NotificationBell: React.FC = () => {
   const {
@@ -15,6 +20,7 @@ export const NotificationBell: React.FC = () => {
   const [isOpen, setIsOpen] = useState<boolean>(false);
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
+  const navigate = useNavigate();
 
   // Close popover when clicking outside
   useEffect(() => {
@@ -55,6 +61,16 @@ export const NotificationBell: React.FC = () => {
     if (!item.read) {
       await markAsRead(item.id);
     }
+  };
+
+  // Open the page the notification is about & mark it read
+  const handleOpenLink = (item: NotificationItem, link: string) => {
+    setIsOpen(false);
+    setExpandedId(null);
+    if (!item.read) {
+      void markAsRead(item.id);
+    }
+    navigate(link);
   };
 
   return (
@@ -103,6 +119,7 @@ export const NotificationBell: React.FC = () => {
             ) : (
               notifications.map((item) => {
                 const isExpanded = expandedId === item.id;
+                const link = inAppLink(item.link);
                 return (
                   <div
                     key={item.id}
@@ -120,15 +137,30 @@ export const NotificationBell: React.FC = () => {
                           }`}
                         />
                         <div className="min-w-0 flex-1">
-                          <p
-                            className={`text-xs tracking-tight ${
-                              !item.read
-                                ? 'font-semibold text-gray-900 dark:text-white'
-                                : 'font-normal text-gray-600 dark:text-gray-300'
-                            }`}
-                          >
-                            {item.title}
-                          </p>
+                          {link ? (
+                            <button
+                              type="button"
+                              onClick={() => handleOpenLink(item, link)}
+                              title="Open"
+                              className={`text-left text-xs tracking-tight hover:underline cursor-pointer ${
+                                !item.read
+                                  ? 'font-semibold text-gray-900 dark:text-white'
+                                  : 'font-normal text-gray-600 dark:text-gray-300'
+                              }`}
+                            >
+                              {item.title}
+                            </button>
+                          ) : (
+                            <p
+                              className={`text-xs tracking-tight ${
+                                !item.read
+                                  ? 'font-semibold text-gray-900 dark:text-white'
+                                  : 'font-normal text-gray-600 dark:text-gray-300'
+                              }`}
+                            >
+                              {item.title}
+                            </p>
+                          )}
                           <span className="text-[10px] text-gray-400 dark:text-neutral-500 block mt-0.5">
                             {new Date(item.createdAt).toLocaleString(undefined, {
                               dateStyle: 'short',
@@ -157,6 +189,15 @@ export const NotificationBell: React.FC = () => {
                     {isExpanded && (
                       <div className="mt-2.5 ml-4 p-2.5 rounded-xl bg-black/5 dark:bg-white/5 text-xs text-gray-700 dark:text-gray-300 leading-relaxed animate-in fade-in duration-150">
                         {item.message}
+                        {link && (
+                          <button
+                            type="button"
+                            onClick={() => handleOpenLink(item, link)}
+                            className="mt-2 flex items-center gap-1 text-[11px] font-medium text-[#0071e3] hover:underline cursor-pointer"
+                          >
+                            Go to page <ArrowUpRight className="w-3 h-3" />
+                          </button>
+                        )}
                       </div>
                     )}
                   </div>

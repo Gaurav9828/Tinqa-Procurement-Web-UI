@@ -13,6 +13,7 @@ import { axiosClient } from '../../../api/axiosClient';
 import { useAuthStore } from '../../../store/useAuthStore';
 import type { ProductResponseDto } from '../types/product.types';
 import type { ProductApprovalResponse, ProductApprovalStatus } from '../types/productApproval.types';
+import { fillGst } from './gstTestUtil';
 import { superAdminPermissions } from '../../../test/access';
 
 /**
@@ -38,6 +39,8 @@ const product = (id: number, title: string, enabled: boolean): ProductResponseDt
   id,
   title,
   price: 1000 + id,
+  hsnSac: '9405',
+  gstRate: 18,
   image1Url: `https://cdn.tinqa.com/${id}.png`,
   enabled,
   stockQuantity: 1,
@@ -186,6 +189,7 @@ describe('Creating a product needs approval', () => {
     await user.type(screen.getByPlaceholderText('Product Title'), 'Touch Panel');
     await user.type(screen.getByPlaceholderText('0.00'), '2999');
     await user.type(screen.getByPlaceholderText('Image Address'), 'https://cdn.tinqa.com/panel.png');
+    await fillGst(user);
   };
   const confirmCreate = async (user: User) => {
     await user.click(screen.getAllByRole('button', { name: 'Create Product' }).at(-1)!);

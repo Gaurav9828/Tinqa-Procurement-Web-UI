@@ -2,6 +2,7 @@ import { useNotify } from '../../../hooks/useNotify';
 import React, { useState, useEffect } from 'react';
 import { CheckCircle2, XCircle, X } from 'lucide-react';
 import type { ApprovalDecisionRequest, StockResponse } from '../types/stock.types';
+import { CHOICE_TONE, SOLID_TONE } from '../../../components/ui/actionTones';
 
 interface Props {
   isOpen: boolean;
@@ -71,9 +72,7 @@ export const StockApprovalModal: React.FC<Props> = ({
                 setDecision('APPROVED');
               }}
               className={`flex-1 p-3 rounded-xl border flex items-center justify-center gap-2 text-xs font-semibold cursor-pointer ${
-                decision === 'APPROVED'
-                  ? 'border-emerald-500 bg-emerald-500/10 text-emerald-600'
-                  : 'border-black/10 dark:border-white/10 text-gray-500'
+                decision === 'APPROVED' ? CHOICE_TONE.approve.active : CHOICE_TONE.approve.idle
               }`}
             >
               <CheckCircle2 className="w-4 h-4" />
@@ -85,9 +84,7 @@ export const StockApprovalModal: React.FC<Props> = ({
                 setDecision('REJECTED');
               }}
               className={`flex-1 p-3 rounded-xl border flex items-center justify-center gap-2 text-xs font-semibold cursor-pointer ${
-                decision === 'REJECTED'
-                  ? 'border-rose-500 bg-rose-500/10 text-rose-600'
-                  : 'border-black/10 dark:border-white/10 text-gray-500'
+                decision === 'REJECTED' ? CHOICE_TONE.danger.active : CHOICE_TONE.danger.idle
               }`}
             >
               <XCircle className="w-4 h-4" />
@@ -123,7 +120,9 @@ export const StockApprovalModal: React.FC<Props> = ({
             <button
               type="submit"
               disabled={isSubmitting || (decision === 'REJECTED' && !rejectionReason.trim())}
-              className="px-4 py-2 text-xs font-medium bg-[#0071e3] hover:bg-[#0071e3]/90 text-white rounded-xl shadow-sm disabled:opacity-50 cursor-pointer"
+              className={`px-4 py-2 text-xs font-medium rounded-xl shadow-sm disabled:opacity-50 cursor-pointer ${
+                decision === 'REJECTED' ? SOLID_TONE.danger : decision === 'APPROVED' ? SOLID_TONE.approve : SOLID_TONE.primary
+              }`}
             >
               {isSubmitting ? 'Processing...' : 'Submit Decision'}
             </button>

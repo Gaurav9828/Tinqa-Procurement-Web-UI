@@ -1,7 +1,6 @@
 import { axiosClient } from '../../../api/axiosClient';
 import type {
   CategoryResponse,
-  CreateCategoryRequest,
   CreateDealerRequest,
   DealerFilterParams,
   DealerResponse,
@@ -12,17 +11,7 @@ import type { ApiResponse, PageableResponse } from '../../../types/common.types'
 const BASE_URL = '/v1/admin/dealers';
 
 export const dealerApi = {
-  // Categories
-  createCategory: async (
-    payload: CreateCategoryRequest
-  ): Promise<ApiResponse<CategoryResponse>> => {
-    const response = await axiosClient.post<ApiResponse<CategoryResponse>>(
-      `${BASE_URL}/categories`,
-      payload
-    );
-    return response.data;
-  },
-
+  /** The item categories, to assign to dealers (needs only DEALER_VIEW). */
   getAllCategories: async (): Promise<ApiResponse<CategoryResponse[]>> => {
     const response = await axiosClient.get<ApiResponse<CategoryResponse[]>>(
       `${BASE_URL}/categories`
@@ -64,7 +53,9 @@ export const dealerApi = {
   ): Promise<ApiResponse<PageableResponse<DealerResponse>>> => {
     const queryParams = new URLSearchParams();
     if (params.search) queryParams.append('search', params.search);
-    if (params.categoryId) queryParams.append('categoryId', params.categoryId.toString());
+    params.categoryIds?.forEach((id) => queryParams.append('categoryId', id.toString()));
+    params.cities?.forEach((city) => queryParams.append('city', city));
+    if (params.isActive !== undefined) queryParams.append('isActive', String(params.isActive));
     if (params.page !== undefined) queryParams.append('page', params.page.toString());
     if (params.size !== undefined) queryParams.append('size', params.size.toString());
     if (params.sort) queryParams.append('sort', params.sort);
@@ -72,6 +63,12 @@ export const dealerApi = {
     const response = await axiosClient.get<ApiResponse<PageableResponse<DealerResponse>>>(
       `${BASE_URL}?${queryParams.toString()}`
     );
+    return response.data;
+  },
+
+  /** GET /v1/admin/dealers/cities — distinct dealer cities, for the list filter. */
+  getDealerCities: async (): Promise<ApiResponse<string[]>> => {
+    const response = await axiosClient.get<ApiResponse<string[]>>(`${BASE_URL}/cities`);
     return response.data;
   },
 

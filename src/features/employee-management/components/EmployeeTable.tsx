@@ -72,91 +72,95 @@ export const EmployeeTable: React.FC<Props> = ({
             </tr>
           </thead>
           <tbody className="divide-y divide-black/5 dark:divide-white/5">
-            {visibleEmployees.map((emp) => (
-              <tr key={emp.id} className="hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition-colors">
-                <td className="p-4">
-                  <div>
-                    <span className="font-semibold text-sm text-black dark:text-white block">
-                      {emp.displayName || `${emp.firstName} ${emp.lastName}`}
-                    </span>
-                    <span className="text-[11px] text-gray-400">{emp.username}</span>
-                  </div>
-                </td>
-                <td className="p-4 font-mono font-medium text-[#0071e3]">
-                  {emp.employeeCode}
-                </td>
-                <td className="p-4">
-                  <div className="font-medium text-black dark:text-white">{emp.designationLabel || emp.designation || 'Not assigned'}</div>
-                  <div className="text-[11px] text-gray-400">{emp.department}</div>
-                  <div className="mt-1">
-                    <EmployeeRoleBadge role={emp.role} />
-                  </div>
-                </td>
-                <td className="p-4">
-                  <div className="text-black dark:text-white">{emp.phone}</div>
-                  <div className="text-[11px] text-gray-400">{emp.personalEmail || 'N/A'}</div>
-                </td>
-                <td className="p-4">
-                  <EmployeeStatusBadge status={emp.status} />
-                </td>
-                <td className="p-4 text-right">
-                  <div className="flex items-center justify-end gap-1">
-                    <button
-                      type="button"
-                      onClick={() => onView(emp.id)}
-                      className="p-2 hover:bg-black/5 dark:hover:bg-white/10 rounded-lg text-gray-500 transition-colors"
-                      title="View Details"
-                    >
-                      <Eye className="w-4 h-4" />
-                    </button>
-                    {canManageAccess && (
+            {visibleEmployees.map((emp) => {
+              // A deleted record is kept for history only, so it can just be viewed
+              const isDeleted = emp.status === EmployeeConstants.DELETED;
+              return (
+                <tr key={emp.id} className="hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition-colors">
+                  <td className="p-4">
+                    <div>
+                      <span className="font-semibold text-sm text-black dark:text-white block">
+                        {emp.displayName || `${emp.firstName} ${emp.lastName}`}
+                      </span>
+                      <span className="text-[11px] text-gray-400">{emp.username}</span>
+                    </div>
+                  </td>
+                  <td className="p-4 font-mono font-medium text-[#0071e3]">
+                    {emp.employeeCode}
+                  </td>
+                  <td className="p-4">
+                    <div className="font-medium text-black dark:text-white">{emp.designationLabel || emp.designation || 'Not assigned'}</div>
+                    <div className="text-[11px] text-gray-400">{emp.department}</div>
+                    <div className="mt-1">
+                      <EmployeeRoleBadge role={emp.role} />
+                    </div>
+                  </td>
+                  <td className="p-4">
+                    <div className="text-black dark:text-white">{emp.phone}</div>
+                    <div className="text-[11px] text-gray-400">{emp.personalEmail || 'N/A'}</div>
+                  </td>
+                  <td className="p-4">
+                    <EmployeeStatusBadge status={emp.status} />
+                  </td>
+                  <td className="p-4 text-right">
+                    <div className="flex items-center justify-end gap-1">
                       <button
                         type="button"
-                        onClick={() => onManageAccess(emp)}
-                        className="p-2 hover:bg-blue-500/10 rounded-lg text-gray-500 hover:text-[#0071e3] transition-colors"
-                        title={isSelf(emp) ? 'View your access' : 'Manage access'}
-                        aria-label={`Manage access for ${emp.displayName}`}
-                      >
-                        <KeyRound className="w-4 h-4" />
-                      </button>
-                    )}
-                    {canEdit && (
-                      <button
-                        type="button"
-                        onClick={() => onEdit(emp)}
+                        onClick={() => onView(emp.id)}
                         className="p-2 hover:bg-black/5 dark:hover:bg-white/10 rounded-lg text-gray-500 transition-colors"
-                        title="Edit Employee"
+                        title="View Details"
                       >
-                        <Edit3 className="w-4 h-4" />
+                        <Eye className="w-4 h-4" />
                       </button>
-                    )}
-                    {canOpenLifecycle && (
-                    <button
-                      type="button"
-                      onClick={() => onDelete(emp)}
-                      disabled={isSelf(emp)}
-                      className={`p-2 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
-                        emp.status === EmployeeConstants.WAITING_FOR_DELETION && canFinalize
-                          ? 'text-red-600 bg-red-500/10 hover:bg-red-500/20'
-                          : 'text-gray-500 hover:bg-black/5 dark:hover:bg-white/10'
-                      }`}
-                      title={
-                        isSelf(emp)
-                          ? 'You cannot delete your own record'
-                          : emp.status === EmployeeConstants.WAITING_FOR_DELETION
-                          ? canFinalize
-                            ? 'Finalize Deletion (Permanent)'
-                            : 'Waiting for an employee approver'
-                          : 'Request Deletion'
-                      }
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                    )}
-                  </div>
-                </td>
-              </tr>
-            ))}
+                      {canManageAccess && !isDeleted && (
+                        <button
+                          type="button"
+                          onClick={() => onManageAccess(emp)}
+                          className="p-2 hover:bg-blue-500/10 rounded-lg text-gray-500 hover:text-[#0071e3] transition-colors"
+                          title={isSelf(emp) ? 'View your access' : 'Manage access'}
+                          aria-label={`Manage access for ${emp.displayName}`}
+                        >
+                          <KeyRound className="w-4 h-4" />
+                        </button>
+                      )}
+                      {canEdit && !isDeleted && (
+                        <button
+                          type="button"
+                          onClick={() => onEdit(emp)}
+                          className="p-2 hover:bg-black/5 dark:hover:bg-white/10 rounded-lg text-gray-500 transition-colors"
+                          title="Edit Employee"
+                        >
+                          <Edit3 className="w-4 h-4" />
+                        </button>
+                      )}
+                      {canOpenLifecycle && !isDeleted && (
+                      <button
+                        type="button"
+                        onClick={() => onDelete(emp)}
+                        disabled={isSelf(emp)}
+                        className={`p-2 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
+                          emp.status === EmployeeConstants.WAITING_FOR_DELETION && canFinalize
+                            ? 'text-red-600 bg-red-500/10 hover:bg-red-500/20'
+                            : 'text-rose-500 hover:text-rose-600 hover:bg-rose-500/10 dark:text-rose-400'
+                        }`}
+                        title={
+                          isSelf(emp)
+                            ? 'You cannot delete your own record'
+                            : emp.status === EmployeeConstants.WAITING_FOR_DELETION
+                            ? canFinalize
+                              ? 'Finalize Deletion'
+                              : 'Waiting for an employee approver'
+                            : 'Request Deletion'
+                        }
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>

@@ -16,14 +16,23 @@ import type { ProductApprovalResponse } from '../products-management/types/produ
 import { RefundsQueue } from '../refunds/components/RefundsQueue';
 import { usePendingRefundCount } from '../refunds/hooks/usePendingRefundCount';
 import { useAccess } from '../../hooks/useAccess';
+import { VouchersPanel } from '../finance/components/VouchersPanel';
+import { usePendingVoucherCount } from '../finance/hooks/useFinanceData';
+import { DealerApprovalsPanel } from './components/DealerApprovalsPanel';
+import { useDealerApprovals } from './hooks/useDealerApprovals';
+import { PreOrderApprovalsPanel } from './components/PreOrderApprovalsPanel';
+import { usePreOrderApprovals } from './hooks/usePreOrderApprovals';
+import { CompanyProfileApprovalsPanel } from './components/CompanyProfileApprovalsPanel';
+import { useCompanyProfileApprovals } from './hooks/useCompanyProfileApprovals';
 
-type HubTab = 'requests' | 'refunds';
+type HubTab = 'requests' | 'refunds' | 'expenses' | 'dealers' | 'pre-orders' | 'company-profile';
 const TAB_STORAGE_KEY = 'approvals.tab';
 
 /** Remembered per browser tab, so Back from an order opened in the refunds queue returns to it. */
 const readTab = (): HubTab => {
   try {
-    return sessionStorage.getItem(TAB_STORAGE_KEY) === 'refunds' ? 'refunds' : 'requests';
+    const saved = sessionStorage.getItem(TAB_STORAGE_KEY);
+    return TABS.find(({ id }) => id === saved)?.id ?? 'requests';
   } catch {
     return 'requests';
   }
@@ -32,15 +41,27 @@ const readTab = (): HubTab => {
 const TABS: { id: HubTab; label: string }[] = [
   { id: 'requests', label: 'Requests' },
   { id: 'refunds', label: 'Refunds' },
+  { id: 'expenses', label: 'Expenses' },
+  { id: 'dealers', label: 'Dealers' },
+  { id: 'pre-orders', label: 'Pre-orders' },
+  { id: 'company-profile', label: 'Company profile' },
 ];
 
 export const ApprovalsHub: React.FC = () => {
   const [selectedTab, setTab] = useState<HubTab>(readTab);
-  const { can, canAny } = useAccess();
-  // Requests: every approval queue except refunds; Refunds: the refund approval queue
+  const { can, canAll, canAny } = useAccess();
+  // Requests: the documents / profiles / stock / orders / products / employees queues; every other tab is one queue
   const availableTabs = TABS.filter(({ id }) =>
-    id === 'refunds'
+    id === 'pre-orders'
+      ? canAll('CUSTOMER_ORDER_PRE_ORDER_APPROVE', 'CUSTOMER_ORDER_VIEW')
+      : id === 'company-profile'
+      ? canAll('COMPANY_PROFILE_APPROVE', 'COMPANY_PROFILE_VIEW')
+      : id === 'refunds'
       ? can('REFUND_APPROVE')
+      : id === 'expenses'
+      ? can('EXPENSE_APPROVE')
+      : id === 'dealers'
+      ? canAny('DEALER_LOGIN_APPROVE', 'DEALER_QUOTATION_CHANGE_APPROVE')
       : canAny('DOCUMENT_APPROVE', 'EMPLOYEE_PROFILE_CHANGE_APPROVE', 'STOCK_APPROVE', 'PROCUREMENT_ORDER_APPROVE',
           'PRODUCT_APPROVAL_DECIDE', 'EMPLOYEE_APPROVE')
   );
@@ -48,9 +69,18 @@ export const ApprovalsHub: React.FC = () => {
   // Refunds live in their own tab; the count keeps them visible from the Requests tab.
   const pendingRefunds = usePendingRefundCount();
   const pendingRefundCount = pendingRefunds.count ?? 0;
+  const pendingVouchers = usePendingVoucherCount();
+  const pendingVoucherCount = pendingVouchers.count ?? 0;
+  const pendingDealers = useDealerApprovals({ quiet: true });
+  const preOrders = usePreOrderApprovals();
+  const companyProfile = useCompanyProfileApprovals();
   const selectTab = (next: HubTab) => {
     setTab(next);
     pendingRefunds.refresh();
+    pendingVouchers.refresh();
+    pendingDealers.refresh();
+    preOrders.refresh();
+    companyProfile.refresh();
     try {
       sessionStorage.setItem(TAB_STORAGE_KEY, next);
     } catch {
@@ -65,6 +95,16 @@ export const ApprovalsHub: React.FC = () => {
     refreshApprovals,
     processPendingApproval,
     downloadDocument } = useApprovals();
+
+  // Each tab's badge, so nothing waiting is hidden behind another tab.
+  const pendingCounts: Record<HubTab, { count: number; noun: string }> = {
+    requests: { count: approvals.length, noun: 'requests' },
+    refunds: { count: pendingRefundCount, noun: 'refunds' },
+    expenses: { count: pendingVoucherCount, noun: 'expenses' },
+    dealers: { count: pendingDealers.count, noun: 'dealer requests' },
+    'pre-orders': { count: preOrders.total, noun: 'pre-orders' },
+    'company-profile': { count: companyProfile.pending ? 1 : 0, noun: 'company profile changes' },
+  };
 
   // Products have their own review (snapshot + Approve / Reject / Cancel), which also activates the product.
   const [productReview, setProductReview] = useState<ProductApprovalResponse | null>(null);
@@ -188,7 +228,8 @@ export const ApprovalsHub: React.FC = () => {
             Approval Hub
           </h1>
           <p className="text-gray-500 dark:text-neutral-400 text-sm mt-1">
-            Review and action incoming requests across documents, profile updates, new employees, stock, orders, products and refunds.
+            Every request waiting for your decision: documents, profile updates, new employees, stock, orders, products,
+            refunds, expenses, dealers, pre-orders and the company profile.
           </p>
         </div>
         {tab === 'requests' && (
@@ -216,20 +257,33 @@ export const ApprovalsHub: React.FC = () => {
             }`}
           >
             {label}
-            {id === 'refunds' && pendingRefundCount > 0 && (
+            {pendingCounts[id].count > 0 && (
               <span
-                aria-label={`${pendingRefundCount} awaiting approval`}
+                aria-label={`${pendingCounts[id].count} ${pendingCounts[id].noun} awaiting approval`}
                 className="ml-2 inline-flex items-center justify-center min-w-5 h-5 px-1.5 rounded-full bg-amber-500 text-white text-[10px] font-bold"
               >
-                {pendingRefundCount}
+                {pendingCounts[id].count}
               </span>
             )}
           </button>
         ))}
       </div>
 
-      {tab === 'refunds' ? (
+      {tab === 'pre-orders' ? (
+        <PreOrderApprovalsPanel orders={preOrders.orders} total={preOrders.total} isLoading={preOrders.isLoading} onRefresh={preOrders.refresh} />
+      ) : tab === 'company-profile' ? (
+        <CompanyProfileApprovalsPanel pending={companyProfile.pending} isLoading={companyProfile.isLoading} onRefresh={companyProfile.refresh} />
+      ) : tab === 'dealers' ? (
+        <DealerApprovalsPanel onChanged={pendingDealers.refresh} />
+      ) : tab === 'refunds' ? (
         <RefundsQueue onChanged={pendingRefunds.refresh} />
+      ) : tab === 'expenses' ? (
+        <VouchersPanel
+          title="Expenses awaiting approval"
+          description="Expenses, shipping costs and other vouchers raised by the team. Approving posts the money to the company account; you can't approve what you raised."
+          defaultStatus="SUBMITTED"
+          onChanged={pendingVouchers.refresh}
+        />
       ) : (
         <>
           {pendingRefundCount > 0 && (

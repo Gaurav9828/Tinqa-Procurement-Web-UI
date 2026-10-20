@@ -34,7 +34,7 @@ const badRequest = (message: string, errors: { field: string; message: string }[
 const ok = <T,>(data: T, message = 'OK') => ({ data: { success: true, message, data, timestamp: '', path: '' } });
 
 // ---------- fake backend ----------
-type ItemBody = Omit<ItemResponse, 'id' | 'warranties' | 'isActive' | 'sku'> & { sku?: string; isActive?: boolean; warranties?: ItemWarrantyRequest[] | null };
+type ItemBody = Omit<ItemResponse, 'id' | 'warranties' | 'isActive' | 'sku' | 'categories'> & { categoryIds: number[]; sku?: string; isActive?: boolean; warranties?: ItemWarrantyRequest[] | null };
 let db: ItemResponse[];
 let nextWarrantyId: number;
 const HOURS_AGO = (h: number) => new Date(Date.now() - h * 3600_000).toISOString();
@@ -78,8 +78,7 @@ const saved = (id: number, overrides: Partial<ItemWarrantyResponse> = {}): ItemW
 
 const LAPTOP: ItemResponse = {
   id: 1,
-  categoryId: 1,
-  categoryName: 'Electronics',
+  categories: [{ id: 1, name: 'Electronics' }],
   name: 'Zenbook 14',
   brand: 'ASUS',
   sku: 'ZB-14',
@@ -109,7 +108,15 @@ const installFakeBackend = () => {
     const body = raw as ItemBody;
     if (body.warranties?.some((w) => w.id !== undefined)) throw badRequest('Warranty 1 does not belong to item 100');
     const id = 100 + db.length;
-    const item = { ...body, id, sku: body.sku!, isActive: true, warranties: (body.warranties ?? []).map((w) => toResponse(id, w)) };
+    const { categoryIds, ...fields } = body;
+    const item = {
+      ...fields,
+      id,
+      sku: body.sku!,
+      isActive: true,
+      categories: categoryIds.map((categoryId) => ({ id: categoryId, name: 'Electronics' })),
+      warranties: (body.warranties ?? []).map((w) => toResponse(id, w)),
+    };
     db.push(item);
     return ok(item, 'Item created successfully');
   });
@@ -180,6 +187,8 @@ const fillCard = async (user: User, n: number, { type, duration, unit, title, pr
 const openCreate = async (user: User) => {
   await screen.findByText('Zenbook 14');
   await user.click(screen.getByRole('button', { name: 'Add Item' }));
+  // No category is preselected; an item needs at least one
+  await user.click(screen.getByRole('button', { name: 'Electronics', pressed: false }));
   await user.type(screen.getByPlaceholderText('e.g. ESP32-WROOM-32'), 'MOUSE-1');
   await user.type(screen.getByPlaceholderText('e.g. ESP32 Microcontroller Board'), 'Wireless Mouse');
   await user.type(screen.getByPlaceholderText('499.00'), '1299');
@@ -191,6 +200,8 @@ const openEdit = async (user: User, name = 'Zenbook 14') => {
   await user.click(within(rowFor(name)).getByTitle('Edit Item'));
 };
 const submitEdit = (user: User) => user.click(screen.getByRole('button', { name: 'Update Item' }));
+/** Update stays disabled until something changes, so tests saving "other fields" edit the name. */
+const editName = (user: User) => user.type(screen.getByPlaceholderText('e.g. ESP32 Microcontroller Board'), ' Pro');
 
 const openPreview = async (user: User, name = 'Zenbook 14') => {
   await screen.findByText(name);
@@ -214,6 +225,7 @@ describe('Create item with warranties', () => {
     await submitCreate(user);
     await waitFor(() => expect(http.post).toHaveBeenCalledTimes(1));
     expect(lastBody('post')).not.toHaveProperty('warranties');
+    expect(lastBody('post').categoryIds).toEqual([1]);
     expect(lastBody('post')).not.toHaveProperty('warrantyMonths');
   });
 
@@ -401,9 +413,18 @@ describe('Edit item warranties', () => {
     expect(screen.getByText('No warranties for this item.')).toBeInTheDocument();
   });
 
+  it('keeps Update disabled until something changes', async () => {
+    const { user } = renderPage();
+    await openEdit(user);
+    expect(screen.getByRole('button', { name: 'Update Item' })).toBeDisabled();
+    await editName(user);
+    expect(screen.getByRole('button', { name: 'Update Item' })).toBeEnabled();
+  });
+
   it('saving other fields resends the unchanged warranties with their ids', async () => {
     const { user } = renderPage();
     await openEdit(user);
+    await editName(user);
     await submitEdit(user);
     await waitFor(() => expect(http.put).toHaveBeenCalledTimes(1));
     expect(lastBody('put').warranties!.map((w) => w.id)).toEqual([10, 11]);
@@ -418,6 +439,7 @@ describe('Edit item warranties', () => {
     http.put.mockRejectedValueOnce(badRequest('Duplicate warranty ID in request: 10'));
     const { user } = renderPage();
     await openEdit(user);
+    await editName(user);
     await submitEdit(user);
     expect(await screen.findByText('Duplicate warranty ID in request: 10')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Update Item' })).toBeInTheDocument();

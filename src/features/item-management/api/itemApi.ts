@@ -72,7 +72,9 @@ export const itemApi = {
   ): Promise<ApiResponse<PageableResponse<ItemResponse>>> => {
     const queryParams = new URLSearchParams();
     if (params.search) queryParams.append('search', params.search);
-    if (params.categoryId) queryParams.append('categoryId', params.categoryId.toString());
+    params.categoryIds?.forEach((id) => queryParams.append('categoryId', id.toString()));
+    params.unitsOfMeasure?.forEach((unit) => queryParams.append('unitOfMeasure', unit));
+    if (params.isActive !== undefined) queryParams.append('isActive', String(params.isActive));
     if (params.page !== undefined) queryParams.append('page', params.page.toString());
     if (params.size !== undefined) queryParams.append('size', params.size.toString());
     if (params.sort) queryParams.append('sort', params.sort);

@@ -235,8 +235,16 @@ const stepValues = (panel: HTMLElement) =>
     .getAllByRole('radio')
     .map((radio) => radio.getAttribute('value'));
 
-const chooseStep = (user: User, panel: HTMLElement, status: string) =>
+const pickStep = (user: User, panel: HTMLElement, status: string) =>
   user.click(within(within(panel).getByRole('radiogroup', { name: 'Next step' })).getAllByRole('radio').find((r) => r.getAttribute('value') === status)!);
+
+/** Picks a step; shipping out also needs what the shipment costs the company (sent for approval as an expense). */
+const chooseStep = async (user: User, panel: HTMLElement, status: string) => {
+  await pickStep(user, panel, status);
+  if (status === 'SHIPPED') await user.type(within(panel).getByLabelText('Shipping cost'), '150');
+};
+
+const SHIPPING = { shippingCost: 150, shippingPartner: null };
 
 const updateButton = (panel: HTMLElement) => within(panel).getByRole('button', { name: 'Update status' });
 
@@ -334,7 +342,7 @@ describe('OrderTrackingPage', () => {
       await user.click(screen.getByRole('button', { name: 'Next page' }));
       await waitFor(() => expect(lastListParams()?.page).toBe(1));
 
-      await user.type(screen.getByLabelText('Search orders'), '  asha  ');
+      await user.type(screen.getByLabelText('Search orders'), '  asha  {Enter}');
       await waitFor(() => expect(lastListParams()).toMatchObject({ search: 'asha', page: 0 }));
       expect(api.listOrders.mock.calls.filter(([p]) => p.search && p.search !== 'asha')).toHaveLength(0);
     });
@@ -343,7 +351,7 @@ describe('OrderTrackingPage', () => {
       const { user } = renderPage();
       await screen.findByRole('table');
       api.listOrders.mockResolvedValue(page([]));
-      await user.type(screen.getByLabelText('Search orders'), 'zzz');
+      await user.type(screen.getByLabelText('Search orders'), 'zzz{Enter}');
       expect(await screen.findByText('No orders found')).toBeInTheDocument();
     });
 
@@ -398,9 +406,11 @@ describe('OrderTrackingPage', () => {
       const clear = screen.getByRole('button', { name: 'Clear filters' });
       expect(clear).toHaveTextContent('');
       expect(clear).toHaveAttribute('title', 'Clear filters');
+      // The unfiltered list was already loaded on this visit, so it comes back without another request.
+      const requests = api.listOrders.mock.calls.length;
       await user.click(clear);
-      await waitFor(() => expect(lastListParams()).toMatchObject({ paymentStatus: '' }));
-      expect(currentUrl()).toBe('/order-tracking');
+      await waitFor(() => expect(currentUrl()).toBe('/order-tracking'));
+      expect(api.listOrders).toHaveBeenCalledTimes(requests);
     });
 
     it('reads the payment filter from the URL, case-insensitively', async () => {
@@ -563,7 +573,41 @@ describe('OrderTrackingPage', () => {
       await user.click(updateButton(panel));
 
       await waitFor(() => expect(api.updateTracking).toHaveBeenCalledTimes(1));
-      expect(api.updateTracking).toHaveBeenCalledWith('ORD-1001', { status: 'SHIPPED', notes: 'Handed to courier' });
+      expect(api.updateTracking).toHaveBeenCalledWith('ORD-1001', { status: 'SHIPPED', notes: 'Handed to courier', ...SHIPPING });
+    });
+
+    it('requires the shipping cost when shipping out and sends it with the partner', async () => {
+      const { user } = renderPage();
+      const panel = await openOrder(user);
+
+      await pickStep(user, panel, 'SHIPPED');
+      await user.click(updateButton(panel));
+      expect(api.updateTracking).not.toHaveBeenCalled();
+      expect(within(panel).getByText('Enter what this shipment costs (0 if nothing).')).toBeInTheDocument();
+
+      await user.type(within(panel).getByLabelText('Shipping cost'), '12.345');
+      await user.click(updateButton(panel));
+      expect(api.updateTracking).not.toHaveBeenCalled();
+
+      await user.clear(within(panel).getByLabelText('Shipping cost'));
+      await user.type(within(panel).getByLabelText('Shipping cost'), '185.50');
+      await user.type(within(panel).getByLabelText('Shipping partner'), ' Delhivery ');
+      await user.click(updateButton(panel));
+      await waitFor(() =>
+        expect(api.updateTracking).toHaveBeenCalledWith('ORD-1001', {
+          status: 'SHIPPED',
+          notes: null,
+          shippingCost: 185.5,
+          shippingPartner: 'Delhivery',
+        })
+      );
+    });
+
+    it('does not ask for a shipping cost on steps without a shipping leg', async () => {
+      const { user } = renderPage();
+      const panel = await openOrder(user);
+      await pickStep(user, panel, 'CANCELLED');
+      expect(within(panel).queryByLabelText('Shipping cost')).not.toBeInTheDocument();
     });
 
     it('sends blank notes as null', async () => {
@@ -572,7 +616,7 @@ describe('OrderTrackingPage', () => {
       await chooseStep(user, panel, 'SHIPPED');
       await user.type(within(panel).getByLabelText('Notes'), '    ');
       await user.click(updateButton(panel));
-      await waitFor(() => expect(api.updateTracking).toHaveBeenCalledWith('ORD-1001', { status: 'SHIPPED', notes: null }));
+      await waitFor(() => expect(api.updateTracking).toHaveBeenCalledWith('ORD-1001', { status: 'SHIPPED', notes: null, ...SHIPPING }));
     });
 
     it('asks for confirmation before cancelling and sends nothing if dismissed', async () => {
@@ -1243,6 +1287,29 @@ describe('delivery riders', () => {
       cleanup();
     }
     expect(api.updateDeliveryStatus).not.toHaveBeenCalled();
+  });
+
+  it('never asks for refunds: riders and their seniors can\'t see them', async () => {
+    const { panel } = await openAsRider('OUT_FOR_DELIVERY');
+    await within(panel).findByRole('radiogroup', { name: 'Next step' });
+    expect(within(panel).queryByRole('region', { name: 'Refunds' })).not.toBeInTheDocument();
+    cleanup();
+
+    // Fleet coordinator: CUSTOMER_ORDER_READ, LAST_MILE_DELIVERY and DELIVERY_OPERATIONS
+    useAuthStore.setState({
+      user: {
+        userId: 10,
+        username: 'fleet1',
+        email: 'fleet1@tinqa.com',
+        role: 'ADMIN_L1',
+        authClient: 'web',
+        isFirstLogin: false,
+        permissions: ['CUSTOMER_ORDER_VIEW', 'CUSTOMER_ORDER_TRACKING_UPDATE', 'DELIVERY_ASSIGN', 'DELIVERY_STATUS_UPDATE'],
+      },
+    });
+    renderPage('/order-tracking/ORD-1001');
+    await within(detailPage()).findByRole('radiogroup', { name: 'Next step' });
+    expect(refunds.getOrderRefunds).not.toHaveBeenCalled();
   });
 
   it('admins who may change any status keep the full set and the general endpoint', async () => {

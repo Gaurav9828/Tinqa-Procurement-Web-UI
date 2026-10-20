@@ -63,7 +63,7 @@ const LifecycleDialog: React.FC<Props & { employee: EmployeeResponse }> = ({
       <div
         role="dialog"
         aria-modal="true"
-        aria-label={finalizing ? 'Finalize permanent deletion' : 'Employee lifecycle action'}
+        aria-label={finalizing ? 'Finalize deletion' : 'Employee lifecycle action'}
         className="w-full max-w-md bg-white dark:bg-neutral-900 shadow-2xl rounded-2xl overflow-hidden border border-black/10 dark:border-white/10 p-6 space-y-4"
       >
         <div className="flex items-center gap-3">
@@ -72,7 +72,7 @@ const LifecycleDialog: React.FC<Props & { employee: EmployeeResponse }> = ({
           </div>
           <div>
             <h3 className="font-bold text-sm text-black dark:text-white">
-              {finalizing ? 'Finalize Permanent Deletion' : 'Employee Lifecycle Action'}
+              {finalizing ? 'Finalize Deletion' : 'Employee Lifecycle Action'}
             </h3>
             <p className="text-xs text-gray-500">
               Target: <strong className="text-black dark:text-white">{employee.displayName}</strong> ({employee.employeeCode})
@@ -116,7 +116,10 @@ const LifecycleDialog: React.FC<Props & { employee: EmployeeResponse }> = ({
 
         <div className="p-3 bg-black/5 dark:bg-white/5 rounded-xl text-xs space-y-2">
           {finalizing ? (
-            <p className="text-red-600 font-medium">CRITICAL: Confirming will permanently erase the employee record from the database.</p>
+            <p className="text-red-600 font-medium">
+              Confirming marks this employee as <strong>DELETED</strong> and disables their sign-in. The record is kept and
+              can still be viewed with the DELETED status filter, but it can no longer be changed.
+            </p>
           ) : isWaitingForDeletion ? (
             <p className="text-gray-600 dark:text-neutral-300 flex items-start gap-1.5">
               <Info className="w-3.5 h-3.5 shrink-0 mt-px" /> This deletion is waiting for an employee approver to finalize it.
@@ -147,7 +150,7 @@ const LifecycleDialog: React.FC<Props & { employee: EmployeeResponse }> = ({
                   <Loader2 className="w-3.5 h-3.5 animate-spin" /> Processing...
                 </>
               ) : finalizing ? (
-                'Confirm Permanent Delete'
+                'Confirm Delete'
               ) : (
                 'Mark Waiting for Deletion'
               )}

@@ -25,7 +25,9 @@ import {
   Truck,
   LifeBuoy,
   Star,
-  Building2
+  Building2,
+  Wallet,
+  BookOpen
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useThemeStore } from '../../store/useThemeStore';
@@ -58,6 +60,8 @@ const ICON_MAP: Record<string, LucideIcon> = {
   FileText,
   LayoutDashboard,
   Building2,
+  Wallet,
+  BookOpen,
 };
 
 export const AdminLayout: React.FC = () => {
@@ -84,10 +88,12 @@ export const AdminLayout: React.FC = () => {
   };
 
   useAccessSync();
-  const { authorizedNavigation, designationLabel, level } = useAccess();
+  const { authorizedNavigation, designationLabel, level, can } = useAccess();
+  // Dealer logins see only their own portal: no admin level, no management modules
+  const isDealer = can('DEALER_PORTAL_VIEW');
   // Only the modules the user's permissions open
   const visibleNavItems = useMemo(() => authorizedNavigation(), [authorizedNavigation]);
-  const levelLabel = level === 'ADMIN_L2' ? 'Level 2' : level === 'ADMIN_L1' ? 'Level 1' : level;
+  const levelLabel = level === 'ADMIN_L2' ? 'Level 2' : level === 'ADMIN_L1' ? 'Level 1' : isDealer ? null : level;
 
   // "1" next to Company Profile while a change waits for approval.
   const hasCompanyProfileNav = visibleNavItems.some((item) => item.id === 'company-profile');
@@ -108,7 +114,7 @@ export const AdminLayout: React.FC = () => {
           <span className="font-semibold text-lg tracking-tight flex items-center">
             TinQa Procurement 
             <span className="text-xs px-2 py-0.5 rounded-full bg-blue-500/10 text-[#0071e3] dark:text-blue-400 ml-2 font-mono uppercase">
-              {designationLabel ? `${designationLabel} · ${levelLabel}` : levelLabel || 'Admin'}
+              {[designationLabel, levelLabel].filter(Boolean).join(' · ') || 'Admin'}
             </span>
           </span>
         </div>
@@ -166,7 +172,7 @@ export const AdminLayout: React.FC = () => {
         <aside className="w-64 hidden md:block shrink-0">
           <div className="bg-white dark:bg-[#161617] rounded-2xl p-3 sticky top-20 flex flex-col gap-1 border border-black/10 dark:border-white/10 shadow-sm transition-colors duration-200">
             <p className="px-3 py-2 text-[11px] font-bold tracking-wider text-gray-400 dark:text-neutral-500 uppercase select-none">
-              Management Modules
+              {isDealer ? 'Dealer Portal' : 'Management Modules'}
             </p>
 
             {visibleNavItems.length === 0 && (
@@ -179,11 +185,12 @@ export const AdminLayout: React.FC = () => {
             {visibleNavItems.map((item) => {
               const Icon = ICON_MAP[item.iconName] || HelpCircle;
               return (
+                // The User Guide is last in APP_NAVIGATION; a divider sets it apart from the modules
                 <NavLink
                   key={item.path}
                   to={item.path}
                   className={({ isActive }) =>
-                    `group flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-colors duration-150 ${
+                    `${item.id === 'user-guide' ? 'mt-2 relative before:absolute before:-top-1.5 before:left-3 before:right-3 before:border-t before:border-black/10 dark:before:border-white/10 ' : ''}group flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-colors duration-150 ${
                       isActive
                         ? 'bg-[#0071e3] text-white shadow-sm font-semibold'
                         : 'text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-white/10 hover:text-black dark:hover:text-white'

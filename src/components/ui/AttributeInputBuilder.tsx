@@ -140,7 +140,7 @@ export const AttributeInputBuilder: React.FC<Props> = ({
                 <button
                   type="button"
                   onClick={() => handleRemoveAttribute(key)}
-                  className="p-0.5 text-gray-400 hover:text-red-500 rounded transition-colors ml-1 cursor-pointer"
+                  className="p-0.5 text-rose-500 hover:text-rose-600 hover:bg-rose-500/10 dark:text-rose-400 rounded transition-colors ml-1 cursor-pointer"
                   title="Remove Attribute"
                 >
                   <Trash2 className="w-3.5 h-3.5" />

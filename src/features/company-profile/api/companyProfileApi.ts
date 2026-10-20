@@ -46,6 +46,12 @@ export const companyProfileApi = {
     return response.data;
   },
 
+  /** DELETE /drafts/{id} — own DRAFT/REJECTED (anyone's with COMPANY_PROFILE_DRAFT_DELETE_ANY) → DELETED (final). */
+  deleteDraft: async (id: number): Promise<ApiResponse<CompanyProfileVersion>> => {
+    const response = await ecommerceAxiosClient.delete<ApiResponse<CompanyProfileVersion>>(`${BASE_URL}/drafts/${id}`);
+    return response.data;
+  },
+
   /** POST /drafts/{id}/submit — L1, own DRAFT/REJECTED → PENDING_APPROVAL. */
   submitDraft: async (id: number): Promise<ApiResponse<CompanyProfileVersion>> => {
     const response = await ecommerceAxiosClient.post<ApiResponse<CompanyProfileVersion>>(`${BASE_URL}/drafts/${id}/submit`);

@@ -6,21 +6,27 @@ import { useAccess } from '../../../hooks/useAccess';
 
 export interface ItemFilterBarProps {
   searchQuery: string;
-  selectedCategoryId?: number;
+  /** Shared with the table's Category column filter, which can pick several. */
+  selectedCategoryIds: number[];
   categories: CategoryResponse[];
   onSearchChange: (value: string) => void;
-  onCategoryChange: (categoryId: number | undefined) => void;
+  /** Enter in the search box: search now instead of waiting for typing to pause. */
+  onSearchSubmit?: () => void;
+  onCategoryChange: (categoryIds: number[]) => void;
   /** Hidden when absent (no permission). */
   onOpenCreateItemModal?: () => void;
   /** Hidden when absent (no permission). */
   onOpenCreateCategoryModal?: () => void;
 }
 
+const MULTIPLE = 'multiple';
+
 export const ItemFilterBar: React.FC<ItemFilterBarProps> = ({
   searchQuery,
-  selectedCategoryId,
+  selectedCategoryIds,
   categories,
   onSearchChange,
+  onSearchSubmit,
   onCategoryChange,
   onOpenCreateItemModal,
   onOpenCreateCategoryModal,
@@ -35,18 +41,23 @@ export const ItemFilterBar: React.FC<ItemFilterBarProps> = ({
           type="text"
           value={searchQuery}
           onChange={(e) => onSearchChange(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && onSearchSubmit?.()}
           placeholder="Search items by name or code..."
           className="w-full pl-9 pr-4 py-2 bg-white dark:bg-neutral-900 border border-black/10 dark:border-white/10 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-[#0071e3] text-black dark:text-white"
         />
       </div>
       <select
-        value={selectedCategoryId || ''}
-        onChange={(e) =>
-          onCategoryChange(e.target.value ? Number(e.target.value) : undefined)
-        }
+        aria-label="Category"
+        value={selectedCategoryIds.length > 1 ? MULTIPLE : String(selectedCategoryIds[0] ?? '')}
+        onChange={(e) => onCategoryChange(e.target.value ? [Number(e.target.value)] : [])}
         className="px-3 py-2 bg-white dark:bg-neutral-900 border border-black/10 dark:border-white/10 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-[#0071e3] text-black dark:text-white cursor-pointer"
       >
         <option value="">All Categories</option>
+        {selectedCategoryIds.length > 1 && (
+          <option value={MULTIPLE} disabled>
+            {selectedCategoryIds.length} categories
+          </option>
+        )}
         {categories.map((c) => (
           <option key={c.id} value={c.id}>
             {c.name}

@@ -1,6 +1,7 @@
 import { useNotify } from '../../../hooks/useNotify';
 import React, { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
+import { hasFormChanges } from '../../../utils/formChanges';
 import type {
   CategoryResponse,
   ItemResponse,
@@ -34,10 +35,11 @@ interface Props {
 
 // Keep in sync with the backend item constraints.
 const validateItemPayload = (
-  payload: { categoryId: number; name: string; mrp: number; unitOfMeasure: string; countryOfOrigin: string },
+  payload: { categoryIds: number[]; name: string; mrp: number; unitOfMeasure: string; countryOfOrigin: string },
   sku?: string
 ): string | null => {
-  if (!Number.isInteger(payload.categoryId) || payload.categoryId <= 0) return 'Please select a category.';
+  if (payload.categoryIds.length === 0) return 'Please select at least one category.';
+  if (payload.categoryIds.length > 20) return 'An item cannot have more than 20 categories.';
   if (payload.name.length < 2 || payload.name.length > 150) return 'Item name must be 2-150 characters.';
   if (sku !== undefined && !/^[A-Za-z0-9_-]{2,50}$/.test(sku)) {
     return 'SKU must be 2-50 characters using letters, numbers, "-" or "_".';
@@ -61,7 +63,8 @@ export const ItemFormModal: React.FC<Props> = ({
   serverFieldErrors,
 }) => {
   const [formData, setFormData] = useState({
-    categoryId: '',
+    // Kept sorted, so the order categories were picked in doesn't count as a change
+    categoryIds: [] as number[],
     name: '',
     brand: '',
     sku: '',
@@ -76,6 +79,8 @@ export const ItemFormModal: React.FC<Props> = ({
   const [attributes, setAttributes] = useState<Record<string, string>>({});
   const [warranties, setWarranties] = useState<WarrantyFormItem[]>([]);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  // What the form opened with; Save stays disabled until something differs from it.
+  const [baseline, setBaseline] = useState<{ formData: typeof formData; attributes: Record<string, string>; warranties: WarrantyFormItem[] } | null>(null);
   const notify = useNotify();
 
   // Show backend field errors from the latest save on their cards (adjusted during render, not in an effect).
@@ -87,8 +92,8 @@ export const ItemFormModal: React.FC<Props> = ({
 
   useEffect(() => {
     if (initialData) {
-      setFormData({
-        categoryId: String(initialData.categoryId),
+      const initialForm = {
+        categoryIds: (initialData.categories ?? []).map((c) => c.id).sort((a, b) => a - b),
         name: initialData.name,
         brand: initialData.brand || '',
         sku: initialData.sku,
@@ -98,12 +103,15 @@ export const ItemFormModal: React.FC<Props> = ({
         rawMaterialsUsed: initialData.rawMaterialsUsed || '',
         termsAndCondition: initialData.termsAndCondition || '',
         description: initialData.description || '',
-      });
+      };
+      const initialWarranties = toWarrantyForms(initialData.warranties);
+      setFormData(initialForm);
       setAttributes(initialData.attributes || {});
-      setWarranties(toWarrantyForms(initialData.warranties));
+      setWarranties(initialWarranties);
+      setBaseline({ formData: initialForm, attributes: initialData.attributes || {}, warranties: initialWarranties });
     } else {
-      setFormData({
-        categoryId: categories[0]?.id ? String(categories[0].id) : '',
+      const initialForm = {
+        categoryIds: [] as number[],
         name: '',
         brand: '',
         sku: '',
@@ -111,26 +119,44 @@ export const ItemFormModal: React.FC<Props> = ({
         mrp: '',
         countryOfOrigin: 'India',
         rawMaterialsUsed: '',
-            termsAndCondition: '',
+        termsAndCondition: '',
         description: '',
-      });
+      };
+      setFormData(initialForm);
       setAttributes({});
       setWarranties([]);
+      setBaseline({ formData: initialForm, attributes: {}, warranties: [] });
     }
     setFieldErrors({});
-  }, [initialData, categories, isOpen]);
+  }, [initialData, isOpen]);
 
   if (!isOpen) return null;
 
   const isEdit = !!initialData;
   const isFormComplete =
-    !!formData.categoryId &&
+    formData.categoryIds.length > 0 &&
     !!formData.name.trim() &&
     (isEdit || !!formData.sku.trim()) &&
     !!formData.unitOfMeasure.trim() &&
     Number(formData.mrp) > 0 &&
     !!formData.countryOfOrigin.trim() &&
     warrantiesComplete(warranties);
+  // `uid` is a client-only card key, not data.
+  const withoutUids = (list: WarrantyFormItem[]) => list.map((w) => ({ ...w, uid: '' }));
+  const hasChanges =
+    !baseline ||
+    hasFormChanges(
+      { formData, attributes, warranties: withoutUids(warranties) },
+      { ...baseline, warranties: withoutUids(baseline.warranties) }
+    );
+
+  const toggleCategory = (id: number) =>
+    setFormData((prev) => ({
+      ...prev,
+      categoryIds: prev.categoryIds.includes(id)
+        ? prev.categoryIds.filter((c) => c !== id)
+        : [...prev.categoryIds, id].sort((a, b) => a - b),
+    }));
 
   const handleWarrantiesChange: WarrantyEditorChange = (items, edited) => {
     setWarranties(items);
@@ -139,10 +165,10 @@ export const ItemFormModal: React.FC<Props> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!isFormComplete) return;
+    if (!isFormComplete || !hasChanges) return;
 
     const basePayload = {
-      categoryId: Number(formData.categoryId),
+      categoryIds: formData.categoryIds,
       name: formData.name.trim(),
       brand: formData.brand.trim() || undefined,
       unitOfMeasure: formData.unitOfMeasure.trim(),
@@ -201,23 +227,35 @@ export const ItemFormModal: React.FC<Props> = ({
         <form onSubmit={handleSubmit} className="p-6 space-y-4 overflow-y-auto flex-1">
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {/* Category */}
-            <div>
-              <label className="block text-xs font-semibold text-gray-600 dark:text-neutral-300 mb-1">
-                Category *
-              </label>
-              <select
-                required
-                value={formData.categoryId}
-                onChange={(e) => setFormData({ ...formData, categoryId: e.target.value })}
-                className="w-full px-3 py-2 text-xs bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0071e3]"
-              >
-                {categories.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
+            {/* Categories: dealers assigned any of them can quote for the item */}
+            <div className="sm:col-span-2">
+              <span className="block text-xs font-semibold text-gray-600 dark:text-neutral-300 mb-1">
+                Categories *
+              </span>
+              <div className="flex flex-wrap gap-2 p-3 rounded-xl border border-black/10 dark:border-white/10 bg-black/5 dark:bg-white/5 max-h-36 overflow-y-auto">
+                {categories.length === 0 && (
+                  <span className="text-[11px] text-gray-400">No categories yet — create one with "New Category".</span>
+                )}
+                {categories.map((c) => {
+                  const isSelected = formData.categoryIds.includes(c.id);
+                  return (
+                    <button
+                      key={c.id}
+                      type="button"
+                      aria-pressed={isSelected}
+                      onClick={() => toggleCategory(c.id)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
+                        isSelected
+                          ? 'bg-[#0071e3] text-white'
+                          : 'bg-black/5 dark:bg-white/10 text-gray-700 dark:text-neutral-300 hover:bg-black/10'
+                      }`}
+                    >
+                      {c.name}
+                    </button>
+                  );
+                })}
+              </div>
+              {fieldErrors.categoryIds && <p className="mt-1 text-[11px] text-red-500">{fieldErrors.categoryIds}</p>}
             </div>
 
             {/* SKU */}
@@ -389,7 +427,8 @@ export const ItemFormModal: React.FC<Props> = ({
             </button>
             <button
               type="submit"
-              disabled={isSubmitting || !isFormComplete}
+              disabled={isSubmitting || !isFormComplete || !hasChanges}
+              title={!hasChanges ? 'No changes to save.' : undefined}
               className="px-5 py-2 bg-[#0071e3] hover:bg-[#0077ed] text-white rounded-xl text-xs font-semibold disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
             >
               {isSubmitting

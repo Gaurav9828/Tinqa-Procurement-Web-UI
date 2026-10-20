@@ -3,6 +3,8 @@ import { X } from 'lucide-react';
 import { ComponentsPreview } from './ComponentsPreview';
 import { ProductRatingSummary } from '../../reviews/components/ProductRatingSummary';
 import type { ProductResponse } from '../types/product.types';
+import { describeGst } from '../utils/productTax';
+import { ProductTaxBreakdown } from './ProductTaxBreakdown';
 
 interface ProductPreviewModalProps {
   product: ProductResponse | null;
@@ -39,7 +41,7 @@ export const ProductPreviewModal: React.FC<ProductPreviewModalProps> = ({ produc
 
           <div className="grid grid-cols-3 gap-3 p-3 bg-black/[0.02] dark:bg-white/[0.02] border border-black/10 dark:border-white/10 rounded-xl">
             <div>
-              <span className="text-gray-400 block">Price</span>
+              <span className="text-gray-400 block">Price (incl. GST)</span>
               <span className="font-bold text-black dark:text-white text-sm">₹{product.price?.toLocaleString('en-IN')}</span>
             </div>
             <div>
@@ -50,6 +52,12 @@ export const ProductPreviewModal: React.FC<ProductPreviewModalProps> = ({ produc
               <span className="text-gray-400 block">Discount</span>
               <span className="font-bold text-black dark:text-white text-sm">{product.discountPercentage ? `${product.discountPercentage}%` : '0%'}</span>
             </div>
+          </div>
+
+          <div className="space-y-1">
+            <h4 className="font-semibold text-gray-700 dark:text-gray-300">GST</h4>
+            <p className="text-black dark:text-white">{describeGst(product)}</p>
+            <ProductTaxBreakdown price={product.price} discountPercentage={product.discountPercentage} gst={product} />
           </div>
 
           {product.description && (

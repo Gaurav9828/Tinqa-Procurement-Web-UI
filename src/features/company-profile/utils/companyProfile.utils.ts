@@ -21,6 +21,7 @@ export const STATUS_LABELS: Record<VersionStatus, string> = {
   REJECTED: 'Rejected',
   SUPERSEDED: 'Superseded',
   WITHDRAWN: 'Withdrawn',
+  DELETED: 'Deleted',
 };
 
 /** Labels for change rows and missing-field lists; keys are the backend's field paths. */
@@ -48,6 +49,7 @@ export const FIELD_LABELS: Record<string, string> = {
   careersEmail: 'Careers email',
   website: 'Website',
   invoiceTerms: 'Invoice terms',
+  shippingRules: 'Shipping charges',
   homeVideoEnabled: 'Home page video',
   homeVideoUrl: 'Home page video link',
 };
@@ -57,6 +59,8 @@ export const IMAGE_FIELDS = new Set(['logoUrl', 'logoDarkUrl', 'faviconUrl']);
 export const fieldLabel = (field: string) => {
   const term = /^invoiceTerms\[(\d+)\]$/.exec(field);
   if (term) return `Invoice term ${Number(term[1]) + 1}`;
+  const rule = /^shippingRules\[(\d+)\]\.(minOrderValue|maxOrderValue|fee)$/.exec(field);
+  if (rule) return `Shipping rule ${Number(rule[1]) + 1} ${rule[2] === 'fee' ? 'fee' : 'order value'}`;
   return FIELD_LABELS[field] ?? field;
 };
 
@@ -71,6 +75,14 @@ export const changesLiveHomeVideo = (version: CompanyProfileVersion, live?: Comp
     return on !== wasOn || (on && (version.homeVideoUrl ?? null) !== (live?.homeVideoUrl ?? null));
   }
   return !!version.changes?.some((c) => c.field === 'homeVideoEnabled' || (c.field === 'homeVideoUrl' && on));
+};
+
+export const rupees = (amount: number) => `₹${amount.toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
+
+/** "Below ₹10,000", "₹10,000 to below ₹15,000", "₹15,000 and above" (or "Every order" for a single rule). */
+export const shippingRuleRange = (min: number, max: number | null) => {
+  if (max == null) return min === 0 ? 'Every order' : `${rupees(min)} and above`;
+  return min === 0 ? `Below ${rupees(max)}` : `${rupees(min)} to below ${rupees(max)}`;
 };
 
 /** Booleans in read-only views and change rows; null (never set) reads as off. */
@@ -104,7 +116,7 @@ export const PENDING_SUBMIT_BLOCKED = 'A change is waiting for approval. Submit 
 /** Fallback texts for the backend's error codes (its own `message` wins when present). */
 export const ERROR_MESSAGES: Record<string, string> = {
   APPROVAL_SELF_NOT_ALLOWED: 'You created or submitted this change; another approver must approve it.',
-  NOT_VERSION_OWNER: 'Only the admin who created this draft can edit or submit it, and only the submitter can withdraw it.',
+  NOT_VERSION_OWNER: 'Only the admin who created this draft can edit, submit or delete it (a Super Admin can delete any draft), and only the submitter can withdraw it.',
   FORBIDDEN: 'Your admin level is not allowed to do this.',
   VERSION_NOT_FOUND: 'This version no longer exists.',
   COMPANY_PROFILE_NOT_FOUND: 'No company profile has been set up yet.',

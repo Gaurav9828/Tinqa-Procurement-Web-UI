@@ -1,4 +1,4 @@
-import type { CreateProductRequest, ProductResponse, UpdateProductRequest } from '../types/product.types';
+import type { CreateProductRequest, ProductGstFields, ProductResponse, UpdateProductRequest } from '../types/product.types';
 import type { ProductApprovalResponse, ProductApprovalSnapshot } from '../types/productApproval.types';
 
 /**
@@ -95,7 +95,7 @@ export const APPROVAL_STATE_LABELS: Record<ProductApprovalState, string> = {
 
 /** Copy of the product for the reviewer. */
 export const buildApprovalSnapshot = (
-  product: Pick<ProductResponse, 'title' | 'tagline' | 'price' | 'discountPercentage' | 'stockQuantity' | 'image1Url'> & {
+  product: Pick<ProductResponse, 'title' | 'tagline' | 'price' | 'discountPercentage' | 'stockQuantity' | 'image1Url'> & Partial<ProductGstFields> & {
     specifications?: unknown[] | null;
     components?: { itemId: number; itemName: string; quantity: number }[] | null;
     warranties?: { title: string; warrantyType: string; durationValue: number; durationUnit: string; isActive?: boolean }[] | null;
@@ -105,6 +105,8 @@ export const buildApprovalSnapshot = (
   tagline: product.tagline ?? null,
   price: Number(product.price),
   discountPercentage: product.discountPercentage ?? null,
+  hsnSac: product.hsnSac ?? null,
+  gstRate: product.gstRate ?? null,
   stockQuantity: Number(product.stockQuantity ?? 0),
   image1Url: product.image1Url ?? null,
   components: (product.components ?? []).map((c) => ({ itemId: c.itemId, itemName: c.itemName, quantity: Number(c.quantity) })),
@@ -125,6 +127,8 @@ export const snapshotFromRequest = (payload: CreateProductRequest | UpdateProduc
     tagline: payload.tagline ?? null,
     price: Number(payload.price ?? 0),
     discountPercentage: payload.discountPercentage ?? null,
+    hsnSac: payload.hsnSac ?? null,
+    gstRate: payload.gstRate ?? null,
     stockQuantity: Number(payload.stockQuantity ?? 0),
     image1Url: payload.image1Url ?? null,
     specifications: payload.specifications ?? [],

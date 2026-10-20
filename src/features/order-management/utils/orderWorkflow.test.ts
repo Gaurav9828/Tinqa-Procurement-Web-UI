@@ -10,8 +10,7 @@ import {
   getOrderBlockReason,
   validateMove,
   NO_ORDER_ACCESS,
-  type OrderAccess,
-} from './orderWorkflow';
+  type OrderAccess, isFrozenByDealerChange } from './orderWorkflow';
 
 // A Level 1 maker and a Level 2 approver, as the permissions they hold
 const L1: OrderAccess = { canEdit: true, canProgress: true, canApprove: false };
@@ -117,5 +116,14 @@ describe('orders without the progress permission', () => {
     expect(getNextOrderStatuses('CONFIRMED', viewer)).toEqual([]);
     expect(getOrderBlockReason('CONFIRMED', viewer)).toMatch(/designation/);
     expect(canEditOrder('QUOTATION', viewer)).toBe(false);
+  });
+});
+
+describe('dealer changes', () => {
+  it('freezes a quotation only while a dealer change waits for approval', () => {
+    expect(isFrozenByDealerChange({ orderStatus: 'QUOTATION', dealerChangePending: true })).toBe(true);
+    expect(isFrozenByDealerChange({ orderStatus: 'QUOTATION', dealerChangePending: false })).toBe(false);
+    expect(isFrozenByDealerChange({ orderStatus: 'QUOTATION' })).toBe(false);
+    expect(isFrozenByDealerChange({ orderStatus: 'PENDING', dealerChangePending: true })).toBe(false);
   });
 });

@@ -45,7 +45,7 @@ export const ItemTable: React.FC<Props> = ({
             <tr>
               <th className="p-4">Item Details</th>
               <th className="p-4">SKU</th>
-              <th className="p-4">Category</th>
+              <th className="p-4">Categories</th>
               <th className="p-4">UOM</th>
               <th className="p-4">MRP</th>
               <th className="p-4">Status</th>
@@ -81,7 +81,7 @@ export const ItemTable: React.FC<Props> = ({
                   {item.sku || '—'}
                 </td>
                 <td className="p-4 font-medium text-black dark:text-white">
-                  {item.categoryName || `Category #${item.categoryId}`}
+                  {item.categories?.map((c) => c.name).join(', ') || '—'}
                 </td>
                 <td className="p-4 text-gray-600 dark:text-neutral-300 font-medium">
                   {item.unitOfMeasure}

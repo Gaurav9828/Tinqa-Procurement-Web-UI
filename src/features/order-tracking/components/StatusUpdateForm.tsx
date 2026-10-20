@@ -1,11 +1,17 @@
 import React, { useMemo, useState } from 'react';
 import { CreditCard, Loader2, Lock, RefreshCw, Send, Truck, Undo2 } from 'lucide-react';
-import { CommonTextArea } from '../../../components/ui/FormInputs';
+import { CommonInput, CommonTextArea } from '../../../components/ui/FormInputs';
 import { ConfirmationModal } from '../../../components/ui/ConfirmationModal';
 import { NextStepPicker } from '../../../components/ui/NextStepPicker';
 import type { TrackingStatusOption } from '../types/orderTracking.types';
 import { formatStatusLabel } from '../utils/orderTracking.utils';
-import { STATUS_NOTES_MAX_LENGTH, type StatusUpdateResult } from '../hooks/useStatusUpdate';
+import {
+  SHIPPING_COST_REQUIRED,
+  SHIPPING_COST_STATUSES,
+  STATUS_NOTES_MAX_LENGTH,
+  type ShippingCostInput,
+  type StatusUpdateResult,
+} from '../hooks/useStatusUpdate';
 import {
   FINAL_STATUSES,
   STATUS_INFO,
@@ -29,7 +35,7 @@ interface Props {
   /** Current status and payment, which decide the allowed next steps. */
   workflow: WorkflowContext;
   isSubmitting: boolean;
-  onSubmit: (orderNumber: string, status: string, notes: string) => Promise<StatusUpdateResult>;
+  onSubmit: (orderNumber: string, status: string, notes: string, shipping?: ShippingCostInput) => Promise<StatusUpdateResult>;
   /** Delivery riders: only delivery outcomes are offered; payment and refund guidance is not theirs to act on. */
   deliveryOnly?: boolean;
 }
@@ -52,10 +58,15 @@ export const StatusUpdateForm: React.FC<Props> = ({
 }) => {
   const [status, setStatus] = useState('');
   const [notes, setNotes] = useState('');
+  const [shippingCost, setShippingCost] = useState('');
+  const [shippingPartner, setShippingPartner] = useState('');
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [confirmOpen, setConfirmOpen] = useState(false);
 
   const lockReason = getLockReason(workflow);
+  // The cost of the leg this move starts, entered here and sent for approval as an expense
+  const asksShippingCost = !deliveryOnly && SHIPPING_COST_STATUSES.has(status);
+  const shippingCostRequired = SHIPPING_COST_REQUIRED.has(status);
 
   // Workflow rules ∩ statuses the server knows (a step the backend doesn't support yet is never offered).
   const options = useMemo(() => {
@@ -78,18 +89,24 @@ export const StatusUpdateForm: React.FC<Props> = ({
   const refundHint = deliveryOnly ? null : getRefundHint(workflow);
 
   const send = async () => {
-    const result = await onSubmit(orderNumber, status, notes);
+    const result = await onSubmit(orderNumber, status, notes, asksShippingCost ? { cost: shippingCost, partner: shippingPartner } : undefined);
     setConfirmOpen(false);
     setFieldErrors(result.fieldErrors);
     if (result.ok) {
       setStatus('');
       setNotes('');
+      setShippingCost('');
+      setShippingPartner('');
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (controlsDisabled || !status) return;
+    if (asksShippingCost && shippingCostRequired && !shippingCost.trim()) {
+      setFieldErrors((prev) => ({ ...prev, shippingCost: 'Enter what this shipment costs (0 if nothing).' }));
+      return;
+    }
     if (status && needsConfirmation(status)) {
       setConfirmOpen(true);
       return;
@@ -198,6 +215,39 @@ export const StatusUpdateForm: React.FC<Props> = ({
             }}
           />
         )}
+        {asksShippingCost && (
+          <div className="space-y-2 p-3 rounded-xl bg-black/[0.03] dark:bg-white/[0.04]" role="group" aria-label="Shipping cost of this leg">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <CommonInput
+                label={shippingCostRequired ? 'Shipping cost (₹)' : 'Shipping cost (₹, optional)'}
+                aria-label="Shipping cost"
+                required={shippingCostRequired}
+                inputMode="decimal"
+                placeholder="0.00"
+                value={shippingCost}
+                error={fieldErrors.shippingCost}
+                disabled={controlsDisabled}
+                onChange={(e) => {
+                  setShippingCost(e.target.value);
+                  setFieldErrors((prev) => ({ ...prev, shippingCost: '' }));
+                }}
+              />
+              <CommonInput
+                label="Courier / partner (optional)"
+                aria-label="Shipping partner"
+                maxLength={100}
+                value={shippingPartner}
+                error={fieldErrors.shippingPartner}
+                disabled={controlsDisabled}
+                onChange={(e) => setShippingPartner(e.target.value)}
+              />
+            </div>
+            <p className="text-[10px] text-gray-500 dark:text-neutral-400 px-1">
+              What the company pays for this leg, even when the customer paid no shipping. It goes to an approver as an
+              expense and is posted to the company account once approved. Enter 0 if nothing was spent.
+            </p>
+          </div>
+        )}
         <div>
           <CommonTextArea
             label="Notes (optional)"
@@ -219,7 +269,9 @@ export const StatusUpdateForm: React.FC<Props> = ({
         <button
           type="submit"
           disabled={controlsDisabled || !status}
-          className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-[#0071e3] hover:bg-[#0077ed] text-white rounded-xl text-xs font-semibold transition-colors disabled:opacity-60 cursor-pointer disabled:cursor-not-allowed"
+          className={`w-full flex items-center justify-center gap-2 px-4 py-2.5 text-white rounded-xl text-xs font-semibold transition-colors disabled:opacity-60 cursor-pointer disabled:cursor-not-allowed ${
+            !status ? 'bg-[#0071e3] hover:bg-[#0077ed]' : STATUS_INFO[status]?.tone === 'exception' ? 'bg-rose-600 hover:bg-rose-700' : 'bg-emerald-600 hover:bg-emerald-700'
+          }`}
         >
           {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
           {isSubmitting ? 'Saving…' : 'Update status'}

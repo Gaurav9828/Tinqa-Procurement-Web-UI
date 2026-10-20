@@ -202,7 +202,7 @@ export const ItemWarrantiesEditor = <T extends WarrantyFormItem>({
                 disabled={cardDisabled}
                 aria-label={`Remove warranty ${index + 1}`}
                 title={isReadOnly ? 'Remove the item from Components to remove its warranties' : 'Remove warranty'}
-                className="p-1.5 text-gray-400 hover:text-rose-500 rounded-lg cursor-pointer shrink-0 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:text-gray-400"
+                className="p-1.5 text-rose-500 hover:text-rose-600 hover:bg-rose-500/10 dark:text-rose-400 rounded-lg cursor-pointer shrink-0 disabled:opacity-40 disabled:cursor-not-allowed disabled:text-gray-400 disabled:hover:bg-transparent"
               >
                 <Trash2 className="w-4 h-4" />
               </button>

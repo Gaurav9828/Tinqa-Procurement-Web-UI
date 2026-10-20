@@ -28,6 +28,9 @@ import {
   type ComponentFormRow,
 } from '../utils/componentForm';
 import { componentMaxFor } from '../utils/componentStock';
+import { describeGst, emptyTaxForm, gstChanged, toGstFields, toTaxForm, validateTaxForm, type ProductTaxForm } from '../utils/productTax';
+import { ProductTaxSection } from './ProductTaxSection';
+import { ProductTaxBreakdown } from './ProductTaxBreakdown';
 
 interface EditProductModalProps {
   product: ProductResponse | null;
@@ -68,6 +71,8 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
 
   const [showPreviewModal, setShowPreviewModal] = useState(false);
   const [pendingPayload, setPendingPayload] = useState<UpdateProductRequest | null>(null);
+  // GST included in the price: which taxes apply and their rates
+  const [tax, setTax] = useState<ProductTaxForm>(emptyTaxForm);
 
   // Components keep the warranty snapshot stored with the product until an item is changed or refreshed.
   const [components, setComponents] = useState<ComponentFormRow[]>([]);
@@ -99,6 +104,7 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
         lastUpdateDescription: '',
         specifications: product.specifications ? product.specifications.map(s => ({ specKey: s.specKey, specValue: s.specValue })) : [],
       });
+      setTax(toTaxForm(product));
       resetWarranties(toProductWarrantyForms(product.warranties));
       setComponents(toComponentRows(product.components));
       setFieldErrors({});
@@ -120,14 +126,17 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
     if (!product) return [];
     const changes: { label: string; oldVal: any; newVal: any }[] = [];
 
-    if (formData.title !== product.title) {
+    if ((formData.title || '').trim() !== (product.title || '').trim()) {
       changes.push({ label: 'Title', oldVal: product.title, newVal: formData.title });
     }
-    if ((formData.tagline || '') !== (product.tagline || '')) {
+    if ((formData.tagline || '').trim() !== (product.tagline || '').trim()) {
       changes.push({ label: 'Tagline', oldVal: product.tagline || 'None', newVal: formData.tagline || 'None' });
     }
     if (Number(formData.price) !== Number(product.price)) {
       changes.push({ label: 'Price', oldVal: `₹${product.price}`, newVal: `₹${formData.price}` });
+    }
+    if (gstChanged(product, toGstFields(tax))) {
+      changes.push({ label: 'GST', oldVal: describeGst(product), newVal: describeGst(toGstFields(tax)) });
     }
     if (Number(formData.stockQuantity) !== Number(product.stockQuantity)) {
       changes.push({ label: 'Stock Quantity', oldVal: product.stockQuantity, newVal: formData.stockQuantity });
@@ -135,7 +144,7 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
     if (Number(formData.discountPercentage || 0) !== Number(product.discountPercentage || 0)) {
       changes.push({ label: 'Discount Percentage', oldVal: `${product.discountPercentage || 0}%`, newVal: `${formData.discountPercentage || 0}%` });
     }
-    if ((formData.description || '') !== (product.description || '')) {
+    if ((formData.description || '').trim() !== (product.description || '').trim()) {
       changes.push({ label: 'Description', oldVal: product.description || 'None', newVal: formData.description || 'None' });
     }
     if (Boolean(formData.enabled) !== Boolean(product.enabled)) {
@@ -146,7 +155,7 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
     for (let i = 1; i <= 5; i++) {
       const key = `image${i}Url` as keyof ProductResponse;
       const payloadKey = `image${i}Url` as keyof UpdateProductRequest;
-      if ((formData[payloadKey] || '') !== (product[key] || '')) {
+      if (String(formData[payloadKey] || '').trim() !== String(product[key] || '').trim()) {
         changes.push({ label: `Image ${i} URL`, oldVal: product[key] || 'None', newVal: formData[payloadKey] || 'None' });
       }
     }
@@ -186,6 +195,7 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
   };
 
   const changedFields = getChangedFields();
+  const taxErrors = validateTaxForm(tax);
 
   // Button is only enabled if fields are valid AND at least one modification is caught
   const isFormValid =
@@ -194,6 +204,7 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
     Number(formData.stockQuantity) >= 0 &&
     components.every((row) => row.itemId !== null && !!row.quantity.trim()) &&
     warrantiesComplete(warranties) &&
+    Object.keys(taxErrors).length === 0 &&
     changedFields.length > 0;
 
   const handleAddSpec = () => {
@@ -228,6 +239,7 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
     // Components: sent only when changed (the list replaces them all); omitted otherwise so stored snapshots stay untouched.
     setPendingPayload({
       ...formData,
+      ...toGstFields(tax),
       warranties: toProductWarrantyRequests(warranties, true),
       ...(componentsChanged(product.components ?? [], components) ? { components: toComponentRequests(components) } : {}),
     });
@@ -307,7 +319,7 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div>
-                <label className="block font-semibold text-gray-700 dark:text-gray-300 mb-1">Price (₹) *</label>
+                <label className="block font-semibold text-gray-700 dark:text-gray-300 mb-1">Price incl. GST (₹) *</label>
                 <input
                   type="number"
                   required
@@ -347,6 +359,15 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
                 />
               </div>
             </div>
+
+            <ProductTaxSection
+              value={tax}
+              onChange={setTax}
+              price={formData.price ?? ''}
+              discountPercentage={formData.discountPercentage}
+              errors={taxErrors}
+              disabled={isSubmitting}
+            />
 
             <div>
               <label className="block font-semibold text-gray-700 dark:text-gray-300 mb-1">Description</label>
@@ -509,6 +530,12 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
                   ))}
                 </div>
               )}
+              <ProductTaxBreakdown
+                price={pendingPayload.price}
+                discountPercentage={pendingPayload.discountPercentage}
+                gst={pendingPayload}
+                title={needsApproval ? 'What the invoice will show per unit once approved' : 'What the invoice will show per unit'}
+              />
             </div>
 
             <div className="flex items-center justify-end gap-2 px-6 py-4 border-t border-black/10 dark:border-white/10 bg-black/[0.01]">

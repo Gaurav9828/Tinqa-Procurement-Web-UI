@@ -111,6 +111,33 @@ export const Validator = {
     return /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(pan.trim().toUpperCase());
   },
 
+  /** A person's own PAN (4th letter P), as the backend requires for employees. */
+  isPersonalPan: (pan: string): boolean => {
+    if (!Validator.isValid(pan)) return false;
+    return /^[A-Z]{3}P[A-Z][0-9]{4}[A-Z]$/.test(pan.trim().toUpperCase());
+  },
+
+  /** https Google Maps links only, mirroring the backend's @GoogleMapsUrl check. */
+  isGoogleMapsUrl: (val: string): boolean => {
+    if (!Validator.isValid(val)) return false;
+    const raw = val.trim();
+    if (raw.length > 500 || /\s/.test(raw)) return false;
+    try {
+      const url = new URL(raw);
+      if (url.protocol !== 'https:' || url.username || url.password || url.port) return false;
+      const host = url.hostname.toLowerCase();
+      const path = url.pathname;
+      return (
+        ['maps.google.com', 'maps.google.co.in', 'maps.app.goo.gl'].includes(host) ||
+        (['google.com', 'www.google.com', 'google.co.in', 'www.google.co.in'].includes(host) &&
+          (path === '/maps' || path.startsWith('/maps/'))) ||
+        (host === 'goo.gl' && path.startsWith('/maps/'))
+      );
+    } catch {
+      return false;
+    }
+  },
+
   isPincode: (pincode: string): boolean => {
     if (!Validator.isValid(pincode)) return false;
     return /^[1-9][0-9]{5}$/.test(pincode.trim());

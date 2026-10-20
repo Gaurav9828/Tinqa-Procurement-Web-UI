@@ -44,7 +44,7 @@ export interface StatusInfo {
 export const ORDER_STATUS_INFO: Record<OrderStatus, StatusInfo> = {
   QUOTATION: { label: 'Quotation', description: 'Dealer quotation recorded; still editable.', action: 'Back to quotation', tone: 'forward' },
   PENDING: { label: 'Pending approval', description: 'Sent to an order approver.', action: 'Submit for approval', tone: 'forward' },
-  DEALER_LEVEL_PENDING: { label: 'Awaiting dealer', description: 'Approved; waiting for the dealer to accept the order.', action: 'Approve', tone: 'forward' },
+  DEALER_LEVEL_PENDING: { label: 'Awaiting dealer', description: 'Approved; waiting for the dealer to accept or reject it (they can answer from their dealer login).', action: 'Approve', tone: 'forward' },
   CONFIRMED: { label: 'Confirmed', description: 'The dealer accepted the order.', action: 'Dealer confirmed', tone: 'forward' },
   SHIPPED: { label: 'Shipped', description: 'The dealer dispatched the goods.', action: 'Mark shipped', tone: 'forward' },
   DELIVERED: { label: 'Delivered', description: 'Goods received at the warehouse.', action: 'Mark delivered', tone: 'forward' },
@@ -115,7 +115,7 @@ export const getOrderBlockReason = (status: string | null | undefined, access: O
   if (!access.canProgress) return "You can view this order but your designation doesn't include progressing orders.";
   if (APPROVER_ONLY_FROM.has(status) && !access.canApprove) {
     return status === 'DEALER_LEVEL_PENDING'
-      ? 'Waiting for the dealer. An order approver records their answer.'
+      ? 'Waiting for the dealer to accept or reject it from their dealer login. An order approver can record their answer instead.'
       : 'An order approver decides whether to approve this return.';
   }
   return null;
@@ -165,3 +165,9 @@ export const validateMove = (
   }
   return errors;
 };
+
+/** A dealer's change waits for approval: the quotation is frozen until it is decided (the backend refuses with 409). */
+export const DEALER_CHANGE_BLOCK_REASON = "A dealer's change to this quotation is waiting for approval in the Approvals hub.";
+
+export const isFrozenByDealerChange = (order: { orderStatus: string; dealerChangePending?: boolean }): boolean =>
+  !!order.dealerChangePending && order.orderStatus === 'QUOTATION';

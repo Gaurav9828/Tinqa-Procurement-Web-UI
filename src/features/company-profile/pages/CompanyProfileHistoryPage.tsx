@@ -6,6 +6,7 @@ import { useCompanyProfileAccess } from '../hooks/useCompanyProfileAccess';
 import { useCompanyProfileActions } from '../hooks/useCompanyProfileActions';
 import { BrandName, VersionStatusBadge } from '../components/ProfileDisplay';
 import { Skeleton, StateMessage } from '../components/Dialogs';
+import { DeleteDraftButton } from '../components/DeleteDraftButton';
 import { BUTTON } from '../utils/companyProfileUi';
 import type { CompanyProfileVersion } from '../types/companyProfile.types';
 import { COMPANY_PROFILE_PATH, companyDraftPath, companyVersionPath, formatServerTime } from '../utils/companyProfile.utils';
@@ -104,6 +105,7 @@ export const CompanyProfileHistoryPage: React.FC = () => {
                           <CopyPlus className="w-3.5 h-3.5" /> New draft from this
                         </button>
                       )}
+                      <DeleteDraftButton version={v} access={access} onStale={reload} onDeleted={() => void reload()} className="whitespace-nowrap" />
                     </td>
                   )}
                 </tr>

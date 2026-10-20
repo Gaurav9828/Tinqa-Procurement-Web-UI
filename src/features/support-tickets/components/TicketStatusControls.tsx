@@ -52,8 +52,10 @@ export const TicketStatusControls: React.FC<Props> = ({ referenceNumber, current
               onClick={() => (isClose ? setConfirmClose(true) : onChange(status))}
               className={`w-full flex items-start gap-2.5 p-3 rounded-xl border text-left transition-colors disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed ${
                 isClose
-                  ? 'border-rose-500/30 hover:bg-rose-500/5 text-rose-600 dark:text-rose-400'
-                  : 'border-black/10 dark:border-white/10 hover:bg-black/[0.03] dark:hover:bg-white/[0.04] text-black dark:text-white'
+                  ? 'border-rose-500/40 bg-rose-500/5 hover:bg-rose-500/10 text-rose-600 dark:text-rose-400'
+                  : status === 'RESOLVED'
+                    ? 'border-emerald-500/40 bg-emerald-500/5 hover:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400'
+                    : 'border-[#0071e3]/40 bg-[#0071e3]/5 hover:bg-[#0071e3]/10 text-[#0071e3] dark:text-blue-400'
               }`}
             >
               <Icon className="w-4 h-4 mt-0.5 shrink-0" />
@@ -74,6 +76,7 @@ export const TicketStatusControls: React.FC<Props> = ({ referenceNumber, current
       <ConfirmationModal
         isOpen={confirmClose}
         actionType="CONFIRM"
+        tone="danger"
         title="Close this ticket?"
         description={`Ticket ${referenceNumber} will be closed. Closed tickets are read-only: no further replies or status changes are possible.`}
         isSubmitting={isUpdating}

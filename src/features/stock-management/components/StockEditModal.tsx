@@ -2,6 +2,7 @@ import { useNotify } from '../../../hooks/useNotify';
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { X, Save } from 'lucide-react';
 import { Validator, type ValidationRule } from '../../../utils/validator';
+import { hasFormChanges } from '../../../utils/formChanges';
 import type { StockResponse, UpdateStockRequest } from '../types/stock.types';
 import { useDealerOptions, useItemOptions } from '../../../hooks/useLookupOptions';
 import { CommonInput, CommonSelect, CommonCheckbox } from '../../../components/ui/FormInputs';
@@ -50,13 +51,15 @@ export const StockEditModal: React.FC<StockEditModalProps> = ({
         isActive: true,
     });
 
+    // What the form opened with; Save stays disabled until something differs from it.
+    const [baseline, setBaseline] = useState<FormState | null>(null);
     const [touched, setTouched] = useState<Record<string, boolean>>({});
     const notify = useNotify();
 
 
     useEffect(() => {
         if (isOpen && stock) {
-            setFormData({
+            const initial: FormState = {
                 batchNumber: stock.batchNumber || '',
                 dealerId: String(stock.dealerId || ''),
                 itemId: String(stock.itemId || ''),
@@ -66,7 +69,9 @@ export const StockEditModal: React.FC<StockEditModalProps> = ({
                 dateOfArrival: stock.dateOfArrival || new Date().toISOString().split('T')[0],
                 additionalInfo: stock.additionalInfo || {},
                 isActive: stock.isActive ?? true,
-            });
+            };
+            setFormData(initial);
+            setBaseline(initial);
             setTouched({});
         }
     }, [isOpen, stock]);
@@ -109,6 +114,7 @@ export const StockEditModal: React.FC<StockEditModalProps> = ({
     }, [formData, validationRules]);
 
     const isValid = Object.keys(validationErrors).length === 0;
+    const hasChanges = !!baseline && hasFormChanges(formData, baseline);
 
     const handleBlur = useCallback((field: string) => {
         setTouched((prev) => ({ ...prev, [field]: true }));
@@ -120,7 +126,7 @@ export const StockEditModal: React.FC<StockEditModalProps> = ({
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!stock) return;
+        if (!stock || !hasChanges) return;
 
         if (!isValid) {
             const allTouched = Object.keys(validationErrors).reduce((acc, k) => ({ ...acc, [k]: true }), {});
@@ -280,7 +286,8 @@ export const StockEditModal: React.FC<StockEditModalProps> = ({
                     <button
                         type="submit"
                         form="stock-edit-form"
-                        disabled={isSubmitting || !isValid}
+                        disabled={isSubmitting || !isValid || !hasChanges}
+                        title={!hasChanges ? 'No changes to save.' : undefined}
                         className="flex items-center gap-1.5 px-4 py-2 text-xs font-medium text-white bg-[#0071e3] hover:bg-[#0071e3]/90 rounded-xl transition-colors disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
                     >
                         <Save className="w-4 h-4" />

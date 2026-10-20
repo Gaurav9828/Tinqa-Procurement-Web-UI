@@ -29,16 +29,23 @@ import { ItemPreviewModal } from '../components/ItemPreviewModal';
 import { HeaderColumnFilter } from '../components/HeaderColumnFilter';
 import { WarrantySummary } from '../components/WarrantyBadge';
 import { useAccess } from '../../../hooks/useAccess';
+import { Pager } from '../../../components/ui/Pager';
+import { UNITS_OF_MEASURE } from '../../../constants/unitsOfMeasure';
+import { ACTIVE_STATUS_OPTIONS } from '../../../utils/activeStatusFilter';
+
+const UOM_OPTIONS = UNITS_OF_MEASURE.map((unit) => unit.code);
 
 export const ItemManagementPage: React.FC = () => {
     const { can } = useAccess();
     const {
         items,
         totalElements,
+        totalPages,
         isLoading,
         filters,
-        updateSearch,
-        updateCategoryFilter,
+        updateFilter,
+        searchNow,
+        updatePage,
         refetch,
     } = useItemList();
 
@@ -60,11 +67,6 @@ export const ItemManagementPage: React.FC = () => {
     const [targetItemStatusToggle, setTargetItemStatusToggle] =
         useState<ItemResponse | null>(null);
 
-    // Column Header Specific Filters State
-    const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
-    const [selectedUoms, setSelectedUoms] = useState<string[]>([]);
-    const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
-
     const notify = useNotify();
 
     const loadCategories = useCallback(async () => {
@@ -82,36 +84,14 @@ export const ItemManagementPage: React.FC = () => {
         loadCategories();
     }, [loadCategories]);
 
-    // Unique options derived dynamically from fetched item set
-    const uomOptions = useMemo(() => {
-        return Array.from(new Set(items.map((i) => i.unitOfMeasure).filter(Boolean)));
-    }, [items]);
-
-    const categoryOptions = useMemo(() => {
-        return Array.from(
-            new Set(items.map((i) => i.categoryName || `Category #${i.categoryId}`).filter(Boolean))
-        );
-    }, [items]);
-
-    const statusOptions = ['Active', 'Inactive'];
-
-    // Client-side filtering across column header filters
-    const filteredItems = useMemo(() => {
-        return items.filter((item) => {
-            const catName = item.categoryName || `Category #${item.categoryId}`;
-            const matchesCat =
-                selectedCategories.length === 0 || selectedCategories.includes(catName);
-
-            const matchesUom =
-                selectedUoms.length === 0 || selectedUoms.includes(item.unitOfMeasure);
-
-            const itemStatus = item.isActive ? 'Active' : 'Inactive';
-            const matchesStatus =
-                selectedStatuses.length === 0 || selectedStatuses.includes(itemStatus);
-
-            return matchesCat && matchesUom && matchesStatus;
-        });
-    }, [items, selectedCategories, selectedUoms, selectedStatuses]);
+    // Header filter options cover the whole catalog (not just the loaded page); the backend applies them.
+    const categoryOptions = useMemo(() => categories.map((c) => c.name), [categories]);
+    const selectedCategoryNames = useMemo(
+        () => categories.filter((c) => filters.categoryIds.includes(c.id)).map((c) => c.name),
+        [categories, filters.categoryIds]
+    );
+    const handleCategoryNamesChange = (names: string[]) =>
+        updateFilter('categoryIds', categories.filter((c) => names.includes(c.name)).map((c) => c.id));
 
     const handleCreateCategory = async (data: any) => {
         const success = await createCategory(data);
@@ -178,183 +158,193 @@ export const ItemManagementPage: React.FC = () => {
             {/* Toolbar */}
             <ItemFilterBar
                 searchQuery={filters.search || ''}
-                selectedCategoryId={filters.categoryId}
+                selectedCategoryIds={filters.categoryIds}
                 categories={categories}
-                onSearchChange={updateSearch}
-                onCategoryChange={updateCategoryFilter}
+                onSearchChange={(search) => updateFilter('search', search)}
+                onSearchSubmit={searchNow}
+                onCategoryChange={(ids) => updateFilter('categoryIds', ids)}
                 onOpenCreateItemModal={can('ITEM_CREATE') ? handleOpenCreateItem : undefined}
                 onOpenCreateCategoryModal={can('ITEM_CATEGORY_MANAGE') ? () => setIsCategoryModalOpen(true) : undefined}
             />
 
-            {/* Item Table */}
-            {isLoading ? (
-                <div className="apple-card p-12 text-center text-gray-500 dark:text-neutral-400">
-                    <div className="inline-block w-6 h-6 border-2 border-[#0071e3] border-t-transparent rounded-full animate-spin mb-2" />
-                    <p className="text-sm">Loading item catalog...</p>
-                </div>
-            ) : filteredItems.length === 0 ? (
-                <div className="apple-card p-12 text-center space-y-2">
-                    <PackageSearch className="w-8 h-8 text-gray-400 mx-auto" />
-                    <h3 className="text-sm font-semibold">No Items Found</h3>
-                    <p className="text-xs text-gray-500">
-                        Try adjusting your search criteria or header column filter options.
-                    </p>
-                </div>
-            ) : (
-                <div className="apple-card overflow-hidden border border-black/10 dark:border-white/10">
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-left text-xs">
-                            <thead className="bg-black/5 dark:bg-white/5 border-b border-black/10 dark:border-white/10 font-semibold text-gray-500 uppercase tracking-wider">
+            {/* Item Table: stays mounted while loading or empty so the header filters stay open and can be cleared */}
+            <div className="apple-card overflow-hidden border border-black/10 dark:border-white/10">
+                <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs">
+                        <thead className="bg-black/5 dark:bg-white/5 border-b border-black/10 dark:border-white/10 font-semibold text-gray-500 uppercase tracking-wider">
+                            <tr>
+                                <th className="p-4">Item Details</th>
+                                <th className="p-4">SKU</th>
+                                <th className="p-4">
+                                    <HeaderColumnFilter
+                                        title="Category"
+                                        options={categoryOptions}
+                                        selectedValues={selectedCategoryNames}
+                                        onChange={handleCategoryNamesChange}
+                                    />
+                                </th>
+                                <th className="p-4">
+                                    <HeaderColumnFilter
+                                        title="UOM"
+                                        options={UOM_OPTIONS}
+                                        selectedValues={filters.unitsOfMeasure}
+                                        onChange={(units) => updateFilter('unitsOfMeasure', units)}
+                                    />
+                                </th>
+                                <th className="p-4">MRP</th>
+                                <th className="p-4">Warranties</th>
+                                <th className="p-4">
+                                    <HeaderColumnFilter
+                                        title="Status"
+                                        options={ACTIVE_STATUS_OPTIONS}
+                                        selectedValues={filters.statuses}
+                                        onChange={(statuses) => updateFilter('statuses', statuses)}
+                                    />
+                                </th>
+                                <th className="p-4 text-right">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody
+                            aria-busy={isLoading}
+                            className={`divide-y divide-black/5 dark:divide-white/5 transition-opacity ${isLoading && items.length > 0 ? 'opacity-50' : ''}`}
+                        >
+                            {items.length === 0 && (
                                 <tr>
-                                    <th className="p-4">Item Details</th>
-                                    <th className="p-4">SKU</th>
-                                    <th className="p-4">
-                                        <HeaderColumnFilter
-                                            title="Category"
-                                            options={categoryOptions}
-                                            selectedValues={selectedCategories}
-                                            onChange={setSelectedCategories}
-                                        />
-                                    </th>
-                                    <th className="p-4">
-                                        <HeaderColumnFilter
-                                            title="UOM"
-                                            options={uomOptions}
-                                            selectedValues={selectedUoms}
-                                            onChange={setSelectedUoms}
-                                        />
-                                    </th>
-                                    <th className="p-4">MRP</th>
-                                    <th className="p-4">Warranties</th>
-                                    <th className="p-4">
-                                        <HeaderColumnFilter
-                                            title="Status"
-                                            options={statusOptions}
-                                            selectedValues={selectedStatuses}
-                                            onChange={setSelectedStatuses}
-                                        />
-                                    </th>
-                                    <th className="p-4 text-right">Actions</th>
+                                    {/* Tall enough for an open header filter dropdown */}
+                                    <td colSpan={8} className="px-4 py-20 text-center text-gray-500 dark:text-neutral-400">
+                                        {isLoading ? (
+                                            <>
+                                                <div className="inline-block w-6 h-6 border-2 border-[#0071e3] border-t-transparent rounded-full animate-spin mb-2" />
+                                                <p className="text-sm">Loading item catalog...</p>
+                                            </>
+                                        ) : (
+                                            <div className="space-y-2">
+                                                <PackageSearch className="w-8 h-8 text-gray-400 mx-auto" />
+                                                <h3 className="text-sm font-semibold text-black dark:text-white">No Items Found</h3>
+                                                <p className="text-xs">Try adjusting your search criteria or header column filter options.</p>
+                                            </div>
+                                        )}
+                                    </td>
                                 </tr>
-                            </thead>
-                            <tbody className="divide-y divide-black/5 dark:divide-white/5">
-                                {filteredItems.map((item) => (
-                                    <tr
-                                        key={item.id}
-                                        className="hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition-colors"
-                                    >
-                                        <td className="p-4 max-w-xs">
-                                            <div>
-                                                <div className="flex items-center gap-2">
-                                                    <span className="font-semibold text-sm text-black dark:text-white">
-                                                        {item.name}
+                            )}
+                            {items.map((item) => (
+                                <tr
+                                    key={item.id}
+                                    className="hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition-colors"
+                                >
+                                    <td className="p-4 max-w-xs">
+                                        <div>
+                                            <div className="flex items-center gap-2">
+                                                <span className="font-semibold text-sm text-black dark:text-white">
+                                                    {item.name}
+                                                </span>
+                                                {item.brand && (
+                                                    <span className="px-2 py-0.5 rounded-md bg-black/5 dark:bg-white/10 text-[10px] font-medium text-gray-600 dark:text-neutral-300">
+                                                        {item.brand}
                                                     </span>
-                                                    {item.brand && (
-                                                        <span className="px-2 py-0.5 rounded-md bg-black/5 dark:bg-white/10 text-[10px] font-medium text-gray-600 dark:text-neutral-300">
-                                                            {item.brand}
+                                                )}
+                                            </div>
+                                            {item.description && (
+                                                <div className="mt-0.5">
+                                                    <Tooltip title={item.name} content={item.description}>
+                                                        <span className="text-[11px] text-gray-400 truncate max-w-[200px] block cursor-help">
+                                                            {item.description}
                                                         </span>
-                                                    )}
+                                                    </Tooltip>
                                                 </div>
-                                                {item.description && (
-                                                    <div className="mt-0.5">
-                                                        <Tooltip title={item.name} content={item.description}>
-                                                            <span className="text-[11px] text-gray-400 truncate max-w-[200px] block cursor-help">
-                                                                {item.description}
-                                                            </span>
-                                                        </Tooltip>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </td>
-                                        <td className="p-4 font-mono font-medium text-[#0071e3]">
-                                            {item.sku || '—'}
-                                        </td>
-                                        <td className="p-4 font-medium text-black dark:text-white">
-                                            {item.categoryName || `Category #${item.categoryId}`}
-                                        </td>
-                                        <td className="p-4 text-gray-600 dark:text-neutral-300 font-medium">
-                                            {item.unitOfMeasure}
-                                        </td>
-                                        <td className="p-4 font-semibold text-black dark:text-white">
-                                            {item.mrp !== undefined && item.mrp !== null
-                                                ? `₹${Number(item.mrp).toLocaleString('en-IN', {
-                                                      minimumFractionDigits: 2,
-                                                  })}`
-                                                : 'N/A'}
-                                        </td>
-                                        <td className="p-4" data-testid="item-warranties">
-                                            <WarrantySummary warranties={item.warranties} />
-                                        </td>
-                                        <td className="p-4">
-                                            <ItemStatusBadge active={item.isActive} />
-                                        </td>
-                                        <td className="p-4 text-right">
-                                            <div className="flex items-center justify-end gap-1">
-                                                {/* Preview Button */}
+                                            )}
+                                        </div>
+                                    </td>
+                                    <td className="p-4 font-mono font-medium text-[#0071e3]">
+                                        {item.sku || '—'}
+                                    </td>
+                                    <td className="p-4 font-medium text-black dark:text-white">
+                                        {item.categories?.map((c) => c.name).join(', ') || '—'}
+                                    </td>
+                                    <td className="p-4 text-gray-600 dark:text-neutral-300 font-medium">
+                                        {item.unitOfMeasure}
+                                    </td>
+                                    <td className="p-4 font-semibold text-black dark:text-white">
+                                        {item.mrp !== undefined && item.mrp !== null
+                                            ? `₹${Number(item.mrp).toLocaleString('en-IN', {
+                                                  minimumFractionDigits: 2,
+                                              })}`
+                                            : 'N/A'}
+                                    </td>
+                                    <td className="p-4" data-testid="item-warranties">
+                                        <WarrantySummary warranties={item.warranties} />
+                                    </td>
+                                    <td className="p-4">
+                                        <ItemStatusBadge active={item.isActive} />
+                                    </td>
+                                    <td className="p-4 text-right">
+                                        <div className="flex items-center justify-end gap-1">
+                                            {/* Preview Button */}
+                                            <button
+                                                type="button"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setPreviewItem(item);
+                                                }}
+                                                className="p-2 hover:bg-black/5 dark:hover:bg-white/10 rounded-lg text-gray-500 hover:text-[#0071e3] transition-colors cursor-pointer"
+                                                title="Preview Item Details"
+                                            >
+                                                <Eye className="w-4 h-4" />
+                                            </button>
+
+                                            {/* Edit and activate/inactivate need ITEM_UPDATE */}
+                                            {can('ITEM_UPDATE') && (
+                                            <>
+                                            <button
+                                                type="button"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    handleOpenEditItem(item);
+                                                }}
+                                                className="p-2 hover:bg-black/5 dark:hover:bg-white/10 rounded-lg text-gray-500 transition-colors cursor-pointer"
+                                                title="Edit Item"
+                                            >
+                                                <Edit3 className="w-4 h-4" />
+                                            </button>
+
+                                            {/* Inactivate/Activate Button */}
+                                            {item.isActive ? (
                                                 <button
                                                     type="button"
                                                     onClick={(e) => {
                                                         e.stopPropagation();
-                                                        setPreviewItem(item);
+                                                        setTargetItemStatusToggle(item);
                                                     }}
-                                                    className="p-2 hover:bg-black/5 dark:hover:bg-white/10 rounded-lg text-gray-500 hover:text-[#0071e3] transition-colors cursor-pointer"
-                                                    title="Preview Item Details"
+                                                    className="p-2 hover:bg-amber-500/10 text-amber-600 rounded-lg transition-colors cursor-pointer"
+                                                    title="Inactivate Item"
                                                 >
-                                                    <Eye className="w-4 h-4" />
+                                                    <Power className="w-4 h-4" />
                                                 </button>
-
-                                                {/* Edit and activate/inactivate need ITEM_UPDATE */}
-                                                {can('ITEM_UPDATE') && (
-                                                <>
+                                            ) : (
                                                 <button
                                                     type="button"
                                                     onClick={(e) => {
                                                         e.stopPropagation();
-                                                        handleOpenEditItem(item);
+                                                        setTargetItemStatusToggle(item);
                                                     }}
-                                                    className="p-2 hover:bg-black/5 dark:hover:bg-white/10 rounded-lg text-gray-500 transition-colors cursor-pointer"
-                                                    title="Edit Item"
+                                                    className="p-2 hover:bg-emerald-500/10 text-emerald-600 rounded-lg transition-colors cursor-pointer"
+                                                    title="Activate Item"
                                                 >
-                                                    <Edit3 className="w-4 h-4" />
+                                                    <CheckCircle className="w-4 h-4" />
                                                 </button>
-
-                                                {/* Inactivate/Activate Button */}
-                                                {item.isActive ? (
-                                                    <button
-                                                        type="button"
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            setTargetItemStatusToggle(item);
-                                                        }}
-                                                        className="p-2 hover:bg-amber-500/10 text-amber-600 rounded-lg transition-colors cursor-pointer"
-                                                        title="Inactivate Item"
-                                                    >
-                                                        <Power className="w-4 h-4" />
-                                                    </button>
-                                                ) : (
-                                                    <button
-                                                        type="button"
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            setTargetItemStatusToggle(item);
-                                                        }}
-                                                        className="p-2 hover:bg-emerald-500/10 text-emerald-600 rounded-lg transition-colors cursor-pointer"
-                                                        title="Activate Item"
-                                                    >
-                                                        <CheckCircle className="w-4 h-4" />
-                                                    </button>
-                                                )}
-                                                </>
-                                                )}
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
+                                            )}
+                                            </>
+                                            )}
+                                        </div>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
                 </div>
-            )}
+            </div>
+
+            <Pager page={filters.page} totalPages={totalPages} disabled={isLoading} onPage={updatePage} />
 
             {/* Item Details Preview Modal */}
             <ItemPreviewModal

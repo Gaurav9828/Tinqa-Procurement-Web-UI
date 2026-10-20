@@ -52,10 +52,10 @@ export const ItemPreviewModal: React.FC<Props> = ({ isOpen, item, onClose }) => 
             </div>
             <div className="p-3 rounded-xl bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/5">
               <span className="text-[10px] text-gray-500 uppercase font-semibold flex items-center gap-1">
-                <Layers className="w-3 h-3 text-[#0071e3]" /> Category
+                <Layers className="w-3 h-3 text-[#0071e3]" /> Categories
               </span>
-              <p className="text-xs font-semibold text-black dark:text-white mt-1 truncate">
-                {item.categoryName || `ID: ${item.categoryId}`}
+              <p className="text-xs font-semibold text-black dark:text-white mt-1">
+                {item.categories?.map((c) => c.name).join(', ') || '—'}
               </p>
             </div>
             <div className="p-3 rounded-xl bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/5">

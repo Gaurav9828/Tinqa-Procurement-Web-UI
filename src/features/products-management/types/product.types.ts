@@ -92,7 +92,19 @@ export interface ProductComponentResponse {
     createdBy?: string | null;
 }
 
-export interface CreateProductRequest {
+/**
+ * GST included in the product price (Ecommerce BE). Each order charges the rate as CGST + SGST (delivered in our
+ * state) or IGST (another state). Both are required on create/update; null only on products created before GST
+ * was recorded. See utils/productTax.
+ */
+export interface ProductGstFields {
+    /** HSN (goods) / SAC (services) code printed on the invoice: 4, 6 or 8 digits. */
+    hsnSac: string | null;
+    /** Percent: one of GST_RATES (utils/productTax). */
+    gstRate: number | null;
+}
+
+export interface CreateProductRequest extends Partial<ProductGstFields> {
     title: string;
     tagline?: string;
     description?: string;
@@ -139,6 +151,8 @@ export interface ProductResponseDto {
     description?: string | null;
     price: number;
     discountPercentage?: number | null;
+    hsnSac?: string | null;
+    gstRate?: number | null;
     image1Url?: string | null;
     image2Url?: string | null;
     image3Url?: string | null;
@@ -163,7 +177,7 @@ export interface ProductResponseDto {
 }
 
 /** UI product model (normalised from ProductResponseDto by toProduct()). */
-export interface ProductResponse {
+export interface ProductResponse extends Partial<ProductGstFields> {
     id: number;
     title: string;
     tagline: string | null;

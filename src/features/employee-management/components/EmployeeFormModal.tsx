@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { X, Save, AlertCircle, Lock } from 'lucide-react';
+import { X, Save, AlertCircle, Lock, Loader2, RefreshCw } from 'lucide-react';
 import { CommonInput, CommonSelect } from '../../../components/ui/FormInputs';
 import { ConfirmationModal } from '../../../components/ui/ConfirmationModal';
 import type {
@@ -16,7 +16,10 @@ import { useAccess } from '../../../hooks/useAccess';
 import { useAccessCatalog } from '../../../hooks/useAccessCatalog';
 import { GENDERS } from '../../../types/common.types';
 import { Validator, type ValidationRule } from '../../../utils/validator';
+import { hasFormChanges } from '../../../utils/formChanges';
 import { DEFAULT_EMPLOYEE_ROLE, designationHasApprovalLevel, isEmployeeRole, validateDesignation } from '../utils/employeeRole';
+import { usePincodeLookup } from '../../../hooks/usePincodeLookup';
+import { PINCODE_MESSAGES } from '../../../utils/pincode';
 
 interface Props {
   isOpen: boolean;
@@ -36,6 +39,46 @@ const isValidEmailTLD = (email: string): boolean => {
   if (!email) return false;
   const regex = /^[^\s@]+@[^\s@]+\.(com|co\.in|net|org)$/i;
   return regex.test(email.trim());
+};
+
+/** PAN and address fields; landmark and map link are optional, the rest required for new employees. */
+const IDENTITY_FIELDS = ['panNumber', 'houseNumber', 'street', 'landmark', 'district', 'state', 'pincode', 'googleMapsUrl'] as const;
+type IdentityField = (typeof IDENTITY_FIELDS)[number];
+const REQUIRED_IDENTITY_FIELDS: readonly IdentityField[] = ['panNumber', 'houseNumber', 'street', 'district', 'state', 'pincode'];
+const EMPTY_IDENTITY: Record<IdentityField, string> = {
+  panNumber: '',
+  houseNumber: '',
+  street: '',
+  landmark: '',
+  district: '',
+  state: '',
+  pincode: '',
+  googleMapsUrl: '',
+};
+
+const IDENTITY_LABELS: Record<IdentityField, string> = {
+  panNumber: 'PAN',
+  houseNumber: 'House / Flat No.',
+  street: 'Street',
+  landmark: 'Landmark',
+  district: 'District',
+  state: 'State',
+  pincode: 'PIN Code',
+  googleMapsUrl: 'Google Maps Link',
+};
+
+/** Format problems with the PAN / address, or null. Blank values are handled by the required check. */
+const identityFormatError = (field: IdentityField, value: string): string | null => {
+  const v = value.trim();
+  if (!v) return null;
+  if (field === 'panNumber' && !Validator.isPersonalPan(v)) {
+    return "PAN must be an individual's 10-character PAN like ABCPE1234F (4th letter P).";
+  }
+  if (field === 'pincode' && !Validator.isPincode(v)) return 'Enter a valid 6-digit PIN code.';
+  if (field === 'googleMapsUrl' && !Validator.isGoogleMapsUrl(v)) {
+    return 'Use an https Google Maps link (maps.google.com, google.com/maps, maps.app.goo.gl or goo.gl/maps).';
+  }
+  return null;
 };
 
 const FORM_RULES: Record<string, ValidationRule> = {
@@ -99,6 +142,7 @@ export const EmployeeFormModal: React.FC<Props> = ({
     phone: '',
     alternatePhone: '',
     personalEmail: '',
+    ...EMPTY_IDENTITY,
     status: EmployeeConstants.FIRST_LOGIN as EmployeeStatus,
   });
 
@@ -112,8 +156,32 @@ export const EmployeeFormModal: React.FC<Props> = ({
 
   // Compute if any field in the form has changed
   const isFormDirty = useMemo(() => {
-    return JSON.stringify(formData) !== JSON.stringify(initialFormData);
+    return hasFormChanges(formData, initialFormData);
   }, [formData, initialFormData]);
+
+  // Required for new employees; when editing, a value that is already saved can be changed but not cleared
+  // (older records may not have them yet).
+  const identityRequired = REQUIRED_IDENTITY_FIELDS.filter((field) => !isEditMode || !!initialFormData[field].trim());
+  const identityErrors = Object.fromEntries(
+    IDENTITY_FIELDS.map((field) => [field, identityFormatError(field, formData[field])]).filter(([, error]) => error)
+  ) as Partial<Record<IdentityField, string>>;
+
+  // District and state come from the PIN code; typed in by hand only when the lookup service is unreachable.
+  const pincodeLookup = usePincodeLookup(formData.pincode, {
+    enabled: isOpen,
+    onFound: (location, pin) => {
+      const keepExisting = pin === (employeeToEdit?.pincode ?? '').trim();
+      const apply = <T extends { district: string; state: string }>(prev: T): T => ({
+        ...prev,
+        district: keepExisting ? prev.district || location.district : location.district,
+        state: keepExisting ? prev.state || location.state : location.state,
+      });
+      setFormData(apply);
+      // Filling blanks for the saved PIN isn't a user edit, so it doesn't enable Save on its own.
+      if (employeeToEdit && keepExisting) setInitialFormData(apply);
+    },
+  });
+  const placeLocked = pincodeLookup.locked;
 
   const requiredFilled =
     (isEditMode || !!String(formData.username).trim()) &&
@@ -126,6 +194,7 @@ export const EmployeeFormModal: React.FC<Props> = ({
       formData.dateOfBirth,
       formData.joiningDate,
     ].every((value) => !!String(value ?? '').trim()) &&
+    identityRequired.every((field) => !!formData[field].trim()) &&
     (isEditMode || !!formData.designation) &&
     (!canChooseRole || isEditMode || isEmployeeRole(formData.role));
 
@@ -222,6 +291,7 @@ export const EmployeeFormModal: React.FC<Props> = ({
         phone: employeeToEdit.phone,
         alternatePhone: employeeToEdit.alternatePhone || '',
         personalEmail: employeeToEdit.personalEmail || '',
+        ...Object.fromEntries(IDENTITY_FIELDS.map((field) => [field, employeeToEdit[field] || ''])) as Record<IdentityField, string>,
         status: employeeToEdit.status,
       };
     } else {
@@ -243,6 +313,7 @@ export const EmployeeFormModal: React.FC<Props> = ({
         phone: '',
         alternatePhone: '',
         personalEmail: '',
+        ...EMPTY_IDENTITY,
         status: EmployeeConstants.FIRST_LOGIN as EmployeeStatus,
       };
     }
@@ -308,6 +379,12 @@ export const EmployeeFormModal: React.FC<Props> = ({
       }
     }
 
+    const missingIdentity = identityRequired.find((field) => !formData[field].trim());
+    if (missingIdentity) return setValidationError(`${IDENTITY_LABELS[missingIdentity]} is required.`);
+    const identityErr = IDENTITY_FIELDS.map((field) => identityErrors[field]).find(Boolean);
+    if (identityErr) return setValidationError(identityErr);
+    if (pincodeLookup.status === 'notFound') return setValidationError(PINCODE_MESSAGES.notFound);
+
     if (formData.salaryAmount) {
       const salaryErr = Validator.validateField(Number(formData.salaryAmount), FORM_RULES.salaryAmount);
       if (salaryErr) return setValidationError(salaryErr);
@@ -366,6 +443,9 @@ export const EmployeeFormModal: React.FC<Props> = ({
     if (changed('phone')) payload.phone = formData.phone;
     if (changed('alternatePhone')) payload.alternatePhone = formData.alternatePhone;
     if (changed('personalEmail')) payload.personalEmail = formData.personalEmail;
+    IDENTITY_FIELDS.forEach((field) => {
+      if (changed(field)) payload[field] = field === 'panNumber' ? formData[field].trim().toUpperCase() : formData[field].trim();
+    });
     if (changed('designation') && formData.designation) payload.designation = formData.designation;
     if (changed('employmentType')) payload.employmentType = formData.employmentType;
     if (changed('joiningDate')) payload.joiningDate = formData.joiningDate;
@@ -403,6 +483,14 @@ export const EmployeeFormModal: React.FC<Props> = ({
           phone: formData.phone,
           alternatePhone: formData.alternatePhone,
           personalEmail: formData.personalEmail,
+          panNumber: formData.panNumber.trim().toUpperCase(),
+          houseNumber: formData.houseNumber.trim(),
+          street: formData.street.trim(),
+          landmark: formData.landmark.trim() || undefined,
+          district: formData.district.trim(),
+          state: formData.state.trim(),
+          pincode: formData.pincode.trim(),
+          googleMapsUrl: formData.googleMapsUrl.trim() || undefined,
           // Always the enum value, never a label. Only an employee approver picks the level; others create Level 1.
           role: canChooseRole && isEmployeeRole(formData.role) ? formData.role : DEFAULT_EMPLOYEE_ROLE,
         })
@@ -488,6 +576,16 @@ export const EmployeeFormModal: React.FC<Props> = ({
               <CommonInput label="Middle Name" name="middleName" placeholder="e.g. Robert" value={formData.middleName} onChange={handleChange} />
               <CommonInput label="Last Name" name="lastName" required placeholder="e.g. Doe" value={formData.lastName} onChange={handleChange} />
               <CommonInput label="Display Name" name="displayName" placeholder="e.g. Johnny Doe" value={formData.displayName} onChange={handleChange} />
+              <CommonInput
+                label="PAN"
+                name="panNumber"
+                required={identityRequired.includes('panNumber')}
+                placeholder="e.g. ABCPE1234F"
+                maxLength={10}
+                value={formData.panNumber}
+                onChange={(e) => setField('panNumber', e.target.value.toUpperCase().replace(/\s/g, ''))}
+                error={fieldErrors.panNumber ?? identityErrors.panNumber}
+              />
 
               <CommonSelect
                 label="Gender"
@@ -602,6 +700,98 @@ export const EmployeeFormModal: React.FC<Props> = ({
               />
             </div>
 
+            <div className="space-y-3 pt-3 border-t border-black/5 dark:border-white/5">
+              <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Residential Address</h4>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <CommonInput
+                  label={IDENTITY_LABELS.houseNumber}
+                  name="houseNumber"
+                  required={identityRequired.includes('houseNumber')}
+                  placeholder="e.g. Flat 4B, Sunrise Apartments"
+                  value={formData.houseNumber}
+                  onChange={handleChange}
+                  error={fieldErrors.houseNumber}
+                />
+                <div className="md:col-span-2">
+                  <CommonInput
+                    label={IDENTITY_LABELS.street}
+                    name="street"
+                    required={identityRequired.includes('street')}
+                    placeholder="e.g. 12 MG Road, Indiranagar"
+                    value={formData.street}
+                    onChange={handleChange}
+                    error={fieldErrors.street}
+                  />
+                </div>
+                <CommonInput
+                  label={IDENTITY_LABELS.landmark}
+                  name="landmark"
+                  placeholder="e.g. Near City Mall"
+                  value={formData.landmark}
+                  onChange={handleChange}
+                  error={fieldErrors.landmark}
+                />
+                <div className="space-y-1">
+                  <div className="relative">
+                    <CommonInput
+                      label={IDENTITY_LABELS.pincode}
+                      name="pincode"
+                      required={identityRequired.includes('pincode')}
+                      inputMode="numeric"
+                      maxLength={6}
+                      placeholder="e.g. 560001"
+                      value={formData.pincode}
+                      onChange={(e) => setField('pincode', e.target.value.replace(/\D/g, ''))}
+                      error={fieldErrors.pincode ?? identityErrors.pincode}
+                    />
+                    {pincodeLookup.status === 'loading' && (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin absolute right-3 top-8 text-gray-400" aria-hidden />
+                    )}
+                  </div>
+                  {pincodeLookup.status === 'notFound' ? (
+                    <p className="text-[11px] text-red-500 font-medium">{PINCODE_MESSAGES.notFound}</p>
+                  ) : pincodeLookup.status === 'error' ? (
+                    <p className="text-[11px] text-amber-600 dark:text-amber-400 flex items-center gap-1.5">
+                      {PINCODE_MESSAGES.error}
+                      <button type="button" onClick={pincodeLookup.retry} className="inline-flex items-center gap-0.5 font-semibold underline cursor-pointer">
+                        <RefreshCw className="w-3 h-3" /> Retry
+                      </button>
+                    </p>
+                  ) : (
+                    <p className="text-[11px] text-gray-500" aria-live="polite">
+                      {pincodeLookup.status === 'loading' ? PINCODE_MESSAGES.loading : 'District and state are filled from the PIN code.'}
+                    </p>
+                  )}
+                </div>
+                <div />
+                {(['district', 'state'] as const).map((field) => (
+                  <CommonInput
+                    key={field}
+                    label={IDENTITY_LABELS[field]}
+                    name={field}
+                    required={identityRequired.includes(field)}
+                    readOnly={placeLocked}
+                    title={placeLocked ? 'Filled from the PIN code' : undefined}
+                    placeholder={placeLocked ? '' : field === 'district' ? 'e.g. Bengaluru Urban' : 'e.g. Karnataka'}
+                    value={formData[field]}
+                    onChange={handleChange}
+                    error={fieldErrors[field]}
+                  />
+                ))}
+                <div className="md:col-span-3">
+                  <CommonInput
+                    label={IDENTITY_LABELS.googleMapsUrl}
+                    name="googleMapsUrl"
+                    type="url"
+                    placeholder="https://maps.app.goo.gl/..."
+                    value={formData.googleMapsUrl}
+                    onChange={handleChange}
+                    error={fieldErrors.googleMapsUrl ?? identityErrors.googleMapsUrl}
+                  />
+                </div>
+              </div>
+            </div>
+
             <div className="flex justify-end gap-3 pt-3 border-t border-black/10 dark:border-white/10">
               <button
                 type="button"
@@ -620,6 +810,8 @@ export const EmployeeFormModal: React.FC<Props> = ({
                   Boolean(phoneUniquenessError) ||
                   Boolean(alternatePhoneFormatError) ||
                   Boolean(designationError) ||
+                  Object.keys(identityErrors).length > 0 ||
+                  pincodeLookup.status === 'loading' ||
                   (!isEditMode && !Validator.isAlphanumeric(formData.username))
                 }
                 className="px-5 py-2.5 bg-[#0071e3] hover:bg-[#0077ed] text-white rounded-xl text-xs font-semibold flex items-center gap-2 cursor-pointer shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"

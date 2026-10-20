@@ -1,7 +1,12 @@
 import type { CreateProductRequest, UpdateProductRequest } from '../types/product.types';
 import { WARRANTY_TEXT_MAX } from '../types/product.types';
+import { HSN_SAC_PATTERN } from '../../finance/utils/gst';
+import { isAllowedGstRate } from '../utils/productTax';
 
-export const validateProductPayload = (payload: CreateProductRequest | UpdateProductRequest): string => {
+export const validateProductPayload = (
+  payload: CreateProductRequest | UpdateProductRequest,
+  options: { allowWithoutGst?: boolean } = {}
+): string => {
   if (!payload) {
     return "Product request payload cannot be null.";
   }
@@ -33,6 +38,17 @@ export const validateProductPayload = (payload: CreateProductRequest | UpdatePro
     const discount = Number(payload.discountPercentage);
     if (!Number.isFinite(discount) || discount < 0 || discount > 100) {
       return "Discount percentage must be between 0 and 100.";
+    }
+  }
+  // GST: one of the rates in force, with a 4/6/8-digit HSN/SAC. Only a stock change of a product created before GST
+  // was recorded may leave both out (the forms always require them; the backend refuses removing them).
+  const gstLeftOut = (payload.gstRate === undefined || payload.gstRate === null) && !payload.hsnSac;
+  if (!(gstLeftOut && options.allowWithoutGst)) {
+    if (!isAllowedGstRate(payload.gstRate)) {
+      return "Choose one of the GST rates in force.";
+    }
+    if (!payload.hsnSac || !HSN_SAC_PATTERN.test(payload.hsnSac)) {
+      return "HSN/SAC is required and must be 4, 6 or 8 digits.";
     }
   }
   if (payload.stockQuantity === undefined || payload.stockQuantity === null || !Number.isInteger(Number(payload.stockQuantity)) || Number(payload.stockQuantity) < 0) {

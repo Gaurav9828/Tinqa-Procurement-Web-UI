@@ -10,6 +10,9 @@ import { ProductComponentsSection } from './ProductComponentsSection';
 import { ComponentsPreview } from './ComponentsPreview';
 import { dropComponentErrors, toComponentRequests, validateComponentRows, type ComponentFormRow } from '../utils/componentForm';
 import { componentMaxFor } from '../utils/componentStock';
+import { describeGst, emptyTaxForm, toGstFields, validateTaxForm, type ProductTaxForm } from '../utils/productTax';
+import { ProductTaxSection } from './ProductTaxSection';
+import { ProductTaxBreakdown } from './ProductTaxBreakdown';
 
 /** A new product always starts with exactly one unit: its components describe what one unit uses. */
 const NEW_PRODUCT_STOCK = 1;
@@ -36,6 +39,8 @@ export const CreateProductModal: React.FC<CreateProductModalProps> = ({
     const [description, setDescription] = useState('');
     const [price, setPrice] = useState<number | ''>('');
     const [discountPercentage, setDiscountPercentage] = useState<number | ''>('');
+    // GST included in the price: which taxes apply and their rates
+    const [tax, setTax] = useState<ProductTaxForm>(emptyTaxForm);
 
     // Dynamic Image URLs (up to 5, starting with 1)
     const [imageUrls, setImageUrls] = useState<string[]>(['']);
@@ -64,13 +69,16 @@ export const CreateProductModal: React.FC<CreateProductModalProps> = ({
 
     if (!isOpen) return null;
 
+    const taxErrors = validateTaxForm(tax);
+
     // Required fields check: Title and Price must be provided and valid (stock is fixed at 1 on creation)
     const isFormValid =
         title.trim() !== '' &&
         price !== '' &&
         Number(price) >= 0 &&
         components.every((row) => row.itemId !== null && !!row.quantity.trim()) &&
-        warrantiesComplete(warranties);
+        warrantiesComplete(warranties) &&
+        Object.keys(taxErrors).length === 0;
 
     const handleAddImageUrl = () => {
         if (imageUrls.length < 5) {
@@ -126,6 +134,7 @@ export const CreateProductModal: React.FC<CreateProductModalProps> = ({
             description: description || undefined,
             price: Number(price) || 0,
             discountPercentage: discountPercentage !== '' ? Number(discountPercentage) : undefined,
+            ...toGstFields(tax),
             stockQuantity: NEW_PRODUCT_STOCK,
             // Always inactive: activation happens when Admin L2 approves the product.
             enabled: false,
@@ -157,6 +166,7 @@ export const CreateProductModal: React.FC<CreateProductModalProps> = ({
             setDescription('');
             setPrice('');
             setDiscountPercentage('');
+            setTax(emptyTaxForm());
             setImageUrls(['']);
             setSpecifications([{ specKey: '', specValue: '' }]);
             resetWarranties([]);
@@ -225,7 +235,7 @@ export const CreateProductModal: React.FC<CreateProductModalProps> = ({
 
                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                             <div>
-                                <label className="block font-medium text-gray-700 dark:text-gray-300 mb-1">Price (₹) *</label>
+                                <label className="block font-medium text-gray-700 dark:text-gray-300 mb-1">Price incl. GST (₹) *</label>
                                 <input
                                     type="number"
                                     required
@@ -260,6 +270,15 @@ export const CreateProductModal: React.FC<CreateProductModalProps> = ({
                             </div>
                         </div>
 
+                        <ProductTaxSection
+                            value={tax}
+                            onChange={setTax}
+                            price={price}
+                            discountPercentage={discountPercentage}
+                            errors={taxErrors}
+                            disabled={isSubmitting}
+                        />
+
                         {/* Dynamic Image URL Section (Up to 5) */}
                         <div className="space-y-2">
                             <label className="block font-medium text-gray-700 dark:text-gray-300">
@@ -278,7 +297,7 @@ export const CreateProductModal: React.FC<CreateProductModalProps> = ({
                                         <button
                                             type="button"
                                             onClick={() => handleRemoveImage(index)}
-                                            className="p-2 text-gray-400 hover:text-rose-500 rounded-xl transition-colors cursor-pointer"
+                                            className="p-2 text-rose-500 hover:text-rose-600 hover:bg-rose-500/10 dark:text-rose-400 rounded-xl transition-colors cursor-pointer"
                                             title="Remove image"
                                         >
                                             <Trash2 className="w-4 h-4" />
@@ -322,7 +341,7 @@ export const CreateProductModal: React.FC<CreateProductModalProps> = ({
                                     <button
                                         type="button"
                                         onClick={() => handleRemoveSpec(index)}
-                                        className="p-2 text-gray-400 hover:text-rose-500 rounded-xl transition-colors cursor-pointer"
+                                        className="p-2 text-rose-500 hover:text-rose-600 hover:bg-rose-500/10 dark:text-rose-400 rounded-xl transition-colors cursor-pointer"
                                         title="Remove spec"
                                     >
                                         <Trash2 className="w-4 h-4" />
@@ -417,7 +436,7 @@ export const CreateProductModal: React.FC<CreateProductModalProps> = ({
 
                             <div className="grid grid-cols-3 gap-2 bg-black/[0.02] dark:bg-white/[0.02] p-3 rounded-xl border border-black/5 dark:border-white/5">
                                 <div>
-                                    <span className="text-gray-400 block">Price</span>
+                                    <span className="text-gray-400 block">Price (incl. GST)</span>
                                     <span className="font-bold text-black dark:text-white text-sm">₹{pendingPayload.price}</span>
                                 </div>
                                 <div>
@@ -428,6 +447,17 @@ export const CreateProductModal: React.FC<CreateProductModalProps> = ({
                                     <span className="text-gray-400 block">Stock Qty</span>
                                     <span className="font-bold text-black dark:text-white text-sm">{pendingPayload.stockQuantity}</span>
                                 </div>
+                            </div>
+
+                            <div className="space-y-1">
+                                <span className="font-semibold text-gray-500 dark:text-gray-400 block">GST:</span>
+                                <p className="text-black dark:text-white font-medium" data-testid="preview-gst">{describeGst(pendingPayload)}</p>
+                                <ProductTaxBreakdown
+                                    price={pendingPayload.price}
+                                    discountPercentage={pendingPayload.discountPercentage}
+                                    gst={pendingPayload}
+                                    title="What the invoice will show per unit"
+                                />
                             </div>
 
                             {/* Image Previews */}

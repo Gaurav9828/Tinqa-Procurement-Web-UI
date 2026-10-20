@@ -78,6 +78,8 @@ export const useCompanyProfileActions = ({ onStale }: { onStale?: () => void } =
         success: 'Submitted for approval. The live profile stays unchanged until an approver approves it.',
         failure: 'Could not submit the draft.',
       }),
+    deleteDraft: (id: number) =>
+      perform('delete', () => companyProfileApi.deleteDraft(id), { success: 'Draft deleted.', failure: 'Could not delete the draft.' }),
     withdraw: (id: number) =>
       perform('withdraw', () => companyProfileApi.withdraw(id), { success: 'Request withdrawn.', failure: 'Could not withdraw the request.' }),
     approve: (id: number) =>

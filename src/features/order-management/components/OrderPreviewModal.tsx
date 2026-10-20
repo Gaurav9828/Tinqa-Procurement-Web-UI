@@ -3,18 +3,31 @@ import { X, Calendar, Truck, User, Package, IndianRupee } from 'lucide-react';
 import { OrderStatusBadge } from './OrderStatusBadge';
 import { OrderProgress } from './OrderProgress';
 import type { OrderResponse } from '../types/order.types';
+import { PrintMenu } from '../../printing/components/PrintMenu';
+import { DEALER_CHANGE_BLOCK_REASON, isFrozenByDealerChange } from '../utils/orderWorkflow';
+import { TaxBreakupSummary } from './TaxBreakupSummary';
+import { InvoiceVerificationPanel } from './InvoiceVerificationPanel';
+import { useOrderInvoice } from '../hooks/useOrderInvoice';
+import type { OrderStatus } from '../../../types/common.types';
 
 interface OrderPreviewModalProps {
   order: OrderResponse | null;
   onClose: () => void;
 }
 
+// From shipping on, an order may have the dealer's invoice
+const INVOICE_STAGES: ReadonlySet<OrderStatus> = new Set<OrderStatus>([
+  'SHIPPED', 'DELIVERED', 'RETURN_REQUESTED', 'RETURN_APPROVED', 'RETURN_REJECTED', 'RETURN_PICKED_UP',
+  'RETURN_RECEIVED', 'REFUND_INITIATED', 'REFUND_FAILED', 'REFUND_COMPLETED',
+]);
+
 export const OrderPreviewModal: React.FC<OrderPreviewModalProps> = ({ order, onClose }) => {
+  const invoiceState = useOrderInvoice(order?.id ?? null, !!order && INVOICE_STAGES.has(order.orderStatus));
   if (!order) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-      <div className="relative w-full max-w-lg bg-white dark:bg-neutral-900 border border-black/10 dark:border-white/10 rounded-2xl shadow-xl overflow-hidden">
+      <div className="relative w-full max-w-lg max-h-[92vh] overflow-y-auto bg-white dark:bg-neutral-900 border border-black/10 dark:border-white/10 rounded-2xl shadow-xl">
         <div className="flex items-center justify-between p-4 border-b border-black/10 dark:border-white/10">
           <div>
             <h2 className="text-sm font-bold text-black dark:text-white">{order.orderNumber}</h2>
@@ -31,6 +44,11 @@ export const OrderPreviewModal: React.FC<OrderPreviewModalProps> = ({ order, onC
             <OrderStatusBadge status={order.orderStatus} />
           </div>
           <OrderProgress status={order.orderStatus} />
+          {isFrozenByDealerChange(order) && (
+            <p className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-400">
+              {DEALER_CHANGE_BLOCK_REASON}
+            </p>
+          )}
 
           <div className="grid grid-cols-2 gap-3">
             <div className="p-3 border border-black/10 dark:border-white/10 rounded-xl space-y-1">
@@ -38,6 +56,7 @@ export const OrderPreviewModal: React.FC<OrderPreviewModalProps> = ({ order, onC
                 <User className="w-3.5 h-3.5" /> Dealer Details
               </div>
               <p className="font-semibold text-black dark:text-white">{order.dealerName}</p>
+              {order.raisedByDealer && <p className="text-[10px] font-semibold text-[#0071e3] dark:text-blue-400">Raised by the dealer</p>}
             </div>
 
             <div className="p-3 border border-black/10 dark:border-white/10 rounded-xl space-y-1">
@@ -64,10 +83,21 @@ export const OrderPreviewModal: React.FC<OrderPreviewModalProps> = ({ order, onC
               <span>₹{order.shipmentPrice.toFixed(2)}</span>
             </div>
             <div className="flex justify-between font-bold text-black dark:text-white border-t border-black/10 dark:border-white/10 pt-1">
-              <span>Total Price:</span>
+              <span>Total before GST:</span>
               <span className="text-emerald-600 dark:text-emerald-400">₹{order.totalPrice.toFixed(2)}</span>
             </div>
+            <div className="pt-1 border-t border-black/10 dark:border-white/10">
+              <TaxBreakupSummary taxBreakup={order.taxBreakup} totalPrice={order.totalPrice} />
+            </div>
           </div>
+
+          {INVOICE_STAGES.has(order.orderStatus) && (
+            <InvoiceVerificationPanel
+              invoice={invoiceState.invoice}
+              loading={invoiceState.loading}
+              onDownload={() => void invoiceState.download()}
+            />
+          )}
 
           <div className="grid grid-cols-2 gap-3 text-gray-500">
             <div className="flex items-center gap-1.5">
@@ -78,6 +108,10 @@ export const OrderPreviewModal: React.FC<OrderPreviewModalProps> = ({ order, onC
               <Truck className="w-3.5 h-3.5 text-gray-400" />
               <span>Delivered: {order.actualDelivery || 'N/A'}</span>
             </div>
+          </div>
+
+          <div className="pt-3 border-t border-black/10 dark:border-white/10">
+            <PrintMenu orderId={order.id} status={order.orderStatus} />
           </div>
         </div>
       </div>
