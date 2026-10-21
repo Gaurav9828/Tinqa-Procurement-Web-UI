@@ -104,7 +104,42 @@ export interface ProductGstFields {
     gstRate: number | null;
 }
 
-export interface CreateProductRequest extends Partial<ProductGstFields> {
+/** Most extra discount an accessory can get with a parent (Ecommerce BE ProductRequestDTO.AccessoryParentDTO). */
+export const BUNDLE_DISCOUNT_MAX = 90;
+/** Ecommerce BE limits for the accessory text (ProductSecurityValidator). */
+export const ACCESSORY_PURPOSE_MAX = 1000;
+export const ACCESSORY_BENEFITS_MAX = 10;
+export const ACCESSORY_BENEFIT_MAX = 200;
+
+/** A product the accessory is offered with, in POST/PUT /products. */
+export interface AccessoryParentRequest {
+    parentProductId: number;
+    /** Extra percent off the accessory when bought with this parent: 0–90, at most 2 decimals. 0 = no extra discount. */
+    bundleDiscountPercentage: number;
+}
+
+/** One accessory–parent link as returned by the backend; `productId` is the product on the other side. */
+export interface AccessoryLinkResponse {
+    productId: number;
+    title: string;
+    bundleDiscountPercentage: number;
+}
+
+/**
+ * Accessory settings. Update semantics: `accessory` omitted = all of them untouched; false = not an accessory
+ * (its parent links are removed); true = an accessory offered with `accessoryParents` (at least one), which
+ * replace the current ones.
+ */
+export interface AccessoryFields {
+    accessory?: boolean;
+    /** Why the customer needs it / what it does (max 1000). */
+    accessoryPurpose?: string;
+    /** Benefit bullet points (max 10, each max 200, single line). */
+    accessoryBenefits?: string[];
+    accessoryParents?: AccessoryParentRequest[];
+}
+
+export interface CreateProductRequest extends Partial<ProductGstFields>, AccessoryFields {
     title: string;
     tagline?: string;
     description?: string;
@@ -174,6 +209,13 @@ export interface ProductResponseDto {
     averageRating?: number | null;
     /** Number of active reviews. */
     reviewCount?: number | null;
+    accessory?: boolean | null;
+    accessoryPurpose?: string | null;
+    accessoryBenefits?: string[] | null;
+    /** Accessory: the products it is offered with (admin view: disabled ones included). */
+    accessoryFor?: AccessoryLinkResponse[] | null;
+    /** Parent: the accessories offered with it. */
+    accessories?: AccessoryLinkResponse[] | null;
 }
 
 /** UI product model (normalised from ProductResponseDto by toProduct()). */
@@ -201,4 +243,11 @@ export interface ProductResponse extends Partial<ProductGstFields> {
     createdAt?: string | null;
     averageRating: number;
     reviewCount: number;
+    /** Also offered with the products in `accessoryFor`, each at an extra bundle discount. */
+    accessory: boolean;
+    accessoryPurpose: string | null;
+    accessoryBenefits: string[];
+    accessoryFor: AccessoryLinkResponse[];
+    /** Accessories offered with this product. */
+    accessories: AccessoryLinkResponse[];
 }

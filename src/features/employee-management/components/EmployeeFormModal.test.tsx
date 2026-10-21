@@ -9,6 +9,10 @@ import type { AccessCatalog } from '../../../config/access';
 import { accessService } from '../../../api/services/accessService';
 import { useAuthStore } from '../../../store/useAuthStore';
 import { superAdminPermissions } from '../../../test/access';
+import { Provider } from 'react-redux';
+import { configureStore } from '@reduxjs/toolkit';
+import alertReducer from '../../../store/alertSlice';
+import { employeeApi } from '../api/employeeApi';
 
 // The PIN code lookup answers from here instead of India Post
 vi.mock('../../../utils/pincode', async (importOriginal) => ({
@@ -68,9 +72,17 @@ const signInAs = (level: 'ADMIN_L1' | 'ADMIN_L2') =>
     user: { userId: 1, username: 'admin', email: 'a@tinqa.com', role: level, authClient: 'web', isFirstLogin: false, permissions: superAdminPermissions(level) },
   });
 
+const envelope = <T,>(data: T, message = '') => ({ success: true, message, errorCode: null, data, timestamp: '', path: '' });
+
 beforeEach(() => {
   accessService.resetCatalogCache();
   vi.spyOn(accessService, 'getCatalog').mockResolvedValue(CATALOG);
+  vi.spyOn(employeeApi, 'sendEmailCode').mockResolvedValue(
+    envelope({ email: 'ravi.personal@gmail.com', codeValidMinutes: 10, resendAfterSeconds: 60 })
+  );
+  vi.spyOn(employeeApi, 'confirmEmailCode').mockResolvedValue(
+    envelope({ email: 'ravi.personal@gmail.com', verificationToken: 'verified-token', expiresAt: '' })
+  );
   signInAs('ADMIN_L2');
 });
 
@@ -78,15 +90,17 @@ const renderForm = (props: Partial<React.ComponentProps<typeof EmployeeFormModal
   const onSubmitCreate = vi.fn(async () => ok);
   const onSubmitUpdate = vi.fn(async () => ok);
   const view = render(
-    <EmployeeFormModal
-      isOpen
-      employeeToEdit={null}
-      isSubmitting={false}
-      onClose={() => undefined}
-      onSubmitCreate={onSubmitCreate}
-      onSubmitUpdate={onSubmitUpdate}
-      {...props}
-    />
+    <Provider store={configureStore({ reducer: { alert: alertReducer } })}>
+      <EmployeeFormModal
+        isOpen
+        employeeToEdit={null}
+        isSubmitting={false}
+        onClose={() => undefined}
+        onSubmitCreate={onSubmitCreate}
+        onSubmitUpdate={onSubmitUpdate}
+        {...props}
+      />
+    </Provider>
   );
   const field = <T extends HTMLElement>(name: string) => view.container.querySelector(`[name="${name}"]`) as T;
   return { user: userEvent.setup(), field, onSubmitCreate, onSubmitUpdate };
@@ -108,6 +122,12 @@ const fillCreateForm = async (user: ReturnType<typeof userEvent.setup>, field: (
   await user.type(field('pincode'), '560001');
   // District and state are filled from the PIN code
   await screen.findByDisplayValue('Karnataka');
+  // The personal email is verified with the code the employee reads out
+  await user.type(field('personalEmail'), 'ravi.personal@gmail.com');
+  await user.click(screen.getByRole('button', { name: /send code/i }));
+  await user.type(await screen.findByRole('textbox', { name: 'Verification code' }), '48213');
+  await user.click(screen.getByRole('button', { name: /verify/i }));
+  await screen.findByText('Email verified');
 };
 
 const save = async (user: ReturnType<typeof userEvent.setup>, confirmText: string) => {
@@ -133,8 +153,20 @@ describe('EmployeeFormModal PAN and address', () => {
         state: 'Karnataka',
         pincode: '560001',
         googleMapsUrl: 'https://maps.app.goo.gl/abc123',
+        personalEmail: 'ravi.personal@gmail.com',
+        personalEmailVerificationToken: 'verified-token',
       })
     );
+    expect(employeeApi.sendEmailCode).toHaveBeenCalledWith('ravi.personal@gmail.com', 'Ravi');
+    expect(employeeApi.confirmEmailCode).toHaveBeenCalledWith('ravi.personal@gmail.com', '48213');
+  });
+
+  it('starts the verification over when the personal email is edited', async () => {
+    const { user, field } = renderForm();
+    await fillCreateForm(user, field);
+    await user.type(field('personalEmail'), 'x');
+    expect(screen.queryByText('Email verified')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /continue to save/i })).toBeDisabled();
   });
 
   it("refuses a business PAN and a link that isn't Google Maps", async () => {

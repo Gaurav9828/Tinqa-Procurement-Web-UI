@@ -1,4 +1,4 @@
-import type { CreateProductRequest, ProductGstFields, ProductResponse, UpdateProductRequest } from '../types/product.types';
+import type { AccessoryLinkResponse, CreateProductRequest, ProductGstFields, ProductResponse, UpdateProductRequest } from '../types/product.types';
 import type { ProductApprovalResponse, ProductApprovalSnapshot } from '../types/productApproval.types';
 
 /**
@@ -99,6 +99,8 @@ export const buildApprovalSnapshot = (
     specifications?: unknown[] | null;
     components?: { itemId: number; itemName: string; quantity: number }[] | null;
     warranties?: { title: string; warrantyType: string; durationValue: number; durationUnit: string; isActive?: boolean }[] | null;
+    accessory?: boolean;
+    accessoryFor?: AccessoryLinkResponse[] | null;
   }
 ): ProductApprovalSnapshot => ({
   title: product.title,
@@ -118,11 +120,24 @@ export const buildApprovalSnapshot = (
     isActive: w.isActive !== false,
   })),
   specificationCount: (product.specifications ?? []).length,
+  accessoryParents: product.accessory
+    ? (product.accessoryFor ?? []).map((link) => ({
+        productId: link.productId,
+        title: link.title,
+        bundleDiscountPercentage: Number(link.bundleDiscountPercentage),
+      }))
+    : [],
 });
 
-/** Snapshot straight from a create/update request (before the server has returned the product). */
-export const snapshotFromRequest = (payload: CreateProductRequest | UpdateProductRequest): ProductApprovalSnapshot =>
-  buildApprovalSnapshot({
+/**
+ * Snapshot straight from a create/update request (before the server has returned the product). `titleOf` names
+ * the accessory's parents; a request that leaves the accessory settings untouched gives no `accessoryParents`.
+ */
+export const snapshotFromRequest = (
+  payload: CreateProductRequest | UpdateProductRequest,
+  titleOf: (productId: number) => string | undefined = () => undefined
+): ProductApprovalSnapshot => {
+  const snapshot = buildApprovalSnapshot({
     title: payload.title ?? '',
     tagline: payload.tagline ?? null,
     price: Number(payload.price ?? 0),
@@ -134,7 +149,16 @@ export const snapshotFromRequest = (payload: CreateProductRequest | UpdateProduc
     specifications: payload.specifications ?? [],
     components: payload.components ?? [],
     warranties: payload.warranties ?? [],
+    accessory: payload.accessory,
+    accessoryFor: (payload.accessoryParents ?? []).map((parent) => ({
+      productId: parent.parentProductId,
+      title: titleOf(parent.parentProductId) ?? `Product #${parent.parentProductId}`,
+      bundleDiscountPercentage: parent.bundleDiscountPercentage,
+    })),
   });
+  if (payload.accessory === undefined) delete snapshot.accessoryParents;
+  return snapshot;
+};
 
 export const DECISION_REASON_MAX = 500;
 

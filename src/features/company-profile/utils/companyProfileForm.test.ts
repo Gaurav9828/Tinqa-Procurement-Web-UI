@@ -100,7 +100,7 @@ describe('toBody', () => {
       invoiceTerms: ['Pay in 30 days'],
       address: { city: null, stateCode: '27', country: 'India' },
     });
-    expect(Object.keys(body)).toHaveLength(19);
+    expect(Object.keys(body)).toHaveLength(26);
   });
 
   it('round-trips a version', () => {

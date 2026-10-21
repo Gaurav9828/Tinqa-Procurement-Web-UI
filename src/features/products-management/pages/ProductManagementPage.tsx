@@ -20,6 +20,7 @@ import { useAccess } from '../../../hooks/useAccess';
 export const ProductManagementPage: React.FC = () => {
     const {
         products,
+        allProducts,
         totalElements,
         isLoading,
         search,
@@ -95,7 +96,7 @@ export const ProductManagementPage: React.FC = () => {
         // Approved products change only after Admin L2 approves; never-approved (inactive) ones are saved directly
         // and stay inactive until their own approval.
         const success = permissions.editNeedsApproval
-            ? await requestProductUpdate(target, payload, changes)
+            ? await requestProductUpdate(target, payload, changes, (productId) => allProducts.find((p) => p.id === productId)?.title)
             : await updateProduct(id, permissions.canActivate ? payload : { ...payload, enabled: false });
         if (success) {
             setEditingProduct(null);
@@ -200,6 +201,7 @@ export const ProductManagementPage: React.FC = () => {
                 onClose={() => setIsCreateModalOpen(false)}
                 onSubmit={handleCreateProductSubmit}
                 serverFieldErrors={fieldErrors}
+                products={allProducts}
             />
 
             <EditProductModal
@@ -209,6 +211,7 @@ export const ProductManagementPage: React.FC = () => {
                 onClose={() => setEditingProduct(null)}
                 onSubmit={handleEditProductSubmit}
                 serverFieldErrors={fieldErrors}
+                products={allProducts}
             />
 
             <ProductPreviewModal

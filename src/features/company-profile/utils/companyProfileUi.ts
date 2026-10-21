@@ -1,4 +1,5 @@
 import { LIMITS } from './companyProfileForm';
+import type { AssetPurpose } from '../types/companyProfile.types';
 
 const buttonBase =
   'flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl font-semibold cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed';
@@ -22,12 +23,22 @@ export const validateRejectComment = (comment: string): string | null => {
 };
 
 export const MAX_ASSET_BYTES = 1024 * 1024;
-const ALLOWED_EXTENSIONS = ['png', 'svg', 'webp', 'ico'];
+export const MAX_LOGIN_IMAGE_BYTES = 5 * 1024 * 1024;
+
+const BRAND_RULE = { extensions: ['png', 'svg', 'webp', 'ico'], types: 'PNG, SVG, WEBP or ICO', maxBytes: MAX_ASSET_BYTES, maxLabel: '1 MB' };
+// The sign-in background is a photo: JPG allowed, no SVG / ICO, and a larger limit. Mirrors the backend.
+const UPLOAD_RULES: Record<AssetPurpose, typeof BRAND_RULE> = {
+  LOGO: BRAND_RULE,
+  LOGO_DARK: BRAND_RULE,
+  FAVICON: BRAND_RULE,
+  LOGIN_IMAGE: { extensions: ['jpg', 'jpeg', 'png', 'webp'], types: 'JPG, PNG or WEBP', maxBytes: MAX_LOGIN_IMAGE_BYTES, maxLabel: '5 MB' },
+};
 
 /** Quick client checks before uploading (the server checks the real content type and SVG safety). */
-export const precheckAsset = (file: File): string | null => {
+export const precheckAsset = (file: File, purpose: AssetPurpose = 'LOGO'): string | null => {
+  const rule = UPLOAD_RULES[purpose];
   const extension = file.name.split('.').pop()?.toLowerCase() ?? '';
-  if (!ALLOWED_EXTENSIONS.includes(extension)) return 'Only PNG, SVG, WEBP or ICO images are allowed.';
-  if (file.size > MAX_ASSET_BYTES) return 'The image is larger than 1 MB.';
+  if (!rule.extensions.includes(extension)) return `Only ${rule.types} images are allowed.`;
+  if (file.size > rule.maxBytes) return `The image is larger than ${rule.maxLabel}.`;
   return null;
 };

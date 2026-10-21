@@ -62,6 +62,11 @@ export const PERMISSIONS = [
   // Delivery riders: only the delivery outcomes (DELIVERY_OUTCOMES in order-tracking/utils/statusWorkflow.ts)
   'DELIVERY_STATUS_UPDATE',
   'DELIVERY_ASSIGN',
+  // Store sales: agents book orders for walk-in customers (cash they received is booked at once); managers read all
+  'STORE_SALES_VIEW_ALL',
+  'STORE_CUSTOMER_REGISTER',
+  'STORE_ORDER_CREATE',
+  'STORE_ORDER_VIEW',
   // Refunds
   'REFUND_VIEW',
   'REFUND_REQUEST',
@@ -121,6 +126,7 @@ export const DESIGNATIONS = [
   'CUSTOMER_SUPPORT',
   'FINANCIAL_AUDITOR',
   'FINANCE_MANAGER',
+  'SALES_AGENT',
 ] as const;
 
 export type Designation = (typeof DESIGNATIONS)[number];

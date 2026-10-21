@@ -25,6 +25,11 @@ const PRODUCT: ProductResponse = {
   ],
   averageRating: 0,
   reviewCount: 0,
+  accessory: false,
+  accessoryPurpose: null,
+  accessoryBenefits: [],
+  accessoryFor: [],
+  accessories: [],
   components: [
     { id: 8, itemId: 7, itemName: 'Motherboard', quantity: 1, warranties: [{ id: 80, warrantyType: 'MANUFACTURER', title: '1 Year', durationValue: 1, durationUnit: 'YEARS' }] },
   ],

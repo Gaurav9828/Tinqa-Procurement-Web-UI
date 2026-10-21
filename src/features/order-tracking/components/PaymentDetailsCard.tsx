@@ -19,7 +19,7 @@ type PaymentOrder = Pick<AdminOrderDetail, 'paymentStatus' | 'paymentMethod' | '
 
 /**
  * Read-only payment summary from GET /admin/orders/{orderNumber}: the order-level status/method
- * plus each Razorpay attempt. Amounts arrive in paise. No payment actions are offered here.
+ * plus each Razorpay attempt or store cash payment. Amounts arrive in paise. No payment actions are offered here.
  */
 export const PaymentDetailsCard: React.FC<{ order: PaymentOrder }> = ({ order }) => {
   // `undefined` = backend predates the field; [] = no attempt was ever created.
@@ -77,7 +77,17 @@ export const PaymentDetailsCard: React.FC<{ order: PaymentOrder }> = ({ order })
                     <PaymentBadge status={attempt.status} />
                   </td>
                   <td className="py-2 pr-3 text-right whitespace-nowrap">{formatPaise(attempt.amountPaise, attempt.currency)}</td>
-                  <td className="py-2 pr-3 font-mono break-all">{attempt.transactionId || <Muted>—</Muted>}</td>
+                  <td className="py-2 pr-3 font-mono break-all">
+                    {attempt.transactionId ||
+                      (attempt.provider === 'CASH' ? (
+                        <span className="font-sans" data-testid="cash-details">
+                          Cash{attempt.receiptNumber ? ` · receipt ${attempt.receiptNumber}` : ''}
+                          {attempt.collectedBy ? ` · received by ${attempt.collectedBy}` : ''}
+                        </span>
+                      ) : (
+                        <Muted>—</Muted>
+                      ))}
+                  </td>
                   <td className="py-2 pr-3 whitespace-nowrap">{formatDateTime(attempt.createdAt)}</td>
                   <td className="py-2 whitespace-nowrap">{attempt.paidAt ? formatDateTime(attempt.paidAt) : <Muted>—</Muted>}</td>
                 </tr>

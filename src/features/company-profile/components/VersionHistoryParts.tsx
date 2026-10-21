@@ -1,8 +1,8 @@
 import React from 'react';
 import { ArrowRight } from 'lucide-react';
 import type { AuditEntry, FieldChange } from '../types/companyProfile.types';
-import { IMAGE_FIELDS, STATUS_LABELS, TRADEMARK_SYMBOLS, fieldLabel, formatServerTime, onOff } from '../utils/companyProfile.utils';
-import { InvoiceTermsList, ProfileImage, ShippingRulesList, UrlLink, YouTubePreview } from './ProfileDisplay';
+import { IMAGE_FIELDS, LOGIN_HIGHLIGHT_FIELDS, STATUS_LABELS, TRADEMARK_SYMBOLS, fieldLabel, formatServerTime, onOff } from '../utils/companyProfile.utils';
+import { InvoiceTermsList, LoginHighlightsList, ProfileImage, ShippingRulesList, UrlLink, YouTubePreview } from './ProfileDisplay';
 
 const asText = (value: unknown): string => {
   if (value === null || value === undefined || value === '') return '—';
@@ -12,7 +12,7 @@ const asText = (value: unknown): string => {
 
 const ChangeValue: React.FC<{ field: string; value: unknown; side: 'live' | 'proposed' }> = ({ field, value, side }) => {
   if (IMAGE_FIELDS.has(field)) {
-    const variant = field === 'faviconUrl' ? 'favicon' : field === 'logoDarkUrl' ? 'logoDark' : 'logo';
+    const variant = field === 'faviconUrl' ? 'favicon' : field === 'logoDarkUrl' ? 'logoDark' : field === 'loginImageUrl' ? 'loginImage' : 'logo';
     const url = typeof value === 'string' ? value : null;
     return (
       <div className="space-y-1">
@@ -23,6 +23,9 @@ const ChangeValue: React.FC<{ field: string; value: unknown; side: 'live' | 'pro
   }
   if (field === 'invoiceTerms') {
     return <InvoiceTermsList terms={Array.isArray(value) ? value.map(asText) : null} label={`${side === 'live' ? 'Live' : 'Proposed'} invoice terms`} />;
+  }
+  if (LOGIN_HIGHLIGHT_FIELDS.has(field)) {
+    return <LoginHighlightsList points={value} label={`${side === 'live' ? 'Live' : 'Proposed'} ${fieldLabel(field).toLowerCase()}`} />;
   }
   if (field === 'shippingRules') {
     return <ShippingRulesList rules={value} label={`${side === 'live' ? 'Live' : 'Proposed'} shipping charges`} />;

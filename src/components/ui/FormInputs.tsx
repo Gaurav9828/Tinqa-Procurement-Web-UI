@@ -94,6 +94,8 @@ export const CommonInput: React.FC<CommonInputProps> = ({
     >
       <div className="relative flex items-center">
         <input
+          // The visible label isn't a <label>, so name the control for assistive tech
+          aria-label={label}
           type={effectiveType}
           maxLength={effectiveMaxLength}
           disabled={disabled}
@@ -208,6 +210,7 @@ export const CommonTextArea: React.FC<CommonTextAreaProps> = ({
       readOnly={readOnly}
     >
       <textarea
+        aria-label={label}
         rows={rows}
         maxLength={maxLength}
         disabled={disabled}

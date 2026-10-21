@@ -5,6 +5,7 @@ import { ProductRatingSummary } from '../../reviews/components/ProductRatingSumm
 import type { ProductResponse } from '../types/product.types';
 import { describeGst } from '../utils/productTax';
 import { ProductTaxBreakdown } from './ProductTaxBreakdown';
+import { describeAccessory } from '../utils/accessoryForm';
 
 interface ProductPreviewModalProps {
   product: ProductResponse | null;
@@ -68,6 +69,32 @@ export const ProductPreviewModal: React.FC<ProductPreviewModalProps> = ({ produc
           )}
 
           {product.components.length > 0 && <ComponentsPreview components={product.components} />}
+
+          {product.accessory && (
+            <div data-testid="preview-accessory">
+              <h4 className="font-semibold text-gray-700 dark:text-gray-300 mb-1">Accessory</h4>
+              <p className="text-black dark:text-white">{describeAccessory(product.accessoryFor, true)}</p>
+              {product.accessoryPurpose && <p className="mt-1 text-gray-600 dark:text-gray-300">{product.accessoryPurpose}</p>}
+              {product.accessoryBenefits.length > 0 && (
+                <ul className="mt-1 list-disc pl-4 text-gray-600 dark:text-gray-300">
+                  {product.accessoryBenefits.map((benefit, i) => (
+                    <li key={i}>{benefit}</li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
+
+          {product.accessories.length > 0 && (
+            <div>
+              <h4 className="font-semibold text-gray-700 dark:text-gray-300 mb-1">Accessories offered with it</h4>
+              <p className="text-black dark:text-white">
+                {product.accessories
+                  .map((link) => (link.bundleDiscountPercentage > 0 ? `${link.title} (+${link.bundleDiscountPercentage}% off together)` : link.title))
+                  .join(', ')}
+              </p>
+            </div>
+          )}
 
           {product.specifications && product.specifications.length > 0 && (
             <div>

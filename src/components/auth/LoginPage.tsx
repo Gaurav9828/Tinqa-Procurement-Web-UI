@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
-import { Lock, Mail, ArrowRight, Loader2 } from 'lucide-react';
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
+import { Lock, Mail, ArrowRight, Loader2, Eye, EyeOff } from 'lucide-react';
 import { authService } from '../../api/services/authService';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useNotify } from '../../hooks/useNotify';
+import { AuthCard } from './AuthCard';
 
 export const LoginPage: React.FC = () => {
   const navigate = useNavigate();
@@ -16,6 +17,7 @@ export const LoginPage: React.FC = () => {
     password: '',
   });
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [showPassword, setShowPassword] = useState(false);
   const notify = useNotify();
 
   useEffect(() => {
@@ -51,97 +53,90 @@ export const LoginPage: React.FC = () => {
     }
   };
 
+  const inputClass =
+    'w-full h-10 pl-9 pr-3 rounded-lg border border-black/10 dark:border-white/10 bg-white dark:bg-[#1c1c1e] text-sm focus:outline-none focus:ring-2 focus:ring-[#0071e3]/60 focus:border-[#0071e3] transition-all placeholder:text-gray-400';
+
   return (
-    <div className="min-h-screen flex flex-col justify-center items-center bg-[#f5f5f7] dark:bg-black text-[#1d1d1f] dark:text-[#f5f5f7] px-4 transition-colors duration-200">
-      <div className="w-full max-w-md">
-        {/* Brand Header */}
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-white dark:bg-[#1c1c1e] shadow-sm border border-black/10 dark:border-white/10 mb-4 p-3">
-            <img 
-              src="/logo/TinQa.png" 
-              alt="TinQa Logo" 
-              className="w-full h-full object-contain"
+    <AuthCard
+      subtitle="Staff & Dealer Sign-in"
+      footer={
+        <p className="text-center text-xs text-gray-400 dark:text-neutral-500 mt-4">
+          Your role and access are applied automatically after sign-in.
+        </p>
+      }
+    >
+      <form onSubmit={handleLogin} className="space-y-4">
+        <div>
+          <label htmlFor="login-username" className="block text-sm font-medium text-gray-700 dark:text-neutral-300 mb-1.5">
+            Username
+          </label>
+          <div className="relative">
+            <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+            <input
+              id="login-username"
+              type="text"
+              required
+              autoFocus
+              placeholder="Enter your username"
+              autoComplete="username"
+              maxLength={64}
+              value={credentials.username}
+              onChange={(e) => setCredentials({ ...credentials, username: e.target.value })}
+              className={inputClass}
             />
           </div>
-          <h1 className="text-2xl font-bold tracking-tight">TinQa Procurement</h1>
-          <p className="text-xs text-gray-500 dark:text-neutral-400 mt-1 font-mono uppercase tracking-wider">
-            Staff &amp; Dealer Sign-in
-          </p>
         </div>
 
-        {/* Login Card */}
-        <div className="apple-card p-8 shadow-md">
-
-          <form onSubmit={handleLogin} className="space-y-5">
-
-            {/* Username Field */}
-            <div>
-              <label className="block text-xs font-semibold text-gray-500 dark:text-neutral-400 uppercase tracking-wider mb-2">
-                Username
-              </label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-400">
-                  <Mail className="w-4 h-4" />
-                </div>
-                <input
-                  type="text"
-                  required
-                  placeholder="admin"
-                  autoComplete="username"
-                  maxLength={64}
-                  value={credentials.username}
-                  onChange={(e) => setCredentials({ ...credentials, username: e.target.value })}
-                  className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-black/10 dark:border-white/10 bg-white dark:bg-[#1c1c1e] text-sm focus:outline-none focus:ring-2 focus:ring-[#0071e3] transition-all cursor-text placeholder:text-gray-400"
-                />
-              </div>
-            </div>
-
-            {/* Password Field */}
-            <div>
-              <label className="block text-xs font-semibold text-gray-500 dark:text-neutral-400 uppercase tracking-wider mb-2">
-                Password
-              </label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-400">
-                  <Lock className="w-4 h-4" />
-                </div>
-                <input
-                  type="password"
-                  required
-                  placeholder="••••••••"
-                  autoComplete="current-password"
-                  maxLength={128}
-                  value={credentials.password}
-                  onChange={(e) => setCredentials({ ...credentials, password: e.target.value })}
-                  className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-black/10 dark:border-white/10 bg-white dark:bg-[#1c1c1e] text-sm focus:outline-none focus:ring-2 focus:ring-[#0071e3] transition-all cursor-text placeholder:text-gray-400"
-                />
-              </div>
-            </div>
-
-            {/* Submit Button */}
+        <div>
+          <div className="flex items-center justify-between mb-1.5">
+            <label htmlFor="login-password" className="block text-sm font-medium text-gray-700 dark:text-neutral-300">
+              Password
+            </label>
+            <Link to="/forgot-password" className="text-xs font-medium text-[#0071e3] hover:underline">
+              Forgot password?
+            </Link>
+          </div>
+          <div className="relative">
+            <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+            <input
+              id="login-password"
+              type={showPassword ? 'text' : 'password'}
+              required
+              placeholder="••••••••"
+              autoComplete="current-password"
+              maxLength={128}
+              value={credentials.password}
+              onChange={(e) => setCredentials({ ...credentials, password: e.target.value })}
+              className={`${inputClass} pr-10`}
+            />
             <button
-              type="submit"
-              disabled={isLoading || !credentials.username.trim() || !credentials.password}
-              className="w-full mt-2 py-2.5 px-4 bg-[#0071e3] hover:bg-[#0077ed] text-white rounded-xl text-sm font-semibold transition-colors duration-150 shadow-sm flex items-center justify-center gap-2 cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed"
+              type="button"
+              onClick={() => setShowPassword((v) => !v)}
+              aria-label={showPassword ? 'Hide password' : 'Show password'}
+              className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-md text-gray-400 hover:text-gray-600 dark:hover:text-neutral-200 cursor-pointer"
             >
-              {isLoading ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  Authenticating...
-                </>
-              ) : (
-                <>
-                  Sign In <ArrowRight className="w-4 h-4" />
-                </>
-              )}
+              {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
             </button>
-          </form>
+          </div>
         </div>
 
-        <p className="text-center text-xs text-gray-400 dark:text-neutral-500 mt-6">
-          Access permissions and roles are automatically granted based on system credentials.
-        </p>
-      </div>
-    </div>
+        <button
+          type="submit"
+          disabled={isLoading || !credentials.username.trim() || !credentials.password}
+          className="w-full h-10 px-4 bg-[#0071e3] hover:bg-[#0077ed] active:bg-[#006edb] text-white rounded-lg text-sm font-semibold transition-colors duration-150 shadow-sm flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+        >
+          {isLoading ? (
+            <>
+              <Loader2 className="w-4 h-4 animate-spin" />
+              Signing in...
+            </>
+          ) : (
+            <>
+              Sign In <ArrowRight className="w-4 h-4" />
+            </>
+          )}
+        </button>
+      </form>
+    </AuthCard>
   );
 };

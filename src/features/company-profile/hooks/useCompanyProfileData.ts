@@ -107,10 +107,10 @@ export const useCompanyProfileHistory = () => {
   return { page, setPage, result: loader.data, isLoading: loader.isLoading, errorKind: loader.errorKind, reload: loader.reload };
 };
 
-/** Navigation badge: reads the shared overview (loaded once, refreshed on focus when stale) for a pending change. */
+/** Navigation badge: reads the shared overview (loaded once, refreshed on focus when stale) for pending changes. */
 export const usePendingCompanyChangeBadge = (enabled: boolean) => {
   const dispatch = useAppDispatch();
-  const hasPending = useAppSelector((state) => !!state.companyProfile.overview?.pending);
+  const hasPending = useAppSelector((state) => (state.companyProfile.overview?.pendingChanges.length ?? 0) > 0);
   const refresh = useCallback(() => {
     if (enabled) void dispatch(fetchCompanyOverview());
   }, [enabled, dispatch]);

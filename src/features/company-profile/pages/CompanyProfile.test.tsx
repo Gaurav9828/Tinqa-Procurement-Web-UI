@@ -18,6 +18,7 @@ import { CompanyProfileReviewPage } from './CompanyProfileReviewPage';
 import { CompanyProfileHistoryPage } from './CompanyProfileHistoryPage';
 import { clearPincodeCache } from '../../../utils/pincode';
 import { superAdminPermissions } from '../../../test/access';
+import { blocksSubmit, sectionOwns } from '../utils/companyProfileSections';
 
 // Only the network layer is mocked: a small fake of the Ecommerce BE maker-checker rules.
 vi.mock('../api/companyProfileApi', () => ({
@@ -72,6 +73,13 @@ const FIELDS: CompanyProfileFields = {
   ],
   homeVideoEnabled: false,
   homeVideoUrl: null,
+  loginImageUrl: null,
+  adminLoginHeadline: 'Procurement, sales & delivery — one workspace.',
+  adminLoginTagline: null,
+  adminLoginHighlights: ['Quotes in one place', 'Live order tracking'],
+  storeLoginHeadline: 'Miniature worlds, crafted for you.',
+  storeLoginTagline: null,
+  storeLoginHighlights: ['Handcrafted dioramas'],
 };
 
 let versions: CompanyProfileVersion[];
@@ -81,6 +89,7 @@ const version = (id: number, status: VersionStatus, patch: Partial<CompanyProfil
   id,
   versionNo: id,
   status,
+  section: null,
   createdBy: 'maker1',
   createdAt: '2026-10-01T10:00:00',
   updatedBy: 'maker1',
@@ -101,8 +110,10 @@ const find = (id: number) => {
   return v;
 };
 const live = () => versions.find((v) => v.status === 'APPROVED') ?? null;
-const pending = () => versions.find((v) => v.status === 'PENDING_APPROVAL') ?? null;
-const diff = (v: CompanyProfileVersion) => {
+const pendingAll = () => versions.filter((v) => v.status === 'PENDING_APPROVAL');
+// A section version only differs from live in its own section (like the backend's diff).
+const diff = (v: CompanyProfileVersion) => diffAll(v).filter((c) => !v.section || sectionOwns(v.section, c.field));
+const diffAll = (v: CompanyProfileVersion) => {
   const l = live();
   const changes = [];
   for (const key of Object.keys(FIELDS) as (keyof CompanyProfileFields)[]) {
@@ -130,7 +141,7 @@ const installBackend = () => {
   api.getOverview.mockImplementation(async () =>
     ok({
       live: structuredClone(live()),
-      pending: structuredClone(pending()),
+      pendingChanges: structuredClone(pendingAll()),
       myDrafts: structuredClone(versions.filter((v) => (v.status === 'DRAFT' || v.status === 'REJECTED') && v.createdBy === me).reverse()),
     })
   );
@@ -144,7 +155,8 @@ const installBackend = () => {
   });
   api.createDraft.mockImplementation(async (body) => {
     const fields: CompanyProfileFields = 'copyFromLive' in body ? fieldsOnly(live()!) : body;
-    const created = version(Math.max(...versions.map((v) => v.id)) + 1, 'DRAFT', { ...fields, createdBy: me, updatedBy: me, submittedBy: null, submittedAt: null, reviewedBy: null, reviewedAt: null, reviewComment: null, lockVersion: 0 });
+    const section = 'copyFromLive' in body ? (body.section ?? null) : null;
+    const created = version(Math.max(...versions.map((v) => v.id)) + 1, 'DRAFT', { ...fields, section, createdBy: me, updatedBy: me, submittedBy: null, submittedAt: null, reviewedBy: null, reviewedAt: null, reviewComment: null, lockVersion: 0 });
     versions.push(created);
     return ok(structuredClone(created));
   });
@@ -154,18 +166,25 @@ const installBackend = () => {
     if (body.lockVersion !== undefined && body.lockVersion !== v.lockVersion) throw apiError(409, 'CONCURRENT_UPDATE', 'Someone else changed this draft.');
     const { lockVersion: _lock, ...fields } = body;
     void _lock;
-    return transition(v, v.status, { ...fields, updatedBy: me });
+    // A section draft keeps only its own section's fields.
+    const kept = v.section ? Object.fromEntries(Object.entries(fields).filter(([key]) => sectionOwns(v.section!, key))) : fields;
+    return transition(v, v.status, { ...kept, updatedBy: me });
   });
   api.submitDraft.mockImplementation(async (id) => {
     const v = find(id);
-    if (pending()) throw apiError(409, 'PENDING_CHANGE_EXISTS', 'Another change is already waiting for approval.');
-    if (!v.legalName) throw apiError(400, 'VALIDATION_FAILED', 'Validation failed', [{ field: 'legalName', message: 'Legal name is required.' }]);
+    if (pendingAll().some((p) => blocksSubmit(p, v.section))) throw apiError(409, 'PENDING_CHANGE_EXISTS', 'Another change is already waiting for approval.');
+    if ((!v.section || v.section === 'LEGAL_ADDRESS') && !v.legalName) throw apiError(400, 'VALIDATION_FAILED', 'Validation failed', [{ field: 'legalName', message: 'Legal name is required.' }]);
     return transition(v, 'PENDING_APPROVAL', { submittedBy: me, submittedAt: '2026-10-13T10:00:00' });
   });
   api.approve.mockImplementation(async (id) => {
     const v = find(id);
     if (v.createdBy === me || v.submittedBy === me) throw apiError(403, 'APPROVAL_SELF_NOT_ALLOWED', 'You created or submitted this change; another approver must approve it.');
     const previous = live();
+    // A section change goes live on top of the current live profile.
+    if (previous && v.section) {
+      const others = Object.entries(fieldsOnly(previous)).filter(([key]) => !sectionOwns(v.section!, key));
+      Object.assign(v, Object.fromEntries(others));
+    }
     if (previous) previous.status = 'SUPERSEDED';
     return transition(v, 'APPROVED', { reviewedBy: me, reviewedAt: '2026-10-13T11:00:00' });
   });
@@ -228,15 +247,18 @@ beforeEach(() => {
 });
 
 describe('Maker proposes a change (acceptance 1)', () => {
-  it('copies the live profile, edits brand + logo, saves the full form and submits', async () => {
+  it('drafts one section from live, edits brand + logo, saves and submits; only that section is shown', async () => {
     const { user } = renderAt(OVERVIEW);
-    const liveCard = await screen.findByRole('region', { name: 'Live profile' });
-    expect(within(liveCard).getByText(/Version 1, approved by checker1/)).toBeInTheDocument();
+    const liveCard = await screen.findByRole('region', { name: 'Live Brand' });
+    expect(screen.getByText(/Live: version 1, approved by checker1/)).toBeInTheDocument();
     expect(within(liveCard).getByText('™')).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: /Brand/ })).toHaveAttribute('aria-selected', 'true');
 
     await user.click(screen.getByRole('button', { name: 'Propose a change' }));
-    expect(api.createDraft).toHaveBeenCalledWith({ copyFromLive: true });
+    expect(api.createDraft).toHaveBeenCalledWith({ copyFromLive: true, section: 'BRAND' });
     await waitFor(() => expect(brandInput()).toHaveValue('TinQa'));
+    expect(screen.getByRole('heading', { name: /Edit Brand · version 2/ })).toBeInTheDocument();
+    expect(screen.queryByLabelText(/^Legal name/)).not.toBeInTheDocument(); // other sections aren't in this draft
 
     await user.clear(brandInput());
     await user.type(brandInput(), 'TinQa Plus');
@@ -248,19 +270,20 @@ describe('Maker proposes a change (acceptance 1)', () => {
     await waitFor(() => expect(api.submitDraft).toHaveBeenCalledWith(2));
     const body = api.saveDraft.mock.calls[0][1];
     expect(body).toMatchObject({ brandName: 'TinQa Plus', logoUrl: 'https://assets.tinqa.com/company/new-logo.png', lockVersion: 0, legalName: FIELDS.legalName });
-    expect(Object.keys(body)).toHaveLength(20); // every field + lockVersion (PUT is a full replacement)
+    expect(Object.keys(body)).toHaveLength(27); // every field + lockVersion (PUT is a full replacement)
 
-    const panel = await screen.findByRole('region', { name: 'Pending change' });
+    // Back on the Brand tab
+    const panel = await screen.findByRole('region', { name: 'Pending Brand change' });
     expect(within(panel).getByText(/Version 2 submitted by maker1/)).toBeInTheDocument();
     // The live profile is unchanged until approval.
-    expect(within(screen.getByRole('region', { name: 'Live profile' })).getByText('TinQa')).toBeInTheDocument();
+    expect(within(screen.getByRole('region', { name: 'Live Brand' })).getByText('TinQa')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Approve' })).not.toBeInTheDocument(); // makers never approve (acceptance 6)
   });
 });
 
 describe('Checker reviews (acceptance 2, 3, 6)', () => {
   beforeEach(() => {
-    versions.push(version(2, 'PENDING_APPROVAL', { brandName: 'TinQa Plus', logoUrl: 'https://assets.tinqa.com/company/new-logo.png' }));
+    versions.push(version(2, 'PENDING_APPROVAL', { section: 'BRAND', brandName: 'TinQa Plus', logoUrl: 'https://assets.tinqa.com/company/new-logo.png' }));
     // An approver whose designation doesn't include drafting
     signIn('checker1', ['ADMIN_L2'], ['COMPANY_PROFILE_VIEW', 'COMPANY_PROFILE_APPROVE']);
   });
@@ -275,11 +298,11 @@ describe('Checker reviews (acceptance 2, 3, 6)', () => {
 
     await user.click(screen.getByRole('button', { name: 'Approve' }));
     const dialog = screen.getByRole('dialog', { name: 'Approve this change?' });
-    expect(dialog).toHaveTextContent('This will replace the live company profile on the storefront.');
+    expect(dialog).toHaveTextContent('This puts the Brand change live on the storefront; other sections stay as they are.');
     await user.click(within(dialog).getByRole('button', { name: 'Approve' }));
 
-    expect(await screen.findByText('Approved. The new company profile is live.')).toBeInTheDocument();
-    const liveCard = await screen.findByRole('region', { name: 'Live profile' });
+    expect(await screen.findByText('Approved. The change is live.')).toBeInTheDocument();
+    const liveCard = await screen.findByRole('region', { name: 'Live Brand' });
     expect(within(liveCard).getByText('TinQa Plus')).toBeInTheDocument();
     expect(versions[0].status).toBe('SUPERSEDED');
     expect(screen.queryByRole('button', { name: 'Propose a change' })).not.toBeInTheDocument(); // no COMPANY_PROFILE_EDIT
@@ -297,13 +320,13 @@ describe('Checker reviews (acceptance 2, 3, 6)', () => {
     await user.type(within(dialog).getByLabelText(/Comment/), 'Use the registered logo');
     await user.click(within(dialog).getByRole('button', { name: 'Reject' }));
     await waitFor(() => expect(api.reject).toHaveBeenCalledWith(2, 'xUse the registered logo'));
-    await waitFor(() => expect(screen.queryByRole('region', { name: 'Pending change' })).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByRole('region', { name: 'Pending Brand change' })).not.toBeInTheDocument());
   });
 });
 
 describe('Maker after a rejection (acceptance 3)', () => {
   it('sees the comment, edits and resubmits', async () => {
-    versions.push(version(2, 'REJECTED', { brandName: 'TinQa Plus', reviewComment: 'Use the registered logo' }));
+    versions.push(version(2, 'REJECTED', { section: 'BRAND', brandName: 'TinQa Plus', reviewComment: 'Use the registered logo' }));
     const { user } = renderAt(OVERVIEW);
     const draft = await screen.findByTestId('draft-2');
     expect(draft).toHaveTextContent('Rejected by checker1: Use the registered logo');
@@ -313,22 +336,47 @@ describe('Maker after a rejection (acceptance 3)', () => {
     await user.type(brandInput(), '!');
     await user.click(screen.getByRole('button', { name: 'Save & submit for approval' }));
     await waitFor(() => expect(api.submitDraft).toHaveBeenCalledWith(2));
-    expect(await screen.findByRole('region', { name: 'Pending change' })).toBeInTheDocument();
+    expect(await screen.findByRole('region', { name: 'Pending Brand change' })).toBeInTheDocument();
   });
 });
 
-describe('Only one pending change (acceptance 4)', () => {
+describe('One pending change per section (acceptance 4)', () => {
   beforeEach(() => {
-    versions.push(version(2, 'PENDING_APPROVAL', { createdBy: 'maker2', submittedBy: 'maker2' }));
-    versions.push(version(3, 'DRAFT'));
+    versions.push(version(2, 'PENDING_APPROVAL', { section: 'BRAND', createdBy: 'maker2', submittedBy: 'maker2' }));
+    versions.push(version(3, 'DRAFT', { section: 'BRAND' }));
   });
 
-  it('disables Submit while another change is pending', async () => {
+  it('disables Submit while another change to the same section is pending', async () => {
     renderAt(OVERVIEW);
     const draft = await screen.findByTestId('draft-3');
     expect(within(draft).getByRole('button', { name: 'Submit version 3' })).toBeDisabled();
-    expect(screen.getByText(/You can keep editing drafts but can't submit/)).toBeInTheDocument();
+    expect(screen.getByText(/You can keep editing Brand drafts but can't submit/)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Withdraw request' })).not.toBeInTheDocument(); // not the submitter
+    expect(screen.getByRole('tab', { name: /Brand/ })).toContainElement(screen.getByLabelText('change awaiting approval'));
+  });
+
+  it('another section is still submitted while Brand waits', async () => {
+    versions.push(version(4, 'DRAFT', { section: 'SHIPPING', shippingRules: [] }));
+    const { user } = renderAt(`${OVERVIEW}?section=shipping`);
+    const draft = await screen.findByTestId('draft-4');
+    expect(screen.queryByTestId('draft-3')).not.toBeInTheDocument(); // Brand drafts stay on the Brand tab
+    await user.click(within(draft).getByRole('button', { name: 'Submit version 4' }));
+    await waitFor(() => expect(api.submitDraft).toHaveBeenCalledWith(4));
+    expect(await screen.findByRole('region', { name: 'Pending Shipping charges change' })).toBeInTheDocument();
+  });
+
+  it('approving a section keeps a section approved after it was drafted', async () => {
+    versions.push(version(4, 'PENDING_APPROVAL', { section: 'SHIPPING', brandName: 'Old brand copy', shippingRules: [] }));
+    versions[0].brandName = 'TinQa Prime'; // approved after version 4 was drafted
+    signIn('checker1', ['ADMIN_L2'], ['COMPANY_PROFILE_VIEW', 'COMPANY_PROFILE_APPROVE']);
+    const { user } = renderAt('/settings/company-profile/versions/4');
+    expect(await screen.findByTestId('change-shippingRules')).toBeInTheDocument();
+    expect(screen.queryByTestId('change-brandName')).not.toBeInTheDocument(); // the stale brand copy isn't a change
+    expect(screen.queryByText('Old brand copy')).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Approve' }));
+    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Approve' }));
+    await waitFor(() => expect(versions.find((v) => v.id === 4)?.status).toBe('APPROVED'));
+    expect(versions.find((v) => v.id === 4)?.brandName).toBe('TinQa Prime');
   });
 
   it('still saves the draft', async () => {
@@ -450,7 +498,7 @@ describe('Withdraw and history (acceptance 11)', () => {
     await user.click(await screen.findByRole('button', { name: 'Withdraw request' }));
     await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Withdraw request' }));
     await waitFor(() => expect(api.withdraw).toHaveBeenCalledWith(2));
-    await waitFor(() => expect(screen.queryByRole('region', { name: 'Pending change' })).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByRole('region', { name: 'Pending Whole profile change' })).not.toBeInTheDocument());
 
     await user.click(screen.getByRole('link', { name: /History/ }));
     const row = await screen.findByTestId('version-row-2');
@@ -472,8 +520,8 @@ describe('Withdraw and history (acceptance 11)', () => {
 });
 
 describe('Deleting a draft', () => {
-  it("the creator deletes their own draft from My drafts after confirming", async () => {
-    versions.push(version(2, 'DRAFT'));
+  it("the creator deletes their own draft from the section's drafts after confirming", async () => {
+    versions.push(version(2, 'DRAFT', { section: 'BRAND' }));
     const { user } = renderAt(OVERVIEW);
     const row = await screen.findByTestId('draft-2');
     await user.click(within(row).getByRole('button', { name: 'Delete version 2' }));
@@ -483,7 +531,7 @@ describe('Deleting a draft', () => {
     await waitFor(() => expect(api.deleteDraft).toHaveBeenCalledWith(2));
     expect(await screen.findByText('Draft deleted.')).toBeInTheDocument();
     await waitFor(() => expect(screen.queryByTestId('draft-2')).not.toBeInTheDocument());
-    expect(screen.getByText('No drafts yet.')).toBeInTheDocument();
+    expect(screen.getByText('No Brand drafts.')).toBeInTheDocument();
   });
 
   it('the creator can delete from the editor and lands back on the overview', async () => {
@@ -491,7 +539,7 @@ describe('Deleting a draft', () => {
     const { user } = renderAt('/settings/company-profile/drafts/2');
     await user.click(await screen.findByRole('button', { name: 'Delete version 2' }));
     await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Delete draft' }));
-    expect(await screen.findByRole('region', { name: 'Live profile' })).toBeInTheDocument();
+    expect(await screen.findByRole('region', { name: 'Live Brand' })).toBeInTheDocument();
     expect(versions.find((v) => v.id === 2)?.status).toBe('DELETED');
   });
 
@@ -562,7 +610,7 @@ describe('Shipping charges', () => {
   });
 
   it('the live profile lists the price bands', async () => {
-    renderAt(OVERVIEW);
+    renderAt(`${OVERVIEW}?section=shipping`);
     const table = await screen.findByRole('table', { name: 'Shipping charges' });
     expect(within(table).getByText('Below ₹50,000')).toBeInTheDocument();
     expect(within(table).getByText('₹500')).toBeInTheDocument();
@@ -645,11 +693,100 @@ describe('Home page video', () => {
 
   it('the live profile shows the video status, link and thumbnail', async () => {
     Object.assign(versions[0], { homeVideoEnabled: true, homeVideoUrl: LINK });
-    renderAt(OVERVIEW);
+    renderAt(`${OVERVIEW}?section=home-video`);
     const group = await screen.findByRole('group', { name: 'Home page video' });
     expect(within(group).getByText('On')).toBeInTheDocument();
     expect(within(group).getByRole('link', { name: LINK })).toBeInTheDocument();
     expect(within(group).getByAltText('Video preview')).toBeInTheDocument();
+  });
+});
+
+describe('Sign-in pages', () => {
+  it('edits each portal\'s text and points, uploads the shared image and previews both panels', async () => {
+    versions.push(version(2, 'DRAFT'));
+    const { user } = renderAt('/settings/company-profile/drafts/2');
+    const admin = await screen.findByRole('group', { name: 'Admin portal (staff & dealers) sign-in' });
+    const store = screen.getByRole('group', { name: 'Storefront (customers) sign-in' });
+
+    const headline = within(admin).getByLabelText('Headline');
+    await user.clear(headline);
+    await user.type(headline, 'Run procurement in one place.');
+    await user.type(within(admin).getByLabelText(/^Tagline/), 'For staff and dealers.');
+    await user.click(within(store).getByRole('button', { name: 'Remove point 1' }));
+    expect(within(store).getByText('No points.')).toBeInTheDocument();
+    await user.click(within(admin).getByRole('button', { name: 'Move point 2 up' }));
+
+    const previews = screen.getAllByTestId('auth-brand-panel');
+    expect(previews).toHaveLength(2);
+    expect(previews[0]).toHaveTextContent('Run procurement in one place.');
+    expect(previews[0]).toHaveTextContent('For staff and dealers.');
+    expect(previews[1]).toHaveTextContent('Miniature worlds, crafted for you.');
+
+    fireEvent.change(screen.getByTestId('asset-input-LOGIN_IMAGE'), { target: { files: [new File(['jpg'], 'login.jpg', { type: 'image/jpeg' })] } });
+    const image = 'https://assets.tinqa.com/company/login.jpg';
+    await waitFor(() => expect(within(screen.getByRole('group', { name: 'Sign-in image' })).getByText(image)).toBeInTheDocument());
+    expect(api.uploadAsset).toHaveBeenCalledWith(expect.any(File), 'LOGIN_IMAGE', expect.any(Function));
+    // Both previews use the one image
+    expect(screen.getAllByTestId('auth-brand-panel').map((p) => p.querySelector('img[alt=""]')?.getAttribute('src'))).toEqual([image, image]);
+
+    await user.click(screen.getByRole('button', { name: 'Save draft' }));
+    await waitFor(() =>
+      expect(api.saveDraft).toHaveBeenCalledWith(
+        2,
+        expect.objectContaining({
+          loginImageUrl: image,
+          adminLoginHeadline: 'Run procurement in one place.',
+          adminLoginTagline: 'For staff and dealers.',
+          adminLoginHighlights: ['Live order tracking', 'Quotes in one place'],
+          storeLoginHighlights: [],
+        })
+      )
+    );
+  });
+
+  it('blocks saving an empty point and a fifth point', async () => {
+    versions.push(version(2, 'DRAFT'));
+    const { user } = renderAt('/settings/company-profile/drafts/2');
+    const admin = await screen.findByRole('group', { name: 'Admin portal (staff & dealers) sign-in' });
+    await user.click(within(admin).getByRole('button', { name: 'Add point' }));
+    await user.click(within(admin).getByRole('button', { name: 'Add point' }));
+    expect(within(admin).getByRole('button', { name: 'Add point' })).toBeDisabled();
+    await user.type(within(admin).getByLabelText('Point 3'), 'Approvals');
+    await user.click(screen.getByRole('button', { name: 'Save draft' }));
+    expect(await within(admin).findByText('Point 4 is empty — fill it in or remove it.')).toBeInTheDocument();
+    expect(api.saveDraft).not.toHaveBeenCalled();
+  });
+
+  it('the sign-in image takes JPG photos up to 5 MB; logos still don\'t take JPG', async () => {
+    versions.push(version(2, 'DRAFT'));
+    renderAt('/settings/company-profile/drafts/2');
+    fireEvent.change(await screen.findByTestId('asset-input-LOGIN_IMAGE'), {
+      target: { files: [new File([new Uint8Array(6 * 1024 * 1024)], 'huge.jpg', { type: 'image/jpeg' })] },
+    });
+    expect(await within(screen.getByRole('group', { name: 'Sign-in image' })).findByText('The image is larger than 5 MB.')).toBeInTheDocument();
+    fireEvent.change(screen.getByTestId('asset-input-LOGIN_IMAGE'), { target: { files: [new File(['<svg/>'], 'art.svg', { type: 'image/svg+xml' })] } });
+    expect(await within(screen.getByRole('group', { name: 'Sign-in image' })).findByText('Only JPG, PNG or WEBP images are allowed.')).toBeInTheDocument();
+    expect(api.uploadAsset).not.toHaveBeenCalled();
+  });
+
+  it('change rows show the image and the points; the live profile lists both portals', async () => {
+    versions.push(version(2, 'PENDING_APPROVAL', { loginImageUrl: 'https://cdn.tinqa.com/login.jpg', storeLoginHighlights: ['Free shipping over ₹50,000'] }));
+    signIn('checker1', ['ADMIN_L2']);
+    renderAt('/settings/company-profile/versions/2');
+    const imageRow = await screen.findByTestId('change-loginImageUrl');
+    expect(within(imageRow).getByRole('rowheader')).toHaveTextContent('Sign-in image');
+    expect(within(imageRow).getByAltText('Proposed sign-in image')).toHaveAttribute('src', 'https://cdn.tinqa.com/login.jpg');
+    const pointsRow = screen.getByTestId('change-storeLoginHighlights');
+    expect(within(pointsRow).getByRole('list', { name: 'Live storefront sign-in points' })).toHaveTextContent('Handcrafted dioramas');
+    expect(within(pointsRow).getByRole('list', { name: 'Proposed storefront sign-in points' })).toHaveTextContent('Free shipping over ₹50,000');
+  });
+
+  it('the live profile shows the sign-in image and each portal\'s text', async () => {
+    renderAt(`${OVERVIEW}?section=sign-in`);
+    const group = await screen.findByRole('group', { name: 'Sign-in pages' });
+    expect(within(group).getByRole('img', { name: 'Sign-in image: none' })).toBeInTheDocument();
+    expect(within(group).getByText('Procurement, sales & delivery — one workspace.')).toBeInTheDocument();
+    expect(within(group).getByRole('list', { name: 'Storefront sign-in points' })).toHaveTextContent('Handcrafted dioramas');
   });
 });
 

@@ -82,6 +82,26 @@ export interface FirstLoginPasswordRequest {
   confirmNewPassword: string;
 }
 
+/** "Forgot password?": the username or email the person signs in with. */
+export interface ForgotPasswordRequest {
+  identifier: string;
+}
+
+/** An emailed password link that still works (POST /auth/password/link/check). */
+export interface PasswordLinkInfo {
+  /** SETUP: a new account's first password; RESET: forgot password. */
+  purpose: 'SETUP' | 'RESET';
+  username: string;
+  expiresAt: string;
+}
+
+/** The password chosen on an emailed link's page. */
+export interface PasswordLinkResetRequest {
+  token: string;
+  newPassword: string;
+  confirmNewPassword: string;
+}
+
 export interface ChangePasswordResponse {
   success: boolean;
   message: string;

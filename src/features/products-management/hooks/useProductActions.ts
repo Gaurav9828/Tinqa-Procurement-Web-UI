@@ -61,7 +61,10 @@ export const useProductActions = (onSuccessCallback?: () => void) => {
         const approval = await productApprovalApi.submit({
           ecommerceProductId: created.id,
           productTitle: created.title,
-          snapshot: { ...snapshotFromRequest(inactive), title: created.title },
+          snapshot: {
+            ...snapshotFromRequest(inactive, (id) => created?.accessoryFor.find((link) => link.productId === id)?.title),
+            title: created.title,
+          },
         });
         if (!approval.success) throw new Error(approval.message || 'The approval request was not accepted.');
         notify.success(PRODUCT_SUBMITTED_MESSAGE);
@@ -97,14 +100,20 @@ export const useProductActions = (onSuccessCallback?: () => void) => {
   const requestProductUpdate = async (
     product: ProductResponse,
     payload: UpdateProductRequest,
-    changeSummary: ProductChangeSummary[]
+    changeSummary: ProductChangeSummary[],
+    /** Names the accessory's parents in the snapshot. */
+    titleOf?: (productId: number) => string | undefined
   ): Promise<boolean> => {
     setFieldErrors({});
     const validationError = validateProductPayload(payload);
     if (validationError) return reject(validationError);
     const previousSnapshot = buildApprovalSnapshot(product);
     // Components are only in the payload when they changed; otherwise the product keeps its current ones.
-    const snapshot = { ...snapshotFromRequest(payload), ...(payload.components ? {} : { components: previousSnapshot.components }) };
+    const snapshot = {
+      ...snapshotFromRequest(payload, titleOf),
+      ...(payload.components ? {} : { components: previousSnapshot.components }),
+      ...(payload.accessory === undefined ? { accessoryParents: previousSnapshot.accessoryParents } : {}),
+    };
     return run(
       async () => {
         const res = await productApprovalApi.submit({

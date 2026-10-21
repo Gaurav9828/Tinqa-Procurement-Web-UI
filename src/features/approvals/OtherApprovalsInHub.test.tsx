@@ -41,7 +41,7 @@ const PRE_ORDER: AdminOrderSummary = {
 };
 
 const PENDING_VERSION = (overrides: Partial<CompanyProfileVersion> = {}) =>
-  ({ id: 12, versionNo: 4, status: 'PENDING_APPROVAL', brandName: 'TinQa', createdBy: 'maker1', submittedBy: 'maker1', submittedAt: '2026-10-19T10:00:00', ...overrides }) as CompanyProfileVersion;
+  ({ id: 12, versionNo: 4, status: 'PENDING_APPROVAL', section: 'BRAND', brandName: 'TinQa', createdBy: 'maker1', submittedBy: 'maker1', submittedAt: '2026-10-19T10:00:00', ...overrides }) as CompanyProfileVersion;
 
 const signIn = (username: string, permissions: Permission[]) =>
   useAuthStore.setState({
@@ -68,7 +68,9 @@ beforeEach(() => {
     // ignore
   }
   tracking.listOrders.mockResolvedValue(ok({ content: [PRE_ORDER], totalElements: 1, totalPages: 1, number: 0, size: 100 }) as never);
-  company.getOverview.mockResolvedValue(ok({ live: null, pending: PENDING_VERSION(), myDrafts: [] }));
+  company.getOverview.mockResolvedValue(
+    ok({ live: null, pendingChanges: [PENDING_VERSION(), PENDING_VERSION({ id: 13, versionNo: 5, section: 'SHIPPING', createdBy: 'maker2', submittedBy: 'maker2' })], myDrafts: [] })
+  );
 });
 
 describe('Approvals hub: pre-orders and company profile', () => {
@@ -93,18 +95,20 @@ describe('Approvals hub: pre-orders and company profile', () => {
     expect(within(panel).getByRole('link', { name: 'Review pre-order TQ-1007' })).toHaveAttribute('href', '/order-tracking/TQ-1007');
   });
 
-  it('shows the pending company profile change, and says when it is your own', async () => {
+  it('lists each pending company profile change with its section, and says which are your own', async () => {
     const user = userEvent.setup();
     signIn('maker1', ['COMPANY_PROFILE_VIEW', 'COMPANY_PROFILE_APPROVE']);
     renderHub();
 
     const tab = await screen.findByRole('tab', { name: /Company profile/ });
-    await waitFor(() => expect(tab).toHaveTextContent('1'));
+    await waitFor(() => expect(tab).toHaveTextContent('2'));
     expect(tracking.listOrders).not.toHaveBeenCalled();
 
     await user.click(tab);
-    const panel = await screen.findByRole('region', { name: 'Company profile change awaiting approval' });
-    expect(within(panel).getByText(/You made this change/)).toBeInTheDocument();
+    const panel = await screen.findByRole('region', { name: 'Company profile changes awaiting approval' });
+    expect(within(panel).getByText('Brand · version 4')).toBeInTheDocument();
+    expect(within(panel).getByText('Shipping charges · version 5')).toBeInTheDocument();
+    expect(within(panel).getAllByText(/You made this change/)).toHaveLength(1);
     expect(within(panel).getByRole('link', { name: 'Review company profile version 4' })).toHaveAttribute(
       'href',
       '/settings/company-profile/versions/12'

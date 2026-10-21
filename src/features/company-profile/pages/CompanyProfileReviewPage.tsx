@@ -3,13 +3,14 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Pencil, RefreshCw } from 'lucide-react';
 import { useCompanyProfileVersion } from '../hooks/useCompanyProfileData';
 import { useCompanyProfileAccess } from '../hooks/useCompanyProfileAccess';
-import { ProfileDetails, VersionStatusBadge } from '../components/ProfileDisplay';
+import { ProfileDetails, SectionBadge, SectionDetails, VersionStatusBadge } from '../components/ProfileDisplay';
 import { AuditTrail, ChangesTable } from '../components/VersionHistoryParts';
 import { ReviewActions } from '../components/ReviewActions';
 import { DeleteDraftButton } from '../components/DeleteDraftButton';
 import { Skeleton, StateMessage } from '../components/Dialogs';
 import { BUTTON } from '../utils/companyProfileUi';
-import { COMPANY_PROFILE_PATH, HOME_VIDEO_APPROVAL_NOTE, changesLiveHomeVideo, companyDraftPath, formatServerTime } from '../utils/companyProfile.utils';
+import { COMPANY_PROFILE_PATH, HOME_VIDEO_APPROVAL_NOTE, changesLiveHomeVideo, companyDraftPath, companySectionPath, formatServerTime } from '../utils/companyProfile.utils';
+import { SECTIONS } from '../utils/companyProfileSections';
 
 const Meta: React.FC<{ label: string; who: string | null; when: string | null }> = ({ label, who, when }) =>
   who || when ? (
@@ -21,7 +22,10 @@ const Meta: React.FC<{ label: string; who: string | null; when: string | null }>
     </div>
   ) : null;
 
-/** Review screen: /settings/company-profile/versions/:id — changes vs live, full proposal, audit trail, actions. */
+/**
+ * Review screen: /settings/company-profile/versions/:id — changes vs live, the proposal, audit trail, actions.
+ * A section version shows only its section: approving it changes nothing else.
+ */
 export const CompanyProfileReviewPage: React.FC = () => {
   const { id: idParam = '' } = useParams<{ id: string }>();
   const id = Number(idParam) || null;
@@ -30,6 +34,7 @@ export const CompanyProfileReviewPage: React.FC = () => {
   const { version, isLoading, errorKind, reload } = useCompanyProfileVersion(id);
 
   if (!id) return <StateMessage variant="notFound" />;
+  const backPath = version?.section ? companySectionPath(SECTIONS[version.section].slug) : COMPANY_PROFILE_PATH;
   if (!version) {
     if (isLoading) return <Skeleton lines={10} label="Loading version" />;
     return <StateMessage variant={errorKind ?? 'unknown'} onRetry={reload} />;
@@ -39,13 +44,16 @@ export const CompanyProfileReviewPage: React.FC = () => {
     <section aria-label={`Company profile version ${version.versionNo}`} className="p-6 space-y-6 text-xs max-w-5xl">
       <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
         <div className="flex items-start gap-3">
-          <button type="button" onClick={() => navigate(COMPANY_PROFILE_PATH)} className="p-2 rounded-xl bg-black/5 dark:bg-white/10 cursor-pointer" aria-label="Back to company profile">
+          <button type="button" onClick={() => navigate(backPath)} className="p-2 rounded-xl bg-black/5 dark:bg-white/10 cursor-pointer" aria-label="Back to company profile">
             <ArrowLeft className="w-4 h-4" />
           </button>
           <div className="space-y-2">
             <h1 className="text-lg font-bold text-black dark:text-white flex items-center gap-2">
-              Version {version.versionNo} <VersionStatusBadge status={version.status} />
+              Version {version.versionNo} <VersionStatusBadge status={version.status} /> <SectionBadge section={version.section} />
             </h1>
+            {version.section && (
+              <p className="text-gray-500">Changes only {SECTIONS[version.section].label}. Approving it leaves every other section as it is live.</p>
+            )}
             <dl className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <Meta label="Created" who={version.createdBy} when={version.createdAt} />
               <Meta label="Submitted" who={version.submittedBy} when={version.submittedAt} />
@@ -67,7 +75,7 @@ export const CompanyProfileReviewPage: React.FC = () => {
             version={version}
             access={access}
             onStale={reload}
-            onDone={(_, action) => (action === 'withdraw' ? void reload() : navigate(COMPANY_PROFILE_PATH))}
+            onDone={(_, action) => (action === 'withdraw' ? void reload() : navigate(backPath))}
           />
         </div>
       </div>
@@ -91,8 +99,10 @@ export const CompanyProfileReviewPage: React.FC = () => {
       </div>
 
       <div role="region" aria-label="Proposed profile" className="apple-card p-5 space-y-4">
-        <h2 className="text-sm font-bold text-black dark:text-white">{version.status === 'APPROVED' ? 'Profile' : 'Proposed profile'}</h2>
-        <ProfileDetails profile={version} />
+        <h2 className="text-sm font-bold text-black dark:text-white">
+          {version.status === 'APPROVED' ? 'Profile' : 'Proposed'} {version.section ? SECTIONS[version.section].label : 'profile'}
+        </h2>
+        {version.section ? <SectionDetails section={version.section} profile={version} /> : <ProfileDetails profile={version} />}
       </div>
 
       <div role="region" aria-label="Audit trail section" className="apple-card p-5 space-y-4">

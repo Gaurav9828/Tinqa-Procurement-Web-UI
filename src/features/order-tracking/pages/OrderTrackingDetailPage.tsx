@@ -13,6 +13,7 @@ import { PreOrderReviewCard } from '../components/PreOrderReviewCard';
 import { usePreOrderApproval } from '../hooks/usePreOrderApproval';
 import { ShippingAddressLink } from '../components/ShippingAddressLink';
 import { PaymentDetailsCard } from '../components/PaymentDetailsCard';
+import { StoreSaleCard } from '../../store-sales/components/StoreSaleCard';
 import { RefundPanel } from '../../refunds/components/RefundPanel';
 import { useOrderRefunds } from '../../refunds/hooks/useOrderRefunds';
 import { getAllowedStatuses, getDeliveryOutcomes, getStage, isFullyPaid, type WorkflowContext } from '../utils/statusWorkflow';
@@ -202,7 +203,14 @@ export const OrderTrackingDetailPage: React.FC = () => {
                   <tbody className="divide-y divide-black/5 dark:divide-white/5 text-gray-700 dark:text-gray-300">
                     {order.items!.map((item) => (
                       <tr key={item.productId}>
-                        <td className="py-2 pr-2">{item.title}</td>
+                        <td className="py-2 pr-2">
+                          {item.title}
+                          {Number(item.bundleDiscountAmount) > 0 && (
+                            <span className="block text-[10px] text-emerald-600 dark:text-emerald-400">
+                              Bundle discount on {item.bundleQuantity} with its product: −{formatCurrency(Number(item.bundleDiscountAmount))}
+                            </span>
+                          )}
+                        </td>
                         <td className="py-2 text-right whitespace-nowrap">{formatCurrency(item.price)}</td>
                         <td className="py-2 text-right">×{item.quantity}</td>
                         <td className="py-2 text-right whitespace-nowrap font-medium">{formatCurrency(item.totalPrice)}</td>
@@ -215,6 +223,7 @@ export const OrderTrackingDetailPage: React.FC = () => {
           </div>
 
           <div className="space-y-6 min-w-0 lg:sticky lg:top-20">
+            {order.salesChannel === 'STORE' && <StoreSaleCard order={order} />}
             {(hasPreOrderLines(order) || order.orderStatus === 'PRE_ORDER_PENDING') && (
               <PreOrderReviewCard order={order} canAct={canApprovePreOrder} isApproving={isApproving} onApprove={approvePreOrder} />
             )}

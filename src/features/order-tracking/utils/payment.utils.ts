@@ -20,6 +20,7 @@ const PAYMENT_METHOD_LABELS: Record<string, string> = {
   RAZORPAY: 'Razorpay',
   UPI: 'UPI',
   CARD: 'Card',
+  CASH: 'Cash (store sale)',
 };
 
 /** Order-level payment statuses offered in the list filter (GET /admin/orders?paymentStatus=…). */

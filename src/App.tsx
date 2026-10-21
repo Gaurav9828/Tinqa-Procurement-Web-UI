@@ -4,6 +4,8 @@ import { Loader2 } from 'lucide-react';
 import { AdminLayout } from './components/layout/AdminLayout';
 import { LoginPage } from './components/auth/LoginPage';
 import { ResetPasswordPage } from './components/auth/ResetPasswordPage';
+import { ForgotPasswordPage } from './components/auth/ForgotPasswordPage';
+import { SetPasswordPage } from './components/auth/SetPasswordPage';
 import { GlobalErrorBoundary } from './components/ErrorBoundary';
 import { GlobalErrorPage } from './pages/ErrorPage';
 import { GlobalAlertContainer } from './components/ui/GlobalAlertContainer';
@@ -67,6 +69,7 @@ const CompanyProfileHistoryPage = lazy(() =>
   import('./features/company-profile/pages/CompanyProfileHistoryPage').then((m) => ({ default: m.CompanyProfileHistoryPage }))
 );
 
+const StoreSalesPage = lazy(() => import('./features/store-sales/pages/StoreSalesPage').then((m) => ({ default: m.StoreSalesPage })));
 const UserGuidePage = lazy(() => import('./features/user-guide/pages/UserGuidePage').then((m) => ({ default: m.UserGuidePage })));
 
 const PageLoader: React.FC = () => (
@@ -93,6 +96,16 @@ export const App: React.FC = () => {
                 </RedirectIfAuthenticated>
               }
             />
+            <Route
+              path="/forgot-password"
+              element={
+                <RedirectIfAuthenticated>
+                  <ForgotPasswordPage />
+                </RedirectIfAuthenticated>
+              }
+            />
+            {/* An emailed password link (new account or forgot password): works signed in or not */}
+            <Route path="/set-password" element={<SetPasswordPage />} />
             <Route path="/error" element={<GlobalErrorPage />} />
 
             {/* Signed-in, but allowed while a default password is still active */}
@@ -130,6 +143,9 @@ export const App: React.FC = () => {
                 </Route>
                 <Route element={<RequireNavAccess navId="orders" />}>
                   <Route path="orders" element={<OrderManagementPage />} />
+                </Route>
+                <Route element={<RequireNavAccess navId="store-sales" />}>
+                  <Route path="store-sales" element={<StoreSalesPage />} />
                 </Route>
                 <Route element={<RequireNavAccess navId="order-tracking" />}>
                   <Route path="order-tracking" element={<OrderTrackingPage />} />

@@ -6,6 +6,7 @@ import type {
   UpdateEmployeeRequest,
 } from '../types/employee.types';
 import type { ApiResponse, PageableResponse } from '../../../types/common.types';
+import type { EmailCodeSent, EmailVerificationApi, EmailVerified } from '../../../types/emailVerification.types';
 
 
 const BASE_URL = '/v1/admin/employees';
@@ -62,4 +63,22 @@ export const employeeApi = {
     const response = await axiosClient.delete<ApiResponse<EmployeeResponse>>(`${BASE_URL}/${id}`);
     return response.data;
   },
+
+  /** POST /v1/admin/employees/email-verification — emails a 5-digit code to the new employee's personal email. */
+  sendEmailCode: async (email: string, name?: string): Promise<ApiResponse<EmailCodeSent>> => {
+    const response = await axiosClient.post<ApiResponse<EmailCodeSent>>(`${BASE_URL}/email-verification`, { email, name });
+    return response.data;
+  },
+
+  /** POST /v1/admin/employees/email-verification/confirm — the code the employee read out; returns the verification. */
+  confirmEmailCode: async (email: string, code: string): Promise<ApiResponse<EmailVerified>> => {
+    const response = await axiosClient.post<ApiResponse<EmailVerified>>(`${BASE_URL}/email-verification/confirm`, { email, code });
+    return response.data;
+  },
+};
+
+/** Verifies a new employee's personal email through the Procurement API. */
+export const employeeEmailVerificationApi: EmailVerificationApi = {
+  sendCode: (email, name) => employeeApi.sendEmailCode(email, name),
+  confirmCode: (email, code) => employeeApi.confirmEmailCode(email, code),
 };

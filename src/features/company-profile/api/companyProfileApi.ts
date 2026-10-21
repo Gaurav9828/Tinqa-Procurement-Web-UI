@@ -3,9 +3,9 @@ import type { ApiResponse, PageResponse } from '../../../types/common.types';
 import type {
   AssetPurpose,
   AssetUploadResponse,
-  CompanyProfileFields,
   CompanyProfileOverview,
   CompanyProfileVersion,
+  CreateDraftRequest,
   SaveDraftRequest,
 } from '../types/companyProfile.types';
 
@@ -34,13 +34,13 @@ export const companyProfileApi = {
     return response.data;
   },
 
-  /** POST /drafts — L1. Either all fields, or `{ copyFromLive: true }`. */
-  createDraft: async (body: CompanyProfileFields | { copyFromLive: true }): Promise<ApiResponse<CompanyProfileVersion>> => {
+  /** POST /drafts — L1. Either all fields, `{ copyFromLive: true }`, or `{ copyFromLive: true, section }` for one section. */
+  createDraft: async (body: CreateDraftRequest): Promise<ApiResponse<CompanyProfileVersion>> => {
     const response = await ecommerceAxiosClient.post<ApiResponse<CompanyProfileVersion>>(`${BASE_URL}/drafts`, body);
     return response.data;
   },
 
-  /** PUT /drafts/{id} — L1, own DRAFT/REJECTED. Full replacement: always send every field. */
+  /** PUT /drafts/{id} — L1, own DRAFT/REJECTED. Always send every field; a section draft keeps only its section's. */
   saveDraft: async (id: number, body: SaveDraftRequest): Promise<ApiResponse<CompanyProfileVersion>> => {
     const response = await ecommerceAxiosClient.put<ApiResponse<CompanyProfileVersion>>(`${BASE_URL}/drafts/${id}`, body);
     return response.data;

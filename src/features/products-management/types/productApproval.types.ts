@@ -18,6 +18,8 @@ export interface ProductApprovalSnapshot extends Partial<ProductGstFields> {
   components: { itemId: number; itemName: string; quantity: number }[];
   warranties: { title: string; warrantyType: string; durationValue: number; durationUnit: string; isActive: boolean }[];
   specificationCount: number;
+  /** Accessory: the products it is offered with. Empty / absent: not an accessory. */
+  accessoryParents?: { productId: number; title?: string | null; bundleDiscountPercentage: number }[];
 }
 
 /** CREATE / RESUBMISSION: the product goes live. UPDATE: changes to an approved product. */

@@ -4,6 +4,10 @@
 export const VERSION_STATUSES = ['DRAFT', 'PENDING_APPROVAL', 'APPROVED', 'REJECTED', 'SUPERSEDED', 'WITHDRAWN', 'DELETED'] as const;
 export type VersionStatus = (typeof VERSION_STATUSES)[number];
 
+/** A part of the profile that is drafted, reviewed and approved on its own (see utils/companyProfileSections). */
+export const PROFILE_SECTION_KEYS = ['BRAND', 'LEGAL_ADDRESS', 'CONTACT', 'HOME_VIDEO', 'SIGN_IN', 'SHIPPING', 'INVOICE_TERMS'] as const;
+export type ProfileSection = (typeof PROFILE_SECTION_KEYS)[number];
+
 export const TRADEMARK_MARKS = ['', 'TM', 'R', 'SM'] as const;
 export type TrademarkMark = (typeof TRADEMARK_MARKS)[number];
 
@@ -52,6 +56,16 @@ export interface CompanyProfileFields {
   homeVideoEnabled: boolean | null;
   /** YouTube link of the home page background video. */
   homeVideoUrl: string | null;
+  /** Background of the image half of both sign-in pages (admin and storefront); null = the built-in gradient. */
+  loginImageUrl: string | null;
+  /** Admin web UI sign-in page text. Null / empty parts are left out. */
+  adminLoginHeadline: string | null;
+  adminLoginTagline: string | null;
+  adminLoginHighlights: string[] | null;
+  /** Storefront sign-in page text. */
+  storeLoginHeadline: string | null;
+  storeLoginTagline: string | null;
+  storeLoginHighlights: string[] | null;
 }
 
 /** One field that differs from the live profile, e.g. "address.city" or "invoiceTerms". */
@@ -74,6 +88,8 @@ export interface CompanyProfileVersion extends CompanyProfileFields {
   id: number;
   versionNo: number;
   status: VersionStatus;
+  /** The one section this version changes; null = the whole profile (the first version, or older ones). */
+  section: ProfileSection | null;
   createdBy: string | null;
   createdAt: string | null;
   updatedBy: string | null;
@@ -91,12 +107,13 @@ export interface CompanyProfileVersion extends CompanyProfileFields {
 
 export interface CompanyProfileOverview {
   live: CompanyProfileVersion | null;
-  pending: CompanyProfileVersion | null;
+  /** Waiting for approval, oldest submission first: at most one per section, or one whole-profile change. */
+  pendingChanges: CompanyProfileVersion[];
   /** The caller's DRAFT + REJECTED versions, newest first. */
   myDrafts: CompanyProfileVersion[];
 }
 
-export type AssetPurpose = 'LOGO' | 'LOGO_DARK' | 'FAVICON';
+export type AssetPurpose = 'LOGO' | 'LOGO_DARK' | 'FAVICON' | 'LOGIN_IMAGE';
 
 export interface AssetUploadResponse {
   url: string;
@@ -104,5 +121,8 @@ export interface AssetUploadResponse {
   contentType: string;
   size: number;
 }
+
+/** POST /drafts: every field (a whole-profile draft), a copy of live, or a section draft (always copied from live). */
+export type CreateDraftRequest = CompanyProfileFields | { copyFromLive: true; section?: ProfileSection };
 
 export type SaveDraftRequest = CompanyProfileFields & { lockVersion?: number };

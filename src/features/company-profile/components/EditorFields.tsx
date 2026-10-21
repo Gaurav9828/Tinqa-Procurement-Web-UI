@@ -3,7 +3,7 @@ import { AlertCircle, ArrowDown, ArrowUp, Link2, Loader2, Plus, Trash2, Upload, 
 import { companyProfileApi } from '../api/companyProfileApi';
 import type { AssetPurpose } from '../types/companyProfile.types';
 import { parseApiError } from '../../../utils/apiError';
-import { isHttpsUrl, LIMITS, shippingRowStarts, type ShippingRuleRow } from '../utils/companyProfileForm';
+import { isHttpsUrl, LIMITS, shippingRowStarts, type LoginPageText, type LoginPortal, type ShippingRuleRow } from '../utils/companyProfileForm';
 import { ProfileImage, YouTubePreview, type ImageVariant } from './ProfileDisplay';
 import { BUTTON, precheckAsset } from '../utils/companyProfileUi';
 import { rupees } from '../utils/companyProfile.utils';
@@ -155,6 +155,10 @@ const ACCEPTED: Record<AssetPurpose, { accept: string; hint: string }> = {
   LOGO: { accept: '.png,.svg,.webp,image/png,image/svg+xml,image/webp', hint: 'PNG, SVG or WEBP, up to 1 MB.' },
   LOGO_DARK: { accept: '.png,.svg,.webp,image/png,image/svg+xml,image/webp', hint: 'PNG, SVG or WEBP, up to 1 MB. Shown on dark backgrounds.' },
   FAVICON: { accept: '.ico,.png,.svg,image/x-icon,image/vnd.microsoft.icon,image/png,image/svg+xml', hint: 'ICO, PNG or SVG, square (32×32 or 48×48), up to 1 MB.' },
+  LOGIN_IMAGE: {
+    accept: '.jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp',
+    hint: 'JPG, PNG or WEBP, up to 5 MB. A tall photo works best (at least 1200×1600); it is cropped to fill half the screen.',
+  },
 };
 
 interface AssetFieldProps {
@@ -184,7 +188,7 @@ export const AssetField: React.FC<AssetFieldProps> = ({ label, purpose, variant,
   const upload = async (file: File | undefined) => {
     if (!file || disabled || uploading) return;
     setUploadError(null);
-    const problem = precheckAsset(file);
+    const problem = precheckAsset(file, purpose);
     if (problem) return setUploadError(problem);
     setProgress(0);
     onBusyChange?.(true);
@@ -458,6 +462,111 @@ export const InvoiceTermsEditor: React.FC<InvoiceTermsEditorProps> = ({ terms, o
         </span>
       </div>
       <FieldError message={errors.invoiceTerms} />
+    </div>
+  );
+};
+
+interface LoginTextFieldsProps {
+  portal: LoginPortal;
+  value: LoginPageText;
+  onChange: (value: LoginPageText) => void;
+  errors: Record<string, string>;
+  disabled?: boolean;
+}
+
+/** One portal's sign-in page text: headline, optional tagline and up to 4 highlight points (all optional). */
+export const LoginTextFields: React.FC<LoginTextFieldsProps> = ({ portal, value, onChange, errors, disabled }) => {
+  const id = useId();
+  const points = value.highlights;
+  const setPoints = (highlights: string[]) => onChange({ ...value, highlights });
+  const move = (index: number, delta: number) => {
+    const next = [...points];
+    const [item] = next.splice(index, 1);
+    next.splice(index + delta, 0, item);
+    setPoints(next);
+  };
+  const tagline = value.tagline.trim();
+  const taglineError = errors[`${portal}Tagline`];
+  const full = points.length >= LIMITS.loginHighlights;
+
+  return (
+    <div className="space-y-3">
+      <TextField
+        label="Headline"
+        counter
+        maxLength={LIMITS.loginHeadline}
+        value={value.headline}
+        onChange={(headline) => onChange({ ...value, headline })}
+        error={errors[`${portal}Headline`]}
+        disabled={disabled}
+      />
+      <div>
+        <div className="flex items-end justify-between mb-1">
+          <label htmlFor={`${id}-tagline`} className="font-semibold text-gray-700 dark:text-gray-300">
+            Tagline <span className="font-normal text-gray-400">(optional)</span>
+          </label>
+          <span className={`text-[10px] ${tagline.length > LIMITS.loginTagline ? 'text-rose-500' : 'text-gray-400'}`}>
+            {tagline.length}/{LIMITS.loginTagline}
+          </span>
+        </div>
+        <textarea
+          id={`${id}-tagline`}
+          rows={2}
+          value={value.tagline}
+          disabled={disabled}
+          aria-invalid={!!taglineError}
+          maxLength={LIMITS.loginTagline + 20}
+          onChange={(e) => onChange({ ...value, tagline: e.target.value })}
+          className={`${inputClass(taglineError)} resize-y`}
+        />
+        <FieldError message={taglineError} />
+      </div>
+
+      <div className="space-y-2">
+        <span className="block font-semibold text-gray-700 dark:text-gray-300">Highlight points</span>
+        {points.length === 0 && <p className="text-gray-500">No points.</p>}
+        <ol aria-label={`${portal === 'adminLogin' ? 'Admin' : 'Storefront'} sign-in points`} className="space-y-2">
+          {points.map((point, i) => {
+            const error = errors[`${portal}Highlights[${i}]`];
+            return (
+              <li key={i} className="flex gap-2 items-start">
+                <div className="flex-1 min-w-0">
+                  <input
+                    value={point}
+                    disabled={disabled}
+                    aria-label={`Point ${i + 1}`}
+                    aria-invalid={!!error}
+                    maxLength={LIMITS.loginHighlight + 20}
+                    onChange={(e) => setPoints(points.map((p, j) => (j === i ? e.target.value : p)))}
+                    className={inputClass(error)}
+                  />
+                  <FieldError message={error} />
+                </div>
+                <div className="flex gap-1 pt-1.5">
+                  <button type="button" disabled={disabled || i === 0} onClick={() => move(i, -1)} aria-label={`Move point ${i + 1} up`} className="p-1 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 disabled:opacity-30 cursor-pointer">
+                    <ArrowUp className="w-3.5 h-3.5" />
+                  </button>
+                  <button type="button" disabled={disabled || i === points.length - 1} onClick={() => move(i, 1)} aria-label={`Move point ${i + 1} down`} className="p-1 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 disabled:opacity-30 cursor-pointer">
+                    <ArrowDown className="w-3.5 h-3.5" />
+                  </button>
+                  <button type="button" disabled={disabled} onClick={() => setPoints(points.filter((_, j) => j !== i))} aria-label={`Remove point ${i + 1}`} className="p-1 rounded-lg hover:bg-rose-500/10 text-rose-600 cursor-pointer">
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </li>
+            );
+          })}
+        </ol>
+        <div className="flex items-center gap-3">
+          <button type="button" disabled={disabled || full} onClick={() => setPoints([...points, ''])} className={BUTTON.secondary}>
+            <Plus className="w-3.5 h-3.5" /> Add point
+          </button>
+          <span className="text-[10px] text-gray-400">
+            {points.length}/{LIMITS.loginHighlights} points
+          </span>
+        </div>
+        <FieldError message={errors[`${portal}Highlights`]} />
+      </div>
     </div>
   );
 };

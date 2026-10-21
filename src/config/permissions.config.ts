@@ -28,13 +28,13 @@ export const APP_NAVIGATION: NavigationItem[] = [
     iconName: 'ShoppingBag',
     requires: ['DEALER_PORTAL_VIEW'],
   },
-  {
-    id: 'analytics',
-    label: 'Analytics',
-    path: '/analytics',
-    iconName: 'BarChart3',
-    requires: ['ANALYTICS_VIEW'],
-  },
+  // {
+  //   id: 'analytics',
+  //   label: 'Analytics',
+  //   path: '/analytics',
+  //   iconName: 'BarChart3',
+  //   requires: ['ANALYTICS_VIEW'],
+  // },
   {
     // Company account: Overview and Ledger need FINANCE_REPORT_VIEW, Expenses EXPENSE_VIEW / EXPENSE_SUBMIT
     id: 'finance',
@@ -56,6 +56,14 @@ export const APP_NAVIGATION: NavigationItem[] = [
     path: '/orders',
     iconName: 'ShoppingCart',
     requires: ['PROCUREMENT_ORDER_VIEW'],
+  },
+  {
+    // Agents book sales (STORE_ORDER_CREATE) and follow their own (STORE_ORDER_VIEW); store and finance staff see all
+    id: 'store-sales',
+    label: 'Store Sales',
+    path: '/store-sales',
+    iconName: 'Store',
+    requires: ['STORE_ORDER_CREATE', 'STORE_ORDER_VIEW', 'STORE_SALES_VIEW_ALL'],
   },
   {
     id: 'order-tracking',

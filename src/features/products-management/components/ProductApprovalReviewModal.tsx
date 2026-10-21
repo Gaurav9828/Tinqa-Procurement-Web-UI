@@ -200,6 +200,22 @@ export const ProductApprovalReviewModal: React.FC<Props> = ({ request, isSubmitt
             )}
           </div>
 
+          {(snapshot.accessoryParents ?? []).length > 0 && (
+            <div data-testid="review-accessory">
+              <span className="block font-semibold text-gray-500 mb-1">Accessory — offered with</span>
+              <ul className="space-y-0.5" aria-label="Accessory parents">
+                {(snapshot.accessoryParents ?? []).map((parent) => (
+                  <li key={parent.productId} className="flex justify-between gap-2">
+                    <span className="text-black dark:text-white">{parent.title || `Product #${parent.productId}`}</span>
+                    <span className="text-gray-500 shrink-0">
+                      {parent.bundleDiscountPercentage > 0 ? `+${parent.bundleDiscountPercentage}% off together` : 'no extra discount'}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
           <div className="space-y-2 pt-2 border-t border-black/10 dark:border-white/10">
             <span className="block font-semibold text-gray-700 dark:text-gray-300">Decision</span>
             <div role="radiogroup" aria-label="Decision" className={`grid ${isUpdate ? 'grid-cols-2' : 'grid-cols-3'} gap-2`}>

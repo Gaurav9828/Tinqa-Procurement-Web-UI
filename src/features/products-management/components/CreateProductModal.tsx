@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { X, Plus, Trash2, CheckCircle2 } from 'lucide-react';
-import type { CreateProductRequest, SpecificationDTO } from '../types/product.types';
+import type { CreateProductRequest, ProductResponse, SpecificationDTO } from '../types/product.types';
 import { ProductWarrantiesEditor } from './ProductWarrantiesEditor';
 import { FormFieldErrors } from './FormFieldErrors';
 import { toProductWarrantyRequests, validateProductWarranties } from '../utils/warrantyForm';
@@ -13,6 +13,8 @@ import { componentMaxFor } from '../utils/componentStock';
 import { describeGst, emptyTaxForm, toGstFields, validateTaxForm, type ProductTaxForm } from '../utils/productTax';
 import { ProductTaxSection } from './ProductTaxSection';
 import { ProductTaxBreakdown } from './ProductTaxBreakdown';
+import { ProductAccessorySection } from './ProductAccessorySection';
+import { describeAccessory, dropAccessoryErrors, emptyAccessoryForm, toAccessoryFields, validateAccessoryForm, type AccessoryForm } from '../utils/accessoryForm';
 
 /** A new product always starts with exactly one unit: its components describe what one unit uses. */
 const NEW_PRODUCT_STOCK = 1;
@@ -25,6 +27,8 @@ interface CreateProductModalProps {
     onSubmit: (payload: CreateProductRequest) => Promise<boolean>;
     /** Backend 400 field errors from the last save (e.g. `warranties[0].title`). */
     serverFieldErrors?: Record<string, string>;
+    /** Every product, to pick the parents of an accessory from. */
+    products?: ProductResponse[];
 }
 
 export const CreateProductModal: React.FC<CreateProductModalProps> = ({
@@ -33,6 +37,7 @@ export const CreateProductModal: React.FC<CreateProductModalProps> = ({
     onClose,
     onSubmit,
     serverFieldErrors,
+    products = [],
 }) => {
     const [title, setTitle] = useState('');
     const [tagline, setTagline] = useState('');
@@ -41,6 +46,7 @@ export const CreateProductModal: React.FC<CreateProductModalProps> = ({
     const [discountPercentage, setDiscountPercentage] = useState<number | ''>('');
     // GST included in the price: which taxes apply and their rates
     const [tax, setTax] = useState<ProductTaxForm>(emptyTaxForm);
+    const [accessory, setAccessory] = useState<AccessoryForm>(emptyAccessoryForm);
 
     // Dynamic Image URLs (up to 5, starting with 1)
     const [imageUrls, setImageUrls] = useState<string[]>(['']);
@@ -119,6 +125,7 @@ export const CreateProductModal: React.FC<CreateProductModalProps> = ({
         const clientErrors = {
             ...validateComponentRows(components, componentMaxFor(NEW_PRODUCT_STOCK, NO_SAVED_COMPONENTS)),
             ...validateProductWarranties(warranties),
+            ...validateAccessoryForm(accessory),
         };
         setFieldErrors(clientErrors);
         if (Object.keys(clientErrors).length > 0) return;
@@ -149,6 +156,7 @@ export const CreateProductModal: React.FC<CreateProductModalProps> = ({
             // New product: never send ids. Includes the warranties copied from the selected items.
             warranties: warranties.length > 0 ? toProductWarrantyRequests(warranties, false) : undefined,
             components: components.length > 0 ? toComponentRequests(components) : undefined,
+            ...toAccessoryFields(accessory),
         };
 
         setPendingPayload(payload);
@@ -167,6 +175,7 @@ export const CreateProductModal: React.FC<CreateProductModalProps> = ({
             setPrice('');
             setDiscountPercentage('');
             setTax(emptyTaxForm());
+            setAccessory(emptyAccessoryForm());
             setImageUrls(['']);
             setSpecifications([{ specKey: '', specValue: '' }]);
             resetWarranties([]);
@@ -369,6 +378,17 @@ export const CreateProductModal: React.FC<CreateProductModalProps> = ({
 
                         <ProductWarrantiesEditor items={warranties} onChange={handleWarrantiesChange} errors={fieldErrors} disabled={isSubmitting} />
 
+                        <ProductAccessorySection
+                            value={accessory}
+                            onChange={setAccessory}
+                            products={products}
+                            price={price}
+                            discountPercentage={discountPercentage}
+                            errors={fieldErrors}
+                            onClearErrors={() => setFieldErrors((prev) => dropAccessoryErrors(prev))}
+                            disabled={isSubmitting}
+                        />
+
                         <FormFieldErrors errors={fieldErrors} />
 
                         <p role="note" className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-400">
@@ -499,6 +519,18 @@ export const CreateProductModal: React.FC<CreateProductModalProps> = ({
                             {/* Components + their item warranties */}
                             {pendingPayload.components && pendingPayload.components.length > 0 && (
                                 <ComponentsPreview components={pendingPayload.components} />
+                            )}
+
+                            {pendingPayload.accessory && (
+                                <div data-testid="preview-accessory">
+                                    <span className="font-semibold text-gray-500 dark:text-gray-400 block mb-1">Accessory:</span>
+                                    <p className="text-black dark:text-white">
+                                        {describeAccessory(
+                                            accessory.parents.map((row) => ({ productId: row.productId, title: row.title, bundleDiscountPercentage: Number(row.discount) || 0 })),
+                                            true
+                                        )}
+                                    </p>
+                                </div>
                             )}
 
                             {/* Warranties Preview */}

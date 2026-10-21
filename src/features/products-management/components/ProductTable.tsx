@@ -90,7 +90,25 @@ export const ProductTable: React.FC<ProductTableProps> = ({
               return (
               <tr key={product.id} data-testid={`product-row-${product.id}`} className="hover:bg-black/[0.01] dark:hover:bg-white/[0.01]">
                 <td className="p-3 font-medium text-black dark:text-white">
-                  <div>{product.title}</div>
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {product.title}
+                    {product.accessory && (
+                      <span
+                        className="px-1.5 py-0.5 rounded-md bg-violet-500/10 text-violet-700 dark:text-violet-300 text-[10px] font-medium"
+                        title={`Accessory for ${product.accessoryFor.map((link) => link.title).join(', ')}`}
+                      >
+                        Accessory · {product.accessoryFor.length}
+                      </span>
+                    )}
+                    {product.accessories.length > 0 && (
+                      <span
+                        className="px-1.5 py-0.5 rounded-md bg-[#0071e3]/10 text-[#0071e3] dark:text-blue-400 text-[10px] font-medium"
+                        title={product.accessories.map((link) => link.title).join(', ')}
+                      >
+                        {product.accessories.length} accessor{product.accessories.length === 1 ? 'y' : 'ies'}
+                      </span>
+                    )}
+                  </div>
                   {product.tagline && <div className="text-[10px] text-gray-400">{product.tagline}</div>}
                 </td>
                 <td className="p-3 font-semibold text-black dark:text-white">

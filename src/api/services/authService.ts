@@ -1,5 +1,16 @@
 import { axiosClient } from '../axiosClient';
-import type { LoginRequest, AuthResponse, AdminProfile, ChangePasswordRequest, ChangePasswordResponse, FirstLoginPasswordRequest } from '../../types/auth';
+import type {
+  LoginRequest,
+  AuthResponse,
+  AdminProfile,
+  ChangePasswordRequest,
+  ChangePasswordResponse,
+  FirstLoginPasswordRequest,
+  ForgotPasswordRequest,
+  PasswordLinkInfo,
+  PasswordLinkResetRequest,
+} from '../../types/auth';
+import type { ApiResponse } from '../../types/common.types';
 
 export const authService = {
   login: async (payload: LoginRequest): Promise<AuthResponse> => {
@@ -36,6 +47,24 @@ export const authService = {
       data,
       { skipAuthRedirect: true }
     );
+    return response.data;
+  },
+
+  /** Public: emails a reset link if an account matches; the answer is the same either way. */
+  forgotPassword: async (payload: ForgotPasswordRequest): Promise<ApiResponse<void>> => {
+    const response = await axiosClient.post<ApiResponse<void>>(`/auth/password/forgot`, payload, { skipAuthRedirect: true });
+    return response.data;
+  },
+
+  /** Public: whether an emailed password link still works (the token goes in the body, never the URL). */
+  checkPasswordLink: async (token: string): Promise<ApiResponse<PasswordLinkInfo>> => {
+    const response = await axiosClient.post<ApiResponse<PasswordLinkInfo>>(`/auth/password/link/check`, { token }, { skipAuthRedirect: true });
+    return response.data;
+  },
+
+  /** Public: sets the password chosen through an emailed link; every session of the account is signed out. */
+  setPasswordFromLink: async (payload: PasswordLinkResetRequest): Promise<ApiResponse<void>> => {
+    const response = await axiosClient.post<ApiResponse<void>>(`/auth/password/link`, payload, { skipAuthRedirect: true });
     return response.data;
   },
 

@@ -38,7 +38,20 @@ export interface CompanyProfileForm {
   shippingRules: ShippingRuleRow[];
   homeVideoEnabled: boolean;
   homeVideoUrl: string;
+  loginImageUrl: string;
+  adminLogin: LoginPageText;
+  storeLogin: LoginPageText;
 }
+
+/** One portal's sign-in page text. */
+export interface LoginPageText {
+  headline: string;
+  tagline: string;
+  highlights: string[];
+}
+
+/** Which sign-in page: the admin web UI (staff & dealers) or the storefront (customers). */
+export type LoginPortal = 'adminLogin' | 'storeLogin';
 
 export interface ShippingRuleRow {
   /** Ignored on the last row (it covers everything from its start). */
@@ -58,6 +71,10 @@ export const LIMITS = {
   invoiceTerm: 300,
   shippingRules: 20,
   homeVideoUrl: 500,
+  loginHeadline: 120,
+  loginTagline: 300,
+  loginHighlights: 4,
+  loginHighlight: 120,
   rejectComment: { min: 3, max: 500 },
 } as const;
 
@@ -96,6 +113,9 @@ export const emptyForm = (): CompanyProfileForm => ({
   shippingRules: [],
   homeVideoEnabled: false,
   homeVideoUrl: '',
+  loginImageUrl: '',
+  adminLogin: { headline: '', tagline: '', highlights: [] },
+  storeLogin: { headline: '', tagline: '', highlights: [] },
 });
 
 export const toForm = (v: CompanyProfileFields): CompanyProfileForm => ({
@@ -131,6 +151,9 @@ export const toForm = (v: CompanyProfileFields): CompanyProfileForm => ({
   })),
   homeVideoEnabled: v.homeVideoEnabled === true,
   homeVideoUrl: str(v.homeVideoUrl),
+  loginImageUrl: str(v.loginImageUrl),
+  adminLogin: { headline: str(v.adminLoginHeadline), tagline: str(v.adminLoginTagline), highlights: [...(v.adminLoginHighlights ?? [])] },
+  storeLogin: { headline: str(v.storeLoginHeadline), tagline: str(v.storeLoginTagline), highlights: [...(v.storeLoginHighlights ?? [])] },
 });
 
 const orNull = (value: string) => {
@@ -176,6 +199,13 @@ export const toBody = (form: CompanyProfileForm): CompanyProfileFields => {
     shippingRules: toShippingRules(form.shippingRules),
     homeVideoEnabled: form.homeVideoEnabled,
     homeVideoUrl: orNull(form.homeVideoUrl),
+    loginImageUrl: orNull(form.loginImageUrl),
+    adminLoginHeadline: orNull(form.adminLogin.headline),
+    adminLoginTagline: orNull(form.adminLogin.tagline),
+    adminLoginHighlights: form.adminLogin.highlights.map((h) => h.trim()),
+    storeLoginHeadline: orNull(form.storeLogin.headline),
+    storeLoginTagline: orNull(form.storeLogin.tagline),
+    storeLoginHighlights: form.storeLogin.highlights.map((h) => h.trim()),
   };
 };
 
@@ -282,6 +312,7 @@ export const validateForSave = (form: CompanyProfileForm, { knownImageUrls }: Sa
     ['logoUrl', 'Logo'],
     ['logoDarkUrl', 'Dark-mode logo'],
     ['faviconUrl', 'Favicon'],
+    ['loginImageUrl', 'Sign-in image'],
   ] as const) {
     const url = form[key].trim();
     if (url && !isHttpsUrl(url) && !knownImageUrls?.has(url)) errors[key] = `${label} must be an https URL or an uploaded image.`;
@@ -362,6 +393,21 @@ export const validateForSave = (form: CompanyProfileForm, { knownImageUrls }: Sa
     if (!row.fee.trim()) errors[`${key}.fee`] = 'Enter the shipping fee (0 for free shipping).';
     else if (parseAmount(row.fee) === null) errors[`${key}.fee`] = 'Enter an amount in rupees, with at most 2 decimals.';
   });
+
+  for (const [portal, label] of [
+    ['adminLogin', 'Admin sign-in'],
+    ['storeLogin', 'Storefront sign-in'],
+  ] as const) {
+    const text = form[portal];
+    checkText(errors, `${portal}Headline`, text.headline, `${label} headline`, LIMITS.loginHeadline);
+    checkText(errors, `${portal}Tagline`, text.tagline, `${label} tagline`, LIMITS.loginTagline);
+    if (text.highlights.length > LIMITS.loginHighlights) errors[`${portal}Highlights`] = `At most ${LIMITS.loginHighlights} highlight points.`;
+    text.highlights.forEach((highlight, i) => {
+      const key = `${portal}Highlights[${i}]`;
+      if (!highlight.trim()) errors[key] = `Point ${i + 1} is empty — fill it in or remove it.`;
+      else checkText(errors, key, highlight, `Point ${i + 1}`, LIMITS.loginHighlight);
+    });
+  }
 
   // "On" without a link is a valid draft; submit requires the link (see validateForSubmit).
   const videoUrl = form.homeVideoUrl.trim();

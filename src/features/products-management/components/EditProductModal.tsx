@@ -31,6 +31,16 @@ import { componentMaxFor } from '../utils/componentStock';
 import { describeGst, emptyTaxForm, gstChanged, toGstFields, toTaxForm, validateTaxForm, type ProductTaxForm } from '../utils/productTax';
 import { ProductTaxSection } from './ProductTaxSection';
 import { ProductTaxBreakdown } from './ProductTaxBreakdown';
+import { ProductAccessorySection } from './ProductAccessorySection';
+import {
+  accessoryChange,
+  dropAccessoryErrors,
+  emptyAccessoryForm,
+  toAccessoryFields,
+  toAccessoryForm,
+  validateAccessoryForm,
+  type AccessoryForm,
+} from '../utils/accessoryForm';
 
 interface EditProductModalProps {
   product: ProductResponse | null;
@@ -42,6 +52,8 @@ interface EditProductModalProps {
   serverFieldErrors?: Record<string, string>;
   /** Admin L2 approval state: an unapproved product can't be switched on here. */
   approval?: ProductApprovalInfo;
+  /** Every product, to pick the parents of an accessory from. */
+  products?: ProductResponse[];
 }
 
 export const EditProductModal: React.FC<EditProductModalProps> = ({
@@ -51,6 +63,7 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
   isSubmitting,
   serverFieldErrors,
   approval,
+  products = [],
 }) => {
   const [formData, setFormData] = useState<UpdateProductRequest>({
     title: '',
@@ -73,6 +86,7 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
   const [pendingPayload, setPendingPayload] = useState<UpdateProductRequest | null>(null);
   // GST included in the price: which taxes apply and their rates
   const [tax, setTax] = useState<ProductTaxForm>(emptyTaxForm);
+  const [accessory, setAccessory] = useState<AccessoryForm>(emptyAccessoryForm);
 
   // Components keep the warranty snapshot stored with the product until an item is changed or refreshed.
   const [components, setComponents] = useState<ComponentFormRow[]>([]);
@@ -105,6 +119,7 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
         specifications: product.specifications ? product.specifications.map(s => ({ specKey: s.specKey, specValue: s.specValue })) : [],
       });
       setTax(toTaxForm(product));
+      setAccessory(toAccessoryForm(product));
       resetWarranties(toProductWarrantyForms(product.warranties));
       setComponents(toComponentRows(product.components));
       setFieldErrors({});
@@ -181,6 +196,9 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
       });
     }
 
+    const accessoryDiff = accessoryChange(product, accessory);
+    if (accessoryDiff) changes.push(accessoryDiff);
+
     // Check warranties
     const originalWarranties = product.warranties ?? [];
     if (warrantiesChanged(originalWarranties, warranties)) {
@@ -231,7 +249,11 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
     e.preventDefault();
     if (!isFormValid) return;
 
-    const clientErrors = { ...validateComponentRows(components, componentLimit), ...validateProductWarranties(warranties) };
+    const clientErrors = {
+      ...validateComponentRows(components, componentLimit),
+      ...validateProductWarranties(warranties),
+      ...validateAccessoryForm(accessory),
+    };
     setFieldErrors(clientErrors);
     if (Object.keys(clientErrors).length > 0) return;
 
@@ -242,6 +264,7 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
       ...toGstFields(tax),
       warranties: toProductWarrantyRequests(warranties, true),
       ...(componentsChanged(product.components ?? [], components) ? { components: toComponentRequests(components) } : {}),
+      ...toAccessoryFields(accessory),
     });
     setShowPreviewModal(true);
   };
@@ -444,6 +467,19 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
             />
 
             <ProductWarrantiesEditor items={warranties} onChange={handleWarrantiesChange} errors={fieldErrors} disabled={isSubmitting} />
+
+            <ProductAccessorySection
+              value={accessory}
+              onChange={setAccessory}
+              products={products}
+              selfId={product.id}
+              ownAccessories={product.accessories}
+              price={formData.price}
+              discountPercentage={formData.discountPercentage}
+              errors={fieldErrors}
+              onClearErrors={() => setFieldErrors((prev) => dropAccessoryErrors(prev))}
+              disabled={isSubmitting}
+            />
 
             <FormFieldErrors errors={fieldErrors} />
 

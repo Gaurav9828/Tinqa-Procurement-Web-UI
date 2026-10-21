@@ -6,6 +6,7 @@ import { useCompanyProfileActions } from '../hooks/useCompanyProfileActions';
 import { ConfirmDialog, RejectDialog } from './Dialogs';
 import { BUTTON } from '../utils/companyProfileUi';
 import { HOME_VIDEO_APPROVAL_NOTE, changesLiveHomeVideo } from '../utils/companyProfile.utils';
+import { sectionLabel } from '../utils/companyProfileSections';
 
 interface Props {
   version: CompanyProfileVersion;
@@ -75,7 +76,11 @@ export const ReviewActions: React.FC<Props> = ({ version, access, live, onDone, 
       {dialog === 'approve' && (
         <ConfirmDialog
           title="Approve this change?"
-          body="This will replace the live company profile on the storefront. Shoppers see it within about 5 minutes."
+          body={
+            version.section
+              ? `This puts the ${sectionLabel(version.section)} change live on the storefront; other sections stay as they are. Shoppers see it within about 5 minutes.`
+              : 'This will replace the live company profile on the storefront. Shoppers see it within about 5 minutes.'
+          }
           note={changesLiveHomeVideo(version, live) ? HOME_VIDEO_APPROVAL_NOTE : null}
           confirmLabel="Approve"
           tone="approve"

@@ -3,6 +3,8 @@ import type { CompanyProfileVersion, TrademarkMark, VersionStatus } from '../typ
 export const COMPANY_PROFILE_PATH = '/settings/company-profile';
 export const companyHistoryPath = `${COMPANY_PROFILE_PATH}/history`;
 export const companyDraftPath = (id: number | 'new') => `${COMPANY_PROFILE_PATH}/drafts/${id}`;
+/** The profile page opened on a section's tab (slug from SECTIONS). */
+export const companySectionPath = (slug: string) => `${COMPANY_PROFILE_PATH}?section=${slug}`;
 export const companyVersionPath = (id: number) => `${COMPANY_PROFILE_PATH}/versions/${id}`;
 
 export const TRADEMARK_SYMBOLS: Record<TrademarkMark, string> = { '': '', TM: '™', R: '®', SM: '℠' };
@@ -52,13 +54,23 @@ export const FIELD_LABELS: Record<string, string> = {
   shippingRules: 'Shipping charges',
   homeVideoEnabled: 'Home page video',
   homeVideoUrl: 'Home page video link',
+  loginImageUrl: 'Sign-in image',
+  adminLoginHeadline: 'Admin sign-in headline',
+  adminLoginTagline: 'Admin sign-in tagline',
+  adminLoginHighlights: 'Admin sign-in points',
+  storeLoginHeadline: 'Storefront sign-in headline',
+  storeLoginTagline: 'Storefront sign-in tagline',
+  storeLoginHighlights: 'Storefront sign-in points',
 };
 
-export const IMAGE_FIELDS = new Set(['logoUrl', 'logoDarkUrl', 'faviconUrl']);
+export const IMAGE_FIELDS = new Set(['logoUrl', 'logoDarkUrl', 'faviconUrl', 'loginImageUrl']);
+export const LOGIN_HIGHLIGHT_FIELDS = new Set(['adminLoginHighlights', 'storeLoginHighlights']);
 
 export const fieldLabel = (field: string) => {
   const term = /^invoiceTerms\[(\d+)\]$/.exec(field);
   if (term) return `Invoice term ${Number(term[1]) + 1}`;
+  const point = /^(adminLogin|storeLogin)Highlights\[(\d+)\]$/.exec(field);
+  if (point) return `${point[1] === 'adminLogin' ? 'Admin' : 'Storefront'} sign-in point ${Number(point[2]) + 1}`;
   const rule = /^shippingRules\[(\d+)\]\.(minOrderValue|maxOrderValue|fee)$/.exec(field);
   if (rule) return `Shipping rule ${Number(rule[1]) + 1} ${rule[2] === 'fee' ? 'fee' : 'order value'}`;
   return FIELD_LABELS[field] ?? field;
@@ -113,6 +125,10 @@ export const sameUser = (a: string | null | undefined, b: string | null | undefi
 
 export const PENDING_SUBMIT_BLOCKED = 'A change is waiting for approval. Submit is available once it is approved, rejected or withdrawn.';
 
+/** Submit blocked by a pending change to the same section (or to the whole profile). */
+export const pendingSubmitBlocked = (sectionLabel: string) =>
+  `A change to ${sectionLabel} is waiting for approval. Submit is available once it is approved, rejected or withdrawn.`;
+
 /** Fallback texts for the backend's error codes (its own `message` wins when present). */
 export const ERROR_MESSAGES: Record<string, string> = {
   APPROVAL_SELF_NOT_ALLOWED: 'You created or submitted this change; another approver must approve it.',
@@ -120,7 +136,7 @@ export const ERROR_MESSAGES: Record<string, string> = {
   FORBIDDEN: 'Your admin level is not allowed to do this.',
   VERSION_NOT_FOUND: 'This version no longer exists.',
   COMPANY_PROFILE_NOT_FOUND: 'No company profile has been set up yet.',
-  PENDING_CHANGE_EXISTS: 'Another change is already waiting for approval.',
+  PENDING_CHANGE_EXISTS: 'A change to this section is already waiting for approval.',
   INVALID_STATE_TRANSITION: 'This version has changed and no longer allows this action. The page has been refreshed.',
   CONCURRENT_UPDATE: 'Someone else changed this draft. Reload it to continue.',
 };

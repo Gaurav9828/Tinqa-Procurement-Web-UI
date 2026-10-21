@@ -91,7 +91,10 @@ export interface CreateEmployeeRequest {
   salaryCurrency?: string;
   phone: string;
   alternatePhone?: string;
-  personalEmail?: string;
+  /** Where account emails go (the set-password link); verified with a code before the employee is created. */
+  personalEmail: string;
+  /** From the email verification of `personalEmail`. */
+  personalEmailVerificationToken: string;
   panNumber: string;
   houseNumber: string;
   street: string;

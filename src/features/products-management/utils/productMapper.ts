@@ -1,4 +1,4 @@
-import type { ProductResponse, ProductResponseDto, SpecificationDTO } from '../types/product.types';
+import type { AccessoryLinkResponse, ProductResponse, ProductResponseDto, SpecificationDTO } from '../types/product.types';
 
 /**
  * The backend stores user-guide lines as specification rows keyed "Guide - <section>"
@@ -44,4 +44,14 @@ export const toProduct = (dto: ProductResponseDto): ProductResponse => ({
   createdAt: dto.createdAt ?? null,
   averageRating: Number(dto.averageRating ?? 0) || 0,
   reviewCount: dto.reviewCount ?? 0,
+  accessory: !!dto.accessory,
+  accessoryPurpose: dto.accessoryPurpose ?? null,
+  accessoryBenefits: Array.isArray(dto.accessoryBenefits) ? dto.accessoryBenefits : [],
+  accessoryFor: toLinks(dto.accessoryFor),
+  accessories: toLinks(dto.accessories),
 });
+
+const toLinks = (links: AccessoryLinkResponse[] | null | undefined): AccessoryLinkResponse[] =>
+  Array.isArray(links)
+    ? links.map((link) => ({ ...link, bundleDiscountPercentage: Number(link.bundleDiscountPercentage) || 0 }))
+    : [];

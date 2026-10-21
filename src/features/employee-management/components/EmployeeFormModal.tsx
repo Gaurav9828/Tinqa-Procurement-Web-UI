@@ -19,6 +19,9 @@ import { Validator, type ValidationRule } from '../../../utils/validator';
 import { hasFormChanges } from '../../../utils/formChanges';
 import { DEFAULT_EMPLOYEE_ROLE, designationHasApprovalLevel, isEmployeeRole, validateDesignation } from '../utils/employeeRole';
 import { usePincodeLookup } from '../../../hooks/usePincodeLookup';
+import { useEmailVerification } from '../../../hooks/useEmailVerification';
+import { EmailVerificationPanel } from '../../../components/email-verification/EmailVerificationPanel';
+import { employeeEmailVerificationApi } from '../api/employeeApi';
 import { PINCODE_MESSAGES } from '../../../utils/pincode';
 
 interface Props {
@@ -149,6 +152,10 @@ export const EmployeeFormModal: React.FC<Props> = ({
   // Track initial state to detect changes
   const [initialFormData, setInitialFormData] = useState(formData);
 
+  // A new employee's personal email is proved with a code first: their set-password link is sent there
+  const emailVerification = useEmailVerification(employeeEmailVerificationApi, isEditMode ? '' : formData.personalEmail, formData.firstName);
+  const { reset: resetEmailVerification } = emailVerification;
+
   const [validationError, setValidationError] = useState<string | null>(null);
   // 400 field errors from the API, keyed by the error item's `field`.
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
@@ -196,6 +203,7 @@ export const EmployeeFormModal: React.FC<Props> = ({
     ].every((value) => !!String(value ?? '').trim()) &&
     identityRequired.every((field) => !!formData[field].trim()) &&
     (isEditMode || !!formData.designation) &&
+    (isEditMode || !!emailVerification.token) &&
     (!canChooseRole || isEditMode || isEmployeeRole(formData.role));
 
   // Shown once something is picked, so a fresh form isn't covered in errors.
@@ -322,7 +330,8 @@ export const EmployeeFormModal: React.FC<Props> = ({
     setValidationError(null);
     setFieldErrors({});
     setIsConfirmModalOpen(false);
-  }, [employeeToEdit, isOpen]);
+    resetEmailVerification();
+  }, [employeeToEdit, isOpen, resetEmailVerification]);
 
   if (!isOpen) return null;
 
@@ -373,10 +382,16 @@ export const EmployeeFormModal: React.FC<Props> = ({
     if (phoneErr) return setValidationError(phoneErr);
     if (alternatePhoneError) return setValidationError(alternatePhoneError);
 
+    if (!isEditMode && !formData.personalEmail.trim()) {
+      return setValidationError('Personal email is required: the employee\'s set-password link is sent there.');
+    }
     if (formData.personalEmail) {
       if (!isValidEmailTLD(formData.personalEmail)) {
         return setValidationError('Personal email must be a valid address ending with .com, .co.in, .net, or .org.');
       }
+    }
+    if (!isEditMode && !emailVerification.token) {
+      return setValidationError('Verify the personal email with the code we send to it before creating the employee.');
     }
 
     const missingIdentity = identityRequired.find((field) => !formData[field].trim());
@@ -482,7 +497,8 @@ export const EmployeeFormModal: React.FC<Props> = ({
           salaryCurrency: formData.salaryCurrency,
           phone: formData.phone,
           alternatePhone: formData.alternatePhone,
-          personalEmail: formData.personalEmail,
+          personalEmail: formData.personalEmail.trim().toLowerCase(),
+          personalEmailVerificationToken: emailVerification.token ?? '',
           panNumber: formData.panNumber.trim().toUpperCase(),
           houseNumber: formData.houseNumber.trim(),
           street: formData.street.trim(),
@@ -616,16 +632,31 @@ export const EmployeeFormModal: React.FC<Props> = ({
                 error={alternatePhoneFormatError ?? undefined}
               />
 
-              <div className="space-y-1">
-                <CommonInput label="Personal Email" name="personalEmail" type="email" placeholder="john.personal@gmail.com" value={formData.personalEmail} onChange={handleChange} />
+              <div className={`space-y-1 ${isEditMode ? '' : 'md:col-span-2'}`}>
+                <CommonInput
+                  label="Personal Email"
+                  name="personalEmail"
+                  type="email"
+                  required={!isEditMode}
+                  placeholder="john.personal@gmail.com"
+                  value={formData.personalEmail}
+                  onChange={handleChange}
+                />
                 {formData.personalEmail && !isValidEmailTLD(formData.personalEmail) && (
                   <p className="text-[11px] text-red-500 font-medium pt-0.5">
                     ✕ Must end with .com, .co.in, .net, or .org
                   </p>
                 )}
                 {isPersonalEmailTaken && <p className="text-[11px] text-red-500 font-medium pt-0.5">✕ Email address is already registered</p>}
-                {formData.personalEmail && !isPersonalEmailTaken && isValidEmailTLD(formData.personalEmail) && (
+                {isEditMode && formData.personalEmail && !isPersonalEmailTaken && isValidEmailTLD(formData.personalEmail) && (
                   <p className="text-[11px] text-emerald-600 font-medium pt-0.5">✓ Personal email is valid and available</p>
+                )}
+                {!isEditMode && (
+                  <EmailVerificationPanel
+                    verification={emailVerification}
+                    canSend={isValidEmailTLD(formData.personalEmail) && !isPersonalEmailTaken}
+                    whose="the employee"
+                  />
                 )}
               </div>
 

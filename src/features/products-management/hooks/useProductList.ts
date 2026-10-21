@@ -62,6 +62,8 @@ export const useProductList = () => {
 
   return {
     products: filteredProducts,
+    /** Every product, ignoring the search and status filter. */
+    allProducts: products,
     totalElements: filteredProducts.length,
     isLoading,
     search,

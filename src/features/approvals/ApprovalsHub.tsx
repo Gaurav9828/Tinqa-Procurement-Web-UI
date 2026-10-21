@@ -60,6 +60,7 @@ export const ApprovalsHub: React.FC = () => {
       ? can('REFUND_APPROVE')
       : id === 'expenses'
       ? can('EXPENSE_APPROVE')
+
       : id === 'dealers'
       ? canAny('DEALER_LOGIN_APPROVE', 'DEALER_QUOTATION_CHANGE_APPROVE')
       : canAny('DOCUMENT_APPROVE', 'EMPLOYEE_PROFILE_CHANGE_APPROVE', 'STOCK_APPROVE', 'PROCUREMENT_ORDER_APPROVE',
@@ -103,7 +104,7 @@ export const ApprovalsHub: React.FC = () => {
     expenses: { count: pendingVoucherCount, noun: 'expenses' },
     dealers: { count: pendingDealers.count, noun: 'dealer requests' },
     'pre-orders': { count: preOrders.total, noun: 'pre-orders' },
-    'company-profile': { count: companyProfile.pending ? 1 : 0, noun: 'company profile changes' },
+    'company-profile': { count: companyProfile.pending.length, noun: 'company profile changes' },
   };
 
   // Products have their own review (snapshot + Approve / Reject / Cancel), which also activates the product.

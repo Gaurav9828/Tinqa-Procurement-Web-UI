@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react';
 import axios from 'axios';
 import { companyProfileApi } from '../api/companyProfileApi';
-import type { CompanyProfileFields, CompanyProfileVersion, SaveDraftRequest } from '../types/companyProfile.types';
+import type { CompanyProfileVersion, CreateDraftRequest, SaveDraftRequest } from '../types/companyProfile.types';
 import type { ApiResponse } from '../../../types/common.types';
 import { useNotify } from '../../../hooks/useNotify';
 import { getApiFieldErrors, parseApiError } from '../../../utils/apiError';
@@ -69,7 +69,7 @@ export const useCompanyProfileActions = ({ onStale }: { onStale?: () => void } =
   return {
     /** Name of the action in flight (buttons are disabled meanwhile — no double submits). */
     busy,
-    createDraft: (body: CompanyProfileFields | { copyFromLive: true }) =>
+    createDraft: (body: CreateDraftRequest) =>
       perform('create', () => companyProfileApi.createDraft(body), { success: 'Draft created.', failure: 'Could not create the draft.' }),
     saveDraft: (id: number, body: SaveDraftRequest, success = 'Draft saved.') =>
       perform('save', () => companyProfileApi.saveDraft(id, body), { success, failure: 'Could not save the draft.' }),
@@ -84,7 +84,7 @@ export const useCompanyProfileActions = ({ onStale }: { onStale?: () => void } =
       perform('withdraw', () => companyProfileApi.withdraw(id), { success: 'Request withdrawn.', failure: 'Could not withdraw the request.' }),
     approve: (id: number) =>
       perform('approve', () => companyProfileApi.approve(id), {
-        success: 'Approved. The new company profile is live.',
+        success: 'Approved. The change is live.',
         failure: 'Could not approve the change.',
       }),
     reject: (id: number, comment: string) =>

@@ -6,8 +6,8 @@ import { useLatestRequest } from '../../../hooks/useLatestRequest';
 import { useNotify } from '../../../hooks/useNotify';
 
 /**
- * The company profile change waiting for approval, if any (the `pending` of GET /admin/company/profile; there is at
- * most one). Loads only for checkers who can read the profile. The review (changes vs live, approve / reject) is the
+ * Company profile changes waiting for approval (the `pendingChanges` of GET /admin/company/profile: at most one per
+ * section). Loads only for checkers who can read the profile. The review (changes vs live, approve / reject) is each
  * version's own page.
  */
 export const useCompanyProfileApprovals = () => {
@@ -15,7 +15,7 @@ export const useCompanyProfileApprovals = () => {
   const allowed = canAll('COMPANY_PROFILE_APPROVE', 'COMPANY_PROFILE_VIEW');
   const notify = useNotify();
   const beginRequest = useLatestRequest();
-  const [pending, setPending] = useState<CompanyProfileVersion | null>(null);
+  const [pending, setPending] = useState<CompanyProfileVersion[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
   const refresh = useCallback(async () => {
@@ -25,10 +25,10 @@ export const useCompanyProfileApprovals = () => {
     try {
       const res = await companyProfileApi.getOverview();
       if (!isCurrent()) return;
-      if (res.success) setPending(res.data?.pending ?? null);
-      else notify.error(res, 'The company profile change could not be loaded.');
+      if (res.success) setPending(res.data?.pendingChanges ?? []);
+      else notify.error(res, 'The company profile changes could not be loaded.');
     } catch (err: unknown) {
-      if (isCurrent()) notify.error(err, 'The company profile change could not be loaded.');
+      if (isCurrent()) notify.error(err, 'The company profile changes could not be loaded.');
     } finally {
       if (isCurrent()) setIsLoading(false);
     }

@@ -4,7 +4,7 @@ import { ArrowLeft, ChevronLeft, ChevronRight, CopyPlus, RefreshCw } from 'lucid
 import { useCompanyProfileHistory } from '../hooks/useCompanyProfileData';
 import { useCompanyProfileAccess } from '../hooks/useCompanyProfileAccess';
 import { useCompanyProfileActions } from '../hooks/useCompanyProfileActions';
-import { BrandName, VersionStatusBadge } from '../components/ProfileDisplay';
+import { BrandName, SectionBadge, VersionStatusBadge } from '../components/ProfileDisplay';
 import { Skeleton, StateMessage } from '../components/Dialogs';
 import { DeleteDraftButton } from '../components/DeleteDraftButton';
 import { BUTTON } from '../utils/companyProfileUi';
@@ -29,10 +29,18 @@ export const CompanyProfileHistoryPage: React.FC = () => {
   const { page, setPage, result, isLoading, errorKind, reload } = useCompanyProfileHistory();
   const actions = useCompanyProfileActions();
 
-  // Client-side copy: a new draft with that version's field values.
+  // Client-side copy: a new draft with that version's field values. A section version restores only its section
+  // (a section draft from live, then saved with the old values); the rest stays as it is live.
   const startFrom = async (version: CompanyProfileVersion) => {
-    const created = await actions.createDraft(fieldsOf(version));
-    if (created.ok && created.version) navigate(companyDraftPath(created.version.id));
+    if (!version.section) {
+      const created = await actions.createDraft(fieldsOf(version));
+      if (created.ok && created.version) navigate(companyDraftPath(created.version.id));
+      return;
+    }
+    const created = await actions.createDraft({ copyFromLive: true, section: version.section });
+    if (!created.ok || !created.version) return;
+    await actions.saveDraft(created.version.id, { ...fieldsOf(version), lockVersion: created.version.lockVersion }, '');
+    navigate(companyDraftPath(created.version.id));
   };
 
   const renderBody = () => {
@@ -49,7 +57,7 @@ export const CompanyProfileHistoryPage: React.FC = () => {
               <tr className="border-b border-black/10 dark:border-white/10 text-gray-500">
                 <th className="p-3 font-semibold">Version</th>
                 <th className="p-3 font-semibold">Status</th>
-                <th className="p-3 font-semibold">Brand</th>
+                <th className="p-3 font-semibold">Section</th>
                 <th className="p-3 font-semibold">Created</th>
                 <th className="p-3 font-semibold">Submitted</th>
                 <th className="p-3 font-semibold">Reviewed</th>
@@ -73,7 +81,8 @@ export const CompanyProfileHistoryPage: React.FC = () => {
                     <VersionStatusBadge status={v.status} live={v.status === 'APPROVED'} />
                   </td>
                   <td className="p-3">
-                    <BrandName name={v.brandName} mark={v.trademarkMark} />
+                    <SectionBadge section={v.section} />
+                    {(!v.section || v.section === 'BRAND') && <BrandName name={v.brandName} mark={v.trademarkMark} className="block mt-1" />}
                   </td>
                   <td className="p-3">
                     <WhoWhen who={v.createdBy} when={v.createdAt} />

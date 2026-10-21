@@ -26,6 +26,9 @@ export interface OrderItemSummary {
   price: number;
   quantity: number;
   totalPrice: number;
+  /** Accessory units bought with a parent product and the extra discount they got (already taken off totalPrice). */
+  bundleQuantity?: number;
+  bundleDiscountAmount?: number | null;
   /** The line was ordered while out of stock and waits for stock + admin approval. */
   preOrder?: boolean;
   /** Current stock of the product — sent for pre-order lines on the admin detail only. */
@@ -53,6 +56,11 @@ export interface AdminOrderSummary {
   updatedAt: string | null;
   /** Admin who made the order's latest change; null for older records. */
   updatedBy: string | null;
+  /** ONLINE (storefront) or STORE (booked by a selling agent). Missing on backends that predate store sales. */
+  salesChannel?: 'ONLINE' | 'STORE' | string | null;
+  /** Store sales: the agent's login and name the sale is credited to. */
+  soldBy?: string | null;
+  soldByName?: string | null;
   customer: AdminCustomerSummary | null;
   items: OrderItemSummary[] | null;
   /** The entry flagged current, or null when the order has no tracking yet. */
@@ -74,8 +82,9 @@ export interface OrderShippingAddress {
   country: string | null;
 }
 
-/** OrderPaymentResponseDTO — one Razorpay attempt. The signature is never sent. */
+/** OrderPaymentResponseDTO — one Razorpay attempt, or store cash. The signature is never sent. */
 export interface OrderPaymentAttempt {
+  /** RAZORPAY or CASH */
   provider: string | null;
   /** CREATED | ATTEMPTED | FAILED | PAID */
   status: string;
@@ -89,6 +98,9 @@ export interface OrderPaymentAttempt {
   createdAt: string | null;
   /** Set only on the PAID attempt. */
   paidAt: string | null;
+  /** Cash: the agent's receipt number and who received it (admin view). */
+  receiptNumber?: string | null;
+  collectedBy?: string | null;
 }
 
 /** AdminOrderDetailDTO — GET /admin/orders/{orderNumber}. */
