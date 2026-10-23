@@ -143,6 +143,7 @@ export const SOURCE_LABELS = {
   CUSTOMER_PAYMENT: 'Customer payment',
   CUSTOMER_REFUND: 'Customer refund',
   PROCUREMENT_ORDER: 'Dealer purchase',
+  PROCUREMENT_SALARY: 'Salary',
   VOUCHER: 'Voucher',
   REVERSAL: 'Reversal',
 } as const;

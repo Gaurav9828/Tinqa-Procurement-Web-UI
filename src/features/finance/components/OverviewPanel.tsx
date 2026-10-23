@@ -185,7 +185,7 @@ const Dashboard: React.FC<{
       notify.success(res.message || 'Dealer purchases are up to date.');
       refresh();
     } catch (err: unknown) {
-      notify.error(err, 'Dealer purchases could not be read from Procurement.');
+      notify.error(err, 'Dealer purchases and salaries could not be read from Procurement.');
       refresh();
     } finally {
       setSyncing(false);
@@ -261,7 +261,7 @@ const Dashboard: React.FC<{
             ) : (
               <span className="flex items-center gap-1">
                 <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" aria-hidden />
-                Dealer purchases synced {sync?.lastSuccessAt ? formatDateTime(sync.lastSuccessAt) : 'never'}
+                Dealer purchases &amp; salaries synced {sync?.lastSuccessAt ? formatDateTime(sync.lastSuccessAt) : 'never'}
               </span>
             )}
             <button type="button" onClick={syncNow} disabled={syncing}

@@ -6,6 +6,9 @@ import { describeGst } from '../utils/productTax';
 import { ProductTaxBreakdown } from './ProductTaxBreakdown';
 import { formatWarrantyDuration, formatWarrantyType } from '../../item-management/utils/itemWarranty';
 import { CHOICE_TONE, SOLID_TONE, type ActionTone } from '../../../components/ui/actionTones';
+import { useAccess } from '../../../hooks/useAccess';
+import { percent, rupees, signTone } from '../../finance/utils/money';
+import { rupeesToPaise } from '../utils/productCosting';
 
 interface Props {
   request: ProductApprovalResponse | null;
@@ -60,6 +63,9 @@ const Row: React.FC<{ label: string; children: React.ReactNode }> = ({ label, ch
 
 /** Admin L2 review of a product approval request: the submitted snapshot, then Approve / Reject / Cancel. */
 export const ProductApprovalReviewModal: React.FC<Props> = ({ request, isSubmitting, onClose, onDecide }) => {
+  // Margins are shown only to those allowed to see costs
+  const { can } = useAccess();
+  const canSeeCosts = can('PRODUCT_COST_VIEW');
   const [decision, setDecision] = useState<ProductApprovalDecision | null>(null);
   const [reason, setReason] = useState('');
   const [touched, setTouched] = useState(false);
@@ -121,6 +127,7 @@ export const ProductApprovalReviewModal: React.FC<Props> = ({ request, isSubmitt
             <div className="min-w-0">
               <p className="text-sm font-semibold text-black dark:text-white">{snapshot.title}</p>
               {snapshot.tagline && <p className="text-gray-500">{snapshot.tagline}</p>}
+              {snapshot.categoryName && <p className="text-gray-500" data-testid="approval-category">Category: {snapshot.categoryName}</p>}
               <p className="text-[10px] text-gray-400 font-mono">Product #{request.ecommerceProductId}</p>
             </div>
           </div>
@@ -164,6 +171,32 @@ export const ProductApprovalReviewModal: React.FC<Props> = ({ request, isSubmitt
             <p className="text-black dark:text-white" data-testid="review-gst">{describeGst(snapshot)}</p>
             <ProductTaxBreakdown price={snapshot.price} discountPercentage={snapshot.discountPercentage} gst={snapshot} />
           </div>
+
+          {canSeeCosts && snapshot.costSummary && (
+            <div data-testid="review-costs" className="space-y-1">
+              <span className="block font-semibold text-gray-500">Cost & profit per unit (GST excluded)</span>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-3 rounded-xl bg-black/[0.03] dark:bg-white/[0.04] tabular-nums">
+                <Row label="Net revenue">{rupees(rupeesToPaise(snapshot.costSummary.netRevenue))}</Row>
+                <Row label="Cost">{rupees(rupeesToPaise(snapshot.costSummary.unitCost))}</Row>
+                <Row label="Profit · margin">
+                  <span className={signTone(rupeesToPaise(snapshot.costSummary.grossProfit))}>
+                    {rupees(rupeesToPaise(snapshot.costSummary.grossProfit))}
+                  </span>{' '}
+                  · {percent(snapshot.costSummary.marginPercent)}
+                </Row>
+                <Row label="After tax (PAT)">
+                  <span className={signTone(rupeesToPaise(snapshot.costSummary.profitAfterTax))}>
+                    {rupees(rupeesToPaise(snapshot.costSummary.profitAfterTax))}
+                  </span>
+                </Row>
+              </div>
+              {snapshot.costSummary.componentsWithoutCost > 0 && (
+                <p role="note" className="text-amber-700 dark:text-amber-400">
+                  {snapshot.costSummary.componentsWithoutCost} component(s) were submitted without a cost, so the cost is understated.
+                </p>
+              )}
+            </div>
+          )}
 
           <div>
             <span className="block font-semibold text-gray-500 mb-1">Components ({snapshot.components.length})</span>

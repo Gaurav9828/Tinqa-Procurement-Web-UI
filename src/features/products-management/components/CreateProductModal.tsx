@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { X, Plus, Trash2, CheckCircle2 } from 'lucide-react';
-import type { CreateProductRequest, ProductResponse, SpecificationDTO } from '../types/product.types';
+import type { CreateProductRequest, ProductCategory, ProductResponse, SpecificationDTO } from '../types/product.types';
+import { ProductCategoryField } from './ProductCategoryField';
+import { findCategory, resolveCategoryName, validateCategoryName } from '../utils/productCategory';
 import { ProductWarrantiesEditor } from './ProductWarrantiesEditor';
 import { FormFieldErrors } from './FormFieldErrors';
 import { toProductWarrantyRequests, validateProductWarranties } from '../utils/warrantyForm';
@@ -15,6 +17,22 @@ import { ProductTaxSection } from './ProductTaxSection';
 import { ProductTaxBreakdown } from './ProductTaxBreakdown';
 import { ProductAccessorySection } from './ProductAccessorySection';
 import { describeAccessory, dropAccessoryErrors, emptyAccessoryForm, toAccessoryFields, validateAccessoryForm, type AccessoryForm } from '../utils/accessoryForm';
+import { useAccess } from '../../../hooks/useAccess';
+import { useIncomeTaxRate } from '../hooks/useCosting';
+import { ProductCostingSection } from './ProductCostingSection';
+import { ProfitBreakdown } from './ProfitBreakdown';
+import type { ProductCostSummary } from '../types/productApproval.types';
+import {
+    costPreviewRows,
+    costPreviewWarnings,
+    dropCostEntryErrors,
+    previewCosts,
+    toCostEntryRequests,
+    toCostSummary,
+    validateCostEntries,
+    type CostEntryRow,
+    type CostPreview,
+} from '../utils/productCosting';
 
 /** A new product always starts with exactly one unit: its components describe what one unit uses. */
 const NEW_PRODUCT_STOCK = 1;
@@ -24,11 +42,14 @@ interface CreateProductModalProps {
     isOpen: boolean;
     isSubmitting: boolean;
     onClose: () => void;
-    onSubmit: (payload: CreateProductRequest) => Promise<boolean>;
+    /** `costSummary`: one unit's cost and profit, shown to the approver (only for those who can see costs). */
+    onSubmit: (payload: CreateProductRequest, costSummary?: ProductCostSummary) => Promise<boolean>;
     /** Backend 400 field errors from the last save (e.g. `warranties[0].title`). */
     serverFieldErrors?: Record<string, string>;
     /** Every product, to pick the parents of an accessory from. */
     products?: ProductResponse[];
+    /** Existing categories to pick from; a new name creates one. */
+    categories?: readonly ProductCategory[];
 }
 
 export const CreateProductModal: React.FC<CreateProductModalProps> = ({
@@ -38,8 +59,12 @@ export const CreateProductModal: React.FC<CreateProductModalProps> = ({
     onSubmit,
     serverFieldErrors,
     products = [],
+    categories = [],
 }) => {
     const [title, setTitle] = useState('');
+    const [category, setCategory] = useState('');
+    // Shown once the field was left or a save was tried, not while the user is still on their way to it
+    const [categoryTouched, setCategoryTouched] = useState(false);
     const [tagline, setTagline] = useState('');
     const [description, setDescription] = useState('');
     const [price, setPrice] = useState<number | ''>('');
@@ -59,6 +84,13 @@ export const CreateProductModal: React.FC<CreateProductModalProps> = ({
     // Components (items) with their auto-added item warranties. Zero is allowed.
     const [components, setComponents] = useState<ComponentFormRow[]>([]);
 
+    // Extra costs of one unit (manpower, software...): seen with PRODUCT_COST_VIEW, entered with PRODUCT_COST_EDIT
+    const [costRows, setCostRows] = useState<CostEntryRow[]>([]);
+    const { can } = useAccess();
+    const canSeeCosts = can('PRODUCT_COST_VIEW');
+    const canEditCosts = canSeeCosts && can('PRODUCT_COST_EDIT');
+    const incomeTaxRate = useIncomeTaxRate(isOpen);
+
     const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
     // Warranties (product-level), including copies of the selected items' warranties. Zero is allowed.
     const { warranties, onChange: handleWarrantiesChange, reset: resetWarranties } = useProductWarranties(components, setFieldErrors);
@@ -72,14 +104,25 @@ export const CreateProductModal: React.FC<CreateProductModalProps> = ({
     // Confirmation Preview State
     const [showPreviewModal, setShowPreviewModal] = useState(false);
     const [pendingPayload, setPendingPayload] = useState<CreateProductRequest | null>(null);
+    const [pendingCosts, setPendingCosts] = useState<CostPreview | null>(null);
 
     if (!isOpen) return null;
 
     const taxErrors = validateTaxForm(tax);
+    const categoryError = validateCategoryName(category);
+    const costPreview = previewCosts({
+        price,
+        discountPercentage,
+        gstRate: tax.gstRate,
+        components: components.map((row) => ({ quantity: row.quantity, unitCost: row.unitCost })),
+        extraCosts: costRows.map((row) => row.amount),
+        incomeTaxRate: incomeTaxRate ?? 0,
+    });
 
     // Required fields check: Title and Price must be provided and valid (stock is fixed at 1 on creation)
     const isFormValid =
         title.trim() !== '' &&
+        categoryError === null &&
         price !== '' &&
         Number(price) >= 0 &&
         components.every((row) => row.itemId !== null && !!row.quantity.trim()) &&
@@ -126,6 +169,7 @@ export const CreateProductModal: React.FC<CreateProductModalProps> = ({
             ...validateComponentRows(components, componentMaxFor(NEW_PRODUCT_STOCK, NO_SAVED_COMPONENTS)),
             ...validateProductWarranties(warranties),
             ...validateAccessoryForm(accessory),
+            ...(canEditCosts ? validateCostEntries(costRows) : {}),
         };
         setFieldErrors(clientErrors);
         if (Object.keys(clientErrors).length > 0) return;
@@ -137,6 +181,7 @@ export const CreateProductModal: React.FC<CreateProductModalProps> = ({
 
         const payload: CreateProductRequest = {
             title,
+            categoryName: resolveCategoryName(categories, category),
             tagline: tagline || undefined,
             description: description || undefined,
             price: Number(price) || 0,
@@ -155,21 +200,27 @@ export const CreateProductModal: React.FC<CreateProductModalProps> = ({
             // New product: never send ids.
             // New product: never send ids. Includes the warranties copied from the selected items.
             warranties: warranties.length > 0 ? toProductWarrantyRequests(warranties, false) : undefined,
-            components: components.length > 0 ? toComponentRequests(components) : undefined,
+            components: components.length > 0 ? toComponentRequests(components, canEditCosts) : undefined,
+            ...(canEditCosts && costRows.length > 0 ? { costEntries: toCostEntryRequests(costRows) } : {}),
             ...toAccessoryFields(accessory),
         };
 
         setPendingPayload(payload);
+        setPendingCosts(canSeeCosts ? costPreview : null);
         setShowPreviewModal(true);
     };
 
     const handleConfirmSubmit = async () => {
         if (!pendingPayload) return;
 
-        const success = await onSubmit(pendingPayload);
+        // The approver sees one unit's cost and profit once any cost has been entered
+        const costSummary = pendingCosts ? toCostSummary(pendingCosts) : undefined;
+        const success = await (costSummary ? onSubmit(pendingPayload, costSummary) : onSubmit(pendingPayload));
         if (success) {
             // Reset form fields and close modals
             setTitle('');
+            setCategory('');
+            setCategoryTouched(false);
             setTagline('');
             setDescription('');
             setPrice('');
@@ -180,6 +231,8 @@ export const CreateProductModal: React.FC<CreateProductModalProps> = ({
             setSpecifications([{ specKey: '', specValue: '' }]);
             resetWarranties([]);
             setComponents([]);
+            setCostRows([]);
+            setPendingCosts(null);
             setFieldErrors({});
             setShowPreviewModal(false);
             setPendingPayload(null);
@@ -229,6 +282,16 @@ export const CreateProductModal: React.FC<CreateProductModalProps> = ({
                                     className="w-full px-3 py-2 bg-black/[0.02] dark:bg-white/[0.02] border border-black/10 dark:border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0071e3] text-black dark:text-white"
                                 />
                             </div>
+                        </div>
+
+                        <div onBlur={() => setCategoryTouched(true)}>
+                            <ProductCategoryField
+                                value={category}
+                                onChange={setCategory}
+                                categories={categories}
+                                error={categoryTouched || fieldErrors.categoryName ? (fieldErrors.categoryName ?? categoryError) : null}
+                                disabled={isSubmitting}
+                            />
                         </div>
 
                         <div>
@@ -376,6 +439,18 @@ export const CreateProductModal: React.FC<CreateProductModalProps> = ({
                             disabled={isSubmitting}
                         />
 
+                        {canSeeCosts && (
+                            <ProductCostingSection
+                                rows={costRows}
+                                setRows={setCostRows}
+                                errors={fieldErrors}
+                                onClearErrors={() => setFieldErrors((prev) => dropCostEntryErrors(prev))}
+                                preview={costPreview}
+                                incomeTaxRate={incomeTaxRate}
+                                disabled={isSubmitting}
+                            />
+                        )}
+
                         <ProductWarrantiesEditor items={warranties} onChange={handleWarrantiesChange} errors={fieldErrors} disabled={isSubmitting} />
 
                         <ProductAccessorySection
@@ -438,6 +513,16 @@ export const CreateProductModal: React.FC<CreateProductModalProps> = ({
                             <div>
                                 <span className="font-semibold text-gray-500 dark:text-gray-400">Title:</span>
                                 <p className="text-black dark:text-white font-medium text-sm">{pendingPayload.title}</p>
+                            </div>
+
+                            <div data-testid="preview-category">
+                                <span className="font-semibold text-gray-500 dark:text-gray-400">Category:</span>
+                                <p className="text-black dark:text-white">
+                                    {pendingPayload.categoryName}
+                                    {pendingPayload.categoryName && !findCategory(categories, pendingPayload.categoryName) && (
+                                        <span className="ml-1.5 px-1.5 py-0.5 rounded-md bg-[#0071e3]/10 text-[#0071e3] text-[10px] font-medium">New category</span>
+                                    )}
+                                </p>
                             </div>
 
                             {pendingPayload.tagline && (
@@ -513,6 +598,31 @@ export const CreateProductModal: React.FC<CreateProductModalProps> = ({
                                             </div>
                                         ))}
                                     </div>
+                                </div>
+                            )}
+
+                            {pendingCosts && (
+                                <div data-testid="preview-costing" className="space-y-1">
+                                    {(pendingPayload.costEntries ?? []).length > 0 && (
+                                        <ul className="border border-black/10 dark:border-white/10 rounded-xl overflow-hidden" aria-label="Extra costs preview">
+                                            {(pendingPayload.costEntries ?? []).map((entry, i) => (
+                                                <li key={i} className="px-3 py-1.5 border-b last:border-b-0 border-black/5 dark:border-white/5">
+                                                    <span className="flex justify-between gap-2">
+                                                        <span className="font-medium text-black dark:text-white">{entry.label}</span>
+                                                        <span className="tabular-nums">₹{entry.amount.toFixed(2)}</span>
+                                                    </span>
+                                                    {entry.description && <span className="block text-gray-500 whitespace-pre-wrap">{entry.description}</span>}
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    )}
+                                    <ProfitBreakdown
+                                        title="What one unit earns"
+                                        rows={costPreviewRows(pendingCosts)}
+                                        profit={pendingCosts.profit}
+                                        incomeTaxRate={incomeTaxRate}
+                                        warnings={costPreviewWarnings(pendingCosts)}
+                                    />
                                 </div>
                             )}
 

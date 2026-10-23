@@ -2,7 +2,7 @@ import { useCallback, useState } from 'react';
 import { productApi } from '../api/productsApi';
 import { productApprovalApi } from '../api/productApprovalApi';
 import type { CreateProductRequest, ProductResponse, UpdateProductRequest, UpdateProductStatusRequest } from '../types/product.types';
-import type { ProductApprovalDecision, ProductApprovalResponse, ProductChangeSummary } from '../types/productApproval.types';
+import type { ProductApprovalDecision, ProductApprovalResponse, ProductChangeSummary, ProductCostSummary } from '../types/productApproval.types';
 import { validateProductPayload } from '../validator/productSecurityValidator';
 import { useApiAction } from '../../../hooks/useApiAction';
 import { useNotify } from '../../../hooks/useNotify';
@@ -30,7 +30,7 @@ export const useProductActions = (onSuccessCallback?: () => void) => {
    * request to the Procurement backend for Admin L2. If (2) fails the product still exists (inactive)
    * and can be submitted later from the product list.
    */
-  const createProduct = async (payload: CreateProductRequest): Promise<boolean> => {
+  const createProduct = async (payload: CreateProductRequest, costSummary?: ProductCostSummary): Promise<boolean> => {
     setFieldErrors({});
     const inactive: CreateProductRequest = { ...payload, enabled: false };
     const validationError = validateProductPayload(inactive);
@@ -64,6 +64,7 @@ export const useProductActions = (onSuccessCallback?: () => void) => {
           snapshot: {
             ...snapshotFromRequest(inactive, (id) => created?.accessoryFor.find((link) => link.productId === id)?.title),
             title: created.title,
+            ...(costSummary ? { costSummary } : {}),
           },
         });
         if (!approval.success) throw new Error(approval.message || 'The approval request was not accepted.');
@@ -102,7 +103,9 @@ export const useProductActions = (onSuccessCallback?: () => void) => {
     payload: UpdateProductRequest,
     changeSummary: ProductChangeSummary[],
     /** Names the accessory's parents in the snapshot. */
-    titleOf?: (productId: number) => string | undefined
+    titleOf?: (productId: number) => string | undefined,
+    /** One unit's cost and profit after the changes, shown to the approver. */
+    costSummary?: ProductCostSummary
   ): Promise<boolean> => {
     setFieldErrors({});
     const validationError = validateProductPayload(payload);
@@ -113,6 +116,7 @@ export const useProductActions = (onSuccessCallback?: () => void) => {
       ...snapshotFromRequest(payload, titleOf),
       ...(payload.components ? {} : { components: previousSnapshot.components }),
       ...(payload.accessory === undefined ? { accessoryParents: previousSnapshot.accessoryParents } : {}),
+      ...(costSummary ? { costSummary } : {}),
     };
     return run(
       async () => {

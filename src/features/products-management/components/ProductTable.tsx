@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Eye, PackageMinus, PackagePlus, Pencil, Send, ShieldCheck, UploadCloud } from 'lucide-react';
 import { ProductStatusBadge } from './ProductStatusBadge';
 import { ProductApprovalBadge } from './ProductApprovalBadge';
+import { ProductOrderHandle } from './ProductOrderHandle';
 import type { ProductResponse } from '../types/product.types';
 import type { ProductApprovalResponse } from '../types/productApproval.types';
 import { getApprovalPermissions, type ProductApprovalState } from '../utils/productApproval';
@@ -39,6 +40,10 @@ interface ProductTableProps {
   onReview: (request: ProductApprovalResponse) => void;
   /** Write approved changes that couldn't be applied when they were approved. */
   onApplyUpdate: (request: ProductApprovalResponse) => void;
+  /** Storefront order: drag a row (or ↑ ↓ on its handle) to move it. No position column when absent. */
+  onMove?: (from: number, to: number) => void;
+  /** A move is being saved: further moves wait. */
+  isReordering?: boolean;
 }
 
 export const ProductTable: React.FC<ProductTableProps> = ({
@@ -53,13 +58,45 @@ export const ProductTable: React.FC<ProductTableProps> = ({
   onSubmitForApproval,
   onReview,
   onApplyUpdate,
+  onMove,
+  isReordering = false,
 }) => {
+  const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const [overIndex, setOverIndex] = useState<number | null>(null);
+  const columnCount = onMove ? 10 : 9;
+
+  const endDrag = () => {
+    setDragIndex(null);
+    setOverIndex(null);
+  };
+
+  const dropTargetProps = (index: number, from: number, move: (from: number, to: number) => void) => ({
+    onDragOver: (e: React.DragEvent) => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      if (overIndex !== index) setOverIndex(index);
+    },
+    onDrop: (e: React.DragEvent) => {
+      e.preventDefault();
+      if (from !== index) move(from, index);
+      endDrag();
+    },
+  });
+
+  // Line above or below the row the dragged product will take, on the side it is coming from
+  const dropIndicator = (index: number) => {
+    if (dragIndex === null || overIndex !== index || dragIndex === index) return '';
+    return dragIndex < index ? 'shadow-[inset_0_-2px_0_#0071e3]' : 'shadow-[inset_0_2px_0_#0071e3]';
+  };
+
   return (
     <div className="overflow-x-auto border border-black/10 dark:border-white/10 rounded-2xl text-xs">
       <table className="w-full text-left border-collapse">
         <thead>
           <tr className="border-b border-black/10 dark:border-white/10 bg-black/[0.02] dark:bg-white/[0.02] text-gray-500">
+            {onMove && <th className="p-3 font-semibold w-14" title="Position on the storefront">#</th>}
             <th className="p-3 font-semibold">Title</th>
+            <th className="p-3 font-semibold">Category</th>
             <th className="p-3 font-semibold">Price</th>
             <th className="p-3 font-semibold">Stock Qty</th>
             <th className="p-3 font-semibold">Discount</th>
@@ -72,14 +109,14 @@ export const ProductTable: React.FC<ProductTableProps> = ({
         <tbody className="divide-y divide-black/10 dark:divide-white/10">
           {isLoading ? (
             <tr>
-              <td colSpan={8} className="text-center p-12 text-gray-400">Loading products...</td>
+              <td colSpan={columnCount} className="text-center p-12 text-gray-400">Loading products...</td>
             </tr>
           ) : products.length === 0 ? (
             <tr>
-              <td colSpan={8} className="text-center p-12 text-gray-400">No products found.</td>
+              <td colSpan={columnCount} className="text-center p-12 text-gray-400">No products found.</td>
             </tr>
           ) : (
-            products.map((product) => {
+            products.map((product, index) => {
               const approval = approvalFor(product);
               const state = getApprovalPermissions(approval.state);
               const permissions = {
@@ -88,7 +125,25 @@ export const ProductTable: React.FC<ProductTableProps> = ({
                 canApplyUpdate: actions.canPublish && state.canApplyUpdate,
               };
               return (
-              <tr key={product.id} data-testid={`product-row-${product.id}`} className="hover:bg-black/[0.01] dark:hover:bg-white/[0.01]">
+              <tr
+                key={product.id}
+                data-testid={`product-row-${product.id}`}
+                className={`hover:bg-black/[0.01] dark:hover:bg-white/[0.01] ${dragIndex === index ? 'opacity-40' : ''} ${dropIndicator(index)}`}
+                {...(onMove && dragIndex !== null ? dropTargetProps(index, dragIndex, onMove) : {})}
+              >
+                {onMove && (
+                  <td className="p-3">
+                    <ProductOrderHandle
+                      title={product.title}
+                      index={index}
+                      count={products.length}
+                      busy={isReordering}
+                      onDragStart={() => setDragIndex(index)}
+                      onDragEnd={endDrag}
+                      onMove={onMove}
+                    />
+                  </td>
+                )}
                 <td className="p-3 font-medium text-black dark:text-white">
                   <div className="flex flex-wrap items-center gap-1.5">
                     {product.title}
@@ -110,6 +165,15 @@ export const ProductTable: React.FC<ProductTableProps> = ({
                     )}
                   </div>
                   {product.tagline && <div className="text-[10px] text-gray-400">{product.tagline}</div>}
+                </td>
+                <td className="p-3">
+                  {product.category ? (
+                    <span className="px-2 py-0.5 rounded-md bg-black/[0.04] dark:bg-white/[0.08] text-gray-700 dark:text-gray-300 text-[10px] font-medium whitespace-nowrap">
+                      {product.category.name}
+                    </span>
+                  ) : (
+                    <span className="text-gray-400">—</span>
+                  )}
                 </td>
                 <td className="p-3 font-semibold text-black dark:text-white">
                   ₹{product.price?.toLocaleString('en-IN')}

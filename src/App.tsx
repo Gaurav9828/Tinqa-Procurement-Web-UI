@@ -41,6 +41,12 @@ const SupportTicketsPage = lazy(() =>
 const SupportTicketDetailPage = lazy(() =>
   import('./features/support-tickets/pages/SupportTicketDetailPage').then((m) => ({ default: m.SupportTicketDetailPage }))
 );
+const CustomersPage = lazy(() =>
+  import('./features/customer-management/pages/CustomersPage').then((m) => ({ default: m.CustomersPage }))
+);
+const CustomerDetailPage = lazy(() =>
+  import('./features/customer-management/pages/CustomerDetailPage').then((m) => ({ default: m.CustomerDetailPage }))
+);
 const ReviewsPage = lazy(() => import('./features/reviews/pages/ReviewsPage').then((m) => ({ default: m.ReviewsPage })));
 const ProductManagementPage = lazy(() =>
   import('./features/products-management/pages/ProductManagementPage').then((m) => ({ default: m.ProductManagementPage }))
@@ -70,6 +76,8 @@ const CompanyProfileHistoryPage = lazy(() =>
 );
 
 const StoreSalesPage = lazy(() => import('./features/store-sales/pages/StoreSalesPage').then((m) => ({ default: m.StoreSalesPage })));
+const PaymentsPage = lazy(() => import('./features/payroll/pages/PaymentsPage').then((m) => ({ default: m.PaymentsPage })));
+const MyPayslipsPage = lazy(() => import('./features/payroll/pages/MyPayslipsPage').then((m) => ({ default: m.MyPayslipsPage })));
 const UserGuidePage = lazy(() => import('./features/user-guide/pages/UserGuidePage').then((m) => ({ default: m.UserGuidePage })));
 
 const PageLoader: React.FC = () => (
@@ -151,6 +159,10 @@ export const App: React.FC = () => {
                   <Route path="order-tracking" element={<OrderTrackingPage />} />
                   <Route path="order-tracking/:orderNumber" element={<OrderTrackingDetailPage />} />
                 </Route>
+                <Route element={<RequireNavAccess navId="customers" />}>
+                  <Route path="customers" element={<CustomersPage />} />
+                  <Route path="customers/:customerId" element={<CustomerDetailPage />} />
+                </Route>
                 <Route element={<RequireNavAccess navId="support-tickets" />}>
                   <Route path="support-tickets" element={<SupportTicketsPage />} />
                   <Route path="support-tickets/:referenceNumber" element={<SupportTicketDetailPage />} />
@@ -179,7 +191,10 @@ export const App: React.FC = () => {
                   <Route path="auctions" element={<Placeholder title="Auctions Module Container" />} />
                 </Route>
                 <Route element={<RequireNavAccess navId="payments" />}>
-                  <Route path="payments" element={<Placeholder title="Payments & Chalans Container" />} />
+                  <Route path="payments" element={<PaymentsPage />} />
+                </Route>
+                <Route element={<RequireNavAccess navId="my-payslips" />}>
+                  <Route path="my-payslips" element={<MyPayslipsPage />} />
                 </Route>
                 <Route element={<RequireNavAccess navId="complaints" />}>
                   <Route path="complaints" element={<Placeholder title="Complaints & Claims Container" />} />

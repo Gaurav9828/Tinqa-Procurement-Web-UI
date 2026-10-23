@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { Package, RefreshCw } from 'lucide-react';
+import { GripVertical, Package, RefreshCw } from 'lucide-react';
 import { useProductList } from '../hooks/useProductList';
 import { useProductActions } from '../hooks/useProductActions';
 import { ProductFilterBar } from '../components/ProductFilterBar';
@@ -11,11 +11,12 @@ import { ProductStatusModal } from '../components/ProductStatusModal';
 import { StockAdjustModal } from '../components/StockAdjustModal';
 import type { StockAdjustMode } from '../utils/stockAdjustment';
 import type { ProductResponse, CreateProductRequest, UpdateProductRequest } from '../types/product.types';
-import type { ProductApprovalResponse, ProductChangeSummary } from '../types/productApproval.types';
+import type { ProductApprovalResponse, ProductChangeSummary, ProductCostSummary } from '../types/productApproval.types';
 import { useProductApprovals } from '../hooks/useProductApprovals';
 import { ProductApprovalReviewModal } from '../components/ProductApprovalReviewModal';
 import { getApprovalPermissions, getApprovalState } from '../utils/productApproval';
 import { useAccess } from '../../../hooks/useAccess';
+import { useProductCategories } from '../hooks/useProductCategories';
 
 export const ProductManagementPage: React.FC = () => {
     const {
@@ -25,10 +26,15 @@ export const ProductManagementPage: React.FC = () => {
         isLoading,
         search,
         statusFilter,
+        categoryFilter,
         updateSearch,
         updateStatusFilter,
+        updateCategoryFilter,
         refetch,
+        isReordering,
+        moveProduct,
     } = useProductList();
+    const categories = useProductCategories(allProducts);
 
     // Admin L2 approval state of the listed products (Procurement backend).
     const productIds = useMemo(() => products.map((p) => p.id), [products]);
@@ -65,6 +71,17 @@ export const ProductManagementPage: React.FC = () => {
     );
     const [reviewRequest, setReviewRequest] = useState<ProductApprovalResponse | null>(null);
 
+    // Storefront order: PRODUCT_PUBLISH decides what the storefront shows, so also where. A search shows a scattered
+    // subset, so dragging waits until it is cleared.
+    const canReorder = can('PRODUCT_PUBLISH');
+    const isSearching = search.trim() !== '';
+    const reorderCategory = categories.find((category) => category.slug === categoryFilter);
+    let reorderHint = 'Drag a product by its handle to set the order of the whole catalog on the storefront. Choose a category to arrange only its products.';
+    if (isSearching) reorderHint = 'Clear the search to drag products into a new order.';
+    else if (reorderCategory) {
+        reorderHint = `Drag a product by its handle to set where it appears among ${reorderCategory.name} on the storefront. Other categories don't move.`;
+    }
+
     const approvalFor = useCallback(
         (product: ProductResponse) => {
             const latest = approvals.byProductId.get(product.id);
@@ -80,15 +97,20 @@ export const ProductManagementPage: React.FC = () => {
     const [statusModalProduct, setStatusModalProduct] = useState<ProductResponse | null>(null);
     const [stockTarget, setStockTarget] = useState<{ product: ProductResponse; mode: StockAdjustMode } | null>(null);
 
-    const handleCreateProductSubmit = async (payload: CreateProductRequest) => {
-        const success = await createProduct(payload);
+    const handleCreateProductSubmit = async (payload: CreateProductRequest, costSummary?: ProductCostSummary) => {
+        const success = await createProduct(payload, costSummary);
         if (success) {
             setIsCreateModalOpen(false);
         }
         return success;
     };
 
-    const handleEditProductSubmit = async (id: number, payload: UpdateProductRequest, changes: ProductChangeSummary[]) => {
+    const handleEditProductSubmit = async (
+        id: number,
+        payload: UpdateProductRequest,
+        changes: ProductChangeSummary[],
+        costSummary?: ProductCostSummary
+    ) => {
         const target = products.find((p) => p.id === id);
         if (!target) return false;
         const permissions = getApprovalPermissions(approvalFor(target).state);
@@ -96,7 +118,7 @@ export const ProductManagementPage: React.FC = () => {
         // Approved products change only after Admin L2 approves; never-approved (inactive) ones are saved directly
         // and stay inactive until their own approval.
         const success = permissions.editNeedsApproval
-            ? await requestProductUpdate(target, payload, changes, (productId) => allProducts.find((p) => p.id === productId)?.title)
+            ? await requestProductUpdate(target, payload, changes, (productId) => allProducts.find((p) => p.id === productId)?.title, costSummary)
             : await updateProduct(id, permissions.canActivate ? payload : { ...payload, enabled: false });
         if (success) {
             setEditingProduct(null);
@@ -140,6 +162,9 @@ export const ProductManagementPage: React.FC = () => {
                 statusFilter={statusFilter}
                 onSearchChange={updateSearch}
                 onStatusFilterChange={updateStatusFilter}
+                categories={categories}
+                categoryFilter={categoryFilter}
+                onCategoryFilterChange={updateCategoryFilter}
                 onOpenCreateModal={
                     can('PRODUCT_CREATE')
                         ? () => {
@@ -149,6 +174,12 @@ export const ProductManagementPage: React.FC = () => {
                         : undefined
                 }
             />
+
+            {canReorder && allProducts.length > 1 && (
+                <p className="flex items-center gap-1.5 -mt-3 text-xs text-gray-500">
+                    <GripVertical className="w-3.5 h-3.5 shrink-0" /> {reorderHint}
+                </p>
+            )}
 
             {/* Products Table */}
             <ProductTable
@@ -170,6 +201,8 @@ export const ProductManagementPage: React.FC = () => {
                 onApplyUpdate={(request) => {
                     void applyApprovedUpdate(request);
                 }}
+                onMove={canReorder && !isSearching ? (from, to) => void moveProduct(from, to) : undefined}
+                isReordering={isReordering}
             />
 
             {approvals.error && (
@@ -202,6 +235,7 @@ export const ProductManagementPage: React.FC = () => {
                 onSubmit={handleCreateProductSubmit}
                 serverFieldErrors={fieldErrors}
                 products={allProducts}
+                categories={categories}
             />
 
             <EditProductModal
@@ -212,6 +246,7 @@ export const ProductManagementPage: React.FC = () => {
                 onSubmit={handleEditProductSubmit}
                 serverFieldErrors={fieldErrors}
                 products={allProducts}
+                categories={categories}
             />
 
             <ProductPreviewModal

@@ -47,6 +47,9 @@ export const PERMISSIONS = [
   'PRODUCT_APPROVAL_SUBMIT',
   'PRODUCT_PUBLISH',
   'PRODUCT_APPROVAL_DECIDE',
+  // Product costing: cost sheets (component costs + extra costs such as manpower), product and order profit / PAT
+  'PRODUCT_COST_VIEW',
+  'PRODUCT_COST_EDIT',
   // Inventory
   'STOCK_VIEW',
   'STOCK_CREATE',
@@ -78,6 +81,10 @@ export const PERMISSIONS = [
   'SUPPORT_TICKET_UPDATE_STATUS',
   'REVIEW_VIEW',
   'REVIEW_MODERATE',
+  // Customers: profile, order history, cart and tickets (customer care); changes are asked for and made by Super Admin
+  'CUSTOMER_VIEW',
+  'CUSTOMER_CHANGE_REQUEST',
+  'CUSTOMER_UPDATE',
   // Company profile
   'COMPANY_PROFILE_VIEW',
   'COMPANY_PROFILE_EDIT',
@@ -89,7 +96,7 @@ export const PERMISSIONS = [
   'DOCUMENT_UPLOAD',
   'DOCUMENT_DELETE',
   'DOCUMENT_APPROVE',
-  // Money
+  // Money. Salaries (Payments & Chalans): recorded as transferred, confirmed by a different Level 2 approver
   'PAYMENT_VIEW',
   'PAYMENT_RECORD',
   'PAYMENT_APPROVE',
@@ -105,6 +112,8 @@ export const PERMISSIONS = [
   'AUDIT_LOG_VIEW',
   // In-app user guide and its per-role PDF downloads (Super Admin, Store Manager)
   'USER_GUIDE_VIEW',
+  // Every employee: their own payslips (My Payslips)
+  'PAYSLIP_VIEW_OWN',
   // Dealer portal: held only by dealer logins, always limited to the dealer's own records on the server
   'DEALER_PORTAL_VIEW',
   'DEALER_QUOTATION_SUBMIT',

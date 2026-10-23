@@ -12,6 +12,8 @@ import { OrderTrackingPage } from './OrderTrackingPage';
 import { OrderTrackingDetailPage } from './OrderTrackingDetailPage';
 import { orderTrackingApi } from '../api/orderTrackingApi';
 import { refundApi } from '../../refunds/api/refundApi';
+import { costingApi } from '../../products-management/api/costingApi';
+import type { OrderProfit, Profit } from '../../products-management/types/costing.types';
 import { resetTrackingStatusCache } from '../hooks/useTrackingStatuses';
 import { resetAdminOrdersCache } from '../hooks/useAdminOrders';
 import type { ApiResponse, PageResponse } from '../../../types/common.types';
@@ -50,8 +52,20 @@ vi.mock('../../refunds/api/refundApi', () => ({
   },
 }));
 
+// Order profit (PRODUCT_COST_VIEW): the costing API is mocked like the others
+vi.mock('../../products-management/api/costingApi', () => ({
+  costingApi: {
+    getSettings: vi.fn(),
+    getProductProfit: vi.fn(),
+    getProfitSummary: vi.fn(),
+    getOrderProfit: vi.fn(),
+    getItemCost: vi.fn(),
+  },
+}));
+
 const api = vi.mocked(orderTrackingApi);
 const refunds = vi.mocked(refundApi);
+const costing = vi.mocked(costingApi);
 type User = ReturnType<typeof userEvent.setup>;
 
 // ---------- fixtures ----------
@@ -259,6 +273,7 @@ beforeEach(() => {
   api.getTrackingStatuses.mockResolvedValue(ok(STATUSES));
   api.updateTracking.mockResolvedValue(trackingOk());
   api.updateDeliveryStatus.mockResolvedValue(trackingOk('Delivery status updated successfully'));
+  costing.getOrderProfit.mockImplementation(async (orderNumber: string) => ok(orderProfit(orderNumber)));
   refunds.getOrderRefunds.mockImplementation(async (orderNumber: string) =>
     ok({
       orderNumber,
@@ -278,6 +293,29 @@ beforeEach(() => {
 });
 
 // ---------- tests ----------
+const profitOf = (revenue: number, cost: number): Profit => {
+  const gross = revenue - cost;
+  const tax = Math.round(gross * 25.17) / 100;
+  return { revenue, cost, grossProfit: gross, marginPercent: Math.round((gross * 10000) / revenue) / 100, markupPercent: null, incomeTaxRate: 25.17, incomeTax: tax, profitAfterTax: gross - tax };
+};
+
+// One Smart Lock sold at ₹10,000 (GST excluded) that cost ₹6,000 to make, shipped for ₹200 (charged ₹100)
+const orderProfit = (orderNumber: string): OrderProfit => ({
+  orderNumber,
+  orderStatus: 'DELIVERED',
+  paymentStatus: 'PAID',
+  realised: true,
+  lines: [{ productId: 1, title: 'Smart Lock', quantity: 1, revenue: 10000, unitCost: 6000, cost: 6000, estimatedCost: false, profit: profitOf(10000, 6000) }],
+  salesRevenue: 10000,
+  shippingCollected: 100,
+  refunded: 0,
+  productCost: 6000,
+  shippingCost: 200,
+  shippingCosts: [{ voucherNumber: 'VCH-7', category: 'Shipping & delivery to customers', amount: 200, status: 'APPROVED', payee: 'BlueDart', date: '2026-10-20' }],
+  estimatedCost: false,
+  profit: profitOf(10100, 6200),
+});
+
 describe('OrderTrackingPage', () => {
   describe('order list', () => {
     it('shows a loading state while the first page is fetched', () => {
@@ -1544,5 +1582,35 @@ describe('Pre-order review and approval', () => {
     renderPage('/order-tracking/ORD-1001');
     const reviewCard = await within(detailPage()).findByRole('region', { name: 'Pre-order review' });
     expect(within(reviewCard).queryByRole('button', { name: 'Approve pre-order' })).not.toBeInTheDocument();
+  });
+});
+
+describe('order profit', () => {
+  it('shows what the order made, before and after tax, to those who can see costs', async () => {
+    renderPage('/order-tracking/ORD-1001');
+    const card = await within(detailPage()).findByRole('region', { name: 'Profit' });
+    expect(await within(card).findByText('Smart Lock × 1')).toBeInTheDocument();
+    expect(within(card).getByText(/BlueDart · VCH-7/)).toBeInTheDocument();
+    expect(within(card).getByTestId('profit-gross')).toHaveTextContent('₹3,900.00');
+    expect(within(card).getByTestId('profit-pat')).toHaveTextContent('₹2,918.37');
+    expect(costing.getOrderProfit).toHaveBeenCalledWith('ORD-1001');
+  });
+
+  it('is neither shown nor requested without PRODUCT_COST_VIEW', async () => {
+    useAuthStore.setState({
+      user: {
+        userId: 9,
+        username: 'support',
+        email: 'support@tinqa.com',
+        role: 'ADMIN_L1',
+        authClient: 'web',
+        isFirstLogin: false,
+        permissions: superAdminPermissions('ADMIN_L1').filter((p) => p !== 'PRODUCT_COST_VIEW'),
+      },
+    });
+    renderPage('/order-tracking/ORD-1001');
+    await within(detailPage()).findByRole('list', { name: 'Tracking history' });
+    expect(within(detailPage()).queryByRole('region', { name: 'Profit' })).not.toBeInTheDocument();
+    expect(costing.getOrderProfit).not.toHaveBeenCalled();
   });
 });

@@ -12,6 +12,10 @@ import {
   type ComponentFormRow,
 } from '../utils/componentForm';
 import { availableUnitsByItem, componentMaxFor, fetchItemAvailableUnits, quantityOptions } from '../utils/componentStock';
+import { costingApi } from '../api/costingApi';
+import { describeItemCost, rupeesToPaise, suggestedUnitCost } from '../utils/productCosting';
+import { rupees } from '../../finance/utils/money';
+import type { ItemCost } from '../types/costing.types';
 
 interface Props {
   rows: ComponentFormRow[];
@@ -45,6 +49,9 @@ export const ProductComponentsSection: React.FC<Props> = ({ rows, setRows, error
   // Stock figures need STOCK_VIEW (e.g. customer support views products but not stock): without it none are asked for
   const { can } = useAccess();
   const canSeeStock = can('STOCK_VIEW');
+  // Unit costs: seen with PRODUCT_COST_VIEW (the item's purchase price is suggested), entered with PRODUCT_COST_EDIT
+  const canSeeCosts = can('PRODUCT_COST_VIEW');
+  const canEditCosts = canSeeCosts && can('PRODUCT_COST_EDIT');
   const { options: items, isLoading: itemsLoading } = useItemOptions();
   const { options: stocks, isLoading: stocksLoading } = useStockOptions();
   const stockByItem = useMemo(() => availableUnitsByItem(stocks), [stocks]);
@@ -54,16 +61,36 @@ export const ProductComponentsSection: React.FC<Props> = ({ rows, setRows, error
   const patchRow = (uid: string, patch: Partial<ComponentFormRow> | ((row: ComponentFormRow) => Partial<ComponentFormRow>)) =>
     setRows((prev) => prev.map((row) => (row.uid === uid ? { ...row, ...(typeof patch === 'function' ? patch(row) : patch) } : row)));
 
+  // A missing purchase price never blocks the row: the admin then types the cost
+  const fetchItemCost = (itemId: number): Promise<ItemCost | null> =>
+    costingApi
+      .getItemCost(itemId)
+      .then((res) => (res.success ? res.data : null))
+      .catch(() => null);
+
   /**
-   * Fetches the item's warranties (GET /items/{id}/warranties) and its exact stock
-   * (GET /stocks/items/{id}/availability) together; the row is usable once both are in.
+   * Fetches the item's warranties (GET /items/{id}/warranties), its exact stock (GET /stocks/items/{id}/availability)
+   * and its purchase cost (GET /stocks/items/{id}/cost) together; the row is usable once they are in.
    */
   const loadItemDetails = (uid: string, itemId: number, requestId: number) => {
-    Promise.all([itemApi.getItemWarranties(itemId), canSeeStock ? fetchItemAvailableUnits(itemId) : Promise.resolve(null)])
-      .then(([res, availableUnits]) => {
+    Promise.all([
+      itemApi.getItemWarranties(itemId),
+      canSeeStock ? fetchItemAvailableUnits(itemId) : Promise.resolve(null),
+      canSeeCosts ? fetchItemCost(itemId) : Promise.resolve(null),
+    ])
+      .then(([res, availableUnits, cost]) => {
         if (!res.success) throw new Error(res.message || 'Failed to load item warranties.');
         patchRow(uid, (row) =>
-          row.requestId === requestId ? { status: 'ready', error: undefined, warranties: snapshotItemWarranties(res.data), availableUnits } : {}
+          row.requestId === requestId
+            ? {
+                status: 'ready',
+                error: undefined,
+                warranties: snapshotItemWarranties(res.data),
+                availableUnits,
+                // A cost the admin already typed is kept; otherwise the purchase price is suggested
+                ...(canSeeCosts ? { costHint: describeItemCost(cost, rupees), unitCost: row.unitCost.trim() || suggestedUnitCost(cost) } : {}),
+              }
+            : {}
         );
       })
       .catch((err: unknown) => {
@@ -112,6 +139,8 @@ export const ProductComponentsSection: React.FC<Props> = ({ rows, setRows, error
       error: undefined,
       requestId,
       copiesToProduct: true,
+      unitCost: '',
+      costHint: '',
     });
     onClearErrors([componentErrorKey(index, 'quantity')]);
     loadItemDetails(row.uid, item.id, requestId);
@@ -153,7 +182,7 @@ export const ProductComponentsSection: React.FC<Props> = ({ rows, setRows, error
 
       {rows.map((row, index) => {
         const rowErrors = errorsForComponent(errors, index);
-        const nestedErrors = Object.entries(rowErrors).filter(([field]) => !['', 'itemId', 'quantity'].includes(field));
+        const nestedErrors = Object.entries(rowErrors).filter(([field]) => !['', 'itemId', 'quantity', 'unitCost'].includes(field));
         const id = (field: string) => `${baseId}-${index}-${field}`;
         const selected = row.itemId !== null ? items.find((option) => option.id === row.itemId) : undefined;
         // Only active items with stock are offered; a row's current item stays listed so it still displays.
@@ -222,6 +251,34 @@ export const ProductComponentsSection: React.FC<Props> = ({ rows, setRows, error
                 )}
                 {rowErrors.quantity && <p role="alert" className="mt-1 text-rose-500">{rowErrors.quantity}</p>}
               </div>
+              {canSeeCosts && (
+                <div className="sm:w-36">
+                  <label htmlFor={id('unitCost')} className="block font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Unit cost (₹)
+                  </label>
+                  <input
+                    id={id('unitCost')}
+                    inputMode="decimal"
+                    value={row.unitCost}
+                    placeholder="e.g. 120.00"
+                    readOnly={!canEditCosts}
+                    disabled={disabled || row.itemId === null}
+                    aria-invalid={!!rowErrors.unitCost}
+                    aria-describedby={row.costHint ? id('costHint') : undefined}
+                    onChange={(e) => {
+                      patchRow(row.uid, { unitCost: e.target.value });
+                      onClearErrors([componentErrorKey(index, 'unitCost')]);
+                    }}
+                    className={`${inputClass(!!rowErrors.unitCost)} ${canEditCosts ? '' : 'opacity-70'}`}
+                  />
+                  {row.unitCost.trim() && Number(row.quantity) > 1 && !rowErrors.unitCost && (
+                    <p className="mt-1 text-[11px] text-gray-500" data-testid="component-line-cost">
+                      × {row.quantity} = {rupees(rupeesToPaise(row.unitCost) * Number(row.quantity))}
+                    </p>
+                  )}
+                  {rowErrors.unitCost && <p role="alert" className="mt-1 text-rose-500">{rowErrors.unitCost}</p>}
+                </div>
+              )}
               <button
                 type="button"
                 onClick={() => remove(row.uid)}
@@ -263,6 +320,12 @@ export const ProductComponentsSection: React.FC<Props> = ({ rows, setRows, error
                   </button>
                 )}
               </div>
+            )}
+
+            {canSeeCosts && row.costHint && row.status === 'ready' && (
+              <p id={id('costHint')} className="text-[11px] text-gray-500" data-testid="component-cost-hint">
+                {row.costHint}
+              </p>
             )}
 
             {rowErrors[''] && row.status !== 'error' && <p role="alert" className="text-rose-500">{rowErrors['']}</p>}

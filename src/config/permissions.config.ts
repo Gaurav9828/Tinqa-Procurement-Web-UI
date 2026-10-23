@@ -36,12 +36,13 @@ export const APP_NAVIGATION: NavigationItem[] = [
   //   requires: ['ANALYTICS_VIEW'],
   // },
   {
-    // Company account: Overview and Ledger need FINANCE_REPORT_VIEW, Expenses EXPENSE_VIEW / EXPENSE_SUBMIT
+    // Company account: Overview and Ledger need FINANCE_REPORT_VIEW, Expenses EXPENSE_VIEW / EXPENSE_SUBMIT,
+    // Product profit PRODUCT_COST_VIEW
     id: 'finance',
     label: 'Accounts & Finance',
     path: '/finance',
     iconName: 'Wallet',
-    requires: ['FINANCE_REPORT_VIEW', 'EXPENSE_VIEW', 'EXPENSE_SUBMIT'],
+    requires: ['FINANCE_REPORT_VIEW', 'EXPENSE_VIEW', 'EXPENSE_SUBMIT', 'PRODUCT_COST_VIEW'],
   },
   {
     id: 'approvals',
@@ -71,6 +72,14 @@ export const APP_NAVIGATION: NavigationItem[] = [
     path: '/order-tracking',
     iconName: 'Truck',
     requires: ['CUSTOMER_ORDER_VIEW'],
+  },
+  {
+    // Storefront customers: profile, purchase history, cart and tickets, so customer care can follow up
+    id: 'customers',
+    label: 'Customer Management',
+    path: '/customers',
+    iconName: 'Contact',
+    requires: ['CUSTOMER_VIEW'],
   },
   {
     id: 'support-tickets',
@@ -123,11 +132,20 @@ export const APP_NAVIGATION: NavigationItem[] = [
   //   requires: [],
   // },
   {
+    // Monthly salaries: PAYMENT_RECORD records transfers, PAYMENT_APPROVE (Level 2) confirms them
     id: 'payments',
     label: 'Payments & Chalans',
     path: '/payments',
     iconName: 'CreditCard',
     requires: ['PAYMENT_VIEW'],
+  },
+  {
+    // Every employee: their own payslips of confirmed months
+    id: 'my-payslips',
+    label: 'My Payslips',
+    path: '/my-payslips',
+    iconName: 'FileText',
+    requires: ['PAYSLIP_VIEW_OWN'],
   },
   // {
   //   id: 'complaints',

@@ -66,10 +66,42 @@ export interface GuideChange {
 }
 
 /** Bump with every guide update; printed on the page and on every PDF. */
-export const GUIDE_VERSION = '2.8';
-export const GUIDE_UPDATED = '2026-10-21';
+export const GUIDE_VERSION = '2.14';
+export const GUIDE_UPDATED = '2026-10-23';
 
 export const GUIDE_CHANGELOG: GuideChange[] = [
+  {
+    date: '2026-10-23',
+    changes: [
+      'Product order: in Products Management, drag a product by its handle (⋮⋮) to the position it should have on the storefront, e.g. from fifth to first. The # column shows each product\'s position, the order is saved as soon as you drop it, and the arrow keys ↑ ↓ on the handle move a product one place.',
+      'Choose a category first to arrange only that category: its products swap places among themselves and other categories don\'t move. With All Categories you set the order of the whole catalog. Clear the search before dragging.',
+      'New products appear last until moved. Ordering is done by whoever can publish products (Super Admins, Store Managers, Catalog Specialists); it is not part of the product form and needs no approval.',
+    ],
+  },
+  {
+    date: '2026-10-23',
+    changes: [
+      'Product categories: every product now has a category (Dioramas, Accessories, Spare parts...). In the product form, pick one from the Category box or type a new name and choose "Create category" — it is created when the product is saved. There is no fixed list.',
+      'A name that matches an existing category, ignoring capitals, spaces and punctuation ("accessories", "Accessories "), always picks that category, so the same category is never created twice.',
+      'Existing products were placed in Dioramas, and accessories in Accessories. Changing a product\'s category is an edit like any other: on an approved product it goes for approval, and the approver sees the old and new category.',
+      'Products Management shows each product\'s category and filters the list by category.',
+      'Storefront: the Dioramas page is now Products. Its bar lists the categories with how many products each has; choosing one jumps to that category and shows all its products. A link such as /products?category=accessories opens the page at that category.',
+    ],
+  },
+  {
+    date: '2026-10-22',
+    changes: [
+      'Customer Management (new menu): search storefront customers by name, email or phone, or list those who left items in their cart. A customer\'s page shows their profile and addresses, every order with what they bought and when, their cart, their support tickets and an activity timeline, with email and call links to contact them.',
+      'Customer details (name, phone, date of birth) are changed only by the Super Admin (Level 2), with a reason. Customer Support and Store Managers use "Request change": the Super Admin is notified with the requested values and a link to the customer, and makes the change after checking it.',
+      'Product costing: the product form has a "Costing & profit" section. Each component\'s unit cost is filled from its purchase price (what the next unit taken from stock cost, including its share of freight) and can be adjusted; add every other cost of one unit — manpower, software, packaging — with how you worked it out.',
+      'The form shows live what one unit earns: selling price, GST taken out, net revenue, cost, profit before tax, margin, income tax and profit after tax (PAT). The approver sees the cost and profit with the request.',
+      'Product details show the cost sheet and the profit made so far on delivered orders. Customer order details show the order\'s profit: each line at its cost when ordered, shipping charged and shipping paid.',
+      'Accounts & Finance › Product profit lists the profit of every product on delivered orders in a period. Costs are seen by Super Admins, Store Managers, Catalog Specialists, Financial Auditors and Finance Managers, and entered by the first three; customers never see them.',
+      'Analytics is no longer listed in the role menus; it is hidden from the sidebar for now.',
+      'Salaries: each month the Finance Manager records salary transfers in Payments & Chalans (one employee, or everyone unpaid at once, with bonuses or deductions); a different Level 2 confirms them. Confirmed salaries are booked in Accounts & Finance and each payslip is emailed.',
+      'My Payslips: every employee sees and downloads their own payslips once the month\'s salary is confirmed.',
+    ],
+  },
   {
     date: '2026-10-21',
     changes: [
@@ -154,8 +186,8 @@ const ROLE_LIST: RoleGuide[] = [
     id: 'SUPER_ADMIN',
     name: 'Super Admin',
     summary: 'Runs the whole portal: staff accounts, access, settings and every approval.',
-    menu: ['analytics', 'finance', 'approvals', 'orders', 'store-sales', 'order-tracking', 'support-tickets', 'reviews', 'employees',
-      'items', 'products', 'dealers', 'payments', 'company-profile', 'user-guide'],
+    menu: ['finance', 'approvals', 'orders', 'store-sales', 'order-tracking', 'customers', 'support-tickets', 'reviews',
+      'employees', 'items', 'products', 'dealers', 'payments', 'my-payslips', 'company-profile', 'user-guide'],
     hasApprovalLevel: true,
     does: [
       'Create employees with a designation and level, edit them, and request their removal',
@@ -163,11 +195,14 @@ const ROLE_LIST: RoleGuide[] = [
       'Everything every other staff role can do',
       'Open the User Guide and download a role\'s PDF to hand to a colleague',
       'Set up the mail server and sender of customer emails, and send a test (Company Profile › Email, Level 2)',
+      'Record monthly salary transfers (Payments & Chalans), like a Finance Manager',
+      'Correct a customer\'s name, phone or date of birth (Customer Management › Edit details, Level 2), including changes customer care asked for',
     ],
     approves: [
       'New employee accounts, employee deletions and profile changes',
       'Products, stock entries, procurement orders and returns, dealer logins and dealer quotation changes',
       'Refunds, expenses, company profile changes and documents',
+      'Salary transfers recorded by someone else (never your own salary)',
       'Delete anyone\'s company profile draft',
     ],
     tips: [
@@ -179,18 +214,21 @@ const ROLE_LIST: RoleGuide[] = [
     id: 'STORE_MANAGER',
     name: 'Store Manager',
     summary: 'Owns the online store: catalog, stock, customer orders, refunds, support, reviews and the company profile.',
-    menu: ['analytics', 'finance', 'approvals', 'store-sales', 'order-tracking', 'support-tickets', 'reviews', 'items', 'products',
-      'payments', 'company-profile', 'user-guide'],
+    menu: ['finance', 'approvals', 'store-sales', 'order-tracking', 'customers', 'support-tickets', 'reviews', 'items',
+      'products', 'payments', 'my-payslips', 'company-profile', 'user-guide'],
     hasApprovalLevel: true,
     does: [
       'Create and edit items (with warranties) and products, submit them for approval and publish approved ones',
+      'Set the order products appear in on the storefront by dragging them in Products Management',
+      'Enter each product\'s costs (component costs, manpower, software…) and see its profit before and after tax, per unit and on delivered orders',
       'Move customer orders forward, update tracking and accept pre-orders once stock is there',
       'Book store sales for walk-in customers, like a Store Sales Agent, and follow every agent\'s sales',
       'Request refunds, reply to support tickets, publish or hide reviews',
+      'Look up customers with their orders, carts and tickets, and ask the Super Admin to correct their details',
       'Draft company profile changes, upload documents, raise expenses',
       'Open the User Guide and download a role\'s PDF to hand to a colleague',
     ],
-    approves: ['Products and their changes before they go live', 'Stock entries', 'Refunds', 'Company profile changes'],
+    approves: ['Products and their changes before they go live, seeing each one\'s cost, margin and profit after tax', 'Stock entries', 'Refunds', 'Company profile changes'],
     tips: [
       'Pre-orders can be accepted at Level 1 too: Approvals Hub › Pre-orders.',
       'Dealers and procurement orders belong to the Dealer Manager; they are not in your menu.',
@@ -200,7 +238,7 @@ const ROLE_LIST: RoleGuide[] = [
     id: 'DEALER_MANAGER',
     name: 'Dealer Manager',
     summary: 'Buys from suppliers: dealers, their web logins, quotations and procurement orders.',
-    menu: ['finance', 'approvals', 'orders', 'items', 'products', 'dealers', 'payments'],
+    menu: ['finance', 'approvals', 'orders', 'items', 'products', 'dealers', 'payments', 'my-payslips'],
     hasApprovalLevel: true,
     does: [
       'Onboard, edit, activate or deactivate dealers and assign them item categories',
@@ -230,29 +268,37 @@ const ROLE_LIST: RoleGuide[] = [
     id: 'CATALOG_SPECIALIST',
     name: 'Catalog Specialist',
     summary: 'Builds and maintains the product catalog.',
-    menu: ['items', 'products'],
+    menu: ['finance', 'items', 'products', 'my-payslips'],
     hasApprovalLevel: false,
     does: [
       'Create, edit and delete items and item categories, including their warranties',
       'Create products from items, with components and warranties',
+      'Give each product a category: pick an existing one or type a new name to create it',
+      'Enter what one unit costs: each component\'s unit cost (filled from its purchase price) and extra costs such as manpower or software, each with how it was worked out',
+      'Check what the product earns before saving: net revenue, cost, profit, margin and profit after tax; later, its profit on delivered orders (product details, Accounts & Finance › Product profit)',
       'Set each product\'s HSN/SAC and GST rate; the price you enter is what the customer pays, GST included',
       'Mark a product as an accessory of other products, with an extra discount when bought together',
       'Submit products for approval and publish approved ones to the storefront',
+      'Set the order products appear in on the storefront by dragging them in Products Management, for the whole catalog or one category',
       'View stock, upload documents',
     ],
     approves: [],
     tips: [
       'Editing a product that is already approved sends the change for approval; the live product stays as it is until then.',
+      'To put a product first in its category, choose that category in Products Management and drag the product to the top. Without a category chosen, you move it in the whole catalog.',
+      'Before creating a category, type a few letters and look at the suggestions: reuse "Accessories" rather than creating "Accessory". The storefront lists products under their category, so a clear, plural name reads best.',
       'Enter the GST-inclusive price (e.g. ₹59,999). The form shows the split for delivery in our state (CGST + SGST) and to other states (IGST); both add up to exactly that price. Orders keep the GST they were placed with even if the rate changes later.',
       'Products created before GST was recorded need their HSN/SAC and rate added the next time they are edited.',
       'Accessory extra discounts stack on the accessory\'s own discount: ₹1,000 at 10 % off is ₹900; with 5 % extra next to its product it is ₹855. Use 0 % to show it with a product without an extra discount.',
+      'Costs exclude GST (GST paid on purchases comes back as input tax credit). Write the reason with each extra cost, e.g. "2 technicians × 4 hours × ₹250/hour", so the approver and finance can check it.',
+      'A component left without a cost is flagged: the profit shown is then too high. Shipping is not part of the product\'s cost; it is added to each order when it ships.',
     ],
   },
   {
     id: 'FULFILLMENT_SPECIALIST',
     name: 'Fulfillment & Warehouse',
     summary: 'Receives stock and picks, packs and ships customer orders.',
-    menu: ['finance', 'approvals', 'order-tracking', 'items', 'products'],
+    menu: ['finance', 'approvals', 'order-tracking', 'items', 'products', 'my-payslips'],
     hasApprovalLevel: false,
     does: [
       'Receive any delivered purchase order into stock, correct an entry\'s quantities, set storefront stock',
@@ -267,7 +313,7 @@ const ROLE_LIST: RoleGuide[] = [
     id: 'DELIVERY_RIDER',
     name: 'Delivery Rider',
     summary: 'Delivers orders to the customer\'s door.',
-    menu: ['order-tracking'],
+    menu: ['order-tracking', 'my-payslips'],
     hasApprovalLevel: false,
     does: [
       'See customer orders and their shipping address',
@@ -280,7 +326,7 @@ const ROLE_LIST: RoleGuide[] = [
     id: 'FLEET_COORDINATOR',
     name: 'Fleet Coordinator',
     summary: 'The riders\' senior: plans deliveries and keeps tracking up to date.',
-    menu: ['finance', 'order-tracking'],
+    menu: ['finance', 'order-tracking', 'my-payslips'],
     hasApprovalLevel: false,
     does: [
       'Record the same door-step outcomes as a rider',
@@ -294,27 +340,34 @@ const ROLE_LIST: RoleGuide[] = [
     id: 'CUSTOMER_SUPPORT',
     name: 'Customer Support',
     summary: 'Helps customers with tickets, orders and refunds.',
-    menu: ['order-tracking', 'support-tickets', 'items', 'products'],
+    menu: ['order-tracking', 'customers', 'support-tickets', 'items', 'products', 'my-payslips'],
     hasApprovalLevel: false,
     does: [
       'View, reply to and change the status of support tickets; suggested replies help you answer quickly',
+      'Open a customer (Customer Management) to see everything they bought and when, what is still in their cart and their tickets, then email or call them',
+      'Ask for a correction to a customer\'s details (Request change); the Super Admin makes it',
       'Look up the customer\'s order, payment and products from the ticket',
       'Request a refund and re-check its status with the payment gateway',
     ],
     approves: [],
-    tips: ['Suggested replies are never sent by themselves: you choose and edit before sending.'],
+    tips: [
+      'Suggested replies are never sent by themselves: you choose and edit before sending.',
+      'Customer Management › "Items left in cart" lists customers who added products but did not order: a good list to follow up.',
+    ],
   },
   {
     id: 'FINANCIAL_AUDITOR',
     name: 'Financial Auditor',
     summary: 'Checks the books. Read-only everywhere.',
-    menu: ['analytics', 'finance', 'orders', 'store-sales', 'order-tracking', 'payments'],
+    menu: ['finance', 'orders', 'store-sales', 'order-tracking', 'payments', 'my-payslips'],
     hasApprovalLevel: false,
     does: [
       'View the company account overview, ledger, expenses and vouchers',
       'Export finance reports as PDF, Excel or Word',
+      'Check what every product earns on delivered orders (Accounts & Finance › Product profit), product cost sheets and each customer order\'s profit',
       'Check the GST position and register: output tax, input tax credit, payable in cash per month, paid and outstanding',
-      'View payments, refunds, customer and procurement orders, documents',
+      'View every month\'s salary payments and download any payslip (Payments & Chalans)',
+      'View refunds, customer and procurement orders, documents',
       'See every agent\'s store sales (Store Sales)',
     ],
     approves: [],
@@ -324,24 +377,32 @@ const ROLE_LIST: RoleGuide[] = [
     id: 'FINANCE_MANAGER',
     name: 'Finance Manager',
     summary: 'Runs company money: expenses, vouchers, payments and reports.',
-    menu: ['analytics', 'finance', 'approvals', 'orders', 'store-sales', 'order-tracking', 'payments'],
+    menu: ['finance', 'approvals', 'orders', 'store-sales', 'order-tracking', 'payments', 'my-payslips'],
     levelTwoMenu: ['approvals'],
     hasApprovalLevel: true,
     does: [
       'View and export the company account, ledger and reports',
-      'Raise expenses and vouchers, record payments',
+      'See the profit of every product and customer order, before and after income tax (Accounts & Finance › Product profit, order details)',
+      'Raise expenses and vouchers',
+      'Each month, record the salaries transferred from the bank (Payments & Chalans): one employee with a bonus or deduction, or everyone unpaid at once; resend a payslip email',
       'Track GST payable each month (Accounts & Finance › GST) and record GST paid to the government as a GST payment voucher',
       'View refunds, customer and procurement orders, documents',
       'See every agent\'s store sales and how they were paid (Store Sales)',
     ],
-    approves: ['Expenses and vouchers: approve, reject or reverse (approving posts them to the ledger)', 'Payments and dealer payouts (coming soon)'],
-    tips: ['You cannot approve a voucher you raised yourself.'],
+    approves: [
+      'Expenses and vouchers: approve, reject or reverse (approving posts them to the ledger)',
+      'Salary transfers recorded by someone else: confirming books them as salaries and emails each payslip',
+    ],
+    tips: [
+      'You cannot approve a voucher you raised yourself, confirm a salary you recorded, or confirm your own salary.',
+      'Confirm a salary only once the money has left the bank: it can\'t be undone. A wrong one is rejected and recorded again.',
+    ],
   },
   {
     id: 'SALES_AGENT',
     name: 'Store Sales Agent',
     summary: 'Sells devices at a store or in the market, for cash or online payment.',
-    menu: ['store-sales'],
+    menu: ['store-sales', 'my-payslips'],
     hasApprovalLevel: false,
     does: [
       'Find a walk-in customer by mobile number or email, or register them with their delivery address',
@@ -485,8 +546,9 @@ export const GUIDE_FLOWS: GuideFlow[] = [
     summary: 'Products go live only after a Level 2 Store Manager approves them.',
     steps: [
       { who: ['CATALOG_SPECIALIST', 'STORE_MANAGER', 'SUPER_ADMIN'], label: 'Catalog Specialist', kind: 'maker', text: 'Creates the item, with one or more categories, attributes and warranties.', where: 'Item Management' },
-      { who: ['CATALOG_SPECIALIST', 'STORE_MANAGER', 'SUPER_ADMIN'], label: 'Catalog Specialist', kind: 'maker', text: 'Creates the product from items (components), GST-inclusive price, GST rate and HSN/SAC, and warranties, and submits it for approval. An accessory also lists the products it is offered with and the extra discount with each.', where: 'Products Management' },
-      { who: ['STORE_MANAGER', 'SUPER_ADMIN'], label: 'Store Manager · Level 2', kind: 'checker', text: 'Reviews the snapshot, including the GST split of the price, and approves, which activates the product.', where: 'Approvals Hub › Requests', otherwise: 'Reject → back with a reason; fix and resubmit' },
+      { who: ['CATALOG_SPECIALIST', 'STORE_MANAGER', 'SUPER_ADMIN'], label: 'Catalog Specialist', kind: 'maker', text: 'Creates the product from items (components), its category (an existing one or a new one), GST-inclusive price, GST rate and HSN/SAC, and warranties, and submits it for approval. An accessory also lists the products it is offered with and the extra discount with each.', where: 'Products Management' },
+      { who: ['CATALOG_SPECIALIST', 'STORE_MANAGER', 'SUPER_ADMIN'], label: 'Catalog Specialist', kind: 'maker', text: 'Enters what one unit costs: each component\'s unit cost (filled from its purchase price) and extra costs such as manpower or software with their reasons, and checks the profit before and after tax shown in the form.', where: 'Products Management › Costing & profit' },
+      { who: ['STORE_MANAGER', 'SUPER_ADMIN'], label: 'Store Manager · Level 2', kind: 'checker', text: 'Reviews the snapshot, including the GST split of the price and one unit\'s cost, margin and profit after tax, and approves, which activates the product.', where: 'Approvals Hub › Requests', otherwise: 'Reject → back with a reason; fix and resubmit' },
       { who: ['CATALOG_SPECIALIST', 'STORE_MANAGER', 'SUPER_ADMIN'], label: 'Catalog Specialist', kind: 'maker', text: 'Publishes it to the storefront. Later edits go for approval again; the live product stays unchanged until approved.', where: 'Products Management' },
       { who: ['CUSTOMER'], label: 'Customer', kind: 'end', text: 'Can buy it.' },
     ],
@@ -503,6 +565,19 @@ export const GUIDE_FLOWS: GuideFlow[] = [
       { who: ['DELIVERY_RIDER', 'FLEET_COORDINATOR'], label: 'Delivery Rider', kind: 'maker', text: 'Records out for delivery, then delivered, using the order\'s shipping address.', otherwise: 'Customer unavailable, invalid address or refused → re-attempt' },
       { who: ['FLEET_COORDINATOR', 'FULFILLMENT_SPECIALIST', 'STORE_MANAGER', 'SUPER_ADMIN'], label: 'Fleet Coordinator', kind: 'maker', text: 'Sends a parcel that cannot be delivered back to the warehouse.' },
       { who: ['CUSTOMER'], label: 'Customer', kind: 'end', text: 'Sees every update in their order tracking.' },
+      { who: ['STORE_MANAGER', 'CATALOG_SPECIALIST', 'FINANCIAL_AUDITOR', 'FINANCE_MANAGER', 'SUPER_ADMIN'], label: 'Anyone who sees costs', kind: 'end', text: 'Sees the order\'s profit on the order: each line at its cost when ordered, plus shipping charged less shipping paid, before and after tax.', where: 'Customer Order Tracking › order' },
+    ],
+  },
+  {
+    id: 'product-profit',
+    title: 'Product cost and profit',
+    summary: 'What a product costs to make and what it earns, from the product form to the books. Amounts exclude GST.',
+    steps: [
+      { who: ['DEALER_MANAGER', 'STORE_MANAGER', 'SUPER_ADMIN'], label: 'Dealer Manager / Store Manager', kind: 'maker', text: 'Items are bought and their stock approved; each stock entry carries its purchase price and freight.', where: 'Procurement Orders, Stock' },
+      { who: ['CATALOG_SPECIALIST', 'STORE_MANAGER', 'SUPER_ADMIN'], label: 'Catalog Specialist', kind: 'maker', text: 'In the product form, each component\'s unit cost is filled from what the next unit in stock cost and can be adjusted. Adds extra costs (manpower, software, packaging…) with how each was worked out, and reads the live profit, margin, income tax and profit after tax.', where: 'Products Management › Costing & profit' },
+      { who: ['STORE_MANAGER', 'SUPER_ADMIN'], label: 'Store Manager · Level 2', kind: 'checker', text: 'Sees one unit\'s cost, margin and profit after tax with the approval request. Cost changes to a live product go for approval like any other edit.', where: 'Approvals Hub › Requests', otherwise: 'Reject → back with a reason' },
+      { who: ['SYSTEM'], label: 'TinQa', kind: 'end', text: 'Every order line keeps the unit cost of the day it was ordered, so later cost changes never rewrite past profit. Shipping costs entered when the order ships are counted against that order.' },
+      { who: ['STORE_MANAGER', 'CATALOG_SPECIALIST', 'FINANCIAL_AUDITOR', 'FINANCE_MANAGER', 'SUPER_ADMIN'], label: 'Anyone who sees costs', kind: 'end', text: 'Reads the profit of an order (order details), of a product (product details) and of every product in a period, before and after income tax.', where: 'Accounts & Finance › Product profit' },
     ],
   },
   {
@@ -547,6 +622,17 @@ export const GUIDE_FLOWS: GuideFlow[] = [
       { who: ['CUSTOMER_SUPPORT', 'STORE_MANAGER', 'SUPER_ADMIN'], label: 'Customer Support', kind: 'maker', text: 'Opens the ticket, checks the linked order and picks or edits a suggested reply.', where: 'Support Tickets' },
       { who: ['CUSTOMER_SUPPORT', 'STORE_MANAGER', 'SUPER_ADMIN'], label: 'Customer Support', kind: 'maker', text: 'Sends the reply and updates the status (e.g. resolved).' },
       { who: ['CUSTOMER'], label: 'Customer', kind: 'end', text: 'Sees the reply on the store.' },
+    ],
+  },
+  {
+    id: 'customer-change',
+    title: 'Customer detail change',
+    summary: 'A customer asks to correct their details; customer care asks and only the Super Admin changes them.',
+    steps: [
+      { who: ['CUSTOMER'], label: 'Customer', kind: 'external', text: 'Asks support to correct their name, phone number or date of birth.' },
+      { who: ['CUSTOMER_SUPPORT', 'STORE_MANAGER'], label: 'Customer Support', kind: 'maker', text: 'Opens the customer, fills in the new values and the reason and sends the request. Nothing changes yet.', where: 'Customer Management › Request change' },
+      { who: ['SUPER_ADMIN'], label: 'Super Admin · Level 2', kind: 'checker', text: 'Gets a notification with the requested values, opens the customer from it, checks and saves the change with a reason.', where: 'Customer Management › Edit details', otherwise: 'If the request is wrong, the details are left as they are.' },
+      { who: ['CUSTOMER'], label: 'Customer', kind: 'end', text: 'Sees the corrected details in their account. The email address (their sign-in) is never changed here.' },
     ],
   },
   {
@@ -600,6 +686,17 @@ export const GUIDE_FLOWS: GuideFlow[] = [
       { who: ['FINANCE_MANAGER', 'SUPER_ADMIN'], label: 'Finance Manager · Level 2', kind: 'checker', text: 'Approves, rejects or later reverses it.', where: 'Approvals Hub › Expenses', otherwise: 'Reject → the maker can fix and resubmit while it awaits approval' },
       { who: ['SYSTEM'], label: 'Company ledger', kind: 'end', text: 'The entry is posted to the ledger. A GST bill\'s GST is claimed as input tax credit and recorded in the GST register, unless it was marked as blocked credit.' },
       { who: ['FINANCIAL_AUDITOR', 'FINANCE_MANAGER', 'SUPER_ADMIN'], label: 'Financial Auditor', kind: 'end', text: 'Reviews the overview and ledger and exports PDF, Excel or Word reports.', where: 'Accounts & Finance' },
+    ],
+  },
+  {
+    id: 'salary',
+    title: 'Monthly salary and payslip',
+    summary: 'Salaries are transferred from the bank; nothing is booked or emailed until a different Level 2 confirms the transfer.',
+    steps: [
+      { who: ['FINANCE_MANAGER', 'SUPER_ADMIN'], label: 'Finance Manager', kind: 'maker', text: 'Transfers the salaries from the bank, then records them for the month: everyone unpaid at once at their monthly salary, or one employee with this month\'s bonus, overtime, unpaid leave, TDS or PF. Adds the transfer date and bank reference (UTR).', where: 'Payments & Chalans › choose the month' },
+      { who: ['FINANCE_MANAGER', 'SUPER_ADMIN'], label: 'Finance Manager · Level 2', kind: 'checker', text: 'Checks the transfers against the bank and confirms them (one by one or all waiting at once). Nobody confirms a salary they recorded or their own.', where: 'Payments & Chalans', otherwise: 'Reject with a reason → the recorder corrects it and records it again; before anyone decides, the recorder can also withdraw it' },
+      { who: ['SYSTEM'], label: 'TinQa', kind: 'end', text: 'Each confirmed salary is booked in Accounts & Finance under Salaries & staff costs (the net pay, on the transfer date) and the payslip PDF is emailed to the employee\'s personal email, or their sign-in email. A failed email is retried; "Resend" sends it again.' },
+      { who: ANY_STAFF, label: 'Every employee', kind: 'end', text: 'Opens and downloads their payslip for any confirmed month. It is created fresh each time from the confirmed payment.', where: 'My Payslips' },
     ],
   },
   {

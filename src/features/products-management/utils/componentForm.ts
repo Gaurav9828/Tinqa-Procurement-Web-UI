@@ -1,5 +1,6 @@
 import type { ItemWarrantyResponse } from '../../item-management/types/item.types';
 import type { ComponentWarrantySnapshot, ProductComponentRequest, ProductComponentResponse } from '../types/product.types';
+import { costAmountError, parseCostAmount } from './productCosting';
 
 /**
  * One component row in the product form. `status` tracks the item-warranty fetch:
@@ -23,7 +24,14 @@ export interface ComponentFormRow {
    * item was changed). Saved rows don't: their copies were already saved as product warranties.
    */
   copiesToProduct: boolean;
+  /** Cost of one unit of the item excluding GST, as typed ('' = not entered). Only shown to PRODUCT_COST_VIEW holders. */
+  unitCost: string;
+  /** Where the suggested cost came from (Procurement purchase prices); '' when none was looked up. */
+  costHint: string;
 }
+
+/** Item id → unit cost saved on the product (from its cost sheet). */
+export type SavedUnitCosts = Map<number, number | null>;
 
 let uidCounter = 0;
 const nextUid = () => `component-${++uidCounter}`;
@@ -39,6 +47,8 @@ export const emptyComponentRow = (): ComponentFormRow => ({
   availableUnits: null,
   requestId: 0,
   copiesToProduct: true,
+  unitCost: '',
+  costHint: '',
 });
 
 const stripId = ({ sourceWarrantyId, warrantyType, title, durationValue, durationUnit, provider, coverage, exclusions, termsAndConditions }: ComponentWarrantySnapshot): ComponentWarrantySnapshot => ({
@@ -53,8 +63,13 @@ const stripId = ({ sourceWarrantyId, warrantyType, title, durationValue, duratio
   termsAndConditions: termsAndConditions ?? null,
 });
 
-/** Saved components → rows (their stored snapshot is kept as-is unless the admin refreshes it). */
-export const toComponentRows = (components: ProductComponentResponse[] | null | undefined): ComponentFormRow[] =>
+const formatCost = (cost: number | null | undefined) => (cost === null || cost === undefined ? '' : Number(cost).toFixed(2));
+
+/**
+ * Saved components → rows (their stored snapshot is kept as-is unless the admin refreshes it). `costs` fills in the
+ * unit costs saved on the product, when the user may see them.
+ */
+export const toComponentRows = (components: ProductComponentResponse[] | null | undefined, costs?: SavedUnitCosts): ComponentFormRow[] =>
   (components ?? []).map((c) => ({
     uid: nextUid(),
     itemId: c.itemId,
@@ -66,6 +81,8 @@ export const toComponentRows = (components: ProductComponentResponse[] | null | 
     availableUnits: null,
     requestId: 0,
     copiesToProduct: false,
+    unitCost: formatCost(costs?.get(c.itemId)),
+    costHint: '',
   }));
 
 /** An item's current warranties → the copy stored with the product. Inactive item warranties are not carried over. */
@@ -94,6 +111,15 @@ export const parseComponentQuantity = (raw: string): number | null => {
   const value = Number(trimmed);
   return value > 0 ? value : null;
 };
+
+/** `components[i].unitCost` errors for costs typed in a wrong format (a blank cost is allowed). */
+const unitCostErrors = (rows: ComponentFormRow[]): Record<string, string> =>
+  Object.fromEntries(
+    rows.flatMap((row, i) => {
+      const error = costAmountError(row.unitCost);
+      return error ? [[componentErrorKey(i, 'unitCost'), error]] : [];
+    })
+  );
 
 export const componentErrorKey = (index: number, field?: string) => (field ? `components[${index}].${field}` : `components[${index}]`);
 
@@ -124,26 +150,44 @@ export const validateComponentRows = (
     if (row.itemId !== null && row.status === 'loading') errors[componentErrorKey(i)] = 'Still loading this item’s details.';
     if (row.status === 'error') errors[componentErrorKey(i)] = 'Couldn’t load this item’s details. Retry or remove the item.';
   });
-  return errors;
+  return { ...errors, ...unitCostErrors(rows) };
 };
 
-export const toComponentRequests = (rows: ComponentFormRow[]): ProductComponentRequest[] =>
-  rows.map((row) => ({
-    itemId: row.itemId as number,
-    itemName: row.itemName.trim(),
-    ...(row.itemSku.trim() ? { itemSku: row.itemSku.trim() } : {}),
-    quantity: parseComponentQuantity(row.quantity) as number,
-    warranties: row.warranties.map(stripId),
-  }));
+/**
+ * Rows → request. `withCosts` (PRODUCT_COST_EDIT) adds each entered unit cost; a row without one keeps the cost its
+ * item already has on the product.
+ */
+export const toComponentRequests = (rows: ComponentFormRow[], withCosts = false): ProductComponentRequest[] =>
+  rows.map((row) => {
+    const unitCost = withCosts ? parseCostAmount(row.unitCost) : null;
+    return {
+      itemId: row.itemId as number,
+      itemName: row.itemName.trim(),
+      ...(row.itemSku.trim() ? { itemSku: row.itemSku.trim() } : {}),
+      quantity: parseComponentQuantity(row.quantity) as number,
+      warranties: row.warranties.map(stripId),
+      ...(unitCost !== null ? { unitCost } : {}),
+    };
+  });
 
 const normalise = (c: { itemId: number | null; quantity: number | string; warranties: ComponentWarrantySnapshot[] }) =>
   JSON.stringify([c.itemId, Number(c.quantity), c.warranties.map(stripId)]);
 
-export const componentsChanged = (original: ProductComponentResponse[], rows: ComponentFormRow[]): boolean =>
-  original.length !== rows.length || original.some((c, i) => normalise(c) !== normalise(rows[i]));
+/** A row's cost differs from the one saved for its item (only checked when the saved costs are known). */
+const costChanged = (row: ComponentFormRow, costs: SavedUnitCosts | undefined): boolean => {
+  if (!costs || row.itemId === null) return false;
+  const saved = costs.get(row.itemId);
+  const typed = parseCostAmount(row.unitCost);
+  return (saved ?? null) === null ? typed !== null : typed !== null && typed !== Number(saved);
+};
+
+export const componentsChanged = (original: ProductComponentResponse[], rows: ComponentFormRow[], costs?: SavedUnitCosts): boolean =>
+  original.length !== rows.length ||
+  original.some((c, i) => normalise(c) !== normalise(rows[i])) ||
+  rows.some((row) => costChanged(row, costs));
 
 /** What saving will do to the components — shown on the edit review. */
-export const describeComponentChanges = (original: ProductComponentResponse[], rows: ComponentFormRow[]): string[] => {
+export const describeComponentChanges = (original: ProductComponentResponse[], rows: ComponentFormRow[], costs?: SavedUnitCosts): string[] => {
   const before = new Map(original.map((c) => [c.itemId, c]));
   const kept = new Set(rows.map((r) => r.itemId));
   const lines: string[] = [];
@@ -158,6 +202,7 @@ export const describeComponentChanges = (original: ProductComponentResponse[], r
     const parts: string[] = [];
     if (Number(prev.quantity) !== Number(row.quantity)) parts.push(`quantity ${prev.quantity} → ${row.quantity}`);
     if (JSON.stringify(prev.warranties.map(stripId)) !== JSON.stringify(row.warranties.map(stripId))) parts.push(`warranties refreshed (${count})`);
+    if (costChanged(row, costs)) parts.push(`unit cost ${formatCost(costs?.get(row.itemId as number)) || 'not set'} → ${row.unitCost.trim()}`);
     if (parts.length) lines.push(`Update ${name}: ${parts.join(', ')}`);
   });
   original.filter((c) => !kept.has(c.itemId)).forEach((c) => lines.push(`Remove ${c.itemName} and its warranties`));

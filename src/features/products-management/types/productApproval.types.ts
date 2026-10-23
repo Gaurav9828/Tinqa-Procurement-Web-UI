@@ -11,6 +11,8 @@ export type ProductApprovalDecision = Exclude<ProductApprovalStatus, 'PENDING'>;
 export interface ProductApprovalSnapshot extends Partial<ProductGstFields> {
   title: string;
   tagline?: string | null;
+  /** Absent on snapshots taken before categories existed. */
+  categoryName?: string | null;
   price: number;
   discountPercentage?: number | null;
   stockQuantity: number;
@@ -20,6 +22,20 @@ export interface ProductApprovalSnapshot extends Partial<ProductGstFields> {
   specificationCount: number;
   /** Accessory: the products it is offered with. Empty / absent: not an accessory. */
   accessoryParents?: { productId: number; title?: string | null; bundleDiscountPercentage: number }[];
+  /** One unit's cost and profit at the submitted price. Absent when the submitter can't see costs. */
+  costSummary?: ProductCostSummary | null;
+}
+
+/** Rupees, GST excluded (Procurement ProductApprovalDTOs.CostSummary). */
+export interface ProductCostSummary {
+  unitCost: number;
+  netRevenue: number;
+  /** Negative on a loss. */
+  grossProfit: number;
+  marginPercent: number | null;
+  profitAfterTax: number;
+  /** Components entered without a cost (the cost is then understated). */
+  componentsWithoutCost: number;
 }
 
 /** CREATE / RESUBMISSION: the product goes live. UPDATE: changes to an approved product. */

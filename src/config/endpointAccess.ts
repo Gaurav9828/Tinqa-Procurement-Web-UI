@@ -78,6 +78,8 @@ export const PROCUREMENT_ENDPOINTS: readonly EndpointRule[] = [
   rule('POST', '/v1/dealer-portal/orders/{id}/ship', 'DEALER_ORDER_SHIP'),
   rule('POST', '/v1/dealer-portal/quotations', 'DEALER_QUOTATION_SUBMIT'),
   rule('POST', '/v1/dealer-portal/quotations/{id}/change-requests', 'DEALER_QUOTATION_CHANGE_REQUEST'),
+  // Customer care asking a Super Admin to correct a storefront customer's details (a notification, nothing stored)
+  rule('POST', '/v1/admin/customer-change-requests', 'CUSTOMER_CHANGE_REQUEST'),
   rule('PATCH', '/v1/dealer-portal/change-requests/{id}/withdraw', 'DEALER_QUOTATION_CHANGE_REQUEST'),
   // Items
   rule('GET', '/v1/admin/items', 'ITEM_VIEW'),
@@ -107,6 +109,7 @@ export const PROCUREMENT_ENDPOINTS: readonly EndpointRule[] = [
   rule('GET', '/v1/stocks/{id}', 'STOCK_VIEW'),
   rule('GET', '/v1/stocks/items/availability', 'STOCK_VIEW'),
   rule('GET', '/v1/stocks/items/{itemId}/availability', 'STOCK_VIEW'),
+  rule('GET', '/v1/stocks/items/{itemId}/cost', 'PRODUCT_COST_VIEW'),
   rule('POST', '/v1/stocks', 'STOCK_CREATE'),
   // Delivered purchase orders not yet received into stock (warehouse staff hold no PROCUREMENT_ORDER_VIEW)
   rule('GET', '/v1/stocks/receivable-orders', 'STOCK_CREATE'),
@@ -114,6 +117,16 @@ export const PROCUREMENT_ENDPOINTS: readonly EndpointRule[] = [
   rule('POST', '/v1/stocks/{id}/reduce-quantity', 'STOCK_ADJUST'),
   rule('POST', '/v1/stocks/{id}/approval', 'STOCK_APPROVE'),
   rule('PUT', '/v1/stocks/{id}', 'STOCK_UPDATE'),
+  // Salaries (PayrollController): recorded by PAYMENT_RECORD, confirmed by PAYMENT_APPROVE; own payslips for everyone
+  rule('GET', '/v1/admin/payroll/years/{year}', 'PAYMENT_VIEW'),
+  rule('GET', '/v1/admin/payroll/years/{year}/months/{month}', 'PAYMENT_VIEW'),
+  rule('POST', '/v1/admin/payroll/years/{year}/months/{month}/payments', 'PAYMENT_RECORD'),
+  rule('POST', '/v1/admin/payroll/payments/decision', 'PAYMENT_APPROVE'),
+  rule('POST', '/v1/admin/payroll/payments/{id}/withdraw', 'PAYMENT_RECORD'),
+  rule('POST', '/v1/admin/payroll/payments/{id}/payslip/resend', 'PAYMENT_RECORD'),
+  rule('GET', '/v1/admin/payroll/payments/{id}/payslip', 'PAYMENT_VIEW'),
+  rule('GET', '/v1/payroll/my-payslips', 'PAYSLIP_VIEW_OWN'),
+  rule('GET', '/v1/payroll/my-payslips/{id}/pdf', 'PAYSLIP_VIEW_OWN'),
   // Documents: listing everyone's needs DOCUMENT_VIEW; your own documents (by id or user) follow an owner rule
   rule('GET', '/v1/documents', 'DOCUMENT_VIEW'),
   rule('PATCH', '/v1/documents/{id}/approval', 'DOCUMENT_APPROVE'),
@@ -125,7 +138,15 @@ export const ECOMMERCE_ENDPOINTS: readonly EndpointRule[] = [
   rule('POST', '/products', 'PRODUCT_CREATE'),
   rule('PUT', '/products/{id}', 'PRODUCT_UPDATE'),
   rule('PATCH', '/products/{id}/status', 'PRODUCT_PUBLISH'),
+  rule('PUT', '/products/display-order', 'PRODUCT_PUBLISH'),
   rule('PATCH', '/products/{id}/stock', 'STOREFRONT_STOCK_UPDATE'),
+  // Product categories (new ones are created with POST/PUT /products via categoryName)
+  rule('GET', '/admin/product-categories', 'PRODUCT_VIEW'),
+  // Product costing: cost sheets, product / order profit (costs themselves are sent with POST/PUT /products)
+  rule('GET', '/admin/costing/settings', 'PRODUCT_COST_VIEW'),
+  rule('GET', '/admin/costing/products', 'PRODUCT_COST_VIEW'),
+  rule('GET', '/admin/costing/products/{id}', 'PRODUCT_COST_VIEW'),
+  rule('GET', '/admin/costing/orders/{orderNumber}', 'PRODUCT_COST_VIEW'),
   // Customer orders and delivery
   rule('GET', '/admin/orders', 'CUSTOMER_ORDER_VIEW'),
   rule('GET', '/admin/orders/tracking-statuses', 'CUSTOMER_ORDER_VIEW'),
@@ -166,6 +187,13 @@ export const ECOMMERCE_ENDPOINTS: readonly EndpointRule[] = [
   rule('GET', '/admin/reviews', 'REVIEW_VIEW'),
   rule('GET', '/admin/reviews/{id}', 'REVIEW_VIEW'),
   rule('PATCH', '/admin/reviews/{id}/status', 'REVIEW_MODERATE'),
+  // Customers (AdminCustomerController)
+  rule('GET', '/admin/customers', 'CUSTOMER_VIEW'),
+  rule('GET', '/admin/customers/{id}', 'CUSTOMER_VIEW'),
+  rule('GET', '/admin/customers/{id}/orders', 'CUSTOMER_VIEW'),
+  rule('GET', '/admin/customers/{id}/cart', 'CUSTOMER_VIEW'),
+  rule('GET', '/admin/customers/{id}/tickets', 'CUSTOMER_VIEW'),
+  rule('PATCH', '/admin/customers/{id}', 'CUSTOMER_UPDATE'),
   // Company profile
   rule('GET', '/admin/company/profile', 'COMPANY_PROFILE_VIEW'),
   rule('GET', '/admin/company/profile/versions', 'COMPANY_PROFILE_VIEW'),

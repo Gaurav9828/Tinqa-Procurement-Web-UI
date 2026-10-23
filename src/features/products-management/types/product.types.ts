@@ -78,6 +78,24 @@ export interface ProductComponentRequest {
     quantity: number;
     /** Snapshot of the item's active warranties; may be empty. */
     warranties: ComponentWarrantySnapshot[];
+    /**
+     * Cost of one unit of the item excluding GST (needs PRODUCT_COST_EDIT). Omitted: the item keeps the cost it already
+     * has on the product.
+     */
+    unitCost?: number;
+}
+
+/** Limits of an extra cost (Ecommerce BE ProductRequestDTO.CostEntryDTO). */
+export const COST_ENTRIES_MAX = 30;
+export const COST_LABEL_MAX = 100;
+export const COST_REASON_MAX = 1000;
+
+/** An extra cost of one product unit (manpower, software...), with how it was worked out. */
+export interface CostEntryRequest {
+    label: string;
+    /** Per product unit, excluding GST: ≥ 0, at most 2 decimals. */
+    amount: number;
+    description?: string;
 }
 
 /** Component as returned by the admin product endpoints (snapshot taken when the product was saved). */
@@ -139,8 +157,30 @@ export interface AccessoryFields {
     accessoryParents?: AccessoryParentRequest[];
 }
 
+/** Ecommerce BE limit for a category name (ProductCategoryService.NAME_MAX). */
+export const CATEGORY_NAME_MAX = 60;
+
+/**
+ * A product category (Ecommerce BE ProductCategoryDTO). Not a fixed list: a new name typed on the product form
+ * creates one. The counts come only from GET /admin/product-categories.
+ */
+export interface ProductCategory {
+    id: number;
+    name: string;
+    /** URL-safe key; names with the same slug are the same category (see utils/productCategory). */
+    slug: string;
+    sortOrder: number;
+    productCount?: number;
+    activeProductCount?: number;
+}
+
 export interface CreateProductRequest extends Partial<ProductGstFields>, AccessoryFields {
     title: string;
+    /**
+     * An existing category's name (matched ignoring case, spacing and punctuation) or a new one, which the backend
+     * creates. Required on create; on update omitted = the category stays as it is.
+     */
+    categoryName?: string;
     tagline?: string;
     description?: string;
     price: number;
@@ -164,6 +204,11 @@ export interface CreateProductRequest extends Partial<ProductGstFields>, Accesso
      * list replaces every component ([] removes all).
      */
     components?: ProductComponentRequest[];
+    /**
+     * Extra costs (needs PRODUCT_COST_EDIT). Update semantics: key omitted = untouched, otherwise the list replaces
+     * them ([] removes all).
+     */
+    costEntries?: CostEntryRequest[];
 }
 
 export interface UpdateProductRequest extends Partial<CreateProductRequest> { }
@@ -183,6 +228,8 @@ export interface ProductResponseDto {
     id: number;
     title: string;
     tagline?: string | null;
+    /** Null only if the category row is missing. */
+    category?: ProductCategory | null;
     description?: string | null;
     price: number;
     discountPercentage?: number | null;
@@ -223,6 +270,8 @@ export interface ProductResponse extends Partial<ProductGstFields> {
     id: number;
     title: string;
     tagline: string | null;
+    /** Null only if the category row is missing. */
+    category?: ProductCategory | null;
     description: string | null;
     price: number;
     discountPercentage: number | null;

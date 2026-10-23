@@ -25,6 +25,7 @@ export const toProduct = (dto: ProductResponseDto): ProductResponse => ({
   id: dto.id,
   title: dto.title,
   tagline: dto.tagline ?? null,
+  category: dto.category ?? null,
   description: dto.description ?? null,
   price: dto.price,
   discountPercentage: dto.discountPercentage ?? null,

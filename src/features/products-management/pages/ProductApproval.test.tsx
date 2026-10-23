@@ -14,6 +14,7 @@ import { useAuthStore } from '../../../store/useAuthStore';
 import type { ProductResponseDto } from '../types/product.types';
 import type { ProductApprovalResponse, ProductApprovalStatus } from '../types/productApproval.types';
 import { fillGst } from './gstTestUtil';
+import { DIORAMAS, fillCategory } from './categoryTestUtil';
 import { superAdminPermissions } from '../../../test/access';
 
 /**
@@ -38,6 +39,7 @@ const httpError = (status: number, message: string) => {
 const product = (id: number, title: string, enabled: boolean): ProductResponseDto => ({
   id,
   title,
+  category: DIORAMAS,
   price: 1000 + id,
   hsnSac: '9405',
   gstRate: 18,
@@ -79,6 +81,7 @@ let approvalsFail: boolean;
 
 const installBackends = () => {
   ecom.get.mockImplementation(async (url: string) => {
+    if (url === '/admin/product-categories') return ok([DIORAMAS]);
     if (url === '/products') return ok(structuredClone(products));
     throw httpError(405, 'Method not allowed');
   });
@@ -190,6 +193,8 @@ describe('Creating a product needs approval', () => {
     await user.type(screen.getByPlaceholderText('0.00'), '2999');
     await user.type(screen.getByPlaceholderText('Image Address'), 'https://cdn.tinqa.com/panel.png');
     await fillGst(user);
+    await fillCategory(user);
+  await fillCategory(user);
   };
   const confirmCreate = async (user: User) => {
     await user.click(screen.getAllByRole('button', { name: 'Create Product' }).at(-1)!);

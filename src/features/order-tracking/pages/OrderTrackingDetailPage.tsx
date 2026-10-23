@@ -16,6 +16,7 @@ import { PaymentDetailsCard } from '../components/PaymentDetailsCard';
 import { StoreSaleCard } from '../../store-sales/components/StoreSaleCard';
 import { RefundPanel } from '../../refunds/components/RefundPanel';
 import { useOrderRefunds } from '../../refunds/hooks/useOrderRefunds';
+import { OrderProfitCard } from '../components/OrderProfitCard';
 import { getAllowedStatuses, getDeliveryOutcomes, getStage, isFullyPaid, type WorkflowContext } from '../utils/statusWorkflow';
 import { formatCurrency, formatDateTime, formatUpdater, getCurrentEntry, hasPreOrderLines, sortTimeline } from '../utils/orderTracking.utils';
 import { useAccess } from '../../../hooks/useAccess';
@@ -188,6 +189,8 @@ export const OrderTrackingDetailPage: React.FC = () => {
             <PaymentDetailsCard order={order} />
 
             <RefundPanel orderNumber={orderNumber} refunds={refunds} onChanged={refreshAll} />
+
+            <OrderProfitCard orderNumber={orderNumber} revision={`${order.orderStatus}-${order.paymentStatus}-${timeline.length}`} />
 
             {(order.items?.length ?? 0) > 0 && (
               <Card title={`Items (${order.itemCount})`}>

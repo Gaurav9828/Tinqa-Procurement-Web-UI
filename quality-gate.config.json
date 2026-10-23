@@ -1,0 +1,60 @@
+{
+  "coverage": {
+    "minLinePercent": 70
+  },
+  "dependencies": {
+    "failOn": ["critical", "high"],
+    "auditTimeoutSeconds": 90,
+    "allow": []
+  },
+  "securitySonarRules": [
+    "sonarjs/no-clear-text-protocols",
+    "sonarjs/no-hardcoded-passwords",
+    "sonarjs/no-hardcoded-secrets",
+    "sonarjs/no-hardcoded-ip",
+    "sonarjs/pseudo-random",
+    "sonarjs/super-linear-regex",
+    "sonarjs/slow-regex",
+    "sonarjs/code-eval",
+    "sonarjs/os-command",
+    "sonarjs/sql-queries",
+    "sonarjs/insecure-cookie",
+    "sonarjs/cookie-no-httponly",
+    "sonarjs/insecure-jwt-token",
+    "sonarjs/hashing",
+    "sonarjs/encryption-secure-mode",
+    "sonarjs/no-weak-cipher",
+    "sonarjs/no-weak-keys",
+    "sonarjs/unverified-certificate",
+    "sonarjs/link-with-target-blank",
+    "sonarjs/post-message",
+    "sonarjs/no-intrusive-permissions",
+    "sonarjs/disabled-auto-escaping",
+    "sonarjs/content-security-policy",
+    "sonarjs/cors",
+    "sonarjs/csrf",
+    "sonarjs/publicly-writable-directories"
+  ],
+  "secrets": {
+    "ignorePaths": [
+      "(^|/)package-lock\\.json$",
+      "(^|/)yarn\\.lock$",
+      "^quality-gate\\.(baseline|config)\\.json$",
+      "^reports/",
+      "^coverage/"
+    ],
+    "patterns": [
+      { "id": "private-key", "regex": "-----BEGIN (RSA |EC |DSA |OPENSSH |PGP )?PRIVATE KEY", "message": "Private key committed to the repository" },
+      { "id": "aws-access-key", "regex": "\\b(AKIA|ASIA)[0-9A-Z]{16}\\b", "message": "AWS access key id" },
+      { "id": "google-api-key", "regex": "\\bAIza[0-9A-Za-z_-]{35}\\b", "message": "Google API key" },
+      { "id": "github-token", "regex": "\\b(ghp|gho|ghu|ghs|ghr|github_pat)_[A-Za-z0-9_]{20,}\\b", "message": "GitHub token" },
+      { "id": "slack-token", "regex": "\\bxox[abposr]-[A-Za-z0-9-]{10,}\\b", "message": "Slack token" },
+      { "id": "stripe-live-key", "regex": "\\b(sk|rk)_live_[A-Za-z0-9]{16,}\\b", "message": "Stripe live secret key" },
+      { "id": "razorpay-key", "regex": "\\brzp_live_[A-Za-z0-9]{10,}\\b", "message": "Razorpay live key" },
+      { "id": "jwt", "regex": "\\beyJ[A-Za-z0-9_-]{10,}\\.eyJ[A-Za-z0-9_-]{10,}\\.[A-Za-z0-9_-]{10,}", "message": "JSON Web Token committed to the repository" },
+      { "id": "credentials-in-url", "regex": "[a-z][a-z0-9+.-]*://[^/\\s:@'\"]+:[^/\\s:@'\"]{3,}@", "flags": "i", "message": "Username/password embedded in a URL" },
+      { "id": "hardcoded-credential", "regex": "\\b(api[_-]?key|secret|client[_-]?secret|access[_-]?token|auth[_-]?token|password|passwd)\\b\\s*[:=]\\s*['\"`][^'\"`\\s]{8,}['\"`]", "flags": "i", "message": "Hard-coded credential" },
+      { "id": "public-env-secret", "regex": "^\\s*VITE_[A-Z0-9_]*(SECRET|PASSWORD|PRIVATE|TOKEN|API_KEY)[A-Z0-9_]*\\s*=", "message": "VITE_* variables are baked into the public JS bundle; never put secrets in them" }
+    ]
+  }
+}

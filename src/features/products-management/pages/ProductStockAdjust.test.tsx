@@ -12,6 +12,7 @@ import { ecommerceAxiosClient } from '../../../api/ecommerceAxiosClient';
 import { mockDirectEditApprovals } from './directEditApprovals.testUtil';
 import type { ProductResponseDto, SpecificationDTO } from '../types/product.types';
 import { signInAsSuperAdmin } from '../../../test/access';
+import { DIORAMAS } from './categoryTestUtil';
 
 /**
  * Only the HTTP client is mocked, with a tiny fake of the real Ecommerce BE ProductController:
@@ -62,6 +63,7 @@ const toReadDto = (p: StoredProduct): ProductResponseDto => {
 const LAMP: StoredProduct = {
   id: 1,
   title: 'SummitX',
+  category: DIORAMAS,
   tagline: 'Smart lamp',
   description: 'A lamp',
   price: 1999,
@@ -87,6 +89,7 @@ const PLUG: StoredProduct = { ...LAMP, id: 2, title: 'Sold-out Plug', stockQuant
 
 const installFakeBackend = () => {
   http.get.mockImplementation(async (url: string) => {
+    if (url === '/admin/product-categories') return okBody([DIORAMAS]);
     if (url === '/products') return okBody(db.map(toReadDto), 'Products retrieved successfully');
     if (url === '/products/active') return okBody(db.filter((p) => p.enabled).map(toReadDto));
     throw methodNotAllowed('GET', url);
@@ -145,7 +148,7 @@ describe('Product API contract (no product-detail route)', () => {
     const { user } = renderPage();
     expect(await screen.findByText('SummitX')).toBeInTheDocument();
     await openDialog(user, 'Add');
-    expect(requestedGetUrls().every((url) => url === '/products')).toBe(true);
+    expect(requestedGetUrls().every((url) => url === '/products' || url === '/admin/product-categories')).toBe(true);
     expect(http.delete).not.toHaveBeenCalled();
   });
 

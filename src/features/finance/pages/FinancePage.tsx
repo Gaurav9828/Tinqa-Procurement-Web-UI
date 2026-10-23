@@ -4,21 +4,22 @@ import { OverviewPanel } from '../components/OverviewPanel';
 import { VouchersPanel } from '../components/VouchersPanel';
 import { LedgerPanel } from '../components/LedgerPanel';
 import { GstPanel } from '../components/GstPanel';
+import { ProductProfitTable } from '../components/ProductProfitTable';
 
-type Tab = 'overview' | 'gst' | 'expenses' | 'ledger';
+type Tab = 'overview' | 'profit' | 'gst' | 'expenses' | 'ledger';
 const TAB_KEY = 'finance.tab';
 
 const readTab = (): Tab => {
   try {
     const saved = sessionStorage.getItem(TAB_KEY);
-    return saved === 'gst' || saved === 'expenses' || saved === 'ledger' ? saved : 'overview';
+    return saved === 'profit' || saved === 'gst' || saved === 'expenses' || saved === 'ledger' ? saved : 'overview';
   } catch {
     return 'overview';
   }
 };
 
 /**
- * Accounts & Finance: the company account's analytics (Overview), GST charged, paid and payable (GST), its expenses and
+ * Accounts & Finance: the company account's analytics (Overview), the profit each product made (Product profit), GST charged, paid and payable (GST), its expenses and
  * other vouchers (Expenses) and every posted entry (Ledger). Each tab shows only for those allowed to use it.
  */
 export const FinancePage: React.FC = () => {
@@ -26,6 +27,7 @@ export const FinancePage: React.FC = () => {
   const [selected, setSelected] = useState<Tab>(readTab);
   const tabs = [
     { id: 'overview' as const, label: 'Overview', allowed: can('FINANCE_REPORT_VIEW') },
+    { id: 'profit' as const, label: 'Product profit', allowed: can('PRODUCT_COST_VIEW') },
     { id: 'gst' as const, label: 'GST', allowed: can('FINANCE_REPORT_VIEW') },
     { id: 'expenses' as const, label: 'Expenses & vouchers', allowed: canAny('EXPENSE_VIEW', 'EXPENSE_SUBMIT') },
     { id: 'ledger' as const, label: 'Ledger', allowed: can('FINANCE_REPORT_VIEW') },
@@ -64,6 +66,7 @@ export const FinancePage: React.FC = () => {
       )}
 
       {tab === 'overview' && <OverviewPanel />}
+      {tab === 'profit' && <ProductProfitTable />}
       {tab === 'gst' && <GstPanel />}
       {tab === 'expenses' && (
         <VouchersPanel

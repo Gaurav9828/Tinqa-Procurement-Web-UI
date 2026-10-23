@@ -59,6 +59,7 @@ describe('snapshot', () => {
   it('copies what the reviewer needs from the create request', () => {
     const snapshot = snapshotFromRequest({
       title: 'Touch Panel',
+      categoryName: 'Spare parts',
       price: 2999,
       hsnSac: '9405',
       gstRate: 18,
@@ -72,6 +73,7 @@ describe('snapshot', () => {
     expect(snapshot).toEqual({
       title: 'Touch Panel',
       tagline: null,
+      categoryName: 'Spare parts',
       price: 2999,
       discountPercentage: null,
       hsnSac: '9405',

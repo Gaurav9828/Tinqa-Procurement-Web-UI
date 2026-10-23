@@ -12,6 +12,7 @@ import { ecommerceAxiosClient } from '../../../api/ecommerceAxiosClient';
 import { mockDirectEditApprovals } from './directEditApprovals.testUtil';
 import type { ProductResponseDto, WarrantyRequest, WarrantyResponse } from '../types/product.types';
 import { fillGst } from './gstTestUtil';
+import { DIORAMAS, fillCategory } from './categoryTestUtil';
 import { signInAsSuperAdmin } from '../../../test/access';
 
 /**
@@ -94,6 +95,7 @@ const MIGRATED = saved(11, '6 Month Extended Warranty', {
 const LAMP: ProductResponseDto = {
   id: 1,
   title: 'SummitX',
+  category: DIORAMAS,
   tagline: 'Smart lamp',
   description: 'A lamp',
   price: 1999,
@@ -111,6 +113,7 @@ const PLUG: ProductResponseDto = { ...LAMP, id: 2, title: 'Smart Plug', specs: [
 
 const installFakeBackend = () => {
   http.get.mockImplementation(async (url: string) => {
+    if (url === '/admin/product-categories') return okBody([DIORAMAS]);
     if (url === '/products') return okBody(structuredClone(db));
     throw httpError(405, { success: false, message: 'Method not allowed' });
   });
@@ -194,6 +197,7 @@ const openCreate = async (user: User) => {
   await user.type(screen.getByPlaceholderText('0.00'), '2499');
   await user.type(screen.getByPlaceholderText('Image Address'), 'https://cdn.tinqa.com/fan.png');
   await fillGst(user);
+  await fillCategory(user);
   expect(screen.getByTestId('new-product-stock')).toHaveTextContent('1'); // stock is fixed at 1 on creation
 };
 /** The page header and the modal footer both have a "Create Product" button; the modal's is last. */

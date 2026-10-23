@@ -18,7 +18,7 @@ export type VoucherSource = 'MANUAL' | 'SHIPMENT';
 /** How GST appears on a voucher's bill: none, CGST + SGST (same state) or IGST (another state). */
 export type TaxTreatment = 'NONE' | 'INTRA_STATE' | 'INTER_STATE';
 export type VoucherDocumentKind = 'INVOICE' | 'RECEIPT' | 'PAYMENT_PROOF' | 'OTHER';
-export type LedgerSource = 'CUSTOMER_PAYMENT' | 'CUSTOMER_REFUND' | 'PROCUREMENT_ORDER' | 'VOUCHER' | 'REVERSAL';
+export type LedgerSource = 'CUSTOMER_PAYMENT' | 'CUSTOMER_REFUND' | 'PROCUREMENT_ORDER' | 'PROCUREMENT_SALARY' | 'VOUCHER' | 'REVERSAL';
 
 export interface FinanceCategory {
   code: string;

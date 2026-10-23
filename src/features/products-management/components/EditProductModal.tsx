@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { X, Plus, Trash2, CheckCircle2 } from 'lucide-react';
-import type { ProductResponse, UpdateProductRequest, SpecificationDTO } from '../types/product.types';
+import type { ProductCategory, ProductResponse, UpdateProductRequest, SpecificationDTO } from '../types/product.types';
+import { ProductCategoryField } from './ProductCategoryField';
+import { categorySlug, resolveCategoryName, validateCategoryName } from '../utils/productCategory';
 import { ProductWarrantiesEditor } from './ProductWarrantiesEditor';
 import type { ProductApprovalInfo } from './ProductTable';
-import type { ProductChangeSummary } from '../types/productApproval.types';
+import type { ProductChangeSummary, ProductCostSummary } from '../types/productApproval.types';
 import { getApprovalPermissions } from '../utils/productApproval';
 import { useProductWarranties } from '../hooks/useProductWarranties';
 import { warrantiesComplete } from '../../item-management/utils/itemWarranty';
@@ -41,12 +43,29 @@ import {
   validateAccessoryForm,
   type AccessoryForm,
 } from '../utils/accessoryForm';
+import { useEditCosts } from '../hooks/useEditCosts';
+import { ProductCostingSection } from './ProductCostingSection';
+import { ProfitBreakdown } from './ProfitBreakdown';
+import { rupees } from '../../finance/utils/money';
+import {
+  costEntriesChanged,
+  costPreviewRows,
+  costPreviewWarnings,
+  dropCostEntryErrors,
+  previewCosts,
+  summarizeCostEntries,
+  toCostEntryRequests,
+  toCostEntryRows,
+  toCostSummary,
+  validateCostEntries,
+} from '../utils/productCosting';
 
 interface EditProductModalProps {
   product: ProductResponse | null;
   onClose: () => void;
   /** `changes` is what was edited (sent to Admin L2 when the product is approved). */
-  onSubmit: (id: number, payload: UpdateProductRequest, changes: ProductChangeSummary[]) => Promise<boolean>;
+  /** `costSummary`: one unit's cost and profit after the changes (only for those who can see costs). */
+  onSubmit: (id: number, payload: UpdateProductRequest, changes: ProductChangeSummary[], costSummary?: ProductCostSummary) => Promise<boolean>;
   isSubmitting: boolean;
   /** Backend 400 field errors from the last save (e.g. `warranties[0].title`). */
   serverFieldErrors?: Record<string, string>;
@@ -54,6 +73,8 @@ interface EditProductModalProps {
   approval?: ProductApprovalInfo;
   /** Every product, to pick the parents of an accessory from. */
   products?: ProductResponse[];
+  /** Existing categories to pick from; a new name creates one. */
+  categories?: readonly ProductCategory[];
 }
 
 export const EditProductModal: React.FC<EditProductModalProps> = ({
@@ -64,7 +85,9 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
   serverFieldErrors,
   approval,
   products = [],
+  categories = [],
 }) => {
+  const [category, setCategory] = useState('');
   const [formData, setFormData] = useState<UpdateProductRequest>({
     title: '',
     tagline: '',
@@ -91,6 +114,10 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
   // Components keep the warranty snapshot stored with the product until an item is changed or refreshed.
   const [components, setComponents] = useState<ComponentFormRow[]>([]);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+
+  // Costs: the saved cost sheet, filled into the component rows and extra costs once loaded
+  const { canSeeCosts, canEditCosts, incomeTaxRate, savedSheet, savedCosts, costRows, setCostRows } = useEditCosts(product, setComponents);
+
   // Saved warranties keep their id; warranties of newly selected items are copied in (see useProductWarranties).
   const { warranties, onChange: handleWarrantiesChange, reset: resetWarranties } = useProductWarranties(components, setFieldErrors);
   // Show backend field errors from the latest save inline (state adjusted during render, not in an effect).
@@ -118,12 +145,16 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
         lastUpdateDescription: '',
         specifications: product.specifications ? product.specifications.map(s => ({ specKey: s.specKey, specValue: s.specValue })) : [],
       });
+      setCategory(product.category?.name ?? '');
       setTax(toTaxForm(product));
       setAccessory(toAccessoryForm(product));
       resetWarranties(toProductWarrantyForms(product.warranties));
-      setComponents(toComponentRows(product.components));
+      setComponents(toComponentRows(product.components, savedCosts));
+      setCostRows(toCostEntryRows(savedSheet?.costEntries));
       setFieldErrors({});
     }
+    // The saved costs are filled in when they arrive (above); reopening the same product must not reset typed costs
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [product, resetWarranties]);
 
   if (!product) return null;
@@ -143,6 +174,9 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
 
     if ((formData.title || '').trim() !== (product.title || '').trim()) {
       changes.push({ label: 'Title', oldVal: product.title, newVal: formData.title });
+    }
+    if (categorySlug(category) !== categorySlug(product.category?.name ?? '')) {
+      changes.push({ label: 'Category', oldVal: product.category?.name || 'None', newVal: resolveCategoryName(categories, category) || 'None' });
     }
     if ((formData.tagline || '').trim() !== (product.tagline || '').trim()) {
       changes.push({ label: 'Tagline', oldVal: product.tagline || 'None', newVal: formData.tagline || 'None' });
@@ -188,11 +222,20 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
 
     // Check components (items + their warranty snapshots)
     const originalComponents = product.components ?? [];
-    if (componentsChanged(originalComponents, components)) {
+    if (componentsChanged(originalComponents, components, savedCosts)) {
       changes.push({
         label: 'Components & item warranties',
         oldVal: summarizeComponents(originalComponents),
-        newVal: describeComponentChanges(originalComponents, components).join('\n') || summarizeComponents(components),
+        newVal: describeComponentChanges(originalComponents, components, savedCosts).join('\n') || summarizeComponents(components),
+      });
+    }
+
+    // Extra costs (compared only once the saved ones are known)
+    if (savedSheet && costEntriesChanged(savedSheet.costEntries, costRows)) {
+      changes.push({
+        label: 'Extra costs',
+        oldVal: summarizeCostEntries(savedSheet.costEntries, rupees),
+        newVal: summarizeCostEntries(costRows.map((row) => ({ label: row.label, amount: row.amount || 0 })), rupees),
       });
     }
 
@@ -214,10 +257,20 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
 
   const changedFields = getChangedFields();
   const taxErrors = validateTaxForm(tax);
+  const categoryError = validateCategoryName(category);
+  const costPreview = previewCosts({
+    price: formData.price,
+    discountPercentage: formData.discountPercentage,
+    gstRate: tax.gstRate,
+    components: components.map((row) => ({ quantity: row.quantity, unitCost: row.unitCost })),
+    extraCosts: costRows.map((row) => row.amount),
+    incomeTaxRate: incomeTaxRate ?? 0,
+  });
 
   // Button is only enabled if fields are valid AND at least one modification is caught
   const isFormValid =
     formData.title?.trim() !== '' &&
+    categoryError === null &&
     Number(formData.price) >= 0 &&
     Number(formData.stockQuantity) >= 0 &&
     components.every((row) => row.itemId !== null && !!row.quantity.trim()) &&
@@ -253,6 +306,7 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
       ...validateComponentRows(components, componentLimit),
       ...validateProductWarranties(warranties),
       ...validateAccessoryForm(accessory),
+      ...(canEditCosts ? validateCostEntries(costRows) : {}),
     };
     setFieldErrors(clientErrors);
     if (Object.keys(clientErrors).length > 0) return;
@@ -261,9 +315,12 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
     // Components: sent only when changed (the list replaces them all); omitted otherwise so stored snapshots stay untouched.
     setPendingPayload({
       ...formData,
+      categoryName: resolveCategoryName(categories, category),
       ...toGstFields(tax),
       warranties: toProductWarrantyRequests(warranties, true),
-      ...(componentsChanged(product.components ?? [], components) ? { components: toComponentRequests(components) } : {}),
+      ...(componentsChanged(product.components ?? [], components, savedCosts) ? { components: toComponentRequests(components, canEditCosts) } : {}),
+      // Extra costs: sent only when changed (the list replaces them all); omitted otherwise
+      ...(canEditCosts && savedSheet && costEntriesChanged(savedSheet.costEntries, costRows) ? { costEntries: toCostEntryRequests(costRows) } : {}),
       ...toAccessoryFields(accessory),
     });
     setShowPreviewModal(true);
@@ -272,11 +329,10 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
   const handleConfirmSubmit = async () => {
     if (!pendingPayload) return;
 
-    const success = await onSubmit(
-      product.id,
-      pendingPayload,
-      changedFields.map((f) => ({ label: f.label, oldValue: String(f.oldVal), newValue: String(f.newVal) }))
-    );
+    const changes = changedFields.map((f) => ({ label: f.label, oldValue: String(f.oldVal), newValue: String(f.newVal) }));
+    // The approver sees one unit's cost and profit once any cost has been entered
+    const costSummary = canSeeCosts ? toCostSummary(costPreview) : undefined;
+    const success = await (costSummary ? onSubmit(product.id, pendingPayload, changes, costSummary) : onSubmit(product.id, pendingPayload, changes));
     
     if (success) {
       setShowPreviewModal(false);
@@ -339,6 +395,14 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
                 />
               </div>
             </div>
+
+            <ProductCategoryField
+              value={category}
+              onChange={setCategory}
+              categories={categories}
+              error={fieldErrors.categoryName ?? categoryError}
+              disabled={isSubmitting}
+            />
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div>
@@ -466,6 +530,18 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
               disabled={isSubmitting}
             />
 
+            {canSeeCosts && (
+              <ProductCostingSection
+                rows={costRows}
+                setRows={setCostRows}
+                errors={fieldErrors}
+                onClearErrors={() => setFieldErrors((prev) => dropCostEntryErrors(prev))}
+                preview={costPreview}
+                incomeTaxRate={incomeTaxRate}
+                disabled={isSubmitting || !savedSheet}
+              />
+            )}
+
             <ProductWarrantiesEditor items={warranties} onChange={handleWarrantiesChange} errors={fieldErrors} disabled={isSubmitting} />
 
             <ProductAccessorySection
@@ -572,6 +648,15 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
                 gst={pendingPayload}
                 title={needsApproval ? 'What the invoice will show per unit once approved' : 'What the invoice will show per unit'}
               />
+              {canSeeCosts && (
+                <ProfitBreakdown
+                  title={needsApproval ? 'What one unit will earn once approved' : 'What one unit will earn'}
+                  rows={costPreviewRows(costPreview)}
+                  profit={costPreview.profit}
+                  incomeTaxRate={incomeTaxRate}
+                  warnings={costPreviewWarnings(costPreview)}
+                />
+              )}
             </div>
 
             <div className="flex items-center justify-end gap-2 px-6 py-4 border-t border-black/10 dark:border-white/10 bg-black/[0.01]">

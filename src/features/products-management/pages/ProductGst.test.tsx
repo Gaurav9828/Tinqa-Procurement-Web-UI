@@ -5,6 +5,7 @@ import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import alertReducer from '../../../store/alertSlice';
 import { signInAsSuperAdmin } from '../../../test/access';
+import { fillCategory } from './categoryTestUtil';
 import { CreateProductModal } from '../components/CreateProductModal';
 import type { CreateProductRequest } from '../types/product.types';
 
@@ -41,6 +42,7 @@ describe('product GST (price includes GST, charged by place of supply)', () => {
     await user.type(screen.getByPlaceholderText('0.00'), '59999');
     await user.selectOptions(screen.getByLabelText('GST rate *'), '18');
     await user.type(screen.getByLabelText('HSN / SAC code *'), '9405');
+    await fillCategory(user, 'Spare parts');
 
     const split = within(gst()).getByRole('region', { name: 'Invoice split per unit' });
     expect(within(split).getByTestId('intra-taxable')).toHaveTextContent('₹50,846.62');

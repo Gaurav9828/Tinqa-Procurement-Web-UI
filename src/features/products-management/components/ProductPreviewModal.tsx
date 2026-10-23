@@ -6,6 +6,7 @@ import type { ProductResponse } from '../types/product.types';
 import { describeGst } from '../utils/productTax';
 import { ProductTaxBreakdown } from './ProductTaxBreakdown';
 import { describeAccessory } from '../utils/accessoryForm';
+import { ProductProfitPanel } from './ProductProfitPanel';
 
 interface ProductPreviewModalProps {
   product: ProductResponse | null;
@@ -33,6 +34,11 @@ export const ProductPreviewModal: React.FC<ProductPreviewModalProps> = ({ produc
         <div className="p-6 space-y-4 overflow-y-auto flex-1">
           {product.tagline && (
             <p className="text-gray-500 dark:text-gray-400 italic font-medium">{product.tagline}</p>
+          )}
+          {product.category && (
+            <p className="text-gray-500 dark:text-gray-400">
+              Category: <span className="font-medium text-black dark:text-white">{product.category.name}</span>
+            </p>
           )}
 
           <div className="flex items-center justify-between gap-3 p-3 bg-black/[0.02] dark:bg-white/[0.02] border border-black/10 dark:border-white/10 rounded-xl">
@@ -69,6 +75,8 @@ export const ProductPreviewModal: React.FC<ProductPreviewModalProps> = ({ produc
           )}
 
           {product.components.length > 0 && <ComponentsPreview components={product.components} />}
+
+          <ProductProfitPanel productId={product.id} />
 
           {product.accessory && (
             <div data-testid="preview-accessory">

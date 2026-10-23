@@ -14,6 +14,7 @@ import { axiosClient } from '../../../api/axiosClient';
 import type { ItemResponse, ItemWarrantyResponse } from '../../item-management/types/item.types';
 import type { ProductComponentRequest, ProductComponentResponse, ProductResponseDto } from '../types/product.types';
 import { fillGst } from './gstTestUtil';
+import { DIORAMAS, fillCategory } from './categoryTestUtil';
 import { signInAsSuperAdmin } from '../../../test/access';
 
 /**
@@ -91,6 +92,7 @@ const toComponents = (requests: ProductComponentRequest[]): ProductComponentResp
 const LAPTOP: ProductResponseDto = {
   id: 1,
   title: 'Laptop X',
+  category: DIORAMAS,
   price: 59999,
   hsnSac: '8471',
   gstRate: 18,
@@ -133,6 +135,7 @@ const installBackends = () => {
     throw httpError(404, { success: false, message: 'Not found' });
   });
   ecom.get.mockImplementation(async (url: string) => {
+    if (url === '/admin/product-categories') return ok([DIORAMAS]);
     if (url === '/products') return ok(structuredClone(db));
     throw httpError(405, { success: false, message: 'Method not allowed' });
   });
@@ -191,6 +194,7 @@ const openCreate = async (user: User) => {
   expect(screen.getByTestId('new-product-stock')).toHaveTextContent('1'); // fixed on creation
   await user.type(screen.getByPlaceholderText('Image Address'), 'https://cdn.tinqa.com/y.png');
   await fillGst(user);
+  await fillCategory(user);
 };
 const submitCreate = (user: User) => user.click(screen.getAllByRole('button', { name: 'Create Product' }).at(-1)!);
 

@@ -16,6 +16,7 @@ import { toProduct } from '../utils/productMapper';
  *   POST   /products              create             (ADMIN_L1/L2)
  *   PUT    /products/{id}         full update        (ADMIN_L1/L2)
  *   PATCH  /products/{id}/status  { isEnabled }      (ADMIN_L1/L2)
+ *   PUT    /products/display-order { productIds }   storefront order (PRODUCT_PUBLISH)
  * There is no GET or DELETE on /products/{id} — calling them returns 405 METHOD_NOT_ALLOWED.
  */
 const BASE_URL = '/products';
@@ -34,6 +35,15 @@ export const productApi = {
 
     updateProductStatus: async (id: number, payload: UpdateProductStatusRequest): Promise<ApiResponse<unknown>> => {
         const response = await ecommerceAxiosClient.patch<ApiResponse<unknown>>(`${BASE_URL}/${id}/status`, payload);
+        return response.data;
+    },
+
+    /**
+     * Shows these products in this order (e.g. one category's, first to last). They swap the positions they already
+     * hold, so other products keep theirs. GET /products and /products/active list products in this order.
+     */
+    reorderProducts: async (productIds: number[]): Promise<ApiResponse<unknown>> => {
+        const response = await ecommerceAxiosClient.put<ApiResponse<unknown>>(`${BASE_URL}/display-order`, { productIds });
         return response.data;
     },
 
