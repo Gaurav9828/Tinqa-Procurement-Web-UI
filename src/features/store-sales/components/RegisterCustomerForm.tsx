@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Loader2, UserPlus } from 'lucide-react';
-import { CommonInput } from '../../../components/ui/FormInputs';
+import { CommonInput, CommonSelect } from '../../../components/ui/FormInputs';
+import { GENDER_OPTIONS } from '../../../types/common.types';
 import { SOLID_TONE } from '../../../components/ui/actionTones';
 import type { StoreCustomerRequest } from '../types/storeSale.types';
 import { emptyCustomer, isValidEmail, validateCustomer, type FieldErrors } from '../utils/storeSale.utils';
@@ -30,7 +31,7 @@ export const RegisterCustomerForm: React.FC<Props> = ({ initialContact = '', isS
   const [submitted, setSubmitted] = useState(false);
   const verification = useEmailVerification(storeEmailVerificationApi, form.email);
   const errors: FieldErrors = submitted ? validateCustomer(form) : {};
-  const set = (field: keyof StoreCustomerRequest) => (event: React.ChangeEvent<HTMLInputElement>) => setForm({ ...form, [field]: event.target.value });
+  const set = (field: keyof StoreCustomerRequest) => (event: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setForm({ ...form, [field]: event.target.value });
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -56,6 +57,7 @@ export const RegisterCustomerForm: React.FC<Props> = ({ initialContact = '', isS
           maxLength={255}
         />
         <CommonInput label="Date of birth" required type="date" value={form.dob} onChange={set('dob')} error={errors.dob} />
+        <CommonSelect label="Gender" required options={GENDER_OPTIONS} placeholder="Select gender" value={form.gender} onChange={set('gender')} error={errors.gender} />
         <div className="sm:col-span-3 space-y-2">
           <EmailVerificationPanel verification={verification} canSend={isValidEmail(form.email)} whose="the customer" />
           <p className="px-1 text-[11px] text-gray-500 dark:text-neutral-400">

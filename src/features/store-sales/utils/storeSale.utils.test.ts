@@ -13,7 +13,7 @@ describe('store sale utils', () => {
   it('reports every sign-up problem at once, with the storefront rules, and asks for no password', () => {
     const errors = validateCustomer(emptyCustomer(), new Date('2026-10-21T00:00:00'));
     expect(Object.keys(errors)).toEqual(
-      expect.arrayContaining(['firstName', 'lastName', 'email', 'phoneNumber', 'dob', 'address.recipientName', 'address.postalCode'])
+      expect.arrayContaining(['firstName', 'lastName', 'email', 'phoneNumber', 'dob', 'gender', 'address.recipientName', 'address.postalCode'])
     );
     expect(errors).not.toHaveProperty('password');
     const valid = {
@@ -23,6 +23,7 @@ describe('store sale utils', () => {
       email: 'walk@example.com',
       phoneNumber: '9876543210',
       dob: '1990-01-01',
+      gender: 'MALE' as const,
       address: { ...emptyCustomer().address, recipientName: 'Walk In', phoneNumber: '9876543210', addressLine1: '12 Market Road', city: 'Pune', state: 'Maharashtra', postalCode: '411001' },
     };
     expect(validateCustomer(valid, new Date('2026-10-21T00:00:00'))).toEqual({});

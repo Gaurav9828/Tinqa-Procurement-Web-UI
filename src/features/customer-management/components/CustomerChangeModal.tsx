@@ -2,7 +2,8 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Loader2, X } from 'lucide-react';
 import type { CustomerDetail, CustomerEditForm, CustomerField } from '../types/customer.types';
 import { FIELD_LABELS, REASON_MAX_LENGTH, changedFields, toEditForm, validateEditForm } from '../utils/customer.utils';
-import { CommonInput, CommonTextArea } from '../../../components/ui/FormInputs';
+import { CommonInput, CommonSelect, CommonTextArea } from '../../../components/ui/FormInputs';
+import { GENDER_OPTIONS } from '../../../types/common.types';
 import { SOLID_TONE } from '../../../components/ui/actionTones';
 
 /**
@@ -31,7 +32,7 @@ export const CustomerChangeModal: React.FC<{
     return () => window.removeEventListener('keydown', onKey);
   }, [busy, onClose]);
 
-  const set = (key: keyof CustomerEditForm) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
+  const set = (key: keyof CustomerEditForm) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
     setForm((prev) => ({ ...prev, [key]: e.target.value }));
 
   const submit = async (e: React.FormEvent) => {
@@ -74,6 +75,7 @@ export const CustomerChangeModal: React.FC<{
             <CommonInput label="Last name" value={form.lastName} onChange={set('lastName')} maxLength={50} error={shown('lastName')} />
             <CommonInput label="Phone number" type="tel" value={form.phoneNumber} onChange={set('phoneNumber')} maxLength={15} error={shown('phoneNumber')} />
             <CommonInput label="Date of birth" type="date" value={form.dob} onChange={set('dob')} error={shown('dob')} />
+            <CommonSelect label="Gender" options={GENDER_OPTIONS} value={form.gender} onChange={set('gender')} error={shown('gender')} />
           </div>
           <p className="text-[11px] text-gray-500">
             The email address is the customer's sign-in and cannot be changed here.

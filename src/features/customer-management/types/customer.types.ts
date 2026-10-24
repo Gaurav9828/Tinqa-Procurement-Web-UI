@@ -1,3 +1,4 @@
+import type { Gender } from '../../../types/common.types';
 import type { StoreCustomerAddress } from '../../store-sales/types/storeSale.types';
 
 /** A row of GET /admin/customers. */
@@ -32,6 +33,7 @@ export interface CustomerDetail {
   email: string;
   phoneNumber: string;
   dob: string | null;
+  gender: Gender;
   status: string;
   emailVerified: boolean;
   emailVerifiedAt: string | null;
@@ -94,11 +96,12 @@ export interface CustomerEditForm {
   lastName: string;
   phoneNumber: string;
   dob: string;
+  gender: string;
   reason: string;
 }
 
 /** Field names the Procurement change request accepts (CustomerChangeRequest.CustomerField). */
-export type CustomerField = 'FIRST_NAME' | 'MIDDLE_NAME' | 'LAST_NAME' | 'PHONE_NUMBER' | 'DOB';
+export type CustomerField = 'FIRST_NAME' | 'MIDDLE_NAME' | 'LAST_NAME' | 'PHONE_NUMBER' | 'DOB' | 'GENDER';
 
 export interface CustomerChangeRequestPayload {
   customerId: number;

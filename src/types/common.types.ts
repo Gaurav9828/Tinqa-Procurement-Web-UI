@@ -58,6 +58,12 @@ import type { UnifiedApprovalItem } from "../features/approvals/types/approval.t
   // This is now a mutable array that matches your specific type
   export const GENDERS: Gender[] = ['MALE', 'FEMALE', 'OTHER'];
 
+  /** "Female" for FEMALE; "—" when unknown. */
+  export const genderLabel = (gender?: string | null): string =>
+    gender && (GENDERS as string[]).includes(gender) ? gender.charAt(0) + gender.slice(1).toLowerCase() : '—';
+
+  export const GENDER_OPTIONS = GENDERS.map((value) => ({ value, label: genderLabel(value) }));
+
   export interface ApiResponse<T> {
     success: boolean;
     message: string;

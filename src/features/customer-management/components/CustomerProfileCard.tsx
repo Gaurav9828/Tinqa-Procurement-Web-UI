@@ -5,6 +5,7 @@ import { formatStatus } from '../utils/customer.utils';
 import { CartBadge, ClosedBadge } from './CustomerTable';
 import { formatCurrency, formatDateTime } from '../../order-tracking/utils/orderTracking.utils';
 import { SOLID_TONE } from '../../../components/ui/actionTones';
+import { genderLabel } from '../../../types/common.types';
 
 const Field: React.FC<{ label: string; children: React.ReactNode }> = ({ label, children }) => (
   <div className="min-w-0">
@@ -81,6 +82,7 @@ export const CustomerProfileCard: React.FC<{
         <Field label="Email">{customer.emailVerified ? `Verified ${formatDateTime(customer.emailVerifiedAt)}` : 'Not verified'}</Field>
         <Field label="Password">{customer.passwordSetupPending ? 'Not set yet (welcome link sent)' : 'Set'}</Field>
         <Field label="Date of birth">{customer.dob ?? '—'}</Field>
+        <Field label="Gender">{genderLabel(customer.gender)}</Field>
         <Field label="Reward points">{customer.rewardPoints ?? 0}</Field>
         <Field label="Joined">
           {formatDateTime(customer.registeredAt)}

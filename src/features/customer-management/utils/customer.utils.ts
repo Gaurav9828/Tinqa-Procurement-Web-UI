@@ -25,6 +25,7 @@ export const FIELD_LABELS: Record<CustomerField, string> = {
   LAST_NAME: 'Last name',
   PHONE_NUMBER: 'Phone number',
   DOB: 'Date of birth',
+  GENDER: 'Gender',
 };
 
 // Same rules as the backends (CustomerUpdateRequestDTO), so mistakes show before a request is sent.
@@ -37,6 +38,7 @@ const FORM_KEYS: Record<CustomerField, keyof CustomerEditForm> = {
   LAST_NAME: 'lastName',
   PHONE_NUMBER: 'phoneNumber',
   DOB: 'dob',
+  GENDER: 'gender',
 };
 
 export const toEditForm = (customer: CustomerDetail): CustomerEditForm => ({
@@ -45,6 +47,7 @@ export const toEditForm = (customer: CustomerDetail): CustomerEditForm => ({
   lastName: customer.lastName ?? '',
   phoneNumber: customer.phoneNumber ?? '',
   dob: customer.dob ?? '',
+  gender: customer.gender ?? 'MALE',
   reason: '',
 });
 

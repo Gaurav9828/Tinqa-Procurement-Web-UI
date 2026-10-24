@@ -27,6 +27,8 @@ export interface CustomerUpdatePayload {
   lastName?: string;
   phoneNumber?: string;
   dob?: string;
+  /** MALE, FEMALE or OTHER. */
+  gender?: string;
   reason: string;
 }
 

@@ -44,6 +44,7 @@ export const emptyCustomer = (): StoreCustomerRequest => ({
   email: '',
   phoneNumber: '',
   dob: '',
+  gender: '',
   address: emptyAddress(),
 });
 
@@ -86,6 +87,7 @@ export const validateCustomer = (form: StoreCustomerRequest, today: Date = new D
     if (Number.isNaN(dob.getTime()) || dob > today) errors.dob = 'Date of birth cannot be in the future.';
     else if (dob < oldest) errors.dob = `Date of birth must be within the last ${MAX_AGE_YEARS} years.`;
   }
+  if (!form.gender) errors.gender = 'Gender is required.';
   return { ...errors, ...validateAddress(form.address) };
 };
 

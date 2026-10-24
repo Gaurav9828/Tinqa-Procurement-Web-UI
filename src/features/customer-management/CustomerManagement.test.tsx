@@ -33,7 +33,7 @@ const SUMMARY: CustomerSummary = {
 
 const CUSTOMER: CustomerDetail = {
   id: 7, uuid: 'u-7', firstName: 'Asha', middleName: null, lastName: 'Verma', name: 'Asha Verma', email: 'asha@example.com',
-  phoneNumber: '+91 9876543210', dob: '1995-05-17', status: 'ACTIVE', emailVerified: true, emailVerifiedAt: '2026-01-05T10:00:00',
+  phoneNumber: '+91 9876543210', dob: '1995-05-17', gender: 'MALE', status: 'ACTIVE', emailVerified: true, emailVerifiedAt: '2026-01-05T10:00:00',
   passwordSetupPending: false, rewardPoints: 0, registeredBy: null, registeredAt: '2026-01-05T10:00:00', updatedAt: '2026-01-05T10:00:00',
   addresses: [], orderCount: 1, totalSpent: 2360, lastOrderAt: '2026-10-01T09:00:00', cartUnits: 3, cartValue: 600,
   lastCartActivityAt: '2026-10-20T18:00:00', openTicketCount: 0,
@@ -136,10 +136,12 @@ describe('Customer Management', () => {
     const first = within(dialog).getByLabelText('First name');
     await user.clear(first);
     await user.type(first, 'Ashaa');
+    expect(within(dialog).getByLabelText('Gender')).toHaveValue('MALE');
+    await user.selectOptions(within(dialog).getByLabelText('Gender'), 'FEMALE');
     await user.type(within(dialog).getByLabelText('Reason'), 'Name misspelt');
     await user.click(within(dialog).getByRole('button', { name: 'Save changes' }));
 
-    await waitFor(() => expect(api.update).toHaveBeenCalledWith(7, { firstName: 'Ashaa', reason: 'Name misspelt' }));
+    await waitFor(() => expect(api.update).toHaveBeenCalledWith(7, { firstName: 'Ashaa', gender: 'FEMALE', reason: 'Name misspelt' }));
     expect(await screen.findByRole('heading', { name: 'Ashaa Verma' })).toBeInTheDocument();
     expect(within(screen.getByRole('region', { name: 'Orders' })).getByRole('link', { name: '#ORD-1' })).toHaveAttribute('href', '/order-tracking/ORD-1');
   });

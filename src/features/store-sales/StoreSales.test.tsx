@@ -143,6 +143,7 @@ describe('Store sales', () => {
     await user.type(within(form).getByLabelText('Last name'), 'In');
     await user.type(within(form).getByLabelText('Mobile number'), '9876543210');
     await user.type(within(form).getByLabelText('Date of birth'), '1990-01-01');
+    await user.selectOptions(within(form).getByLabelText('Gender'), 'FEMALE');
     await user.type(within(form).getByLabelText('Recipient name'), 'Walk In');
     await user.type(within(form).getByLabelText('Recipient mobile'), '9876543210');
     await user.type(within(form).getByLabelText('Address line 1'), '12 Market Road');
@@ -163,7 +164,7 @@ describe('Store sales', () => {
     await user.click(within(form).getByRole('button', { name: /Register customer/ }));
 
     await waitFor(() =>
-      expect(api.registerCustomer).toHaveBeenCalledWith(expect.objectContaining({ email: 'walk@example.com', emailVerificationToken: 'verified-token' }))
+      expect(api.registerCustomer).toHaveBeenCalledWith(expect.objectContaining({ email: 'walk@example.com', gender: 'FEMALE', emailVerificationToken: 'verified-token' }))
     );
   });
 

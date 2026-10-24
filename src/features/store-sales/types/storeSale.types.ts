@@ -1,6 +1,7 @@
 // Mirrors the Ecommerce BE store-sale DTOs (com.tinqa.ecommerce.dto.store.*).
 // A selling agent registers a walk-in customer and books their order. Cash the agent received is booked at once and
 // the order confirmed; the customer is emailed the receipt and, when new, a link to set their password.
+import type { Gender } from '../../../types/common.types';
 import type { OrderItemSummary, OrderPaymentAttempt } from '../../order-tracking/types/orderTracking.types';
 
 /** StoreCustomerDTO.AddressDTO */
@@ -55,6 +56,8 @@ export interface StoreCustomerRequest {
   phoneNumber: string;
   /** yyyy-MM-dd */
   dob: string;
+  /** Empty until the agent picks one. */
+  gender: Gender | '';
   address: StoreAddressRequest;
   /** From verifying `email` with the code sent there. */
   emailVerificationToken?: string;
