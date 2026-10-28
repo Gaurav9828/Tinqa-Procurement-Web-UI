@@ -1,6 +1,7 @@
 import type { ApprovalStatus, OrderStatus } from "../../../types/common.types";
 import type { ProductApprovalResponse } from "../../products-management/types/productApproval.types";
 import type { EmployeeResponse } from "../../employee-management/types/employee.types";
+import type { OrderApprovalType } from "../utils/orderQueues";
 
 export interface ProfileApprovalRequest {
   requestId: number;
@@ -41,6 +42,7 @@ export interface DocumentApprovalItem {
 
 export interface StocksApprovalRequest {
   id: number;
+  stockIdentityNumber?: string;
   batchNumber: string;
   orderNumber: string;
   dealerName: string;
@@ -73,6 +75,13 @@ export interface OrdersApprovalRequest {
   orderDate: string;
   approvalStatus?: ApprovalStatus;
   createdBy: string;
+  createdAt?: string;
+  orderStatus?: OrderStatus;
+  unitPrice?: number;
+  expectedDelivery?: string | null;
+  additionalInfo?: Record<string, unknown> | null;
+  raisedByDealer?: boolean;
+  dealerChangePending?: boolean;
 }
 
 
@@ -85,7 +94,7 @@ export type UnifiedApprovalItem =
   | (DocumentApprovalItem & { approvalType: 'DOCUMENT' } )
   | (ProfileApprovalRequest & { approvalType: 'PROFILE' })
   | (StocksApprovalRequest & { approvalType: 'STOCKS'})
-  | (OrdersApprovalRequest & { approvalType: 'ORDERS'})
+  | (OrdersApprovalRequest & { approvalType: OrderApprovalType })
   | (ProductApprovalResponse & { approvalType: 'PRODUCTS' })
   | (EmployeeResponse & { approvalType: 'EMPLOYEE' });
 

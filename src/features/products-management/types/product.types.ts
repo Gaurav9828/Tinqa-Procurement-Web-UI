@@ -1,3 +1,5 @@
+import type { NewProductUnit } from '../../barcodes/types/barcode.types';
+
 export interface SpecificationDTO {
     specKey: string;
     specValue: string;
@@ -177,13 +179,19 @@ export interface ProductCategory {
 export interface CreateProductRequest extends Partial<ProductGstFields>, AccessoryFields {
     title: string;
     /**
+     * true = save as a draft: only title and category are required, stock stays 0 and nothing is built or sent for
+     * approval. On a draft, false = submit it (full checks, its first unit is built). Omitted = a draft stays a draft.
+     */
+    draft?: boolean;
+    /**
      * An existing category's name (matched ignoring case, spacing and punctuation) or a new one, which the backend
      * creates. Required on create; on update omitted = the category stays as it is.
      */
     categoryName?: string;
     tagline?: string;
     description?: string;
-    price: number;
+    /** Required, except on a draft. */
+    price?: number;
     discountPercentage?: number;
     image1Url?: string;
     image2Url?: string;
@@ -209,6 +217,15 @@ export interface CreateProductRequest extends Partial<ProductGstFields>, Accesso
      * them ([] removes all).
      */
     costEntries?: CostEntryRequest[];
+    /**
+     * Units this change builds (every product unit carries its own barcode and lists the barcode of each piece fitted
+     * into it): on create the first unit, on a stock increase one per added unit. Omitted when stock doesn't go up.
+     */
+    newUnits?: NewProductUnit[];
+    /** When stock goes down: the barcodes of the units taken out. */
+    removedUnits?: string[];
+    /** When stock goes down: their pieces go back to item stock (default) or are scrapped with them (false). */
+    returnItemsToStock?: boolean;
 }
 
 export interface UpdateProductRequest extends Partial<CreateProductRequest> { }
@@ -231,7 +248,8 @@ export interface ProductResponseDto {
     /** Null only if the category row is missing. */
     category?: ProductCategory | null;
     description?: string | null;
-    price: number;
+    /** Null only on a draft that has no price yet. */
+    price: number | null;
     discountPercentage?: number | null;
     hsnSac?: string | null;
     gstRate?: number | null;
@@ -263,6 +281,14 @@ export interface ProductResponseDto {
     accessoryFor?: AccessoryLinkResponse[] | null;
     /** Parent: the accessories offered with it. */
     accessories?: AccessoryLinkResponse[] | null;
+    /** Saved but not finished: disabled, no stock, not sent for approval yet. */
+    draft?: boolean | null;
+    /** 1 for the first version; a new version copied from a sold product counts up. */
+    versionNumber?: number | null;
+    /** The product this version was copied from. */
+    previousVersionId?: number | null;
+    /** On at least one order: its components are locked (changes go into a new version). */
+    sold?: boolean | null;
 }
 
 /** UI product model (normalised from ProductResponseDto by toProduct()). */
@@ -299,4 +325,10 @@ export interface ProductResponse extends Partial<ProductGstFields> {
     accessoryFor: AccessoryLinkResponse[];
     /** Accessories offered with this product. */
     accessories: AccessoryLinkResponse[];
+    /** Saved but not finished: disabled, no stock, not sent for approval yet (see utils/productVersion). */
+    draft: boolean;
+    versionNumber: number;
+    previousVersionId: number | null;
+    /** On at least one order: its components can't change any more; a new version is made instead. */
+    sold: boolean;
 }

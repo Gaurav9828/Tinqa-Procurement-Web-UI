@@ -1,8 +1,9 @@
 import React from 'react';
-import { AlertTriangle, Ban, CheckCircle2, Clock, HelpCircle, Send, XCircle } from 'lucide-react';
+import { AlertTriangle, Ban, CheckCircle2, Clock, FilePen, HelpCircle, Send, XCircle } from 'lucide-react';
 import { APPROVAL_STATE_LABELS, type ProductApprovalState } from '../utils/productApproval';
 
 const STYLES: Record<ProductApprovalState, { tone: string; icon: React.ElementType }> = {
+  DRAFT: { tone: 'bg-slate-500/10 text-slate-600 dark:text-slate-300 border-slate-500/20', icon: FilePen },
   LEGACY: { tone: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20', icon: CheckCircle2 },
   APPROVED: { tone: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20', icon: CheckCircle2 },
   PENDING: { tone: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20', icon: Clock },

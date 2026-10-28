@@ -1,11 +1,21 @@
 {
   "coverage": {
-    "minLinePercent": 70
+    "minLinePercent": 70,
+    "minNewCodePercent": 80
   },
   "dependencies": {
-    "failOn": ["critical", "high"],
+    "failOn": [
+      "critical",
+      "high"
+    ],
     "auditTimeoutSeconds": 90,
-    "allow": []
+    "allow": [
+      {
+        "advisory": "GHSA-w5hq-g745-h8pq",
+        "until": "2027-01-31",
+        "reason": "Not reachable: exceljs 4.4.0 only calls uuid v4() without a buffer; the bug is in v3/v5/v6 with a buffer. Re-check when exceljs ships uuid >= 11."
+      }
+    ]
   },
   "securitySonarRules": [
     "sonarjs/no-clear-text-protocols",
@@ -44,17 +54,84 @@
       "^coverage/"
     ],
     "patterns": [
-      { "id": "private-key", "regex": "-----BEGIN (RSA |EC |DSA |OPENSSH |PGP )?PRIVATE KEY", "message": "Private key committed to the repository" },
-      { "id": "aws-access-key", "regex": "\\b(AKIA|ASIA)[0-9A-Z]{16}\\b", "message": "AWS access key id" },
-      { "id": "google-api-key", "regex": "\\bAIza[0-9A-Za-z_-]{35}\\b", "message": "Google API key" },
-      { "id": "github-token", "regex": "\\b(ghp|gho|ghu|ghs|ghr|github_pat)_[A-Za-z0-9_]{20,}\\b", "message": "GitHub token" },
-      { "id": "slack-token", "regex": "\\bxox[abposr]-[A-Za-z0-9-]{10,}\\b", "message": "Slack token" },
-      { "id": "stripe-live-key", "regex": "\\b(sk|rk)_live_[A-Za-z0-9]{16,}\\b", "message": "Stripe live secret key" },
-      { "id": "razorpay-key", "regex": "\\brzp_live_[A-Za-z0-9]{10,}\\b", "message": "Razorpay live key" },
-      { "id": "jwt", "regex": "\\beyJ[A-Za-z0-9_-]{10,}\\.eyJ[A-Za-z0-9_-]{10,}\\.[A-Za-z0-9_-]{10,}", "message": "JSON Web Token committed to the repository" },
-      { "id": "credentials-in-url", "regex": "[a-z][a-z0-9+.-]*://[^/\\s:@'\"]+:[^/\\s:@'\"]{3,}@", "flags": "i", "message": "Username/password embedded in a URL" },
-      { "id": "hardcoded-credential", "regex": "\\b(api[_-]?key|secret|client[_-]?secret|access[_-]?token|auth[_-]?token|password|passwd)\\b\\s*[:=]\\s*['\"`][^'\"`\\s]{8,}['\"`]", "flags": "i", "message": "Hard-coded credential" },
-      { "id": "public-env-secret", "regex": "^\\s*VITE_[A-Z0-9_]*(SECRET|PASSWORD|PRIVATE|TOKEN|API_KEY)[A-Z0-9_]*\\s*=", "message": "VITE_* variables are baked into the public JS bundle; never put secrets in them" }
+      {
+        "id": "private-key",
+        "regex": "-----BEGIN (RSA |EC |DSA |OPENSSH |PGP )?PRIVATE KEY",
+        "message": "Private key committed to the repository"
+      },
+      {
+        "id": "aws-access-key",
+        "regex": "\\b(AKIA|ASIA)[0-9A-Z]{16}\\b",
+        "message": "AWS access key id"
+      },
+      {
+        "id": "google-api-key",
+        "regex": "\\bAIza[0-9A-Za-z_-]{35}\\b",
+        "message": "Google API key"
+      },
+      {
+        "id": "github-token",
+        "regex": "\\b(ghp|gho|ghu|ghs|ghr|github_pat)_[A-Za-z0-9_]{20,}\\b",
+        "message": "GitHub token"
+      },
+      {
+        "id": "slack-token",
+        "regex": "\\bxox[abposr]-[A-Za-z0-9-]{10,}\\b",
+        "message": "Slack token"
+      },
+      {
+        "id": "stripe-live-key",
+        "regex": "\\b(sk|rk)_live_[A-Za-z0-9]{16,}\\b",
+        "message": "Stripe live secret key"
+      },
+      {
+        "id": "razorpay-key",
+        "regex": "\\brzp_live_[A-Za-z0-9]{10,}\\b",
+        "message": "Razorpay live key"
+      },
+      {
+        "id": "jwt",
+        "regex": "\\beyJ[A-Za-z0-9_-]{10,}\\.eyJ[A-Za-z0-9_-]{10,}\\.[A-Za-z0-9_-]{10,}",
+        "message": "JSON Web Token committed to the repository"
+      },
+      {
+        "id": "credentials-in-url",
+        "regex": "[a-z][a-z0-9+.-]*://[^/\\s:@'\"]+:[^/\\s:@'\"]{3,}@",
+        "flags": "i",
+        "message": "Username/password embedded in a URL"
+      },
+      {
+        "id": "hardcoded-credential",
+        "regex": "\\b(api[_-]?key|secret|client[_-]?secret|access[_-]?token|auth[_-]?token|password|passwd)\\b\\s*[:=]\\s*['\"`][^'\"`\\s]{8,}['\"`]",
+        "flags": "i",
+        "message": "Hard-coded credential"
+      },
+      {
+        "id": "public-env-secret",
+        "regex": "^\\s*VITE_[A-Z0-9_]*(SECRET|PASSWORD|PRIVATE|TOKEN|API_KEY)[A-Z0-9_]*\\s*=",
+        "message": "VITE_* variables are baked into the public JS bundle; never put secrets in them"
+      }
     ]
+  },
+  "newCode": {
+    "baseRefs": [
+      "origin/UAT",
+      "UAT",
+      "origin/main",
+      "main"
+    ]
+  },
+  "e2e": {
+    "maxApiCallsPerPage": 8,
+    "pageBudgets": {
+      "/approvals": {
+        "max": 16,
+        "reason": "The hub counts every approval queue (13 calls, barcode requests and client demos included) when it opens, plus 3 app-shell calls (access, notifications, company profile). Raised from 15 to 16 for the client demos queue (agreed 2026-10-28). One summary endpoint on the backends would bring it to 3 calls."
+      }
+    }
+  },
+  "bundle": {
+    "maxInitialKbGzip": 160,
+    "maxChunkKbGzip": 275
   }
 }

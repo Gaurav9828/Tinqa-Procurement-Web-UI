@@ -3,6 +3,7 @@ import type { ProductApprovalResponse, ProductApprovalSnapshot } from '../types/
 
 /**
  * Where a product stands in the Admin L2 approval workflow.
+ *  - DRAFT:         saved but not finished — not sent for approval yet (no stock, can't go live).
  *  - LEGACY:        active product with no approval request (created before the workflow) — treated as approved.
  *  - NOT_SUBMITTED: inactive product with no request (e.g. submitting failed) — must be submitted to go live.
  *  - PENDING / APPROVED / REJECTED / CANCELLED: the latest CREATE / RESUBMISSION request's status.
@@ -12,6 +13,7 @@ import type { ProductApprovalResponse, ProductApprovalSnapshot } from '../types/
  *  - UNKNOWN:       approval status couldn't be loaded — nothing that would activate the product is allowed.
  */
 export type ProductApprovalState =
+  | 'DRAFT'
   | 'LEGACY'
   | 'NOT_SUBMITTED'
   | 'PENDING'
@@ -24,10 +26,11 @@ export type ProductApprovalState =
   | 'UNKNOWN';
 
 export const getApprovalState = (
-  product: Pick<ProductResponse, 'enabled'>,
+  product: Pick<ProductResponse, 'enabled'> & Partial<Pick<ProductResponse, 'draft'>>,
   latest: ProductApprovalResponse | undefined,
   approvalsLoaded: boolean
 ): ProductApprovalState => {
+  if (product.draft) return 'DRAFT';
   if (latest?.requestType === 'UPDATE') {
     if (latest.status === 'PENDING') return 'UPDATE_PENDING';
     if (latest.status === 'APPROVED') return latest.appliedAt ? 'APPROVED' : 'UPDATE_NOT_APPLIED';
@@ -81,6 +84,7 @@ export const getApprovalPermissions = (state: ProductApprovalState): ApprovalPer
 };
 
 export const APPROVAL_STATE_LABELS: Record<ProductApprovalState, string> = {
+  DRAFT: 'Draft',
   LEGACY: 'Approved',
   NOT_SUBMITTED: 'Not submitted',
   PENDING: 'Pending L2 approval',

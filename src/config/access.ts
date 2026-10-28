@@ -57,6 +57,11 @@ export const PERMISSIONS = [
   'STOCK_UPDATE',
   'STOREFRONT_STOCK_UPDATE',
   'STOCK_APPROVE',
+  // Barcodes: one on every piece of item stock and every product unit, entered with the stock or product change that
+  // creates it and locked once that is approved. Afterwards only a Level 2 Super Admin (BARCODE_APPROVE) changes them
+  'BARCODE_VIEW',
+  'BARCODE_REQUEST',
+  'BARCODE_APPROVE',
   // Customer orders and delivery
   'CUSTOMER_ORDER_VIEW',
   'CUSTOMER_ORDER_UPDATE_STATUS',
@@ -107,13 +112,21 @@ export const PERMISSIONS = [
   'EXPENSE_SUBMIT',
   'EXPENSE_APPROVE',
   'ANALYTICS_VIEW',
+  // Client demos & meetings: planned as a quotation (cost estimate), approved, bills recorded, completion approved and
+  // booked as travel; a completed demo is reopened and corrected only by a Super Admin (DEMO_COMPLETED_EDIT)
+  'DEMO_VIEW',
+  'DEMO_MANAGE',
+  'DEMO_APPROVE',
+  'DEMO_COMPLETED_EDIT',
   // Platform
   'SYSTEM_SETTINGS_MANAGE',
   'AUDIT_LOG_VIEW',
   // In-app user guide and its per-role PDF downloads (Super Admin, Store Manager)
   'USER_GUIDE_VIEW',
-  // Every employee: their own payslips (My Payslips)
+  // Every employee: their own payslips (My Payslips), and the client demos they are tagged on (My Demos)
   'PAYSLIP_VIEW_OWN',
+  'DEMO_VIEW_OWN',
+  'DEMO_EXPENSE_RECORD_OWN',
   // Dealer portal: held only by dealer logins, always limited to the dealer's own records on the server
   'DEALER_PORTAL_VIEW',
   'DEALER_QUOTATION_SUBMIT',
@@ -148,20 +161,24 @@ export const ADMIN_LEVEL_LABELS: Record<AdminLevel, string> = {
   ADMIN_L2: 'Level 2 (approver)',
 };
 
-/** Every approval action. Holding any of them opens the Approvals Hub. */
+/** Every approval action (and reviewing dealers' quotations). Holding any of them opens the Approvals Hub. */
 export const APPROVAL_PERMISSIONS: readonly Permission[] = [
   'EMPLOYEE_APPROVE',
   'EMPLOYEE_PROFILE_CHANGE_APPROVE',
   'DOCUMENT_APPROVE',
   'STOCK_APPROVE',
   'PRODUCT_APPROVAL_DECIDE',
+  'BARCODE_APPROVE',
   'PROCUREMENT_ORDER_APPROVE',
+  // Submitting or cancelling the quotations dealers send in
+  'PROCUREMENT_ORDER_UPDATE_STATUS',
   'REFUND_APPROVE',
   'COMPANY_PROFILE_APPROVE',
   'EXPENSE_APPROVE',
   'DEALER_LOGIN_APPROVE',
   'DEALER_QUOTATION_CHANGE_APPROVE',
   'CUSTOMER_ORDER_PRE_ORDER_APPROVE',
+  'DEMO_APPROVE',
 ];
 
 const PERMISSION_SET: ReadonlySet<string> = new Set(PERMISSIONS);

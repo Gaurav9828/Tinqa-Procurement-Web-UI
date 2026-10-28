@@ -12,6 +12,32 @@ import { productApprovalApi } from '../../products-management/api/productApprova
 import type { ApprovalItem } from '../../../types/common.types';
 import type { EmployeeResponse } from '../../employee-management/types/employee.types';
 import { useNotify } from '../../../hooks/useNotify';
+import { ORDER_APPROVAL_TYPES, ORDER_QUEUES, isOrderApprovalType, isRejectDecision, type OrderApprovalType } from '../utils/orderQueues';
+import type { OrderStatus } from '../../../types/common.types';
+
+/** Holding any of these opens the hub's Requests tab (each queue still loads only for its own decider). */
+export const REQUEST_QUEUE_PERMISSIONS: Permission[] = ['DOCUMENT_APPROVE', 'EMPLOYEE_PROFILE_CHANGE_APPROVE', 'STOCK_APPROVE',
+  'PROCUREMENT_ORDER_APPROVE', 'PROCUREMENT_ORDER_UPDATE_STATUS', 'PRODUCT_APPROVAL_DECIDE', 'EMPLOYEE_APPROVE'];
+
+// The order queues in one call; each order lands in the queue of its status if it waits on staff there
+const loadOrderQueues = async (types: OrderApprovalType[]): Promise<UnifiedApprovalItem[]> => {
+  const orders = await approvalService.getOrdersInStatuses(types.map((type) => ORDER_QUEUES[type].status));
+  return types.flatMap((type) => {
+    const queue = ORDER_QUEUES[type];
+    return orders
+      .filter((order) => order.orderStatus === queue.status && (queue.includes?.(order) ?? true))
+      .map((order) => ({ ...order, approvalType: type }));
+  });
+};
+
+// PENDING orders have their own approval decision; quotations and returns are ordinary status moves
+const decideOrder = (item: ApprovalItem, id: number, payload: ProcessApprovalPayload) =>
+  item.approvalType === 'ORDERS'
+    ? orderApi.processAdminL2Approval(id, payload)
+    : orderApi.updateOrderStatus(id, {
+        status: payload.decision as OrderStatus,
+        reason: isRejectDecision(payload.decision) ? payload.rejectionReason?.trim() : undefined,
+      });
 
 export const useApprovals = () => {
   const [approvals, setApprovals] = useState<UnifiedApprovalItem[]>([]);
@@ -24,8 +50,7 @@ export const useApprovals = () => {
   const notify = useNotify();
 
   const fetchAllApprovals = useCallback(async () => {
-    if (!canAny('DOCUMENT_APPROVE', 'EMPLOYEE_PROFILE_CHANGE_APPROVE', 'STOCK_APPROVE', 'PROCUREMENT_ORDER_APPROVE',
-      'PRODUCT_APPROVAL_DECIDE', 'EMPLOYEE_APPROVE')) return;
+    if (!canAny(...REQUEST_QUEUE_PERMISSIONS)) return;
     // Each queue loads only for someone who can decide it and read the list it comes from (the endpoint's own
     // permission); the rest stay empty
     const ifAllowed = <T,>(permission: Permission | Permission[], load: () => Promise<T[]>): Promise<T[]> =>
@@ -35,11 +60,14 @@ export const useApprovals = () => {
     setIsLoading(true);
 
     try {
+      // Orders waiting on staff (dealer quotations to submit, orders to approve, returns to decide): only the
+      // queues this user decides, and only with PROCUREMENT_ORDER_VIEW to list them
+      const orderTypes = ORDER_APPROVAL_TYPES.filter((type) => can(ORDER_QUEUES[type].decidePermission));
       const [documentsResult, profilesResult, stocksResult, orderResult, productResult, employeeResult] = await Promise.allSettled([
         ifAllowed(['DOCUMENT_APPROVE', 'DOCUMENT_VIEW'], () => approvalService.getPendingDocuments()),
         ifAllowed('EMPLOYEE_PROFILE_CHANGE_APPROVE', () => approvalService.getProfileApprovals()),
         ifAllowed(['STOCK_APPROVE', 'STOCK_VIEW'], () => approvalService.getStocksApprovals()),
-        ifAllowed(['PROCUREMENT_ORDER_APPROVE', 'PROCUREMENT_ORDER_VIEW'], () => approvalService.getOrdersApprovals()),
+        orderTypes.length > 0 ? ifAllowed('PROCUREMENT_ORDER_VIEW', () => loadOrderQueues(orderTypes)) : Promise.resolve([]),
         ifAllowed('PRODUCT_APPROVAL_DECIDE', () =>
           productApprovalApi.getPending().then((res) => (res.success && Array.isArray(res.data) ? res.data : []))
         ),
@@ -77,12 +105,7 @@ export const useApprovals = () => {
       }
 
       if (orderResult.status === 'fulfilled') {
-        mergedApprovals.push(
-          ...orderResult.value.map((order) => ({
-            ...order,
-            approvalType: 'ORDERS' as const,
-          }))
-        );
+        mergedApprovals.push(...orderResult.value);
       }
 
       if (productResult.status === 'fulfilled') {
@@ -129,7 +152,7 @@ export const useApprovals = () => {
   ): Promise<boolean> => {
     const targetId = 'id' in item ? item.id : item.requestId;
 
-    if ((payload.decision === 'REJECTED' || payload.decision === 'CANCELLED') && !payload.rejectionReason?.trim()) {
+    if (isRejectDecision(payload.decision) && !payload.rejectionReason?.trim()) {
       notify.error('A rejection reason is required.');
       return false;
     }
@@ -167,12 +190,12 @@ export const useApprovals = () => {
           notify.error(res, 'Failed to process stock approval.');
           return false;
         }
-      } else if (item.approvalType === 'ORDERS') {
-        const res = await orderApi.processAdminL2Approval(targetId, payload);
+      } else if (isOrderApprovalType(item.approvalType)) {
+        const res = await decideOrder(item, targetId, payload);
         if (res.success) {
-          notify.success(res.message || 'Order L2 approval status updated.');
+          notify.success(res.message || 'Order status updated.');
         } else {
-          notify.error(res, 'Failed to process Order approval.');
+          notify.error(res, 'Failed to update the order.');
           return false;
         }
       } else if (item.approvalType === 'EMPLOYEE') {

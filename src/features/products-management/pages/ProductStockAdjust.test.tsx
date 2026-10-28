@@ -9,10 +9,12 @@ import alertReducer from '../../../store/alertSlice';
 import { GlobalAlertContainer } from '../../../components/ui/GlobalAlertContainer';
 import { ProductManagementPage } from './ProductManagementPage';
 import { ecommerceAxiosClient } from '../../../api/ecommerceAxiosClient';
+import { axiosClient } from '../../../api/axiosClient';
 import { mockDirectEditApprovals } from './directEditApprovals.testUtil';
 import type { ProductResponseDto, SpecificationDTO } from '../types/product.types';
 import { signInAsSuperAdmin } from '../../../test/access';
 import { DIORAMAS } from './categoryTestUtil';
+import { scanUnitBarcodes } from './barcodeTestUtil';
 
 /**
  * Only the HTTP client is mocked, with a tiny fake of the real Ecommerce BE ProductController:
@@ -25,10 +27,11 @@ vi.mock('../../../api/ecommerceAxiosClient', () => ({
   ecommerceAxiosClient: { get: vi.fn(), post: vi.fn(), put: vi.fn(), patch: vi.fn(), delete: vi.fn() },
 }));
 const http = vi.mocked(ecommerceAxiosClient);
-// The product form also loads the Procurement item list (components); keep it off the network.
-vi.mock('../../../api/axiosClient', () => ({
-  axiosClient: { get: vi.fn(async () => ({ data: { success: true, message: 'OK', data: { content: [], totalPages: 0, totalElements: 0 } } })) },
-}));
+// The product form also loads the Procurement item list (components) and unit barcodes (none yet); keep it off the network.
+vi.mock('../../../api/axiosClient', () => ({ axiosClient: { get: vi.fn() } }));
+const procurementGet = async (url: string) => ({
+  data: { success: true, message: 'OK', data: url.startsWith('/v1/barcodes') ? [] : { content: [], totalPages: 0, totalElements: 0 } },
+});
 
 const httpError = (status: number, data: Record<string, unknown>) => {
   const response = { status, statusText: String(status), data, headers: {}, config: { headers: new AxiosHeaders() } } as AxiosResponse;
@@ -140,6 +143,7 @@ beforeEach(() => {
   signInAsSuperAdmin('ADMIN_L1');
   db = [structuredClone(LAMP), structuredClone(PLUG)];
   installFakeBackend();
+  vi.mocked(axiosClient.get).mockImplementation(procurementGet as never);
 });
 
 // ---------- tests ----------
@@ -178,6 +182,9 @@ describe('Product stock add/reduce', () => {
     expect(within(dialog).getByTestId('current-stock')).toHaveTextContent('15');
     await user.type(within(dialog).getByLabelText('Quantity to add'), '5');
     await user.type(within(dialog).getByLabelText(/Reason/), 'Supplier delivery');
+    // Each added unit carries its own barcode
+    expect(within(dialog).getByRole('button', { name: 'Add stock' })).toBeDisabled();
+    await scanUnitBarcodes(user, 'stock-add');
     await user.click(within(dialog).getByRole('button', { name: 'Add stock' }));
 
     await waitFor(() => expect(http.put).toHaveBeenCalledTimes(1));
@@ -199,6 +206,7 @@ describe('Product stock add/reduce', () => {
         { specKey: 'Guide - Setup', specValue: 'Pair with the app' },
       ],
     });
+    expect((body as { newUnits: unknown[] }).newUnits).toHaveLength(5);
     // Round trip: nothing was wiped on the server.
     expect(db[0].specRows).toEqual(LAMP.specRows);
     expect(await screen.findByText('Product updated successfully!')).toBeInTheDocument();
@@ -213,6 +221,25 @@ describe('Product stock add/reduce', () => {
     await user.click(within(dialog).getByRole('button', { name: 'Reduce stock' }));
     await waitFor(() => expect(db[0].stockQuantity).toBe(8));
     expect(db[0].lastUpdateDescription).toBe('Stock reduced: −4 (12 → 8)');
+  });
+
+  it('names the units taken out when they carry barcodes', async () => {
+    // All 12 units in stock have barcodes, so each one taken out is named
+    const units = Array.from({ length: 12 }, (_, i) => ({
+      unit: { id: i + 1, code: `UNIT${String(i).padStart(6, '0')}`, unitType: 'PRODUCT_UNIT', status: 'IN_STOCK', locked: true },
+      parts: [],
+    }));
+    vi.mocked(axiosClient.get).mockImplementation(async (url: string) => ({
+      data: { success: true, message: 'OK', data: url === '/v1/barcodes/products/1' ? units : [] },
+    }));
+    const { user } = renderPage();
+    const dialog = await openDialog(user, 'Reduce');
+    await user.type(within(dialog).getByLabelText('Quantity to remove'), '2');
+    expect(within(dialog).getByRole('button', { name: 'Reduce stock' })).toBeDisabled();
+    await user.click(await within(dialog).findByRole('button', { name: 'Pick 2 from stock' }));
+    await user.click(within(dialog).getByRole('button', { name: 'Reduce stock' }));
+    await waitFor(() => expect(http.put).toHaveBeenCalledTimes(1));
+    expect(http.put.mock.calls[0][1]).toMatchObject({ stockQuantity: 10, removedUnits: ['UNIT000000', 'UNIT000001'] });
   });
 
   it('blocks reducing below zero and sends nothing', async () => {
@@ -258,6 +285,7 @@ describe('Product stock add/reduce', () => {
     const { user } = renderPage();
     const dialog = await openDialog(user, 'Add');
     await user.type(within(dialog).getByLabelText('Quantity to add'), '2');
+    await scanUnitBarcodes(user, 'stock-add');
     await user.click(within(dialog).getByRole('button', { name: 'Add stock' }));
     expect(await screen.findByText('Something went wrong. Please try again later.')).toBeInTheDocument();
     expect(within(dialog).getByLabelText('Quantity to add')).toHaveValue(2);

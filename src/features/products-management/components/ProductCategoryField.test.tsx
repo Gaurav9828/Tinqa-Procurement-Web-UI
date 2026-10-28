@@ -6,7 +6,19 @@ import { configureStore } from '@reduxjs/toolkit';
 import alertReducer from '../../../store/alertSlice';
 import { signInAsSuperAdmin } from '../../../test/access';
 import { CreateProductModal } from './CreateProductModal';
+import { scanUnitBarcodes } from '../pages/barcodeTestUtil';
 import type { CreateProductRequest, ProductCategory } from '../types/product.types';
+
+// The form's lookups (items and stock for the cost sheet, costing settings): empty, these tests are about other fields
+vi.mock('../../item-management/api/itemApi', () => ({
+  itemApi: { getItems: vi.fn().mockResolvedValue({ success: true, data: { content: [], totalElements: 0, totalPages: 0, number: 0, size: 1000 } }), getItemWarranties: vi.fn().mockResolvedValue({ success: true, data: [] }) },
+}));
+vi.mock('../../stock-management/api/stockApi', () => ({
+  stockApi: { getAllStocks: vi.fn().mockResolvedValue({ success: true, data: [] }), getItemAvailability: vi.fn() },
+}));
+vi.mock('../api/costingApi', () => ({
+  costingApi: { getSettings: vi.fn().mockResolvedValue({ success: true, data: { incomeTaxRate: 25 } }), getItemCost: vi.fn() },
+}));
 
 const CATEGORIES: ProductCategory[] = [
   { id: 1, name: 'Dioramas', slug: 'dioramas', sortOrder: 10, productCount: 4 },
@@ -32,6 +44,7 @@ const fillRequired = async (user: ReturnType<typeof userEvent.setup>) => {
 };
 
 const submit = async (user: ReturnType<typeof userEvent.setup>) => {
+  await scanUnitBarcodes(user);
   await user.click(screen.getByRole('button', { name: 'Create Product' }));
   await user.click(await screen.findByRole('button', { name: 'Confirm & Create' }));
 };
@@ -83,6 +96,7 @@ describe('product category picker', () => {
     expect(field).toHaveValue('Spare parts');
     expect(screen.getByText(/New category — "Spare parts" is created when the product is saved/)).toBeInTheDocument();
 
+    await scanUnitBarcodes(user);
     await user.click(screen.getByRole('button', { name: 'Create Product' }));
     expect(screen.getByTestId('preview-category')).toHaveTextContent('Spare partsNew category');
     await user.click(screen.getByRole('button', { name: 'Confirm & Create' }));

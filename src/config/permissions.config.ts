@@ -111,6 +111,14 @@ export const APP_NAVIGATION: NavigationItem[] = [
     requires: ['ITEM_VIEW', 'STOCK_VIEW'],
   },
   {
+    // Trace any piece or product unit by its barcode: batch, purchase order, dealer, the product it is in, its parts
+    id: 'barcodes',
+    label: 'Barcode Tracking',
+    path: '/barcodes',
+    iconName: 'ScanBarcode',
+    requires: ['BARCODE_VIEW'],
+  },
+  {
     id: 'products',
     label: 'Products Management',
     path: '/products',
@@ -138,6 +146,23 @@ export const APP_NAVIGATION: NavigationItem[] = [
     path: '/payments',
     iconName: 'CreditCard',
     requires: ['PAYMENT_VIEW'],
+  },
+  {
+    // Visits to clients for demos and promotions: DEMO_MANAGE plans them step by step and records their bills,
+    // DEMO_APPROVE (Level 2) approves quotations and completions; completions are booked as travel & conveyance
+    id: 'client-demos',
+    label: 'Client Demos & Meetings',
+    path: '/client-demos',
+    iconName: 'Presentation',
+    requires: ['DEMO_VIEW'],
+  },
+  {
+    // Every employee: the client demos they are tagged on, and their own hotel, food and travel bills on them
+    id: 'my-demos',
+    label: 'My Demos',
+    path: '/my-demos',
+    iconName: 'MapPin',
+    requires: ['DEMO_VIEW_OWN'],
   },
   {
     // Every employee: their own payslips of confirmed months

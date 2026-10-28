@@ -7,6 +7,8 @@ export interface CreateStockFromOrderRequest {
   hasTested: boolean;
   dateOfArrival: string;
   additionalInfo?: Record<string, any>;
+  /** One barcode per passed unit, scanned when the stock is received; locked once Admin L2 approves the entry. */
+  barcodes: string[];
 }
 
 export interface StockResponse {
@@ -44,6 +46,8 @@ export interface StockResponse {
   heldUnits?: number;
   /** Value of the approved passed units booked as bought from the dealer (before GST). */
   bookedPurchaseValue?: number;
+  /** Available units received before barcodes were recorded; a Super Admin assigns them theirs. */
+  unitsWithoutBarcode?: number;
 }
 
 /** StockDTOs.ItemAvailabilityResponse — GET /v1/stocks/items/{itemId}/availability. */

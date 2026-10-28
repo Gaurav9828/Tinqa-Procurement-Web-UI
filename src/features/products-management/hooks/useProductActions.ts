@@ -1,7 +1,14 @@
 import { useCallback, useState } from 'react';
 import { productApi } from '../api/productsApi';
 import { productApprovalApi } from '../api/productApprovalApi';
-import type { CreateProductRequest, ProductResponse, UpdateProductRequest, UpdateProductStatusRequest } from '../types/product.types';
+import type { ApiResponse } from '../../../types/common.types';
+import type {
+  CreateProductRequest,
+  ProductResponse,
+  ProductResponseDto,
+  UpdateProductRequest,
+  UpdateProductStatusRequest,
+} from '../types/product.types';
 import type { ProductApprovalDecision, ProductApprovalResponse, ProductChangeSummary, ProductCostSummary } from '../types/productApproval.types';
 import { validateProductPayload } from '../validator/productSecurityValidator';
 import { useApiAction } from '../../../hooks/useApiAction';
@@ -9,9 +16,13 @@ import { useNotify } from '../../../hooks/useNotify';
 import { getApiErrorMessage, getApiFieldErrors } from '../../../utils/apiError';
 import { buildApprovalSnapshot, buildApprovedUpdatePayload, snapshotFromRequest } from '../utils/productApproval';
 import { toProduct } from '../utils/productMapper';
+import type { NewProductUnit } from '../../barcodes/types/barcode.types';
 
 export const PRODUCT_SUBMITTED_MESSAGE =
   'Product created and sent for approval. It stays inactive until it is approved.';
+
+export const DRAFT_SAVED_MESSAGE =
+  'Draft saved. It is marked Draft in the list: open it any time to finish it and submit it for approval.';
 
 export const UPDATE_SUBMITTED_MESSAGE =
   'Changes sent for approval. The product stays as it is until they are approved.';
@@ -29,25 +40,29 @@ export const useProductActions = (onSuccessCallback?: () => void) => {
    * Create = (1) save the product in the Ecommerce backend, always INACTIVE, then (2) send an approval
    * request to the Procurement backend for Admin L2. If (2) fails the product still exists (inactive)
    * and can be submitted later from the product list.
+   * With `draftId`, (1) finishes that draft instead (PUT with `draft: false`, which builds its first unit).
    */
-  const createProduct = async (payload: CreateProductRequest, costSummary?: ProductCostSummary): Promise<boolean> => {
+  const createProduct = async (payload: CreateProductRequest, costSummary?: ProductCostSummary, draftId?: number): Promise<boolean> => {
     setFieldErrors({});
-    const inactive: CreateProductRequest = { ...payload, enabled: false };
+    const inactive: CreateProductRequest = { ...payload, enabled: false, ...(draftId ? { draft: false } : {}) };
     const validationError = validateProductPayload(inactive);
     if (validationError) return reject(validationError);
+    const failure = draftId ? 'Error occurred while submitting the draft.' : 'Error occurred while creating product.';
 
     setIsWorking(true);
     try {
       let created: ProductResponse | null = null;
       try {
-        const res = await productApi.createProduct(inactive);
+        const res = draftId
+          ? ((await productApi.updateProduct(draftId, inactive)) as ApiResponse<ProductResponseDto | null>)
+          : await productApi.createProduct(inactive);
         if (!res.success) {
-          notify.error(res, 'Error occurred while creating product.');
+          notify.error(res, failure);
           return false;
         }
         created = res.data ? toProduct(res.data) : null;
       } catch (err: unknown) {
-        notify.error(err, 'Error occurred while creating product.');
+        notify.error(err, failure);
         captureFieldErrors(err);
         return false;
       }
@@ -76,6 +91,56 @@ export const useProductActions = (onSuccessCallback?: () => void) => {
       }
       onSuccessCallback?.();
       return true;
+    } finally {
+      setIsWorking(false);
+    }
+  };
+
+  /**
+   * Saves unfinished work as a draft: new (`draftId` omitted) or an existing draft. Only title and category are needed;
+   * nothing is built from item stock and nothing is sent for approval.
+   */
+  const saveDraft = async (payload: CreateProductRequest, draftId?: number): Promise<boolean> => {
+    setFieldErrors({});
+    const draft: CreateProductRequest = { ...payload, draft: true, enabled: false, stockQuantity: 0, newUnits: undefined, removedUnits: undefined };
+    const validationError = validateProductPayload(draft, { draft: true });
+    if (validationError) return reject(validationError);
+    return run(
+      async () => {
+        const res = await (draftId ? productApi.updateProduct(draftId, draft) : productApi.createProduct(draft));
+        // Say where to find the draft (not the server's generic text)
+        return res.success ? { ...res, message: '' } : res;
+      },
+      {
+        success: DRAFT_SAVED_MESSAGE,
+        failure: 'Could not save the draft.',
+        onError: captureFieldErrors,
+      }
+    );
+  };
+
+  /**
+   * Copies a sold product into a new draft version whose components can change. Resolves to the new draft (to open
+   * it straight away), or null when it wasn't created.
+   */
+  const createNewVersion = async (product: ProductResponse): Promise<ProductResponse | null> => {
+    setIsWorking(true);
+    try {
+      const res = await productApi.createNewVersion(product.id);
+      if (!res.success || !res.data) {
+        notify.error(res, `Could not create a new version of "${product.title}".`);
+        return null;
+      }
+      const created = toProduct(res.data);
+      notify.success(
+        `Version ${created.versionNumber} of "${product.title}" created as a draft (#${created.id}). Change what you need, then submit it ` +
+          `for approval. Version ${product.versionNumber} keeps selling until the new version is approved and turned on.`
+      );
+      onSuccessCallback?.();
+      return created;
+    } catch (err: unknown) {
+      notify.error(err, `Could not create a new version of "${product.title}".`);
+      return null;
     } finally {
       setIsWorking(false);
     }
@@ -167,14 +232,18 @@ export const useProductActions = (onSuccessCallback?: () => void) => {
       failure: 'Error occurred while updating product status.',
     });
 
-  /** First submission (if the automatic one failed) or resubmission after a rejection. */
-  const submitForApproval = async (product: ProductResponse, isResubmission: boolean): Promise<boolean> =>
+  /**
+   * First submission (if the automatic one failed) or resubmission after a rejection. A rejection gave the product's
+   * pieces back and withdrew its unit barcodes, so a resubmission sends its units in stock again (`units`).
+   */
+  const submitForApproval = async (product: ProductResponse, isResubmission: boolean, units?: NewProductUnit[]): Promise<boolean> =>
     run(
       async () => {
         const res = await productApprovalApi.submit({
           ecommerceProductId: product.id,
           productTitle: product.title,
           snapshot: buildApprovalSnapshot(product),
+          ...(isResubmission ? { units: units ?? [] } : {}),
         });
         // Always tell the user the product stays inactive (not the server's generic text).
         return res.success ? { ...res, message: '' } : res;
@@ -261,6 +330,8 @@ export const useProductActions = (onSuccessCallback?: () => void) => {
     fieldErrors,
     clearFieldErrors,
     createProduct,
+    saveDraft,
+    createNewVersion,
     updateProduct,
     updateProductStatus,
     requestProductUpdate,

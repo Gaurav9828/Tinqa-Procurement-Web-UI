@@ -186,6 +186,18 @@ export const componentsChanged = (original: ProductComponentResponse[], rows: Co
   original.some((c, i) => normalise(c) !== normalise(rows[i])) ||
   rows.some((row) => costChanged(row, costs));
 
+/**
+ * Whether the bill of materials (which items, how many of each per unit) differs. Costs and warranty snapshots don't
+ * count: they can change while units are in stock, the pieces inside them can't.
+ */
+export const billOfMaterialsChanged = (original: ProductComponentResponse[], rows: ComponentFormRow[]): boolean => {
+  const before = new Map(original.map((c) => [c.itemId, Number(c.quantity)]));
+  return (
+    original.length !== rows.length ||
+    rows.some((row) => row.itemId === null || before.get(row.itemId) !== Number(row.quantity))
+  );
+};
+
 /** What saving will do to the components — shown on the edit review. */
 export const describeComponentChanges = (original: ProductComponentResponse[], rows: ComponentFormRow[], costs?: SavedUnitCosts): string[] => {
   const before = new Map(original.map((c) => [c.itemId, c]));

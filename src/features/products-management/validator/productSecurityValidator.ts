@@ -5,8 +5,10 @@ import { isAllowedGstRate } from '../utils/productTax';
 
 export const validateProductPayload = (
   payload: CreateProductRequest | UpdateProductRequest,
-  options: { allowWithoutGst?: boolean } = {}
+  /** `draft`: a draft only needs a title (and category, checked by the form); values given are still checked. */
+  options: { allowWithoutGst?: boolean; draft?: boolean } = {}
 ): string => {
+  const draft = !!options.draft;
   if (!payload) {
     return "Product request payload cannot be null.";
   }
@@ -31,7 +33,8 @@ export const validateProductPayload = (
   }
 
   // 4. Numeric validation
-  if (payload.price === undefined || payload.price === null || !Number.isFinite(Number(payload.price)) || Number(payload.price) < 0) {
+  const priceMissing = payload.price === undefined || payload.price === null;
+  if ((priceMissing && !draft) || (!priceMissing && (!Number.isFinite(Number(payload.price)) || Number(payload.price) < 0))) {
     return "Price must be a valid non-negative number.";
   }
   if (payload.discountPercentage !== undefined && payload.discountPercentage !== null) {
@@ -43,7 +46,12 @@ export const validateProductPayload = (
   // GST: one of the rates in force, with a 4/6/8-digit HSN/SAC. Only a stock change of a product created before GST
   // was recorded may leave both out (the forms always require them; the backend refuses removing them).
   const gstLeftOut = (payload.gstRate === undefined || payload.gstRate === null) && !payload.hsnSac;
-  if (!(gstLeftOut && options.allowWithoutGst)) {
+  if (draft) {
+    // A draft may have either part of GST, or neither, but what it has must be valid
+    const rateGiven = payload.gstRate !== undefined && payload.gstRate !== null;
+    if (rateGiven && !isAllowedGstRate(payload.gstRate)) return "Choose one of the GST rates in force.";
+    if (payload.hsnSac && !HSN_SAC_PATTERN.test(payload.hsnSac)) return "HSN/SAC must be 4, 6 or 8 digits.";
+  } else if (!(gstLeftOut && options.allowWithoutGst)) {
     if (!isAllowedGstRate(payload.gstRate)) {
       return "Choose one of the GST rates in force.";
     }
@@ -56,7 +64,7 @@ export const validateProductPayload = (
   }
 
   // 5. Image Validation (Image 1 is mandatory, Image 2-5 are optional)
-  if (!payload.image1Url || payload.image1Url.trim() === '') {
+  if ((!payload.image1Url || payload.image1Url.trim() === '') && !draft) {
     return "Image 1 is required.";
   }
   const image1Error = validateImageString(payload.image1Url, "Image 1");

@@ -20,6 +20,7 @@ import {
 } from '../utils/warrantyForm';
 import { ProductComponentsSection } from './ProductComponentsSection';
 import {
+  billOfMaterialsChanged,
   componentsChanged,
   describeComponentChanges,
   dropComponentErrors,
@@ -48,6 +49,18 @@ import { ProductCostingSection } from './ProductCostingSection';
 import { ProfitBreakdown } from './ProfitBreakdown';
 import { rupees } from '../../finance/utils/money';
 import {
+  componentChange,
+  componentChangeBlocked,
+  newVersionBlockedReason,
+  nextVersionNumber,
+  soldComponentsLockedMessage,
+  type ComponentChange,
+} from '../utils/productVersion';
+import type { NewProductUnit } from '../../barcodes/types/barcode.types';
+import { ProductUnitsInput } from '../../barcodes/components/ProductUnitsInput';
+import { resizeUnits, toUnitComponents, unitsProblem } from '../../barcodes/utils/productUnits';
+import { ProductVersionBadge } from './ProductVersionBadge';
+import {
   costEntriesChanged,
   costPreviewRows,
   costPreviewWarnings,
@@ -75,7 +88,80 @@ interface EditProductModalProps {
   products?: ProductResponse[];
   /** Existing categories to pick from; a new name creates one. */
   categories?: readonly ProductCategory[];
+  /** Copies the (sold) product into a new draft version. No button when absent (no PRODUCT_CREATE). */
+  onCreateVersion?: (product: ProductResponse) => void;
 }
+
+// Stock always changes through Add/Reduce stock, where each unit's barcode is scanned
+const stockHint = (usesItemStock: boolean) =>
+  `${usesItemStock ? 'Uses item stock — change it' : 'Change it'} with Add/Reduce stock, where each unit's barcode is scanned.`;
+
+/** What a component change does to the units in stock (see componentChange); nothing when it changes nothing. */
+const ComponentChangeNote: React.FC<{ product: ProductResponse; change: ComponentChange }> = ({ product, change }) => {
+  const units = product.stockQuantity;
+  if (change === 'onSale') {
+    return (
+      <p role="alert" className="text-[11px] text-rose-500" data-testid="components-locked">
+        Components can't change while the product is on sale with {units} unit{units === 1 ? '' : 's'} in stock. Turn it off first, then
+        change the components. Unit costs can still be edited.
+      </p>
+    );
+  }
+  if (change === 'tooMany') {
+    return (
+      <p role="alert" className="text-[11px] text-rose-500" data-testid="components-locked">
+        Components can't change while {units} units are in stock: each unit's pieces are recorded by barcode. Reduce the stock to 1 (or 0)
+        first; the unit left is rebuilt with the new components. Unit costs can still be edited.
+      </p>
+    );
+  }
+  if (change === 'free' && units > 0) {
+    return (
+      <p role="note" className="text-[11px] text-gray-500" data-testid="components-released">
+        The rejection already returned this product's pieces to item stock, so its components can change. When you resubmit it, you scan
+        its unit again with the new components.
+      </p>
+    );
+  }
+  return null;
+};
+
+/**
+ * A sold product's components are locked for good: past orders, warranties and costs depend on them (the backend
+ * refuses a change with PRODUCT_SOLD_COMPONENTS_LOCKED). Changing them means a new version. Nothing for an unsold one.
+ */
+const SoldComponentsNote: React.FC<{
+  product: ProductResponse;
+  products: ProductResponse[];
+  /** The form changes the components (refused). */
+  changed: boolean;
+  onCreateVersion?: (product: ProductResponse) => void;
+}> = ({ product, products, changed, onCreateVersion }) => {
+  if (!product.sold) return null;
+  const versionNumber = nextVersionNumber(product, products);
+  const blockedReason = newVersionBlockedReason(product, products);
+  const tone = changed
+    ? 'bg-rose-500/10 border-rose-500/20 text-rose-600 dark:text-rose-400'
+    : 'bg-amber-500/10 border-amber-500/20 text-amber-700 dark:text-amber-400';
+  const text = changed
+    ? soldComponentsLockedMessage(product, products)
+    : `This product has already been sold, so its components are locked (unit costs can still be edited). To change the components, create Version ${versionNumber}: a draft copy you can change and send for approval.`;
+  return (
+    <div role={changed ? 'alert' : 'note'} data-testid="components-sold-locked" className={`p-3 rounded-xl border space-y-2 text-[11px] ${tone}`}>
+      <p>{text}</p>
+      {blockedReason && <p className="font-medium">{blockedReason}</p>}
+      {!blockedReason && onCreateVersion && (
+        <button
+          type="button"
+          onClick={() => onCreateVersion(product)}
+          className="px-3 py-1.5 bg-[#0071e3] hover:bg-[#0077ed] text-white rounded-lg font-medium cursor-pointer"
+        >
+          Create Version {versionNumber}
+        </button>
+      )}
+    </div>
+  );
+};
 
 export const EditProductModal: React.FC<EditProductModalProps> = ({
   product,
@@ -86,6 +172,7 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
   approval,
   products = [],
   categories = [],
+  onCreateVersion,
 }) => {
   const [category, setCategory] = useState('');
   const [formData, setFormData] = useState<UpdateProductRequest>({
@@ -114,6 +201,8 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
   // Components keep the warranty snapshot stored with the product until an item is changed or refreshed.
   const [components, setComponents] = useState<ComponentFormRow[]>([]);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  // Barcodes of the unit in stock when it is rebuilt with new components
+  const [units, setUnits] = useState<NewProductUnit[]>([]);
 
   // Costs: the saved cost sheet, filled into the component rows and extra costs once loaded
   const { canSeeCosts, canEditCosts, incomeTaxRate, savedSheet, savedCosts, costRows, setCostRows } = useEditCosts(product, setComponents);
@@ -152,6 +241,7 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
       setComponents(toComponentRows(product.components, savedCosts));
       setCostRows(toCostEntryRows(savedSheet?.costEntries));
       setFieldErrors({});
+      setUnits([]);
     }
     // The saved costs are filled in when they arrive (above); reopening the same product must not reset typed costs
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -162,10 +252,23 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
   // Approved products aren't changed directly: saving sends the changes to Admin L2.
   const needsApproval = !!approval && getApprovalPermissions(approval.state).editNeedsApproval;
 
-  // Each product unit uses its components' item stock, so stock changes go through Add/Reduce stock.
+  // Each product unit uses its components' item stock and carries its own barcode, so stock changes always go through
+  // Add/Reduce stock, where the units' barcodes are scanned
   const stockManagedByComponents = (product.components ?? []).length > 0;
   const savedPerUnit = new Map((product.components ?? []).map((c) => [c.itemId, Number(c.quantity)]));
   const componentLimit = componentMaxFor(product.stockQuantity, savedPerUnit);
+  // Sold: the components never change again (a new version is made instead). Otherwise units in stock were built
+  // from barcoded pieces: the pieces inside them can't change (the backend refuses both)
+  // Sold: the components never change again (a new version is made instead). An unsold, switched-off product with 1
+  // unit rebuilds it with the new components (its new barcodes scanned here); a rejected one already gave its pieces back
+  const change = componentChange(
+    product,
+    billOfMaterialsChanged(product.components ?? [], components),
+    approval?.state === 'REJECTED'
+  );
+  const rebuildComponents = toUnitComponents(components);
+  const rebuiltUnits = change === 'rebuild' ? resizeUnits(units, 1, rebuildComponents) : [];
+  const rebuildProblem = change === 'rebuild' ? unitsProblem(rebuiltUnits, 1, rebuildComponents) : null;
 
   // Helper to compute diffs between original product and formData
   const getChangedFields = () => {
@@ -276,6 +379,8 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
     components.every((row) => row.itemId !== null && !!row.quantity.trim()) &&
     warrantiesComplete(warranties) &&
     Object.keys(taxErrors).length === 0 &&
+    !componentChangeBlocked(change) &&
+    rebuildProblem === null &&
     changedFields.length > 0;
 
   const handleAddSpec = () => {
@@ -322,6 +427,8 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
       // Extra costs: sent only when changed (the list replaces them all); omitted otherwise
       ...(canEditCosts && savedSheet && costEntriesChanged(savedSheet.costEntries, costRows) ? { costEntries: toCostEntryRequests(costRows) } : {}),
       ...toAccessoryFields(accessory),
+      // The unit in stock, rebuilt with the new components
+      ...(change === 'rebuild' ? { newUnits: rebuiltUnits } : {}),
     });
     setShowPreviewModal(true);
   };
@@ -348,7 +455,10 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 overflow-y-auto">
         <div className="bg-white dark:bg-neutral-900 border border-black/10 dark:border-white/10 rounded-2xl w-full max-w-2xl max-h-[90vh] flex flex-col shadow-2xl">
           <div className="flex items-center justify-between px-6 py-4 border-b border-black/10 dark:border-white/10">
-            <h2 className="text-sm font-bold text-black dark:text-white">Edit Product #{product.id}</h2>
+            <h2 className="text-sm font-bold text-black dark:text-white">
+              Edit Product #{product.id}
+              <ProductVersionBadge product={product} />
+            </h2>
             <button onClick={onClose} className="p-1 hover:bg-black/5 dark:hover:bg-white/10 rounded-lg text-gray-500 cursor-pointer">
               <X className="w-4 h-4" />
             </button>
@@ -423,16 +533,12 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
                   required
                   min={0}
                   value={formData.stockQuantity}
-                  readOnly={stockManagedByComponents}
-                  aria-describedby={stockManagedByComponents ? 'edit-stock-hint' : undefined}
+                  readOnly
+                  aria-describedby="edit-stock-hint"
                   onChange={(e) => setFormData({ ...formData, stockQuantity: Number(e.target.value) })}
                   className="w-full px-3 py-2 bg-black/[0.02] dark:bg-white/[0.02] border border-black/10 dark:border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0071e3] text-black dark:text-white read-only:bg-black/[0.05] read-only:text-gray-500"
                 />
-                {stockManagedByComponents && (
-                  <p id="edit-stock-hint" className="mt-1 text-[10px] text-gray-400">
-                    Uses item stock — change it with Add/Reduce stock.
-                  </p>
-                )}
+                <p id="edit-stock-hint" className="mt-1 text-[10px] text-gray-400">{stockHint(stockManagedByComponents)}</p>
               </div>
               <div>
                 <label className="block font-semibold text-gray-700 dark:text-gray-300 mb-1">Discount %</label>
@@ -529,6 +635,17 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
               onClearErrors={(keys) => setFieldErrors((prev) => dropComponentErrors(prev, keys))}
               disabled={isSubmitting}
             />
+            <ComponentChangeNote product={product} change={change} />
+            <SoldComponentsNote product={product} products={products} changed={change === 'sold'} onCreateVersion={onCreateVersion} />
+            {change === 'rebuild' && (
+              <section aria-label="Rebuilt unit barcodes" className="space-y-2" data-testid="components-rebuild">
+                <p role="note" className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-400">
+                  The unit in stock is rebuilt with the new components: its current pieces go back to item stock. Scan the rebuilt
+                  unit&apos;s barcode and the barcode of each piece fitted into it.
+                </p>
+                <ProductUnitsInput id="rebuild" units={rebuiltUnits} onChange={setUnits} components={rebuildComponents} disabled={isSubmitting} />
+              </section>
+            )}
 
             {canSeeCosts && (
               <ProductCostingSection

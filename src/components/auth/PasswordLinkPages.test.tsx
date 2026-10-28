@@ -14,6 +14,11 @@ import { LoginPage } from './LoginPage';
 vi.mock('../../api/services/authService', () => ({
   authService: { forgotPassword: vi.fn(), checkPasswordLink: vi.fn(), setPasswordFromLink: vi.fn(), login: vi.fn() },
 }));
+// The sign-in pages show the default company branding, without asking the storefront backend
+vi.mock('./loginPageContent', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./loginPageContent')>();
+  return { ...actual, loadAdminLoginContent: vi.fn(async () => actual.DEFAULT_ADMIN_LOGIN) };
+});
 const api = vi.mocked(authService);
 
 const ok = <T,>(data: T, message = '') => ({ success: true, message, errorCode: null, data, timestamp: '', path: '' });
@@ -58,7 +63,7 @@ describe('Set password from an emailed link', () => {
   it('welcomes a new employee and saves the password without asking for an old one', async () => {
     api.checkPasswordLink.mockResolvedValue(ok({ purpose: 'SETUP' as const, username: 'priya', expiresAt: '' }));
     api.setPasswordFromLink.mockResolvedValue(ok(undefined, 'Your password is saved. Sign in with your new password.'));
-    const user = renderAt('/set-password?token=abc123');
+    const user = renderAt('/set-password#token=abc123');
 
     expect(await screen.findByRole('heading', { name: 'Welcome, priya' })).toBeInTheDocument();
     expect(api.checkPasswordLink).toHaveBeenCalledWith('abc123');

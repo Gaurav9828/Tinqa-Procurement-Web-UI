@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Eye, PackageMinus, PackagePlus, Pencil, Send, ShieldCheck, UploadCloud } from 'lucide-react';
+import { CopyPlus, Eye, FilePen, PackageMinus, PackagePlus, Pencil, Send, ShieldCheck, UploadCloud } from 'lucide-react';
 import { ProductStatusBadge } from './ProductStatusBadge';
 import { ProductApprovalBadge } from './ProductApprovalBadge';
 import { ProductOrderHandle } from './ProductOrderHandle';
@@ -7,6 +7,7 @@ import type { ProductResponse } from '../types/product.types';
 import type { ProductApprovalResponse } from '../types/productApproval.types';
 import { getApprovalPermissions, type ProductApprovalState } from '../utils/productApproval';
 import { ProductRatingSummary } from '../../reviews/components/ProductRatingSummary';
+import { newVersionBlockedReason, nextVersionNumber, nextVersionOf, versionLabel } from '../utils/productVersion';
 
 export interface ProductActionAccess {
   /** PRODUCT_UPDATE */
@@ -44,7 +45,85 @@ interface ProductTableProps {
   onMove?: (from: number, to: number) => void;
   /** A move is being saved: further moves wait. */
   isReordering?: boolean;
+  /** Every product (not just the filtered ones), to find each product's other versions. */
+  allProducts?: ProductResponse[];
+  /** Copies a sold product into a new draft version. No button when absent (no PRODUCT_CREATE). */
+  onCreateVersion?: (product: ProductResponse) => void;
 }
+
+/** Version ("v2", with the newer one on hover) and "Sold" next to a product's title. */
+const VersionBadges: React.FC<{ product: ProductResponse; newerVersion: ProductResponse | null }> = ({ product, newerVersion }) => (
+  <>
+    {(product.versionNumber > 1 || newerVersion) && (
+      <span
+        data-testid={`product-version-${product.id}`}
+        className="px-1.5 py-0.5 rounded-md bg-[#0071e3]/10 text-[#0071e3] dark:text-blue-400 text-[10px] font-semibold"
+        title={newerVersion ? `Replaced by ${versionLabel(newerVersion)} (#${newerVersion.id}) once that one is turned on` : undefined}
+      >
+        {versionLabel(product)}
+      </span>
+    )}
+    {product.sold && (
+      <span
+        className="px-1.5 py-0.5 rounded-md bg-amber-500/10 text-amber-700 dark:text-amber-400 text-[10px] font-medium"
+        title="Already sold: its components are locked. Changes to them go into a new version."
+      >
+        Sold
+      </span>
+    )}
+  </>
+);
+
+/** A draft may not have a price yet. */
+const priceText = (product: ProductResponse) =>
+  product.draft && product.price <= 0 ? '—' : `₹${product.price?.toLocaleString('en-IN')}`;
+
+const addStockTitle = (product: ProductResponse, canAddStock: boolean) => {
+  if (canAddStock) return 'Add stock';
+  if (product.draft) return 'A draft has no stock: submit it for approval to build its first unit';
+  return 'Stock can be added once the product is approved';
+};
+
+/** Opens the draft form for a draft, the edit form otherwise. */
+const EditButton: React.FC<{ product: ProductResponse; canEdit: boolean; blockedReason: string | null; onEdit: (product: ProductResponse) => void }> = ({
+  product,
+  canEdit,
+  blockedReason,
+  onEdit,
+}) => {
+  const Icon = product.draft ? FilePen : Pencil;
+  return (
+    <button
+      onClick={() => canEdit && onEdit(product)}
+      disabled={!canEdit}
+      className="p-1.5 hover:bg-black/5 dark:hover:bg-white/10 rounded-lg text-gray-500 hover:text-black dark:text-white cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+      title={blockedReason ?? (product.draft ? 'Continue draft' : 'Edit Product')}
+      aria-label={product.draft ? `Continue draft ${product.title}` : undefined}
+    >
+      <Icon className="w-3.5 h-3.5" />
+    </button>
+  );
+};
+
+/** Copies a sold product into a new draft version (only one newer version per product). */
+const NewVersionButton: React.FC<{ product: ProductResponse; allProducts: ProductResponse[]; onCreateVersion: (product: ProductResponse) => void }> = ({
+  product,
+  allProducts,
+  onCreateVersion,
+}) => {
+  const blocked = newVersionBlockedReason(product, allProducts);
+  return (
+    <button
+      onClick={() => !blocked && onCreateVersion(product)}
+      disabled={!!blocked}
+      className="p-1.5 hover:bg-blue-500/10 rounded-lg text-gray-500 hover:text-[#0071e3] dark:text-white cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+      title={blocked ?? `Create Version ${nextVersionNumber(product, allProducts)} (to change components)`}
+      aria-label={`Create a new version of ${product.title}`}
+    >
+      <CopyPlus className="w-3.5 h-3.5" />
+    </button>
+  );
+};
 
 export const ProductTable: React.FC<ProductTableProps> = ({
   products,
@@ -60,6 +139,8 @@ export const ProductTable: React.FC<ProductTableProps> = ({
   onApplyUpdate,
   onMove,
   isReordering = false,
+  allProducts = products,
+  onCreateVersion,
 }) => {
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [overIndex, setOverIndex] = useState<number | null>(null);
@@ -124,6 +205,7 @@ export const ProductTable: React.FC<ProductTableProps> = ({
                 canSubmit: actions.canSubmit && state.canSubmit,
                 canApplyUpdate: actions.canPublish && state.canApplyUpdate,
               };
+              const newerVersion = nextVersionOf(product, allProducts);
               return (
               <tr
                 key={product.id}
@@ -147,6 +229,7 @@ export const ProductTable: React.FC<ProductTableProps> = ({
                 <td className="p-3 font-medium text-black dark:text-white">
                   <div className="flex flex-wrap items-center gap-1.5">
                     {product.title}
+                    <VersionBadges product={product} newerVersion={newerVersion} />
                     {product.accessory && (
                       <span
                         className="px-1.5 py-0.5 rounded-md bg-violet-500/10 text-violet-700 dark:text-violet-300 text-[10px] font-medium"
@@ -165,6 +248,11 @@ export const ProductTable: React.FC<ProductTableProps> = ({
                     )}
                   </div>
                   {product.tagline && <div className="text-[10px] text-gray-400">{product.tagline}</div>}
+                  {newerVersion && (
+                    <div className="text-[10px] text-[#0071e3] dark:text-blue-400">
+                      Newer: {versionLabel(newerVersion)} (#{newerVersion.id}){newerVersion.draft ? ' — draft' : ''}
+                    </div>
+                  )}
                 </td>
                 <td className="p-3">
                   {product.category ? (
@@ -176,7 +264,7 @@ export const ProductTable: React.FC<ProductTableProps> = ({
                   )}
                 </td>
                 <td className="p-3 font-semibold text-black dark:text-white">
-                  ₹{product.price?.toLocaleString('en-IN')}
+                  {priceText(product)}
                 </td>
                 <td className="p-3 text-gray-600 dark:text-gray-300">{product.stockQuantity}</td>
                 <td className="p-3 text-gray-600 dark:text-gray-300">
@@ -231,14 +319,10 @@ export const ProductTable: React.FC<ProductTableProps> = ({
                       </button>
                     )}
                     {actions.canEdit && (
-                    <button
-                      onClick={() => permissions.canEdit && onEdit(product)}
-                      disabled={!permissions.canEdit}
-                      className="p-1.5 hover:bg-black/5 dark:hover:bg-white/10 rounded-lg text-gray-500 hover:text-black dark:text-white cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent"
-                      title={permissions.editBlockedReason ?? 'Edit Product'}
-                    >
-                      <Pencil className="w-3.5 h-3.5" />
-                    </button>
+                    <EditButton product={product} canEdit={permissions.canEdit} blockedReason={permissions.editBlockedReason} onEdit={onEdit} />
+                    )}
+                    {onCreateVersion && product.sold && (
+                      <NewVersionButton product={product} allProducts={allProducts} onCreateVersion={onCreateVersion} />
                     )}
                     {actions.canAdjustStock && (
                     <>
@@ -246,7 +330,7 @@ export const ProductTable: React.FC<ProductTableProps> = ({
                       onClick={() => onAdjustStock(product, 'add')}
                       disabled={!permissions.canAddStock}
                       className="p-1.5 hover:bg-emerald-500/10 rounded-lg text-gray-500 hover:text-emerald-600 dark:text-white cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent"
-                      title={permissions.canAddStock ? 'Add stock' : 'Stock can be added once the product is approved'}
+                      title={addStockTitle(product, permissions.canAddStock)}
                       aria-label={`Add stock for ${product.title}`}
                     >
                       <PackagePlus className="w-3.5 h-3.5" />

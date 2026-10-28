@@ -3,6 +3,7 @@
 // Contract: docs/backend-prompts/product-approval-workflow.md (create) and product-update-approval.md (updates)
 
 import type { ProductGstFields, UpdateProductRequest } from './product.types';
+import type { NewProductUnit } from '../../barcodes/types/barcode.types';
 
 export type ProductApprovalStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED';
 export type ProductApprovalDecision = Exclude<ProductApprovalStatus, 'PENDING'>;
@@ -62,6 +63,11 @@ export interface SubmitProductApprovalRequest {
   previousSnapshot?: ProductApprovalSnapshot;
   /** UPDATE only: what changed, for the reviewer. */
   changeSummary?: ProductChangeSummary[];
+  /**
+   * Resubmission only: one per unit in stock, each with its barcode and its pieces' barcodes (the rejection gave the
+   * earlier ones back).
+   */
+  units?: NewProductUnit[];
 }
 
 export interface ProductApprovalDecisionRequest {

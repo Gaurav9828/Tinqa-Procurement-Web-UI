@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { CheckCircle2, XCircle, X } from 'lucide-react';
 import type { ApprovalDecisionRequest, StockResponse } from '../types/stock.types';
 import { CHOICE_TONE, SOLID_TONE } from '../../../components/ui/actionTones';
+import { StockBarcodesPanel } from '../../barcodes/components/StockBarcodesPanel';
 
 interface Props {
   isOpen: boolean;
@@ -49,7 +50,7 @@ export const StockApprovalModal: React.FC<Props> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-      <div className="relative w-full max-w-md bg-white dark:bg-neutral-900 rounded-2xl p-6 shadow-2xl border border-black/10 dark:border-white/10">
+      <div className="relative w-full max-w-md bg-white dark:bg-neutral-900 rounded-2xl p-6 shadow-2xl border border-black/10 dark:border-white/10 max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between pb-3 border-b border-black/10 dark:border-white/10 mb-4">
           <h3 className="text-base font-semibold text-black dark:text-white">
             Approval decision
@@ -64,6 +65,14 @@ export const StockApprovalModal: React.FC<Props> = ({
           <p className="text-xs text-gray-500">
             Stock Identity: <span className="font-mono text-black dark:text-white font-semibold">{stock.stockIdentityNumber}</span>
           </p>
+
+          {/* What is being approved: each passed piece's barcode. Approving locks them; rejecting voids those added */}
+          <div className="text-xs">
+            <StockBarcodesPanel stockId={stock.id} stockIdentityNumber={stock.stockIdentityNumber} />
+            <p className="mt-1 text-[11px] text-gray-500">
+              Approving locks the barcodes awaiting approval: after that only a Super Admin can change them.
+            </p>
+          </div>
 
           <div className="flex gap-4">
             <button

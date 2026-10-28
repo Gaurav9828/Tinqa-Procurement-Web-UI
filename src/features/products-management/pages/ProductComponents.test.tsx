@@ -14,6 +14,7 @@ import { axiosClient } from '../../../api/axiosClient';
 import type { ItemResponse, ItemWarrantyResponse } from '../../item-management/types/item.types';
 import type { ProductComponentRequest, ProductComponentResponse, ProductResponseDto } from '../types/product.types';
 import { fillGst } from './gstTestUtil';
+import { noBarcodes, scanUnitBarcodes } from './barcodeTestUtil';
 import { DIORAMAS, fillCategory } from './categoryTestUtil';
 import { signInAsSuperAdmin } from '../../../test/access';
 
@@ -118,6 +119,8 @@ const LAPTOP: ProductResponseDto = {
 
 const installBackends = () => {
   procurement.get.mockImplementation(async (url: string) => {
+    const barcodes = noBarcodes(url);
+    if (barcodes) return barcodes;
     if (url.startsWith('/v1/admin/items?')) return ok({ content: ITEMS, totalPages: 1, totalElements: ITEMS.length });
     if (url === '/v1/stocks') return ok(STOCK_LIST);
     const availability = /^\/v1\/stocks\/items\/(\d+)\/availability$/.exec(url);
@@ -196,7 +199,11 @@ const openCreate = async (user: User) => {
   await fillGst(user);
   await fillCategory(user);
 };
-const submitCreate = (user: User) => user.click(screen.getAllByRole('button', { name: 'Create Product' }).at(-1)!);
+// The new unit and its pieces are scanned first: every unit and piece carries a barcode
+const submitCreate = async (user: User) => {
+  await scanUnitBarcodes(user);
+  await user.click(screen.getAllByRole('button', { name: 'Create Product' }).at(-1)!);
+};
 
 const openEdit = async (user: User) => {
   await screen.findByText('Laptop X');
@@ -285,6 +292,10 @@ describe('Create product: components auto-add their item warranties', () => {
       { itemId: 8, itemName: 'USB Cable', itemSku: 'USB-C', quantity: 3, warranties: [] },
     ]);
     expect(lastBody('post').stockQuantity).toBe(1);
+    // The first unit's barcode, with one barcode per piece: 1 motherboard, 3 cables
+    const [unit] = lastBody('post').newUnits as { barcode: string; parts: { itemId: number; barcodes: string[] }[] }[];
+    expect(unit.barcode).toMatch(/^TB\d{8}$/);
+    expect(unit.parts.map((part) => [part.itemId, part.barcodes.length])).toEqual([[7, 1], [8, 3]]);
   });
 
   it('swapping or removing an item swaps or removes its warranties', async () => {
@@ -476,6 +487,7 @@ describe('Edit product components', () => {
   });
 
   it('saved components don’t add copies; a component added while editing does', async () => {
+    db[0].stockQuantity = 0; // components can only change with no unit in stock
     const { user } = renderPage();
     await openEdit(user);
     expect(productWarrantyCards()).toHaveLength(0);
@@ -491,6 +503,7 @@ describe('Edit product components', () => {
   });
 
   it('adding an item fetches its warranties; removing one drops it; existing snapshots are re-sent unchanged', async () => {
+    db[0].stockQuantity = 0; // components can only change with no unit in stock
     const { user } = renderPage();
     await openEdit(user);
     await user.click(within(section()).getByRole('button', { name: 'Remove component 2' }));
@@ -524,6 +537,7 @@ describe('Edit product components', () => {
   });
 
   it('removing every component sends components: []', async () => {
+    db[0].stockQuantity = 0; // components can only change with no unit in stock
     const { user } = renderPage();
     await openEdit(user);
     await user.click(within(section()).getByRole('button', { name: 'Remove component 2' }));
@@ -544,6 +558,7 @@ describe('Edit product components', () => {
         errors: [{ field: 'components[1].quantity', message: 'Component quantity can have at most 11 digits and 3 decimal places' }],
       })
     );
+    db[0].stockQuantity = 0; // components can only change with no unit in stock
     const { user } = renderPage();
     await openEdit(user);
     await waitFor(() => expect(quantitySelect(2)).toBeEnabled());
@@ -554,6 +569,19 @@ describe('Edit product components', () => {
     const alerts = within(screen.getByRole('list', { name: 'Notifications' }));
     expect(alerts.getByText('Component quantity can have at most 11 digits and 3 decimal places')).toBeInTheDocument();
     expect(screen.queryByText('Request validation failed.')).not.toBeInTheDocument();
+  });
+});
+
+describe('Components of a product with units in stock', () => {
+  beforeEach(mockDirectEditApprovals);
+
+  it("can't change while units are in stock: each unit's pieces are recorded by barcode", async () => {
+    const { user } = renderPage();
+    await openEdit(user);
+    await user.click(within(section()).getByRole('button', { name: 'Remove component 2' }));
+    expect(screen.getByTestId('components-locked')).toHaveTextContent("Components can't change while the product is on sale with 3 units in stock. Turn it off first");
+    expect(screen.getByRole('button', { name: 'Review & Update' })).toBeDisabled();
+    expect(ecom.put).not.toHaveBeenCalled();
   });
 });
 
@@ -592,6 +620,9 @@ describe('Add stock for a product built from components', () => {
     expect(within(dialog).getByRole('button', { name: 'Add stock' })).toBeDisabled();
 
     await user.selectOptions(quantity, '3');
+    // Each new unit: its barcode, 1 motherboard and 2 cables
+    expect(within(dialog).getByRole('button', { name: 'Add stock' })).toBeDisabled();
+    await scanUnitBarcodes(user, 'stock-add');
     available[7] = 2; // stock used elsewhere while the dialog was open
     await user.click(within(dialog).getByRole('button', { name: 'Add stock' }));
     expect(await within(dialog).findByText('You can add at most 2 (limited by item stock).')).toBeInTheDocument();
@@ -602,5 +633,9 @@ describe('Add stock for a product built from components', () => {
     await waitFor(() => expect(ecom.put).toHaveBeenCalledTimes(1));
     expect(lastBody('put')).toMatchObject({ stockQuantity: 5 });
     expect(lastBody('put')).not.toHaveProperty('components'); // components untouched
+    // The first two units scanned are the ones added, each with its pieces
+    const units = lastBody('put').newUnits as { barcode: string; parts: { itemId: number; barcodes: string[] }[] }[];
+    expect(units).toHaveLength(2);
+    expect(units[0].parts.map((part) => [part.itemId, part.barcodes.length])).toEqual([[7, 1], [8, 2]]);
   });
 });

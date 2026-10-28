@@ -5,6 +5,7 @@ import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import { MemoryRouter } from 'react-router-dom';
 import alertReducer from '../../store/alertSlice';
+import companyProfileReducer from '../../store/companyProfileSlice';
 import { GlobalAlertContainer } from '../../components/ui/GlobalAlertContainer';
 import { ApprovalsHub } from './ApprovalsHub';
 import { useAuthStore } from '../../store/useAuthStore';
@@ -59,7 +60,7 @@ const page = (content: Refund[]) => ({
 
 const renderHub = () =>
   render(
-    <Provider store={configureStore({ reducer: { alert: alertReducer } })}>
+    <Provider store={configureStore({ reducer: { alert: alertReducer, companyProfile: companyProfileReducer } })}>
       <MemoryRouter>
         <GlobalAlertContainer />
         <ApprovalsHub />

@@ -78,6 +78,19 @@ const CompanyProfileHistoryPage = lazy(() =>
 const StoreSalesPage = lazy(() => import('./features/store-sales/pages/StoreSalesPage').then((m) => ({ default: m.StoreSalesPage })));
 const PaymentsPage = lazy(() => import('./features/payroll/pages/PaymentsPage').then((m) => ({ default: m.PaymentsPage })));
 const MyPayslipsPage = lazy(() => import('./features/payroll/pages/MyPayslipsPage').then((m) => ({ default: m.MyPayslipsPage })));
+const BarcodeTrackingPage = lazy(() =>
+  import('./features/barcodes/pages/BarcodeTrackingPage').then((m) => ({ default: m.BarcodeTrackingPage }))
+);
+const ClientDemosPage = lazy(() =>
+  import('./features/client-demos/pages/ClientDemosPage').then((m) => ({ default: m.ClientDemosPage }))
+);
+const ClientDemoWizardPage = lazy(() =>
+  import('./features/client-demos/pages/ClientDemoWizardPage').then((m) => ({ default: m.ClientDemoWizardPage }))
+);
+const ClientDemoDetailPage = lazy(() =>
+  import('./features/client-demos/pages/ClientDemoDetailPage').then((m) => ({ default: m.ClientDemoDetailPage }))
+);
+const MyDemosPage = lazy(() => import('./features/client-demos/pages/MyDemosPage').then((m) => ({ default: m.MyDemosPage })));
 const UserGuidePage = lazy(() => import('./features/user-guide/pages/UserGuidePage').then((m) => ({ default: m.UserGuidePage })));
 
 const PageLoader: React.FC = () => (
@@ -181,6 +194,9 @@ export const App: React.FC = () => {
                 </Route>
                 {/* Old sidebar link; stock management now lives under Item Management. */}
                 <Route path="stocks" element={<Navigate to="/item/stocks" replace />} />
+                <Route element={<RequireNavAccess navId="barcodes" />}>
+                  <Route path="barcodes" element={<BarcodeTrackingPage />} />
+                </Route>
                 <Route element={<RequireNavAccess navId="products" />}>
                   <Route path="products" element={<ProductManagementPage />} />
                 </Route>
@@ -195,6 +211,19 @@ export const App: React.FC = () => {
                 </Route>
                 <Route element={<RequireNavAccess navId="my-payslips" />}>
                   <Route path="my-payslips" element={<MyPayslipsPage />} />
+                </Route>
+                {/* Client demos & meetings: scheduled step by step, decided on the demo's page; attending staff under My Demos */}
+                <Route element={<RequireNavAccess navId="client-demos" />}>
+                  <Route path="client-demos" element={<ClientDemosPage />} />
+                  <Route path="client-demos/:id" element={<ClientDemoDetailPage mode="manager" />} />
+                </Route>
+                <Route element={<RequireNavAccess navId="client-demos" requires={['DEMO_MANAGE']} />}>
+                  <Route path="client-demos/new" element={<ClientDemoWizardPage key="new" />} />
+                  <Route path="client-demos/:id/edit" element={<ClientDemoWizardPage key="edit" />} />
+                </Route>
+                <Route element={<RequireNavAccess navId="my-demos" />}>
+                  <Route path="my-demos" element={<MyDemosPage />} />
+                  <Route path="my-demos/:id" element={<ClientDemoDetailPage mode="attendee" />} />
                 </Route>
                 <Route element={<RequireNavAccess navId="complaints" />}>
                   <Route path="complaints" element={<Placeholder title="Complaints & Claims Container" />} />

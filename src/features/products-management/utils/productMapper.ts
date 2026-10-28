@@ -27,7 +27,8 @@ export const toProduct = (dto: ProductResponseDto): ProductResponse => ({
   tagline: dto.tagline ?? null,
   category: dto.category ?? null,
   description: dto.description ?? null,
-  price: dto.price,
+  // A draft may not have a price yet
+  price: dto.price ?? 0,
   discountPercentage: dto.discountPercentage ?? null,
   hsnSac: dto.hsnSac ?? null,
   gstRate: dto.gstRate === null || dto.gstRate === undefined ? null : Number(dto.gstRate),
@@ -50,6 +51,10 @@ export const toProduct = (dto: ProductResponseDto): ProductResponse => ({
   accessoryBenefits: Array.isArray(dto.accessoryBenefits) ? dto.accessoryBenefits : [],
   accessoryFor: toLinks(dto.accessoryFor),
   accessories: toLinks(dto.accessories),
+  draft: !!dto.draft,
+  versionNumber: Number(dto.versionNumber ?? 1) || 1,
+  previousVersionId: dto.previousVersionId ?? null,
+  sold: !!dto.sold,
 });
 
 const toLinks = (links: AccessoryLinkResponse[] | null | undefined): AccessoryLinkResponse[] =>

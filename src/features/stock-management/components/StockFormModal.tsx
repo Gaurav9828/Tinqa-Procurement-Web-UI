@@ -11,6 +11,8 @@ import { AttributeInputBuilder } from '../../../components/ui/AttributeInputBuil
 import type { OrderResponse } from '../../order-management/types/order.types';
 import { OrderPreviewModal } from '../../order-management/components/OrderPreviewModal';
 import { formatCurrency } from '../../order-tracking/utils/orderTracking.utils';
+import { BarcodeListInput } from '../../barcodes/components/BarcodeListInput';
+import { barcodeListError } from '../../barcodes/utils/barcode';
 
 interface StockFormModalProps {
     isOpen: boolean;
@@ -28,6 +30,8 @@ interface FormState {
     unitsPassedTest: string;
     dateOfArrival: string;
     additionalInfo: Record<string, string>;
+    /** One per passed unit, scanned as the pieces are received. */
+    barcodes: string[];
 }
 
 const DEFAULT_FORM: FormState = {
@@ -35,6 +39,7 @@ const DEFAULT_FORM: FormState = {
     unitsPassedTest: '',
     dateOfArrival: new Date().toISOString().split('T')[0],
     additionalInfo: {},
+    barcodes: [],
 };
 
 /** Above this order quantity a select gets unwieldy; a bounded number input is used instead. */
@@ -181,6 +186,11 @@ export const StockFormModal: React.FC<StockFormModalProps> = ({
             if (formData.unitsPassedTest === '') errors.unitsPassedTest = 'Select how many units passed the test.';
             else if (!Number.isFinite(passed) || passed < 0 || passed > totalUnits) {
                 errors.unitsPassedTest = `Passed units must be between 0 and ${totalUnits} (order quantity).`;
+            } else if (!Number.isInteger(passed)) {
+                errors.unitsPassedTest = 'Every passed piece gets its own barcode, so units passed must be a whole number.';
+            } else if (passed > 0) {
+                const problem = barcodeListError(formData.barcodes, passed, 'passed unit');
+                if (problem) errors.barcodes = problem;
             }
         }
 
@@ -214,8 +224,9 @@ export const StockFormModal: React.FC<StockFormModalProps> = ({
         setFormData((prev) => ({
             ...prev,
             orderNumber: orderNum,
-            // A different order has a different quantity, so the tester picks again.
+            // A different order has a different quantity (and pieces), so the tester picks and scans again.
             unitsPassedTest: prev.orderNumber === orderNum ? prev.unitsPassedTest : '',
+            barcodes: prev.orderNumber === orderNum ? prev.barcodes : [],
             dateOfArrival:
                 orderMinDate && prev.dateOfArrival < orderMinDate ? orderMinDate : prev.dateOfArrival,
         }));
@@ -238,6 +249,7 @@ export const StockFormModal: React.FC<StockFormModalProps> = ({
             hasTested,
             dateOfArrival: formData.dateOfArrival,
             additionalInfo: formData.additionalInfo,
+            barcodes: formData.barcodes,
         };
 
         try {
@@ -278,7 +290,7 @@ export const StockFormModal: React.FC<StockFormModalProps> = ({
                                         onFocus={() => setShowOrderSuggestions(true)}
                                         onBlur={() => handleBlur('orderNumber')}
                                         onChange={(e) => {
-                                            setFormData((prev) => ({ ...prev, orderNumber: e.target.value, unitsPassedTest: '' }));
+                                            setFormData((prev) => ({ ...prev, orderNumber: e.target.value, unitsPassedTest: '', barcodes: [] }));
                                             setShowOrderSuggestions(true);
                                         }}
                                         placeholder="Search or select order..."
@@ -378,7 +390,13 @@ export const StockFormModal: React.FC<StockFormModalProps> = ({
                                     value={formData.unitsPassedTest}
                                     onBlur={() => handleBlur('unitsPassedTest')}
                                     onChange={(e) => {
-                                        handleChange('unitsPassedTest', e.target.value);
+                                        const passed = Number(e.target.value);
+                                        // Fewer passed units: keep the first barcodes scanned
+                                        setFormData((prev) => ({
+                                            ...prev,
+                                            unitsPassedTest: e.target.value,
+                                            barcodes: Number.isInteger(passed) ? prev.barcodes.slice(0, passed) : [],
+                                        }));
                                         handleBlur('unitsPassedTest');
                                     }}
                                     error={touched.unitsPassedTest ? validationErrors.unitsPassedTest : undefined}
@@ -413,6 +431,23 @@ export const StockFormModal: React.FC<StockFormModalProps> = ({
                                           : `${defectedUnits} unit${defectedUnits === 1 ? '' : 's'} failed the test.`}
                                 </p>
                             </div>
+
+                            {passedUnits !== null && Number.isInteger(passedUnits) && passedUnits > 0 && (
+                                <div className="sm:col-span-2">
+                                    <BarcodeListInput
+                                        id="stock-barcodes"
+                                        label={`Barcodes of the ${passedUnits} passed unit${passedUnits === 1 ? '' : 's'}`}
+                                        what="passed unit"
+                                        expected={passedUnits}
+                                        disabled={isSubmitting}
+                                        codes={formData.barcodes}
+                                        onChange={(codes) => handleChange('barcodes', codes)}
+                                    />
+                                    <p className="text-[11px] text-gray-400 mt-1">
+                                        Locked when Admin L2 approves this entry; after that only a Super Admin can change them.
+                                    </p>
+                                </div>
+                            )}
 
                             {purchaseValue !== null && (
                                 <p className="sm:col-span-2 text-xs text-gray-600" data-testid="purchase-value">

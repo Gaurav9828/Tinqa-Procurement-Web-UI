@@ -17,6 +17,7 @@ import { toProduct } from '../utils/productMapper';
  *   PUT    /products/{id}         full update        (ADMIN_L1/L2)
  *   PATCH  /products/{id}/status  { isEnabled }      (ADMIN_L1/L2)
  *   PUT    /products/display-order { productIds }   storefront order (PRODUCT_PUBLISH)
+ *   POST   /products/{id}/new-version  copy a submitted product into a new draft version (PRODUCT_CREATE)
  * There is no GET or DELETE on /products/{id} — calling them returns 405 METHOD_NOT_ALLOWED.
  */
 const BASE_URL = '/products';
@@ -35,6 +36,15 @@ export const productApi = {
 
     updateProductStatus: async (id: number, payload: UpdateProductStatusRequest): Promise<ApiResponse<unknown>> => {
         const response = await ecommerceAxiosClient.patch<ApiResponse<unknown>>(`${BASE_URL}/${id}/status`, payload);
+        return response.data;
+    },
+
+    /**
+     * Copies a product (components, warranties, costs, specs...) into a new draft, Version N+1, whose components can be
+     * changed. Turning the new version on later turns this one off.
+     */
+    createNewVersion: async (id: number): Promise<ApiResponse<ProductResponseDto | null>> => {
+        const response = await ecommerceAxiosClient.post<ApiResponse<ProductResponseDto | null>>(`${BASE_URL}/${id}/new-version`);
         return response.data;
     },
 

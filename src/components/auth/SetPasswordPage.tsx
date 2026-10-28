@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { AlertTriangle, CheckCircle2, Eye, EyeOff, KeyRound, Loader2 } from 'lucide-react';
 import { usePasswordLink } from '../../hooks/usePasswordLink';
 import { useAuthStore } from '../../store/useAuthStore';
@@ -13,14 +13,16 @@ const inputClass =
 const labelClass = 'block text-xs font-semibold text-gray-500 dark:text-neutral-400 uppercase tracking-wider mb-1.5';
 
 /**
- * The page an emailed password link opens (/set-password?token=…): a new employee's first password, or "forgot
+ * The page an emailed password link opens (/set-password#token=…): a new employee's first password, or "forgot
  * password". No old or temporary password is asked for; the link itself proves who it is, works once and expires
  * after 15 minutes. Saving signs out every session of the account, so the person signs in afresh.
+ * The token sits after "#" so the browser never sends it to a server (no access logs); ?token= from older emails still works.
  */
 export const SetPasswordPage: React.FC = () => {
   const [searchParams] = useSearchParams();
+  const { hash } = useLocation();
   // Read once: the token is then taken out of the address bar so it can't leak through history or a shared screen
-  const [token] = useState(() => searchParams.get('token') ?? '');
+  const [token] = useState(() => new URLSearchParams(hash.replace(/^#/, '')).get('token') ?? searchParams.get('token') ?? '');
   const { status, link, problem, expired, isSaving, setPassword } = usePasswordLink(token);
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -30,8 +32,8 @@ export const SetPasswordPage: React.FC = () => {
   const notify = useNotify();
 
   useEffect(() => {
-    if (searchParams.has('token')) window.history.replaceState(null, '', '/set-password');
-  }, [searchParams]);
+    if (searchParams.has('token') || hash) window.history.replaceState(null, '', '/set-password');
+  }, [searchParams, hash]);
 
   const setup = link?.purpose === 'SETUP';
   const mismatch = confirmPassword.length > 0 && confirmPassword !== newPassword;

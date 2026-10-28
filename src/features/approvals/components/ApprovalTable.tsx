@@ -14,6 +14,8 @@ import {
   UserPlus,
 } from 'lucide-react';
 import type { ApprovalItem } from '../../../types/common.types';
+import { ORDER_QUEUES, isOrderApprovalType } from '../utils/orderQueues';
+import type { OrdersApprovalRequest } from '../types/approval.types';
 
 
 interface ApprovalTableProps<T extends ApprovalItem = ApprovalItem> {
@@ -89,11 +91,8 @@ export const ApprovalTable = <T extends ApprovalItem>({
               : 'New product',
       };
     }
-    if ('orderNumber' in item && item?.approvalType == 'ORDERS') {
-      return {
-        title: `Order: ${item.orderNumber}`,
-        subtitle: `Dealer: ${item.dealerName ? item.dealerName : undefined}`,
-      }
+    if (isOrderApprovalType(item?.approvalType)) {
+      return ORDER_QUEUES[item.approvalType].describe(item as OrdersApprovalRequest);
     }
     return { title: `Request #${getItemId(item)}` };
   };
@@ -139,11 +138,11 @@ export const ApprovalTable = <T extends ApprovalItem>({
         </span>
       );
     }
-    if (item?.approvalType == 'ORDERS') {
+    if (isOrderApprovalType(item?.approvalType)) {
       return (
         <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-blue-500/10 text-yellow-600 dark:text-yellow-400 border border-yellow-500/20">
           <ShoppingCart className="w-3.5 h-3.5" />
-          Order Approval
+          {ORDER_QUEUES[item.approvalType].badge}
         </span>
       );
     }
@@ -202,6 +201,7 @@ export const ApprovalTable = <T extends ApprovalItem>({
                 ) : (
                   approvals.map((item, index) => {
                     const { title, subtitle } = getItemTitle(item);
+                    const orderQueue = isOrderApprovalType(item.approvalType) ? ORDER_QUEUES[item.approvalType] : null;
                     const rawTime = getItemTime(item);
 
                     return (
@@ -244,14 +244,14 @@ export const ApprovalTable = <T extends ApprovalItem>({
                             </button>
                             <button
                               onClick={() => onInitiateApprove(item)}
-                              title="Approve Request"
+                              title={orderQueue?.approveAction ?? 'Approve Request'}
                               className="p-2 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500 hover:text-white transition-all cursor-pointer"
                             >
                               <Check className="w-4 h-4" />
                             </button>
                             <button
                               onClick={() => onInitiateReject(item)}
-                              title="Reject Request"
+                              title={orderQueue?.rejectAction ?? 'Reject Request'}
                               className="p-2 rounded-xl bg-rose-500/10 text-rose-600 dark:text-rose-400 hover:bg-rose-500 hover:text-white transition-all cursor-pointer"
                             >
                               <X className="w-4 h-4" />

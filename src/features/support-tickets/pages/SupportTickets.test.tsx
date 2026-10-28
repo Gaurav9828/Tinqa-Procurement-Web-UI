@@ -28,6 +28,13 @@ vi.mock('../../order-tracking/api/orderTrackingApi', () => ({
   orderTrackingApi: { getOrder: vi.fn(), getTrackingStatuses: vi.fn(), listOrders: vi.fn(), updateTracking: vi.fn() },
 }));
 const orderApi = vi.mocked(orderTrackingApi);
+// Its refund and profit panels are not part of these tests: they stay loading, without a network call
+vi.mock('../../refunds/api/refundApi', () => ({
+  refundApi: { getOrderRefunds: vi.fn(() => new Promise(() => {})) },
+}));
+vi.mock('../../products-management/api/costingApi', () => ({
+  costingApi: { getOrderProfit: vi.fn(() => new Promise(() => {})) },
+}));
 
 // ---------- fixtures ----------
 const ok = <T,>(data: T, message = 'OK'): ApiResponse<T> => ({ success: true, message, errorCode: null, data, timestamp: '', path: '' });

@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import alertReducer from '../../store/alertSlice';
+import companyProfileReducer from '../../store/companyProfileSlice';
 import { GlobalAlertContainer } from '../../components/ui/GlobalAlertContainer';
 import { ApprovalsHub } from './ApprovalsHub';
 import { useAuthStore } from '../../store/useAuthStore';
@@ -46,7 +47,7 @@ let pendingEmployees: (typeof PENDING_EMPLOYEE)[] = [];
 
 const renderHub = () =>
   render(
-    <Provider store={configureStore({ reducer: { alert: alertReducer } })}>
+    <Provider store={configureStore({ reducer: { alert: alertReducer, companyProfile: companyProfileReducer } })}>
       <GlobalAlertContainer />
       <ApprovalsHub />
     </Provider>

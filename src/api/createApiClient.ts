@@ -1,7 +1,8 @@
-import axios, { type AxiosAdapter, type AxiosError, type AxiosInstance, type AxiosResponse } from 'axios';
+import axios, { type AxiosError, type AxiosInstance } from 'axios';
 import { clearSession, getStoredUser, getToken, isSessionExpired, redirectToLogin, redirectToPasswordSetup } from '../auth/session';
 import { createEndpointMatcher, type EndpointRule } from '../config/endpointAccess';
 import { METHOD_NOT_ALLOWED_MESSAGE } from '../utils/apiError';
+import { guardAdapter, RUNAWAY_ERROR_CODE } from './apiCallGuard';
 
 declare module 'axios' {
   interface AxiosRequestConfig {
@@ -26,6 +27,8 @@ const STATUS_MESSAGES: Record<number, string> = {
 };
 
 const describeError = (error: AxiosError): string => {
+  // A request loop stopped in the browser: the server was never called
+  if (error.code === RUNAWAY_ERROR_CODE) return error.message;
   // The 405 body carries framework text, not a user-facing message.
   if (error.response?.status === 405) return METHOD_NOT_ALLOWED_MESSAGE;
   const serverMessage = (error.response?.data as { message?: string } | undefined)?.message;
@@ -36,28 +39,7 @@ const describeError = (error: AxiosError): string => {
   return STATUS_MESSAGES[status] || error.message;
 };
 
-/**
- * Identical GETs that are already in flight share one network call: StrictMode's double effect,
- * or two components loading the same list at once, no longer hit the server twice. Nothing is
- * cached once the response lands, so later reads are always fresh. Requests with an abort
- * signal are left alone so one caller cancelling can't cancel the other.
- */
-export const dedupeInFlightGets = (adapter: AxiosAdapter): AxiosAdapter => {
-  const inFlight = new Map<string, Promise<AxiosResponse>>();
-
-  return (config) => {
-    if ((config.method ?? 'get').toLowerCase() !== 'get' || config.signal) return adapter(config);
-
-    // The token is part of the key so two sessions never share a response.
-    const key = `${axios.getUri(config)}|${String(config.headers?.Authorization ?? '')}|${config.responseType ?? ''}`;
-    const pending = inFlight.get(key);
-    if (pending) return pending.then((response) => ({ ...response, config }));
-
-    const request = adapter(config).finally(() => inFlight.delete(key));
-    inFlight.set(key, request);
-    return request;
-  };
-};
+export { dedupeInFlightGets } from './apiCallGuard';
 
 /** Why a request was never sent: the signed-in user lacks the permission the endpoint requires. */
 export const NOT_PERMITTED_MESSAGE = 'Not sent: missing permission';
@@ -75,7 +57,8 @@ export const createApiClient = (baseURL: string, label: string, endpointRules: r
     timeout: 30000,
     headers: { 'Content-Type': 'application/json' },
   });
-  client.defaults.adapter = dedupeInFlightGets(axios.getAdapter(client.defaults.adapter));
+  // Shares in-flight GETs, stops request loops, and counts calls in development (see apiCallGuard)
+  client.defaults.adapter = guardAdapter(axios.getAdapter(client.defaults.adapter), label);
 
   client.interceptors.request.use((config) => {
     const token = getToken();

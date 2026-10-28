@@ -94,7 +94,6 @@ export interface CreateItemRequest {
   categoryIds: number[];
   name: string;
   brand?: string;
-  sku: string;
   unitOfMeasure: string;
   mrp: number;
   countryOfOrigin: string;

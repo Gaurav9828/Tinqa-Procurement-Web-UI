@@ -6,13 +6,20 @@
  *   2. ESLint static analysis: Sonar's open-source rules (eslint-plugin-sonarjs), security rules, XSS sinks
  *   3. Secret scan: keys, tokens, private keys and passwords committed to the repo
  *   4. Dependency vulnerabilities (OSV.dev database, checked against package-lock.json)
- *   5. Unit tests + line coverage
+ *   5. Unit tests + line coverage (a test making a real network call fails: src/test/setup.ts)
+ *   6. New-code coverage: the lines changed since the base branch that the tests run
+ * After the build, scripts/e2e-gate.mjs runs the browser tests, API call budgets and bundle budgets.
  *
  * Like Sonar's "new code" mode, existing findings live in quality-gate.baseline.json and only NEW findings
- * fail the build, so the codebase can only get better. Report: reports/quality/index.html
+ * count, so the codebase can only get better. Report: reports/quality/index.html
+ *
+ * Modes (--mode=, default dev):
+ *   dev        errors fail; new warnings, low new-code coverage, moderate vulnerabilities and skipped checks warn
+ *   uat, prod  strict: every one of those fails too ("no warnings in production")
+ *   --quick    before `npm run dev`: lint, secrets and the tests of changed files only; reports, never blocks
  *
  * Usage:
- *   node scripts/quality-gate.mjs                    run the gate
+ *   node scripts/quality-gate.mjs --mode=prod        run the gate
  *   node scripts/quality-gate.mjs --update-baseline  accept the current findings as the new baseline
  *   QG_SKIP=audit,tests node scripts/quality-gate.mjs   skip steps (audit | tests | typecheck) e.g. offline
  */
@@ -27,7 +34,14 @@ const REPORT_DIR = path.join(ROOT, 'reports', 'quality');
 const BASELINE_FILE = path.join(ROOT, 'quality-gate.baseline.json');
 const CONFIG = JSON.parse(fs.readFileSync(path.join(ROOT, 'quality-gate.config.json'), 'utf8'));
 const UPDATE_BASELINE = process.argv.includes('--update-baseline');
-const SKIP = new Set((process.env.QG_SKIP || '').split(',').map((s) => s.trim()).filter(Boolean));
+const MODE = (process.argv.find((a) => a.startsWith('--mode='))?.slice('--mode='.length) || process.env.QG_MODE || 'dev').toLowerCase();
+if (!['dev', 'uat', 'prod'].includes(MODE)) throw new Error(`Unknown --mode=${MODE} (dev | uat | prod)`);
+const STRICT = MODE !== 'dev';
+const QUICK = process.argv.includes('--quick');
+const SKIP = new Set([
+  ...(process.env.QG_SKIP || '').split(',').map((s) => s.trim()).filter(Boolean),
+  ...(QUICK ? ['typecheck', 'audit'] : []),
+]);
 
 const SECURITY_RULE_PREFIXES = ['security/', 'no-unsanitized/', 'secret/'];
 const SECURITY_SONAR_RULES = new Set(CONFIG.securitySonarRules);
@@ -187,7 +201,10 @@ async function audit() {
 function tests() {
   if (SKIP.has('tests')) return { skipped: true };
   const jsonOut = path.join(REPORT_DIR, 'tests.json');
-  run('npx', ['vitest', 'run', '--coverage', '--reporter=dot', '--reporter=json', `--outputFile.json=${jsonOut}`], 15 * 60_000);
+  fs.rmSync(jsonOut, { force: true });
+  // Quick: only the tests affected by uncommitted changes, without coverage
+  const scope = QUICK ? ['--changed', '--passWithNoTests'] : ['--coverage'];
+  run('npx', ['vitest', 'run', ...scope, '--reporter=dot', '--reporter=json', `--outputFile.json=${jsonOut}`], 15 * 60_000);
   let failed = [];
   let total = 0;
   try {
@@ -199,7 +216,7 @@ function tests() {
   } catch {
     failed = [{ file: '-', name: 'Test run crashed', message: 'see `npm test` output' }];
   }
-  const coverage = readCoverage();
+  const coverage = QUICK ? null : readCoverage();
   return { total, failed, coverage };
 }
 
@@ -212,6 +229,81 @@ function readCoverage() {
     else if (line.startsWith('LH:')) hit += Number(line.slice(3));
   }
   return found ? Math.round((hit / found) * 1000) / 10 : null;
+}
+
+/** Output of a git command, or null when git is missing or the command fails. */
+function git(args) {
+  const res = run('git', args, 60_000);
+  return res.code === 0 ? res.stdout : null;
+}
+
+/**
+ * Of the source lines added or changed since the base branch (committed, uncommitted and untracked), how many the
+ * tests ran. Only lines the coverage report knows count (executable code). Null without git history or lcov.
+ */
+function newCodeCoverage() {
+  const lcov = path.join(ROOT, 'coverage', 'lcov.info');
+  if (!fs.existsSync(lcov)) return null;
+  const refs = CONFIG.newCode?.baseRefs ?? ['origin/UAT', 'UAT', 'origin/main', 'main'];
+  let base = null;
+  let baseRef = null;
+  for (const ref of refs) {
+    const mergeBase = git(['merge-base', 'HEAD', ref]);
+    if (mergeBase) {
+      base = mergeBase.trim();
+      baseRef = ref;
+      break;
+    }
+  }
+  if (!base) return null;
+
+  const changed = new Map(); // file -> Set(line)
+  const add = (file, line) => (changed.get(file) ?? changed.set(file, new Set()).get(file)).add(line);
+  let file = null;
+  for (const line of (git(['diff', '-U0', '--no-color', '--no-ext-diff', base, '--', 'src']) ?? '').split('\n')) {
+    if (line.startsWith('+++ ')) {
+      file = line.startsWith('+++ b/') ? line.slice(6) : null;
+      continue;
+    }
+    const hunk = /^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@/.exec(line);
+    if (file && hunk) {
+      const start = Number(hunk[1]);
+      for (let n = start; n < start + Number(hunk[2] ?? 1); n++) add(file, n);
+    }
+  }
+  for (const f of (git(['ls-files', '-o', '--exclude-standard', '--', 'src']) ?? '').split('\n').filter(Boolean)) {
+    const abs = path.join(ROOT, f);
+    if (BINARY_EXT.test(f) || !fs.existsSync(abs)) continue;
+    fs.readFileSync(abs, 'utf8').split('\n').forEach((_, i) => add(f, i + 1));
+  }
+
+  const hits = new Map(); // file -> Map(line -> hit)
+  let current = null;
+  for (const line of fs.readFileSync(lcov, 'utf8').split('\n')) {
+    if (line.startsWith('SF:')) {
+      current = new Map();
+      hits.set(rel(path.resolve(ROOT, line.slice(3))), current);
+    } else if (line.startsWith('DA:') && current) {
+      const [n, count] = line.slice(3).split(',');
+      current.set(Number(n), Number(count) > 0);
+    }
+  }
+
+  let covered = 0;
+  let total = 0;
+  const uncovered = new Map();
+  for (const [f, lines] of changed) {
+    const fileHits = hits.get(f);
+    if (!fileHits) continue; // tests, styles, assets: not measured
+    for (const n of lines) {
+      if (!fileHits.has(n)) continue;
+      total += 1;
+      if (fileHits.get(n)) covered += 1;
+      else uncovered.set(f, (uncovered.get(f) ?? 0) + 1);
+    }
+  }
+  const worst = [...uncovered].sort((a, b) => b[1] - a[1]).slice(0, 8).map(([f, n]) => `${path.basename(f)} (${n} lines)`).join(', ');
+  return { base: baseRef, covered, total, percent: total ? Math.round((covered / total) * 1000) / 10 : null, worst };
 }
 
 // ---------------------------------------------------------------- baseline
@@ -270,7 +362,7 @@ table{border-collapse:collapse;width:100%}th,td{text-align:left;padding:6px 10px
 tr.new{background:var(--newbg)}code{font-size:12px}a{color:inherit}.filters{margin:8px 0;display:flex;gap:8px;flex-wrap:wrap}
 select,label{font:inherit;color:var(--fg);background:var(--card);border:1px solid var(--line);border-radius:6px;padding:4px 8px}
 </style></head><body><main>
-<h1>Quality Gate</h1><div class="muted">${esc(r.generatedAt)}</div>
+<h1>Quality Gate</h1><div class="muted">${esc(r.generatedAt)} · mode ${esc(r.mode)}${r.strict ? ' (strict)' : ''}</div>
 <p class="status ${r.passed ? 'pass' : 'fail'}">${r.passed ? 'PASSED' : 'FAILED'}</p>
 ${r.reasons.length ? `<ul class="reasons">${r.reasons.map((x) => `<li>${esc(x)}</li>`).join('')}</ul>` : ''}
 ${r.warnings.length ? `<ul class="reasons">${r.warnings.map((x) => `<li class="muted">${esc(x)}</li>`).join('')}</ul>` : ''}
@@ -283,6 +375,7 @@ ${card('Fixed since baseline', r.fixed, r.fixed ? 'ok' : '')}
 ${card('Vulnerable deps (high+)', r.blockingVulns, r.blockingVulns ? 'bad' : 'ok')}
 ${card('Failed tests', r.tests.skipped ? 'skipped' : r.tests.failed.length, r.tests.failed?.length ? 'bad' : 'ok')}
 ${card('Line coverage', r.tests.coverage != null ? `${r.tests.coverage}%` : 'n/a', r.coverageOk === false ? 'bad' : 'ok')}
+${card('New-code coverage', r.newCode?.percent != null ? `${r.newCode.percent}%` : 'n/a', r.newCodeOk === false ? 'warn' : 'ok')}
 </div>
 ${r.tests.failed?.length ? `<h2>Failed tests</h2><div class="tbl"><table><tr><th>File</th><th>Test</th><th>Message</th></tr>${r.tests.failed.map((t) => `<tr class="new"><td><code>${esc(t.file)}</code></td><td>${esc(t.name)}</td><td>${esc(t.message)}</td></tr>`).join('')}</table></div>` : ''}
 ${r.vulns.length ? `<h2>Dependency vulnerabilities</h2><div class="tbl"><table><tr><th>Severity</th><th>Package</th><th>Advisory</th><th>Fix</th><th>Accepted because</th></tr>${r.vulns.map(vulnRow).join('')}</table></div>` : ''}
@@ -329,9 +422,17 @@ async function main() {
   const au = await audit();
   done(au.skipped ? yellow('skipped') : au.unavailable ? yellow(au.reason) : au.vulns.length ? yellow(`${au.vulns.length} advisory(ies)`) : green('none'));
 
-  step('Tests + coverage');
+  step(QUICK ? 'Tests of changed files' : 'Tests + coverage');
   const t = tests();
-  done(t.skipped ? yellow('skipped') : `${t.total - t.failed.length}/${t.total} passed, coverage ${t.coverage ?? 'n/a'}%`);
+  done(t.skipped ? yellow('skipped') : `${t.total - t.failed.length}/${t.total} passed${QUICK ? '' : `, coverage ${t.coverage ?? 'n/a'}%`}`);
+
+  let newCode = null;
+  if (!QUICK && !t.skipped) {
+    step('New-code coverage');
+    newCode = newCodeCoverage();
+    done(newCode == null ? yellow('n/a (no git history)') : newCode.percent == null ? green('no changed executable lines')
+      : `${newCode.covered}/${newCode.total} changed lines tested (${newCode.percent}%) since ${newCode.base}`);
+  }
 
   const baseline = loadBaseline() ?? {};
   const fixed = markNew(issues, baseline);
@@ -341,6 +442,9 @@ async function main() {
   const blockingVulns = vulns.filter((v) => failOn.has(v.severity) && !v.allowed);
   const coverageOk = t.coverage == null ? null : t.coverage >= CONFIG.coverage.minLinePercent;
 
+  const minNewCode = CONFIG.coverage.minNewCodePercent ?? 0;
+  const newCodeOk = newCode?.percent == null ? null : newCode.percent >= minNewCode;
+
   const reasons = [];
   const warnings = [];
   if (tc.ok === false) reasons.push(`${tc.errors.length} TypeScript error(s)`);
@@ -349,15 +453,30 @@ async function main() {
   if (blockingVulns.length) reasons.push(`${blockingVulns.length} unaccepted ${[...failOn].join('/')} dependency vulnerability(ies)`);
   if (t.failed?.length) reasons.push(`${t.failed.length} failing test(s)`);
   if (coverageOk === false) reasons.push(`line coverage ${t.coverage}% is below ${CONFIG.coverage.minLinePercent}%`);
-  if (au.unavailable) warnings.push(`Dependency audit not checked: ${au.reason}`);
+
+  // Local (dev) builds only warn about these; strict (UAT/production) builds fail on every one
+  const strictOnly = [];
+  if (au.unavailable) strictOnly.push(`Dependency audit not checked: ${au.reason}`);
   const newWarnings = newIssues.length - newBlocking.length;
-  if (newWarnings) warnings.push(`${newWarnings} new warning(s) — not blocking, but please fix`);
+  if (newWarnings) strictOnly.push(`${newWarnings} new warning(s)`);
+  const moderateVulns = vulns.filter((v) => v.severity === 'moderate' && !failOn.has('moderate') && !v.allowed);
+  if (moderateVulns.length) strictOnly.push(`${moderateVulns.length} unaccepted moderate dependency vulnerability(ies)`);
+  if (newCodeOk === false) strictOnly.push(`new-code coverage ${newCode.percent}% is below ${minNewCode}% — add tests for: ${newCode.worst}`);
+  if (!QUICK) for (const skipped of ['typecheck', 'audit', 'tests'].filter((x) => SKIP.has(x))) strictOnly.push(`${skipped} skipped (QG_SKIP)`);
+  if (STRICT && !QUICK) reasons.push(...strictOnly);
+  else warnings.push(...strictOnly.map((w) => `${w} — allowed in dev, fails UAT/production builds`));
   if (fixed) warnings.push(`${fixed} baseline finding(s) fixed — run "npm run quality:baseline" to lock that in`);
 
   const byCategory = { Security: 0, Reliability: 0, Maintainability: 0 };
   issues.forEach((i) => (byCategory[i.category] += 1));
+  // Quick runs (before the dev server) report but never block
+  if (QUICK) warnings.unshift(...reasons.splice(0).map((r) => `${r} — fix before you build`));
   const report = {
     generatedAt: new Date().toISOString(),
+    mode: MODE,
+    strict: STRICT && !QUICK,
+    newCode,
+    newCodeOk,
     passed: reasons.length === 0,
     reasons, warnings, issues, newIssues, fixed, byCategory, vulns,
     blockingVulns: blockingVulns.length, tests: t, coverageOk, typecheck: tc,
@@ -372,7 +491,7 @@ async function main() {
   for (const f of t.failed ?? []) console.log(`  ${red('TEST')} ${f.file} › ${f.name}`);
   for (const e of (tc.errors ?? []).slice(0, 20)) console.log(`  ${red('TS')} ${e}`);
   for (const w of warnings) console.log(`  ${yellow('!')} ${w}`);
-  console.log(`\n${bold('Quality gate:')} ${report.passed ? green('PASSED') : red('FAILED')}  ${dim(`report → ${rel(path.join(REPORT_DIR, 'index.html'))}`)}`);
+  console.log(`\n${bold(`Quality gate (${MODE}${QUICK ? ', quick' : STRICT ? ', strict' : ''}):`)} ${report.passed ? green('PASSED') : red('FAILED')}  ${dim(`report → ${rel(path.join(REPORT_DIR, 'index.html'))}`)}`);
   for (const r of reasons) console.log(`  ${red('✗')} ${r}`);
   if (!report.passed) process.exitCode = 1;
 }

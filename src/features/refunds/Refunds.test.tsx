@@ -33,6 +33,10 @@ vi.mock('./api/refundApi', () => ({
     getRefund: vi.fn(),
   },
 }));
+// The order page's profit panel is not part of these tests: it stays loading, without a network call
+vi.mock('../products-management/api/costingApi', () => ({
+  costingApi: { getOrderProfit: vi.fn(() => new Promise(() => {})) },
+}));
 
 const orders = vi.mocked(orderTrackingApi);
 const api = vi.mocked(refundApi);

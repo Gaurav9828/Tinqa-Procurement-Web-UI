@@ -45,4 +45,15 @@ export default defineConfig([
       'sonarjs/no-duplicate-string': 'off',
     },
   },
+  {
+    // End-to-end tests run in Node (Playwright) and write their own reports under reports/e2e
+    files: ['e2e/**', 'playwright.config.ts'],
+    languageOptions: {
+      globals: globals.node,
+    },
+    rules: {
+      'security/detect-non-literal-fs-filename': 'off',
+      'sonarjs/no-duplicate-string': 'off',
+    },
+  },
 ])

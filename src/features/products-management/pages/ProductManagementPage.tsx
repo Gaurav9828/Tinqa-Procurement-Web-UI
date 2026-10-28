@@ -9,6 +9,7 @@ import { EditProductModal } from '../components/EditProductModal';
 import { ProductPreviewModal } from '../components/ProductPreviewModal';
 import { ProductStatusModal } from '../components/ProductStatusModal';
 import { StockAdjustModal } from '../components/StockAdjustModal';
+import { ResubmitProductModal } from '../components/ResubmitProductModal';
 import type { StockAdjustMode } from '../utils/stockAdjustment';
 import type { ProductResponse, CreateProductRequest, UpdateProductRequest } from '../types/product.types';
 import type { ProductApprovalResponse, ProductChangeSummary, ProductCostSummary } from '../types/productApproval.types';
@@ -50,6 +51,8 @@ export const ProductManagementPage: React.FC = () => {
         fieldErrors,
         clearFieldErrors,
         createProduct,
+        saveDraft,
+        createNewVersion,
         updateProduct,
         updateProductStatus,
         requestProductUpdate,
@@ -96,6 +99,20 @@ export const ProductManagementPage: React.FC = () => {
     const [previewProduct, setPreviewProduct] = useState<ProductResponse | null>(null);
     const [statusModalProduct, setStatusModalProduct] = useState<ProductResponse | null>(null);
     const [stockTarget, setStockTarget] = useState<{ product: ProductResponse; mode: StockAdjustMode } | null>(null);
+    const [resubmitting, setResubmitting] = useState<ProductResponse | null>(null);
+    // A saved draft being finished, in its own copy of the create form
+    const [openDraft, setOpenDraft] = useState<ProductResponse | null>(null);
+    const canCreate = can('PRODUCT_CREATE');
+
+    // A new version opens straight away in the draft form (PRODUCT_CREATE)
+    const onCreateVersion = canCreate
+        ? (product: ProductResponse) =>
+              void createNewVersion(product).then((created) => {
+                  if (!created) return;
+                  setEditingProduct(null);
+                  setOpenDraft(created);
+              })
+        : undefined;
 
     const handleCreateProductSubmit = async (payload: CreateProductRequest, costSummary?: ProductCostSummary) => {
         const success = await createProduct(payload, costSummary);
@@ -166,7 +183,7 @@ export const ProductManagementPage: React.FC = () => {
                 categoryFilter={categoryFilter}
                 onCategoryFilterChange={updateCategoryFilter}
                 onOpenCreateModal={
-                    can('PRODUCT_CREATE')
+                    canCreate
                         ? () => {
                               clearFieldErrors();
                               setIsCreateModalOpen(true);
@@ -188,14 +205,16 @@ export const ProductManagementPage: React.FC = () => {
                 onPreview={(product) => setPreviewProduct(product)}
                 onEdit={(product) => {
                     clearFieldErrors();
-                    setEditingProduct(product);
+                    (product.draft ? setOpenDraft : setEditingProduct)(product);
                 }}
                 onAdjustStock={(product, mode) => setStockTarget({ product, mode })}
                 approvalFor={approvalFor}
                 canReview={canReview}
                 actions={productActions}
                 onSubmitForApproval={(product, isResubmission) => {
-                    void submitForApproval(product, isResubmission);
+                    // A resubmitted product's units in stock are scanned again (the rejection released them)
+                    if (isResubmission && product.stockQuantity > 0) setResubmitting(product);
+                    else void submitForApproval(product, isResubmission);
                 }}
                 onReview={setReviewRequest}
                 onApplyUpdate={(request) => {
@@ -203,6 +222,8 @@ export const ProductManagementPage: React.FC = () => {
                 }}
                 onMove={canReorder && !isSearching ? (from, to) => void moveProduct(from, to) : undefined}
                 isReordering={isReordering}
+                allProducts={allProducts}
+                onCreateVersion={onCreateVersion}
             />
 
             {approvals.error && (
@@ -212,6 +233,15 @@ export const ProductManagementPage: React.FC = () => {
                         Retry
                     </button>
                 </p>
+            )}
+
+            {resubmitting && (
+                <ResubmitProductModal
+                    product={resubmitting}
+                    isSubmitting={isSubmitting}
+                    onClose={() => setResubmitting(null)}
+                    onSubmit={(units) => submitForApproval(resubmitting, true, units)}
+                />
             )}
 
             <ProductApprovalReviewModal
@@ -233,10 +263,32 @@ export const ProductManagementPage: React.FC = () => {
                 isSubmitting={isSubmitting}
                 onClose={() => setIsCreateModalOpen(false)}
                 onSubmit={handleCreateProductSubmit}
+                onSaveDraft={(payload) => saveDraft(payload)}
                 serverFieldErrors={fieldErrors}
                 products={allProducts}
                 categories={categories}
             />
+
+            {openDraft && (
+                <CreateProductModal
+                    key={openDraft.id}
+                    draft={openDraft}
+                    isOpen
+                    isSubmitting={isSubmitting}
+                    onClose={() => setOpenDraft(null)}
+                    onSubmit={(payload, costSummary) =>
+                        createProduct(payload, costSummary, openDraft.id).then((submitted) => {
+                            if (submitted) setOpenDraft(null);
+                            return submitted;
+                        })
+                    }
+                    // Saving a draft again is an edit (PRODUCT_UPDATE, held with PRODUCT_CREATE)
+                    onSaveDraft={(payload) => saveDraft(payload, openDraft.id)}
+                    serverFieldErrors={fieldErrors}
+                    products={allProducts.filter((p) => p.id !== openDraft.id)}
+                    categories={categories}
+                />
+            )}
 
             <EditProductModal
                 product={editingProduct}
@@ -247,6 +299,7 @@ export const ProductManagementPage: React.FC = () => {
                 serverFieldErrors={fieldErrors}
                 products={allProducts}
                 categories={categories}
+                onCreateVersion={onCreateVersion}
             />
 
             <ProductPreviewModal

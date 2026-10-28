@@ -95,7 +95,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
     setFormData((prev) => ({ ...prev, specifications: updated }));
   };
 
-  const isFormComplete = !!formData.title.trim() && formData.price > 0 && formData.stockQuantity >= 0;
+  const isFormComplete = !!formData.title.trim() && (formData.price ?? 0) > 0 && formData.stockQuantity >= 0;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

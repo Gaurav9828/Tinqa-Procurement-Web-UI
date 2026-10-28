@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { ArrowRight, RefreshCw, Undo2 } from 'lucide-react';
-import { useApprovals } from './hooks/useApprovals';
+import { REQUEST_QUEUE_PERMISSIONS, useApprovals } from './hooks/useApprovals';
+import { ORDER_QUEUES, isOrderApprovalType, isRejectDecision } from './utils/orderQueues';
 import type { UnifiedApprovalItem } from './types/approval.types';
 
 // Sub-components
@@ -24,8 +25,12 @@ import { PreOrderApprovalsPanel } from './components/PreOrderApprovalsPanel';
 import { usePreOrderApprovals } from './hooks/usePreOrderApprovals';
 import { CompanyProfileApprovalsPanel } from './components/CompanyProfileApprovalsPanel';
 import { useCompanyProfileApprovals } from './hooks/useCompanyProfileApprovals';
+import { BarcodeRequestsPanel } from '../barcodes/components/BarcodeRequestsPanel';
+import { useBarcodeRequests } from '../barcodes/hooks/useBarcodeRequests';
+import { ClientDemoApprovalsPanel } from '../client-demos/components/ClientDemoApprovalsPanel';
+import { useWaitingDemos } from '../client-demos/hooks/useClientDemoData';
 
-type HubTab = 'requests' | 'refunds' | 'expenses' | 'dealers' | 'pre-orders' | 'company-profile';
+type HubTab = 'requests' | 'refunds' | 'expenses' | 'dealers' | 'pre-orders' | 'company-profile' | 'barcodes' | 'client-demos';
 const TAB_STORAGE_KEY = 'approvals.tab';
 
 /** Remembered per browser tab, so Back from an order opened in the refunds queue returns to it. */
@@ -45,27 +50,35 @@ const TABS: { id: HubTab; label: string }[] = [
   { id: 'dealers', label: 'Dealers' },
   { id: 'pre-orders', label: 'Pre-orders' },
   { id: 'company-profile', label: 'Company profile' },
+  { id: 'barcodes', label: 'Barcodes' },
+  { id: 'client-demos', label: 'Client demos' },
 ];
 
 export const ApprovalsHub: React.FC = () => {
   const [selectedTab, setTab] = useState<HubTab>(readTab);
   const { can, canAll, canAny } = useAccess();
-  // Requests: the documents / profiles / stock / orders / products / employees queues; every other tab is one queue
-  const availableTabs = TABS.filter(({ id }) =>
-    id === 'pre-orders'
-      ? canAll('CUSTOMER_ORDER_PRE_ORDER_APPROVE', 'CUSTOMER_ORDER_VIEW')
-      : id === 'company-profile'
-      ? canAll('COMPANY_PROFILE_APPROVE', 'COMPANY_PROFILE_VIEW')
-      : id === 'refunds'
-      ? can('REFUND_APPROVE')
-      : id === 'expenses'
-      ? can('EXPENSE_APPROVE')
-
-      : id === 'dealers'
-      ? canAny('DEALER_LOGIN_APPROVE', 'DEALER_QUOTATION_CHANGE_APPROVE')
-      : canAny('DOCUMENT_APPROVE', 'EMPLOYEE_PROFILE_CHANGE_APPROVE', 'STOCK_APPROVE', 'PROCUREMENT_ORDER_APPROVE',
-          'PRODUCT_APPROVAL_DECIDE', 'EMPLOYEE_APPROVE')
-  );
+  // Requests: the documents / profiles / stock / quotations / orders / returns / products / employees queues; every other tab is one queue
+  const tabAllowed = (id: HubTab): boolean => {
+    switch (id) {
+      case 'pre-orders':
+        return canAll('CUSTOMER_ORDER_PRE_ORDER_APPROVE', 'CUSTOMER_ORDER_VIEW');
+      case 'company-profile':
+        return canAll('COMPANY_PROFILE_APPROVE', 'COMPANY_PROFILE_VIEW');
+      case 'refunds':
+        return can('REFUND_APPROVE');
+      case 'expenses':
+        return can('EXPENSE_APPROVE');
+      case 'barcodes':
+        return can('BARCODE_APPROVE');
+      case 'client-demos':
+        return can('DEMO_APPROVE');
+      case 'dealers':
+        return canAny('DEALER_LOGIN_APPROVE', 'DEALER_QUOTATION_CHANGE_APPROVE');
+      default:
+        return canAny(...REQUEST_QUEUE_PERMISSIONS);
+    }
+  };
+  const availableTabs = TABS.filter(({ id }) => tabAllowed(id));
   const tab: HubTab = availableTabs.some(({ id }) => id === selectedTab) ? selectedTab : availableTabs[0]?.id ?? 'requests';
   // Refunds live in their own tab; the count keeps them visible from the Requests tab.
   const pendingRefunds = usePendingRefundCount();
@@ -75,6 +88,8 @@ export const ApprovalsHub: React.FC = () => {
   const pendingDealers = useDealerApprovals({ quiet: true });
   const preOrders = usePreOrderApprovals();
   const companyProfile = useCompanyProfileApprovals();
+  const barcodeRequests = useBarcodeRequests({ quiet: true });
+  const waitingDemos = useWaitingDemos();
   const selectTab = (next: HubTab) => {
     setTab(next);
     pendingRefunds.refresh();
@@ -82,6 +97,8 @@ export const ApprovalsHub: React.FC = () => {
     pendingDealers.refresh();
     preOrders.refresh();
     companyProfile.refresh();
+    barcodeRequests.refresh();
+    waitingDemos.refresh();
     try {
       sessionStorage.setItem(TAB_STORAGE_KEY, next);
     } catch {
@@ -105,6 +122,45 @@ export const ApprovalsHub: React.FC = () => {
     dealers: { count: pendingDealers.count, noun: 'dealer requests' },
     'pre-orders': { count: preOrders.total, noun: 'pre-orders' },
     'company-profile': { count: companyProfile.pending.length, noun: 'company profile changes' },
+    barcodes: { count: barcodeRequests.count, noun: 'barcode requests' },
+    'client-demos': { count: waitingDemos.data?.length ?? 0, noun: 'client demos' },
+  };
+
+  // Every tab but Requests is one queue with its own panel
+  const queuePanel = (current: HubTab): React.ReactNode => {
+    switch (current) {
+      case 'barcodes':
+        return (
+          <BarcodeRequestsPanel
+            requests={barcodeRequests.requests}
+            isLoading={barcodeRequests.isLoading}
+            isSubmitting={barcodeRequests.isSubmitting}
+            onRefresh={barcodeRequests.refresh}
+            onDecide={barcodeRequests.decide}
+          />
+        );
+      case 'client-demos':
+        return <ClientDemoApprovalsPanel demos={waitingDemos.data ?? []} isLoading={waitingDemos.isLoading} onRefresh={waitingDemos.refresh} />;
+      case 'pre-orders':
+        return <PreOrderApprovalsPanel orders={preOrders.orders} total={preOrders.total} isLoading={preOrders.isLoading} onRefresh={preOrders.refresh} />;
+      case 'company-profile':
+        return <CompanyProfileApprovalsPanel pending={companyProfile.pending} isLoading={companyProfile.isLoading} onRefresh={companyProfile.refresh} />;
+      case 'dealers':
+        return <DealerApprovalsPanel onChanged={pendingDealers.refresh} />;
+      case 'refunds':
+        return <RefundsQueue onChanged={pendingRefunds.refresh} />;
+      case 'expenses':
+        return (
+          <VouchersPanel
+            title="Expenses awaiting approval"
+            description="Expenses, shipping costs and other vouchers raised by the team. Approving posts the money to the company account; you can't approve what you raised."
+            defaultStatus="SUBMITTED"
+            onChanged={pendingVouchers.refresh}
+          />
+        );
+      default:
+        return null;
+    }
   };
 
   // Products have their own review (snapshot + Approve / Reject / Cancel), which also activates the product.
@@ -152,18 +208,11 @@ export const ApprovalsHub: React.FC = () => {
 
   const handleInitiateApprove = (item: ApprovalItem) => {
     if (openProductReview(item)) return;
-    switch(item.approvalType){
-      case 'ORDERS': {
-        setConfirmAction('DEALER_LEVEL_PENDING');
-        break;
-      }
-      case 'DOCUMENT': {
-        setConfirmAction('ACTIVE');
-        break;
-      }
-      default: {
-        setConfirmAction('APPROVED')
-      }
+    const type: unknown = item.approvalType;
+    if (isOrderApprovalType(type)) {
+      setConfirmAction(ORDER_QUEUES[type].approveTo);
+    } else {
+      setConfirmAction(type === 'DOCUMENT' ? 'ACTIVE' : 'APPROVED');
     }
     setIsPreviewOpen(false);
     setConfirmTargetItem(item);
@@ -178,25 +227,25 @@ export const ApprovalsHub: React.FC = () => {
   };
 
   const handleRejectionReasonSubmit = (reason: string, approvalType?: string) => {
-    switch(approvalType){
-      case 'ORDERS': {
-        setConfirmAction('CANCELLED');
-        break;
-      }
-      case 'DOCUMENT': {
-        setConfirmAction('REJECTED');
-        break;
-      }
-      default: {
-        setConfirmAction('REJECTED')
-      }
-    }
     setPendingRejectionReason(reason);
     setIsRejectionModalOpen(false);
     setConfirmTargetItem(rejectionTargetItem);
-    setConfirmAction(approvalType == 'ORDERS' ? 'CANCELLED' : 'REJECTED');
+    setConfirmAction(isOrderApprovalType(approvalType) ? ORDER_QUEUES[approvalType].rejectTo : 'REJECTED');
     setIsConfirmOpen(true);
   };
+
+  // Order queues word the confirmation for what the decision does (submit a quotation, approve a return…)
+  const confirmType: unknown = confirmTargetItem?.approvalType;
+  const confirmQueue = isOrderApprovalType(confirmType) ? ORDER_QUEUES[confirmType] : null;
+  const confirmIsReject = isRejectDecision(confirmAction);
+  const confirmText = confirmQueue
+    ? {
+        title: confirmIsReject ? confirmQueue.rejectTitle : confirmQueue.approveTitle,
+        description: confirmIsReject ? undefined : confirmQueue.approveDescription(String((confirmTargetItem as { orderNumber?: string } | null)?.orderNumber ?? '')),
+        confirmLabel: confirmIsReject ? confirmQueue.rejectLabel : confirmQueue.approveLabel,
+        tone: confirmIsReject ? ('danger' as const) : ('approve' as const),
+      }
+    : {};
 
   const handleExecuteAction = async () => {
     if (!confirmTargetItem || !confirmAction) return;
@@ -206,7 +255,7 @@ export const ApprovalsHub: React.FC = () => {
       // The hook reports success/failure through the global alert.
       const ok = await processPendingApproval(confirmTargetItem, {
         decision: confirmAction,
-        rejectionReason: confirmAction === 'REJECTED' || confirmAction === 'CANCELLED' ? pendingRejectionReason : 'Approved by Admin L2',
+        rejectionReason: isRejectDecision(confirmAction) ? pendingRejectionReason : 'Approved by Admin L2',
       });
       if (!ok) return; // keep the dialog open so the user can retry
 
@@ -229,8 +278,8 @@ export const ApprovalsHub: React.FC = () => {
             Approval Hub
           </h1>
           <p className="text-gray-500 dark:text-neutral-400 text-sm mt-1">
-            Every request waiting for your decision: documents, profile updates, new employees, stock, orders, products,
-            refunds, expenses, dealers, pre-orders and the company profile.
+            Every request waiting for your decision: documents, profile updates, new employees, stock, dealer quotations,
+            orders, returns, products, refunds, expenses, dealers, pre-orders, the company profile and barcodes.
           </p>
         </div>
         {tab === 'requests' && (
@@ -270,22 +319,7 @@ export const ApprovalsHub: React.FC = () => {
         ))}
       </div>
 
-      {tab === 'pre-orders' ? (
-        <PreOrderApprovalsPanel orders={preOrders.orders} total={preOrders.total} isLoading={preOrders.isLoading} onRefresh={preOrders.refresh} />
-      ) : tab === 'company-profile' ? (
-        <CompanyProfileApprovalsPanel pending={companyProfile.pending} isLoading={companyProfile.isLoading} onRefresh={companyProfile.refresh} />
-      ) : tab === 'dealers' ? (
-        <DealerApprovalsPanel onChanged={pendingDealers.refresh} />
-      ) : tab === 'refunds' ? (
-        <RefundsQueue onChanged={pendingRefunds.refresh} />
-      ) : tab === 'expenses' ? (
-        <VouchersPanel
-          title="Expenses awaiting approval"
-          description="Expenses, shipping costs and other vouchers raised by the team. Approving posts the money to the company account; you can't approve what you raised."
-          defaultStatus="SUBMITTED"
-          onChanged={pendingVouchers.refresh}
-        />
-      ) : (
+      {queuePanel(tab) ?? (
         <>
           {pendingRefundCount > 0 && (
             <div
@@ -368,6 +402,7 @@ export const ApprovalsHub: React.FC = () => {
         actionType={confirmAction}
         requestId={confirmTargetItem ? ('id' in confirmTargetItem ? confirmTargetItem.id : confirmTargetItem.requestId) : null}
         rejectionReason={pendingRejectionReason}
+        {...confirmText}
         isSubmitting={isSubmitting}
         onClose={() => setIsConfirmOpen(false)}
         onConfirm={handleExecuteAction}

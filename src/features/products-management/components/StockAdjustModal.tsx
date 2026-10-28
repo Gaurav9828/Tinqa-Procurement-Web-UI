@@ -1,10 +1,16 @@
-import React, { useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { Loader2, PackageMinus, PackagePlus, X } from 'lucide-react';
 import type { ProductResponse, UpdateProductRequest } from '../types/product.types';
 import { useStockAdjustment } from '../hooks/useStockAdjustment';
 import { MAX_STOCK_ADJUSTMENT, STOCK_NOTE_MAX_LENGTH, calculateNewStock, type StockAdjustMode } from '../utils/stockAdjustment';
 import { describeLimitingComponent, quantityOptions } from '../utils/componentStock';
 import { CHOICE_TONE, SOLID_TONE, type ActionTone } from '../../../components/ui/actionTones';
+import type { NewProductUnit, ProductUnitBarcodes } from '../../barcodes/types/barcode.types';
+import { barcodeApi } from '../../barcodes/api/barcodeApi';
+import { useBarcodeList } from '../../barcodes/hooks/useBarcodeList';
+import { ProductUnitsInput } from '../../barcodes/components/ProductUnitsInput';
+import { BarcodeListInput } from '../../barcodes/components/BarcodeListInput';
+import { resizeUnits, toUnitComponents, unitsProblem } from '../../barcodes/utils/productUnits';
 
 interface Props {
   product: ProductResponse;
@@ -24,8 +30,13 @@ export const StockAdjustModal: React.FC<Props> = ({ product, initialMode, update
   const [quantity, setQuantity] = useState('');
   const [note, setNote] = useState('');
   const [serverError, setServerError] = useState<string | null>(null);
+  // Every unit carries a barcode: units added are scanned with their pieces, units taken out are named
+  const [units, setUnits] = useState<NewProductUnit[]>([]);
+  const [removed, setRemoved] = useState<string[]>([]);
 
   const { product: latest, isLoading, loadFailed, isSaving, adjust, capacity, capacityError } = useStockAdjustment(product.id, updateProduct);
+  const loadUnits = useCallback((id: number) => barcodeApi.forProduct(id), []);
+  const productUnits = useBarcodeList<ProductUnitBarcodes>(mode === 'reduce' ? product.id : null, loadUnits, 'product unit barcodes');
   const currentStock = latest?.stockQuantity ?? product.stockQuantity;
   // Products built from components can only grow as far as their items' stock allows.
   const usesComponents = (latest?.components ?? product.components ?? []).length > 0;
@@ -34,12 +45,22 @@ export const StockAdjustModal: React.FC<Props> = ({ product, initialMode, update
 
   const calculation = quantity ? calculateNewStock(currentStock, mode, quantity, maxAdd) : null;
   const inlineError = serverError ?? (calculation && !calculation.ok ? calculation.error : null);
-  const canSave = !isLoading && !loadFailed && !isSaving && !capacityBlocked && !!calculation?.ok;
+  const changed = calculation?.ok ? Math.abs(calculation.newStock - currentStock) : 0;
+
+  const unitComponents = toUnitComponents(latest?.components ?? product.components ?? []);
+  const shownUnits = mode === 'add' ? resizeUnits(units, changed, unitComponents) : [];
+  const unitsError = mode === 'add' && changed > 0 ? unitsProblem(shownUnits, changed, unitComponents) : null;
+  // Units in stock with a barcode; units built before barcodes existed are the only ones that can go unnamed
+  const heldCodes = productUnits.data.filter(({ unit }) => unit.status === 'IN_STOCK' || unit.status === 'PENDING').map(({ unit }) => unit.code);
+  const unnamedAllowed = productUnits.allowed ? Math.max(0, currentStock - heldCodes.length) : 0;
+  const namedNeeded = Math.max(0, changed - unnamedAllowed);
+  const removedReady = mode !== 'reduce' || (removed.length >= namedNeeded && removed.length <= changed);
+  const canSave = !isLoading && !loadFailed && !isSaving && !capacityBlocked && !!calculation?.ok && unitsError === null && removedReady;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!canSave) return;
-    const result = await adjust(mode, quantity, note);
+    const result = await adjust(mode, quantity, note, mode === 'add' ? { newUnits: shownUnits } : { removedUnits: removed.slice(0, changed) });
     if (result.ok) onClose();
     else if (result.quantityError) setServerError(result.quantityError);
   };
@@ -52,7 +73,7 @@ export const StockAdjustModal: React.FC<Props> = ({ product, initialMode, update
         role="dialog"
         aria-modal="true"
         aria-label={`Adjust stock for ${product.title}`}
-        className="bg-white dark:bg-neutral-900 border border-black/10 dark:border-white/10 rounded-2xl w-full max-w-md flex flex-col shadow-2xl text-xs"
+        className="bg-white dark:bg-neutral-900 border border-black/10 dark:border-white/10 rounded-2xl w-full max-w-lg flex flex-col shadow-2xl text-xs max-h-[92vh]"
       >
         <div className="flex items-center justify-between px-6 py-4 border-b border-black/10 dark:border-white/10">
           <div className="flex items-center gap-2 font-bold text-black dark:text-white text-sm">
@@ -63,7 +84,7 @@ export const StockAdjustModal: React.FC<Props> = ({ product, initialMode, update
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} noValidate className="p-6 space-y-4">
+        <form onSubmit={handleSubmit} noValidate className="p-6 space-y-4 overflow-y-auto">
           <div className="flex items-center justify-between gap-3 p-3 bg-black/[0.02] dark:bg-white/[0.02] border border-black/10 dark:border-white/10 rounded-xl">
             <span className="font-semibold text-black dark:text-white truncate">{product.title}</span>
             <span className="shrink-0 text-gray-500">
@@ -100,6 +121,8 @@ export const StockAdjustModal: React.FC<Props> = ({ product, initialMode, update
                     setMode(key);
                     setQuantity('');
                     setServerError(null);
+                    setUnits([]);
+                    setRemoved([]);
                   }}
                   className={`flex items-center justify-center gap-1.5 px-2 py-2 rounded-lg border font-semibold transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ${
                     active ? CHOICE_TONE[tone].active : CHOICE_TONE[tone].idle
@@ -201,6 +224,31 @@ export const StockAdjustModal: React.FC<Props> = ({ product, initialMode, update
                   )}
                 </>
               )}
+            </div>
+          )}
+
+          {mode === 'add' && changed > 0 && (
+            <ProductUnitsInput id="stock-add" units={shownUnits} onChange={setUnits} components={unitComponents} disabled={isSaving} />
+          )}
+
+          {mode === 'reduce' && changed > 0 && (
+            <div className="space-y-1">
+              <BarcodeListInput
+                id="stock-remove"
+                label={`Barcodes of the ${changed} unit${changed === 1 ? '' : 's'} taken out`}
+                what="unit taken out"
+                expected={changed}
+                disabled={isSaving}
+                codes={removed}
+                onChange={setRemoved}
+                suggestions={heldCodes}
+              />
+              <p className="text-[11px] text-gray-400">
+                {namedNeeded < changed
+                  ? `${changed - namedNeeded} of them may go unnamed: units built before barcodes were recorded have none. `
+                  : ''}
+                Their component pieces go back to item stock.
+              </p>
             </div>
           )}
 

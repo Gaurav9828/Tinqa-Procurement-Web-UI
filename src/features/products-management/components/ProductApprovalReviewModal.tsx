@@ -9,6 +9,7 @@ import { CHOICE_TONE, SOLID_TONE, type ActionTone } from '../../../components/ui
 import { useAccess } from '../../../hooks/useAccess';
 import { percent, rupees, signTone } from '../../finance/utils/money';
 import { rupeesToPaise } from '../utils/productCosting';
+import { ProductUnitsPanel } from '../../barcodes/components/ProductUnitsPanel';
 
 interface Props {
   request: ProductApprovalResponse | null;
@@ -213,6 +214,14 @@ export const ProductApprovalReviewModal: React.FC<Props> = ({ request, isSubmitt
               </ul>
             )}
           </div>
+
+          {/* New products: the units' barcodes and their pieces, locked when approved */}
+          {request.requestType !== 'UPDATE' && (
+            <div>
+              <ProductUnitsPanel productId={request.ecommerceProductId} />
+              <p className="mt-1 text-[11px] text-gray-500">Approving locks these barcodes; after that only a Super Admin can change them.</p>
+            </div>
+          )}
 
           <div>
             <span className="block font-semibold text-gray-500 mb-1">Warranties ({snapshot.warranties.length})</span>

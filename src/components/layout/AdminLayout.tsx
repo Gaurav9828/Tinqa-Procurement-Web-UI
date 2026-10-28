@@ -29,7 +29,10 @@ import {
   Star,
   Building2,
   Wallet,
-  BookOpen
+  BookOpen,
+  ScanBarcode,
+  Presentation,
+  MapPin
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useThemeStore } from '../../store/useThemeStore';
@@ -43,6 +46,8 @@ import { usePendingCompanyChangeBadge } from '../../features/company-profile/hoo
 // Comprehensive Icon mapping dictionary
 const ICON_MAP: Record<string, LucideIcon> = {
   CheckCircle2,
+  Presentation,
+  MapPin,
   Package,
   Gavel,
   Users,
@@ -66,6 +71,7 @@ const ICON_MAP: Record<string, LucideIcon> = {
   Building2,
   Wallet,
   BookOpen,
+  ScanBarcode,
 };
 
 export const AdminLayout: React.FC = () => {

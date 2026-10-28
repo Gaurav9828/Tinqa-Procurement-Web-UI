@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import alertReducer from '../../store/alertSlice';
+import companyProfileReducer from '../../store/companyProfileSlice';
 import { GlobalAlertContainer } from '../../components/ui/GlobalAlertContainer';
 import { ApprovalsHub } from './ApprovalsHub';
 import { useAuthStore } from '../../store/useAuthStore';
@@ -16,7 +17,7 @@ vi.mock('./services/approvalService', () => ({
     getPendingDocuments: vi.fn(async () => []),
     getProfileApprovals: vi.fn(async () => []),
     getStocksApprovals: vi.fn(async () => []),
-    getOrdersApprovals: vi.fn(async () => []),
+    getOrdersInStatuses: vi.fn(async () => []),
     getEmployeeApprovals: vi.fn(async () => []),
   },
 }));
@@ -45,7 +46,8 @@ const PENDING = {
 beforeEach(() => {
   vi.clearAllMocks();
   let pending = [PENDING];
-  procurement.get.mockImplementation(async () => ok(pending));
+  // The review also lists the product's unit barcodes (none in these tests)
+  procurement.get.mockImplementation(async (url: string) => (url.startsWith('/v1/barcodes') ? ok([]) : ok(pending)));
   procurement.patch.mockImplementation(async () => {
     pending = [];
     return ok({ ...PENDING, status: 'APPROVED' });
@@ -62,7 +64,7 @@ describe('Approvals hub: products', () => {
   it('lists pending products for Admin L2 and approves them through the product review', async () => {
     const user = userEvent.setup();
     render(
-      <Provider store={configureStore({ reducer: { alert: alertReducer } })}>
+      <Provider store={configureStore({ reducer: { alert: alertReducer, companyProfile: companyProfileReducer } })}>
         <GlobalAlertContainer />
         <ApprovalsHub />
       </Provider>

@@ -12,6 +12,7 @@ import { ecommerceAxiosClient } from '../../../api/ecommerceAxiosClient';
 import { mockDirectEditApprovals } from './directEditApprovals.testUtil';
 import type { ProductResponseDto, WarrantyRequest, WarrantyResponse } from '../types/product.types';
 import { fillGst } from './gstTestUtil';
+import { scanUnitBarcodes } from './barcodeTestUtil';
 import { DIORAMAS, fillCategory } from './categoryTestUtil';
 import { signInAsSuperAdmin } from '../../../test/access';
 
@@ -201,7 +202,11 @@ const openCreate = async (user: User) => {
   expect(screen.getByTestId('new-product-stock')).toHaveTextContent('1'); // stock is fixed at 1 on creation
 };
 /** The page header and the modal footer both have a "Create Product" button; the modal's is last. */
-const submitCreate = (user: User) => user.click(screen.getAllByRole('button', { name: 'Create Product' }).at(-1)!);
+// Every unit carries a barcode: the new unit's is scanned first
+const submitCreate = async (user: User) => {
+  await scanUnitBarcodes(user);
+  await user.click(screen.getAllByRole('button', { name: 'Create Product' }).at(-1)!);
+};
 
 const openEdit = async (user: User, index = 0) => {
   await screen.findByText('SummitX');

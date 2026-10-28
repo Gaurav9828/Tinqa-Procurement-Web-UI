@@ -28,6 +28,10 @@ const PRODUCT: ProductResponse = {
   accessory: false,
   accessoryPurpose: null,
   accessoryBenefits: [],
+  draft: false,
+  versionNumber: 1,
+  previousVersionId: null,
+  sold: false,
   accessoryFor: [],
   accessories: [],
   components: [

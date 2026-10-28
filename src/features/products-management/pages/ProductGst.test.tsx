@@ -6,8 +6,20 @@ import { configureStore } from '@reduxjs/toolkit';
 import alertReducer from '../../../store/alertSlice';
 import { signInAsSuperAdmin } from '../../../test/access';
 import { fillCategory } from './categoryTestUtil';
+import { scanUnitBarcodes } from './barcodeTestUtil';
 import { CreateProductModal } from '../components/CreateProductModal';
 import type { CreateProductRequest } from '../types/product.types';
+
+// The form's lookups (items and stock for the cost sheet, costing settings): empty, these tests are about other fields
+vi.mock('../../item-management/api/itemApi', () => ({
+  itemApi: { getItems: vi.fn().mockResolvedValue({ success: true, data: { content: [], totalElements: 0, totalPages: 0, number: 0, size: 1000 } }), getItemWarranties: vi.fn().mockResolvedValue({ success: true, data: [] }) },
+}));
+vi.mock('../../stock-management/api/stockApi', () => ({
+  stockApi: { getAllStocks: vi.fn().mockResolvedValue({ success: true, data: [] }), getItemAvailability: vi.fn() },
+}));
+vi.mock('../api/costingApi', () => ({
+  costingApi: { getSettings: vi.fn().mockResolvedValue({ success: true, data: { incomeTaxRate: 25 } }), getItemCost: vi.fn() },
+}));
 
 const renderCreate = () => {
   const onSubmit = vi.fn<(payload: CreateProductRequest) => Promise<boolean>>().mockResolvedValue(true);
@@ -55,6 +67,7 @@ describe('product GST (price includes GST, charged by place of supply)', () => {
     expect(split).toHaveTextContent('CGST @ 9%');
     expect(split).toHaveTextContent('IGST @ 18%');
 
+    await scanUnitBarcodes(user);
     await user.click(screen.getByRole('button', { name: 'Create Product' }));
     expect(screen.getByTestId('preview-gst')).toHaveTextContent('GST 18% · HSN/SAC 9405');
     const preview = screen.getByRole('region', { name: 'What the invoice will show per unit' });

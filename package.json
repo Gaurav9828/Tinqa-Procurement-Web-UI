@@ -5,14 +5,21 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "prebuild": "npm run quality",
+    "predev": "node scripts/quality-gate.mjs --mode=dev --quick",
+    "prebuild": "node scripts/quality-gate.mjs --mode=prod",
     "build": "tsc -b && vite build",
+    "postbuild": "node scripts/e2e-gate.mjs --mode=prod",
+    "prebuild:dev": "node scripts/quality-gate.mjs --mode=dev",
+    "build:dev": "tsc -b && vite build",
+    "postbuild:dev": "node scripts/e2e-gate.mjs --mode=dev",
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "quality": "node scripts/quality-gate.mjs",
+    "test:e2e": "playwright test",
+    "quality": "node scripts/quality-gate.mjs --mode=dev",
+    "quality:strict": "node scripts/quality-gate.mjs --mode=prod",
     "quality:baseline": "node scripts/quality-gate.mjs --update-baseline"
   },
   "dependencies": {
@@ -32,6 +39,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@playwright/test": "1.64.1",
     "@tailwindcss/postcss": "^4.3.3",
     "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/react": "^16.3.3",

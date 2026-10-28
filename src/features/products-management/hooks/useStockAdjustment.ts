@@ -5,6 +5,13 @@ import { buildStockUpdatePayload, calculateNewStock, describeStockChange, type S
 import { useNotify } from '../../../hooks/useNotify';
 import { loadComponentCapacity, type ComponentCapacity } from '../utils/componentStock';
 import { getApiErrorMessage } from '../../../utils/apiError';
+import type { NewProductUnit } from '../../barcodes/types/barcode.types';
+
+/** The units the change builds (with their pieces) or takes out, by barcode. */
+export interface StockAdjustBarcodes {
+  newUnits?: NewProductUnit[];
+  removedUnits?: string[];
+}
 
 export interface StockAdjustResult {
   ok: boolean;
@@ -75,7 +82,7 @@ export const useStockAdjustment = (
   }, [productId, fetchLatest]);
 
   const adjust = useCallback(
-    async (mode: StockAdjustMode, quantity: string, note: string): Promise<StockAdjustResult> => {
+    async (mode: StockAdjustMode, quantity: string, note: string, barcodes: StockAdjustBarcodes = {}): Promise<StockAdjustResult> => {
       if (inFlight.current) return { ok: false };
       inFlight.current = true;
       setIsSaving(true);
@@ -100,7 +107,10 @@ export const useStockAdjustment = (
         if (!result.ok) return { ok: false, quantityError: result.error };
 
         const description = describeStockChange(mode, latest.stockQuantity, result.newStock, note);
-        const ok = await updateProduct(productId, buildStockUpdatePayload(latest, result.newStock, description));
+        const ok = await updateProduct(productId, {
+          ...buildStockUpdatePayload(latest, result.newStock, description),
+          ...(mode === 'add' ? { newUnits: barcodes.newUnits ?? [] } : { removedUnits: barcodes.removedUnits ?? [] }),
+        });
         return { ok };
       } finally {
         inFlight.current = false;

@@ -1,6 +1,7 @@
 import React from 'react';
 import { X } from 'lucide-react';
 import { ComponentsPreview } from './ComponentsPreview';
+import { ProductUnitsPanel } from '../../barcodes/components/ProductUnitsPanel';
 import { ProductRatingSummary } from '../../reviews/components/ProductRatingSummary';
 import type { ProductResponse } from '../types/product.types';
 import { describeGst } from '../utils/productTax';
@@ -75,6 +76,8 @@ export const ProductPreviewModal: React.FC<ProductPreviewModalProps> = ({ produc
           )}
 
           {product.components.length > 0 && <ComponentsPreview components={product.components} />}
+
+          <ProductUnitsPanel productId={product.id} />
 
           <ProductProfitPanel productId={product.id} />
 

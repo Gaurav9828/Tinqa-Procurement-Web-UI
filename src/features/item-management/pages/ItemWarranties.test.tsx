@@ -34,7 +34,7 @@ const badRequest = (message: string, errors: { field: string; message: string }[
 const ok = <T,>(data: T, message = 'OK') => ({ data: { success: true, message, data, timestamp: '', path: '' } });
 
 // ---------- fake backend ----------
-type ItemBody = Omit<ItemResponse, 'id' | 'warranties' | 'isActive' | 'sku' | 'categories'> & { categoryIds: number[]; sku?: string; isActive?: boolean; warranties?: ItemWarrantyRequest[] | null };
+type ItemBody = Omit<ItemResponse, 'id' | 'warranties' | 'isActive' | 'sku' | 'categories'> & { categoryIds: number[]; isActive?: boolean; warranties?: ItemWarrantyRequest[] | null };
 let db: ItemResponse[];
 let nextWarrantyId: number;
 const HOURS_AGO = (h: number) => new Date(Date.now() - h * 3600_000).toISOString();
@@ -112,7 +112,8 @@ const installFakeBackend = () => {
     const item = {
       ...fields,
       id,
-      sku: body.sku!,
+      // The server always assigns the SKU: TQ-yyyyMMdd-NNNN
+      sku: `TQ-20261028-${String(id).padStart(4, '0')}`,
       isActive: true,
       categories: categoryIds.map((categoryId) => ({ id: categoryId, name: 'Electronics' })),
       warranties: (body.warranties ?? []).map((w) => toResponse(id, w)),
@@ -189,7 +190,6 @@ const openCreate = async (user: User) => {
   await user.click(screen.getByRole('button', { name: 'Add Item' }));
   // No category is preselected; an item needs at least one
   await user.click(screen.getByRole('button', { name: 'Electronics', pressed: false }));
-  await user.type(screen.getByPlaceholderText('e.g. ESP32-WROOM-32'), 'MOUSE-1');
   await user.type(screen.getByPlaceholderText('e.g. ESP32 Microcontroller Board'), 'Wireless Mouse');
   await user.type(screen.getByPlaceholderText('499.00'), '1299');
 };
@@ -218,6 +218,19 @@ beforeEach(() => {
 
 // ---------- tests ----------
 describe('Create item with warranties', () => {
+  it('never asks for or sends a SKU: the server generates it and the list shows it', async () => {
+    const { user } = renderPage();
+    await openCreate(user);
+    const sku = screen.getByLabelText('SKU');
+    expect(sku).toHaveAttribute('readonly');
+    expect(sku).toBeDisabled();
+    expect(sku).toHaveValue('');
+    await submitCreate(user);
+    await waitFor(() => expect(http.post).toHaveBeenCalledTimes(1));
+    expect(lastBody('post')).not.toHaveProperty('sku');
+    expect(await screen.findByText('TQ-20261028-0102')).toBeInTheDocument();
+  });
+
   it('creates with no warranties without sending the key', async () => {
     const { user } = renderPage();
     await openCreate(user);
@@ -301,7 +314,7 @@ describe('Create item with warranties', () => {
     http.post.mockRejectedValueOnce(
       badRequest('Request validation failed', [
         { field: 'warranties[0].title', message: 'Warranty title cannot exceed 255 characters' },
-        { field: 'sku', message: 'SKU already exists' },
+        { field: 'name', message: 'Item name is required' },
       ])
     );
     const { user } = renderPage();
@@ -315,14 +328,25 @@ describe('Create item with warranties', () => {
     const alerts = within(screen.getByRole('list', { name: 'Notifications' })).getAllByRole('listitem');
     expect(alerts).toHaveLength(2);
     expect(alerts[0]).toHaveTextContent('Warranty title cannot exceed 255 characters');
-    expect(alerts[1]).toHaveTextContent('SKU already exists');
+    expect(alerts[1]).toHaveTextContent('Item name is required');
     expect(screen.queryByText('Request validation failed')).not.toBeInTheDocument();
-    expect(screen.getAllByText(/SKU already exists/).length).toBeGreaterThan(0);
     expect(screen.getByRole('button', { name: 'Create Item' })).toBeInTheDocument(); // form stays open
   });
 });
 
 describe('Edit item warranties', () => {
+  it('shows the SKU read-only and never sends it back', async () => {
+    const { user } = renderPage();
+    await openEdit(user);
+    const sku = screen.getByLabelText('SKU');
+    expect(sku).toHaveValue('ZB-14');
+    expect(sku).toBeDisabled();
+    await editName(user);
+    await submitEdit(user);
+    await waitFor(() => expect(http.put).toHaveBeenCalledTimes(1));
+    expect(lastBody('put')).not.toHaveProperty('sku');
+  });
+
   it('pre-fills saved warranties as collapsed cards with a one-line summary', async () => {
     const { user } = renderPage();
     await openEdit(user);

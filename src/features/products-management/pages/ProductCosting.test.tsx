@@ -16,6 +16,7 @@ import type { ItemResponse } from '../../item-management/types/item.types';
 import type { ProductResponseDto } from '../types/product.types';
 import type { ProductProfit } from '../types/costing.types';
 import { fillGst } from './gstTestUtil';
+import { noBarcodes, scanUnitBarcodes } from './barcodeTestUtil';
 import { DIORAMAS, fillCategory } from './categoryTestUtil';
 
 /**
@@ -101,6 +102,8 @@ let db: ProductResponseDto[];
 
 const installBackends = () => {
   procurement.get.mockImplementation(async (url: string) => {
+    const barcodes = noBarcodes(url);
+    if (barcodes) return barcodes;
     if (url.startsWith('/v1/admin/items?')) return ok({ content: [MOTHERBOARD], totalPages: 1, totalElements: 1 });
     if (url === '/v1/stocks') return ok([{ id: 1, itemId: 7, availableUnits: 10, approvalStatus: 'APPROVED', isActive: true }]);
     if (url === '/v1/stocks/items/7/availability') return ok({ itemId: 7, totalAvailableUnits: 10, stocks: [] });
@@ -197,6 +200,7 @@ describe('Product costing', () => {
     await waitFor(() => expect(within(earns()).getByTestId('profit-tax')).toHaveTextContent('₹1,258.50'));
     expect(within(earns()).getByTestId('profit-pat')).toHaveTextContent('₹3,741.50');
 
+    await scanUnitBarcodes(user);
     await user.click(screen.getAllByRole('button', { name: 'Create Product' }).at(-1)!);
     expect(within(screen.getByTestId('preview-costing')).getByText('2 technicians × 4 hours × ₹250/hour')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Confirm & Create' }));
@@ -235,6 +239,7 @@ describe('Product costing', () => {
     expect(within(earns()).getByText('1 component has no unit cost yet, so the cost is understated.')).toBeInTheDocument();
 
     await user.type(within(row).getByLabelText('Unit cost (₹)'), '12.345');
+    await scanUnitBarcodes(user);
     await user.click(screen.getAllByRole('button', { name: 'Create Product' }).at(-1)!);
     expect(await within(row).findByText('Enter an amount of 0 or more with at most 2 decimals.')).toBeInTheDocument();
     expect(ecom.post).not.toHaveBeenCalled();
@@ -271,6 +276,7 @@ describe('Product costing', () => {
     expect(within(row).queryByLabelText('Unit cost (₹)')).not.toBeInTheDocument();
     expect(screen.queryByRole('group', { name: 'Costing' })).not.toBeInTheDocument();
 
+    await scanUnitBarcodes(user);
     await user.click(screen.getAllByRole('button', { name: 'Create Product' }).at(-1)!);
     await user.click(screen.getByRole('button', { name: 'Confirm & Create' }));
     await waitFor(() => expect(ecom.post).toHaveBeenCalled());

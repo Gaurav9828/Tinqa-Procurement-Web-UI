@@ -26,6 +26,8 @@ import {
 } from 'lucide-react';
 
 import type { UnifiedApprovalItem } from '../types/approval.types';
+import { StockBarcodesPanel } from '../../barcodes/components/StockBarcodesPanel';
+import { ORDER_QUEUES, isOrderApprovalType } from '../utils/orderQueues';
 
 export interface PreviewModalProps {
   request: UnifiedApprovalItem | null;
@@ -86,11 +88,13 @@ export const ApprovalPreviewModal: React.FC<PreviewModalProps> = ({
         };
 
       case 'ORDERS':
+      case 'QUOTATIONS':
+      case 'RETURNS':
         return {
           icon: <ShoppingCart className="w-5 h-5" />,
           iconClass: 'bg-cyan-500/10 text-cyan-500',
-          title: 'Order Approval Details',
-          subtitle: 'Order approval request',
+          title: ORDER_QUEUES[request.approvalType].previewTitle,
+          subtitle: ORDER_QUEUES[request.approvalType].previewSubtitle,
         };
 
       case 'EMPLOYEE':
@@ -113,6 +117,7 @@ export const ApprovalPreviewModal: React.FC<PreviewModalProps> = ({
   };
 
   const header = getHeaderConfig();
+  const orderQueue = isOrderApprovalType(request.approvalType) ? ORDER_QUEUES[request.approvalType] : null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
@@ -485,7 +490,15 @@ export const ApprovalPreviewModal: React.FC<PreviewModalProps> = ({
                 ) : (
                   <p>Nothing is bought until you approve: approving books the passed units to the company account, with the quotation's GST as input tax.</p>
                 )}
+                <p>Approving also locks the barcodes awaiting approval; after that only a Super Admin can change them.</p>
               </div>
+
+              {/* Each passed piece's barcode: what is being approved */}
+              {typeof request.id === 'number' && request.stockIdentityNumber && (
+                <div className="text-xs">
+                  <StockBarcodesPanel stockId={request.id} stockIdentityNumber={request.stockIdentityNumber} />
+                </div>
+              )}
 
               {/* Stock Summary */}
               <div className="p-4 rounded-xl bg-black/5 dark:bg-white/5">
@@ -596,7 +609,7 @@ export const ApprovalPreviewModal: React.FC<PreviewModalProps> = ({
           {/* ==========================================================
               ORDERS PREVIEW
           ========================================================== */}
-          {request.approvalType === 'ORDERS' && (
+          {(request.approvalType === 'ORDERS' || request.approvalType === 'QUOTATIONS' || request.approvalType === 'RETURNS') && (
             <div className="space-y-4">
 
               {/* Order Summary */}
@@ -645,6 +658,13 @@ export const ApprovalPreviewModal: React.FC<PreviewModalProps> = ({
                 </div>
 
               </div>
+
+              {typeof request.additionalInfo?.dealerNote === 'string' && (
+                <p className="text-sm rounded-xl bg-gray-50 dark:bg-white/5 px-3 py-2">
+                  <span className="text-xs text-gray-400 block">Dealer's note</span>
+                  {request.additionalInfo.dealerNote}
+                </p>
+              )}
 
               {/* Order Details */}
               <div className="grid grid-cols-2 gap-3">
@@ -742,7 +762,7 @@ export const ApprovalPreviewModal: React.FC<PreviewModalProps> = ({
             className="px-4 py-2 rounded-xl bg-rose-500/10 text-rose-600 dark:text-rose-400 hover:bg-rose-500 hover:text-white font-medium text-xs transition-all cursor-pointer flex items-center gap-1.5"
           >
             <X className="w-4 h-4" />
-            Reject
+            {orderQueue?.rejectAction ?? 'Reject'}
           </button>
 
           <button
@@ -750,7 +770,7 @@ export const ApprovalPreviewModal: React.FC<PreviewModalProps> = ({
             className="px-4 py-2 rounded-xl bg-emerald-500 text-white hover:bg-emerald-600 font-medium text-xs transition-all cursor-pointer flex items-center gap-1.5 shadow-sm"
           >
             <Check className="w-4 h-4" />
-            Approve
+            {orderQueue?.approveAction ?? 'Approve'}
           </button>
 
         </div>

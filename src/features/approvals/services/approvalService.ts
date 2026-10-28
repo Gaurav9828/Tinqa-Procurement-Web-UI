@@ -1,7 +1,7 @@
 import { axiosClient } from '../../../api/axiosClient';
 import { documentService } from '../../../api/services/documentService';
 import type { DocumentApprovalItem, ProfileApprovalRequest, ProcessApprovalPayload, StocksApprovalRequest, OrdersApprovalRequest } from '../types/approval.types';
-import type { ApiResponse } from '../../../types/common.types'
+import type { ApiResponse, OrderStatus } from '../../../types/common.types'
 import type { EmployeeResponse } from '../../employee-management/types/employee.types';
 
 
@@ -24,8 +24,11 @@ export const approvalService = {
     return response.data.data || [];
   },
 
-  getOrdersApprovals: async (): Promise<OrdersApprovalRequest[]> => {
-    const response = await axiosClient.get<ApiResponse<OrdersApprovalRequest[]>>(`/v1/orders/status/PENDING`);
+  // Orders in any of the statuses, oldest first, in one call: the hub's quotation, order and return queues
+  getOrdersInStatuses: async (statuses: OrderStatus[]): Promise<OrdersApprovalRequest[]> => {
+    const params = new URLSearchParams();
+    statuses.forEach((status) => params.append('status', status));
+    const response = await axiosClient.get<ApiResponse<OrdersApprovalRequest[]>>(`/v1/orders?${params}`);
     return response.data.data || [];
   },
 

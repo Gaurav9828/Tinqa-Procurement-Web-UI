@@ -5,6 +5,7 @@ import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import alertReducer from '../../../store/alertSlice';
 import { StockFormModal } from './StockFormModal';
+import { scanAllBarcodes } from '../../products-management/pages/barcodeTestUtil';
 import type { OrderResponse } from '../../order-management/types/order.types';
 
 const ORDERS = [
@@ -67,19 +68,44 @@ describe('Create stock entry from order', () => {
     expect(screen.getByText('1 unit failed the test.')).toBeInTheDocument();
   });
 
-  it('submits the derived values', async () => {
+  it('submits the derived values, with one barcode per passed unit', async () => {
     const { user } = renderForm('ORD-1');
     await user.selectOptions(passed(), '3');
+    await scanAllBarcodes(user, screen.getByTestId('stock-barcodes-barcodes'));
     await user.click(screen.getByRole('button', { name: /Submit Entry/ }));
-    expect(onRequestSubmit).toHaveBeenCalledWith(expect.objectContaining({ orderNumber: 'ORD-1', unitsPassedTest: 3, defectedUnits: 2, hasTested: false }));
+    expect(onRequestSubmit).toHaveBeenCalledWith(
+      expect.objectContaining({ orderNumber: 'ORD-1', unitsPassedTest: 3, defectedUnits: 2, hasTested: false, barcodes: expect.any(Array) })
+    );
+    expect(onRequestSubmit.mock.calls[0][0].barcodes).toHaveLength(3);
   });
 
-  it('requires choosing the passed units', async () => {
+  it('requires choosing the passed units and scanning each one', async () => {
     const { user } = renderForm('ORD-1');
     expect(screen.getByRole('button', { name: /Submit Entry/ })).toBeDisabled();
     await user.selectOptions(passed(), '5');
+    expect(screen.getByRole('button', { name: /Submit Entry/ })).toBeDisabled();
+    await scanAllBarcodes(user, screen.getByTestId('stock-barcodes-barcodes'));
     expect(screen.getByRole('button', { name: /Submit Entry/ })).toBeEnabled();
     expect(onRequestSubmit).not.toHaveBeenCalled();
+  });
+
+  it('takes barcodes upper-case, refuses malformed and repeated ones, and drops the extra ones when fewer units pass', async () => {
+    const { user } = renderForm('ORD-1');
+    await user.selectOptions(passed(), '2');
+    const scan = screen.getByLabelText(/Barcodes of the 2 passed units/);
+    await user.type(scan, 'tq12345678{Enter}');
+    expect(screen.getByRole('list', { name: /entered barcodes/ })).toHaveTextContent('TQ12345678');
+    await user.type(scan, 'TQ12345678{Enter}');
+    expect(screen.getByRole('alert')).toHaveTextContent('TQ12345678 is already entered.');
+    await user.type(scan, 'bad{Enter}');
+    expect(screen.getByRole('alert')).toHaveTextContent('BAD is not a valid barcode');
+    await user.type(scan, 'TQ87654321{Enter}');
+    expect(screen.getByText('All 2 barcodes entered.')).toBeInTheDocument();
+
+    await user.selectOptions(passed(), '1');
+    expect(within(screen.getByRole('list', { name: /entered barcodes/ })).getAllByRole('listitem')).toHaveLength(1);
+    await user.click(screen.getByRole('button', { name: /Submit Entry/ }));
+    expect(onRequestSubmit).toHaveBeenCalledWith(expect.objectContaining({ unitsPassedTest: 1, barcodes: ['TQ12345678'] }));
   });
 
   it('resets the passed units when a different order is picked', async () => {

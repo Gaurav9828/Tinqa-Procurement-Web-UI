@@ -14,6 +14,7 @@ import { useAuthStore } from '../../../store/useAuthStore';
 import type { ProductResponseDto } from '../types/product.types';
 import type { ProductApprovalResponse, ProductApprovalStatus } from '../types/productApproval.types';
 import { fillGst } from './gstTestUtil';
+import { noBarcodes, scanUnitBarcodes } from './barcodeTestUtil';
 import { DIORAMAS, fillCategory } from './categoryTestUtil';
 import { superAdminPermissions } from '../../../test/access';
 
@@ -104,6 +105,8 @@ const installBackends = () => {
   });
 
   procurement.get.mockImplementation(async (url: string, config?: { params?: unknown }) => {
+    const barcodes = noBarcodes(url);
+    if (barcodes) return barcodes;
     if (url === '/v1/product-approvals/latest') {
       if (approvalsFail) throw httpError(503, 'Procurement service unavailable');
       const ids = String((config?.params as { productIds?: string } | undefined)?.productIds ?? '').split(',').map(Number);
@@ -197,6 +200,7 @@ describe('Creating a product needs approval', () => {
   await fillCategory(user);
   };
   const confirmCreate = async (user: User) => {
+    await scanUnitBarcodes(user);
     await user.click(screen.getAllByRole('button', { name: 'Create Product' }).at(-1)!);
     await user.click(await screen.findByRole('button', { name: 'Confirm & Create' }));
   };
@@ -269,8 +273,15 @@ describe('Product list shows the approval state and limits actions', () => {
     await screen.findByText('Rejected Router');
     await waitForStates();
     await user.click(within(row(3)).getByRole('button', { name: 'Resubmit Rejected Router for approval' }));
+    // The rejection released its units: those in stock are scanned again before resubmitting
+    const dialog = screen.getByRole('dialog', { name: 'Resubmit Rejected Router for approval' });
+    expect(within(dialog).getByRole('button', { name: /Resubmit for approval/ })).toBeDisabled();
+    await scanUnitBarcodes(user, 'resubmit');
+    await user.click(within(dialog).getByRole('button', { name: /Resubmit for approval/ }));
     await waitFor(() => expect(stateOf(3)).toHaveAttribute('data-state', 'PENDING'));
     expect(await screen.findByText('Product resubmitted for approval. It stays inactive until approved.')).toBeInTheDocument();
+    const submitted = procurement.post.mock.calls.at(-1)?.[1] as { units: { barcode: string }[] };
+    expect(submitted.units).toHaveLength(products.find((p) => p.title === 'Rejected Router')!.stockQuantity!);
   });
 
   it('a rejected product can be edited but not switched on; the reason is shown', async () => {

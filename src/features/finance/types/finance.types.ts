@@ -18,7 +18,15 @@ export type VoucherSource = 'MANUAL' | 'SHIPMENT';
 /** How GST appears on a voucher's bill: none, CGST + SGST (same state) or IGST (another state). */
 export type TaxTreatment = 'NONE' | 'INTRA_STATE' | 'INTER_STATE';
 export type VoucherDocumentKind = 'INVOICE' | 'RECEIPT' | 'PAYMENT_PROOF' | 'OTHER';
-export type LedgerSource = 'CUSTOMER_PAYMENT' | 'CUSTOMER_REFUND' | 'PROCUREMENT_ORDER' | 'PROCUREMENT_SALARY' | 'VOUCHER' | 'REVERSAL';
+export type LedgerSource =
+  | 'CUSTOMER_PAYMENT'
+  | 'CUSTOMER_REFUND'
+  | 'PROCUREMENT_ORDER'
+  | 'PROCUREMENT_SALARY'
+  // A client demo's costs, booked when its completion (or a correction) is approved
+  | 'PROCUREMENT_DEMO'
+  | 'VOUCHER'
+  | 'REVERSAL';
 
 export interface FinanceCategory {
   code: string;

@@ -89,7 +89,8 @@ const renderPage = () => {
 const listedTitles = () =>
   screen.getAllByTestId(/^product-row-/).map((row) => within(row).getAllByRole('cell')[1].textContent?.trim());
 
-const handle = (title: string) => screen.getByRole('button', { name: new RegExp(`^Move ${title}, position`) });
+const handle = (title: string) =>
+  screen.getByRole('button', { name: (name) => name.startsWith(`Move ${title}, position`) });
 
 const drag = (fromTitle: string, toTitle: string) => {
   const dataTransfer = { setData: vi.fn(), setDragImage: vi.fn(), effectAllowed: '', dropEffect: '' };

@@ -37,6 +37,8 @@ vi.mock('../api/companyProfileApi', () => ({
   },
 }));
 const api = vi.mocked(companyProfileApi);
+// The email settings card (Level 2 Super Admins) is not part of these tests: it stays loading, without a network call
+vi.mock('../api/emailSettingsApi', () => ({ emailSettingsApi: { get: vi.fn(() => new Promise(() => {})) } }));
 
 const ok = <T,>(data: T): ApiResponse<T> => ({ success: true, message: '', data } as ApiResponse<T>);
 const apiError = (status: number, errorCode: string, message: string, errors: { field: string; message: string }[] = []) => {

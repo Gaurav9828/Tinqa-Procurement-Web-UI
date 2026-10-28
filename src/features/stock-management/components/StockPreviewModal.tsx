@@ -2,6 +2,7 @@ import React from 'react';
 import { X, Package, Building2, Tag, Layers, Calendar, FileText, ShoppingCart } from 'lucide-react';
 import { StockStatusBadge } from './StockStatusBadge';
 import type { StockResponse } from '../types/stock.types';
+import { StockBarcodesPanel } from '../../barcodes/components/StockBarcodesPanel';
 
 interface StockPreviewModalProps {
   isOpen: boolean;
@@ -153,6 +154,13 @@ export const StockPreviewModal: React.FC<StockPreviewModalProps> = ({
               </div>
             </div>
 
+            <div className="md:col-span-2">
+              <StockBarcodesPanel
+                stockId={stock.id}
+                stockIdentityNumber={stock.stockIdentityNumber}
+                unitsWithoutBarcode={Number(stock.unitsWithoutBarcode ?? 0)}
+              />
+            </div>
           </div>
 
           {/* Reference Info / Timestamps if applicable */}

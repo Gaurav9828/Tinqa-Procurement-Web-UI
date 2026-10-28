@@ -5,23 +5,34 @@ import { ProductCategoryField } from './ProductCategoryField';
 import { findCategory, resolveCategoryName, validateCategoryName } from '../utils/productCategory';
 import { ProductWarrantiesEditor } from './ProductWarrantiesEditor';
 import { FormFieldErrors } from './FormFieldErrors';
-import { toProductWarrantyRequests, validateProductWarranties } from '../utils/warrantyForm';
+import { toProductWarrantyForms, toProductWarrantyRequests, validateProductWarranties } from '../utils/warrantyForm';
 import { useProductWarranties } from '../hooks/useProductWarranties';
 import { formatWarrantyDuration, formatWarrantyType, warrantiesComplete } from '../../item-management/utils/itemWarranty';
 import { ProductComponentsSection } from './ProductComponentsSection';
 import { ComponentsPreview } from './ComponentsPreview';
-import { dropComponentErrors, toComponentRequests, validateComponentRows, type ComponentFormRow } from '../utils/componentForm';
+import { dropComponentErrors, toComponentRequests, toComponentRows, validateComponentRows, type ComponentFormRow } from '../utils/componentForm';
 import { componentMaxFor } from '../utils/componentStock';
-import { describeGst, emptyTaxForm, toGstFields, validateTaxForm, type ProductTaxForm } from '../utils/productTax';
+import { describeGst, emptyTaxForm, toGstFields, toTaxForm, validateTaxForm, type ProductTaxForm } from '../utils/productTax';
 import { ProductTaxSection } from './ProductTaxSection';
 import { ProductTaxBreakdown } from './ProductTaxBreakdown';
 import { ProductAccessorySection } from './ProductAccessorySection';
-import { describeAccessory, dropAccessoryErrors, emptyAccessoryForm, toAccessoryFields, validateAccessoryForm, type AccessoryForm } from '../utils/accessoryForm';
-import { useAccess } from '../../../hooks/useAccess';
+import {
+    describeAccessory,
+    dropAccessoryErrors,
+    emptyAccessoryForm,
+    toAccessoryFields,
+    toAccessoryForm,
+    validateAccessoryForm,
+    type AccessoryForm,
+} from '../utils/accessoryForm';
 import { useIncomeTaxRate } from '../hooks/useCosting';
+import { useEditCosts } from '../hooks/useEditCosts';
 import { ProductCostingSection } from './ProductCostingSection';
 import { ProfitBreakdown } from './ProfitBreakdown';
 import type { ProductCostSummary } from '../types/productApproval.types';
+import type { NewProductUnit } from '../../barcodes/types/barcode.types';
+import { ProductUnitsInput } from '../../barcodes/components/ProductUnitsInput';
+import { resizeUnits, toUnitComponents, unitsProblem } from '../../barcodes/utils/productUnits';
 import {
     costPreviewRows,
     costPreviewWarnings,
@@ -30,13 +41,46 @@ import {
     toCostEntryRequests,
     toCostSummary,
     validateCostEntries,
-    type CostEntryRow,
     type CostPreview,
 } from '../utils/productCosting';
+import { NewVersionNote, ProductVersionBadge } from './ProductVersionBadge';
 
 /** A new product always starts with exactly one unit: its components describe what one unit uses. */
 const NEW_PRODUCT_STOCK = 1;
 const NO_SAVED_COMPONENTS = new Map<number, number>();
+const IMAGE_FIELDS = ['image1Url', 'image2Url', 'image3Url', 'image4Url', 'image5Url'] as const;
+
+/** The saved images of a draft, one input each (at least one). */
+const draftImages = (draft: ProductResponse | null): string[] => {
+    const saved = draft ? IMAGE_FIELDS.map((field) => draft[field] ?? '').filter(Boolean) : [];
+    return saved.length > 0 ? saved : [''];
+};
+
+/** The form's starting values: empty, or a saved draft's (a draft saved without a price comes back as 0). */
+const initialValues = (draft: ProductResponse | null) => ({
+    title: draft?.title ?? '',
+    category: draft?.category?.name ?? '',
+    tagline: draft?.tagline ?? '',
+    description: draft?.description ?? '',
+    price: draft && draft.price > 0 ? draft.price : ('' as const),
+    discountPercentage: draft?.discountPercentage ?? ('' as const),
+    tax: draft ? toTaxForm(draft) : emptyTaxForm(),
+    accessory: draft ? toAccessoryForm(draft) : emptyAccessoryForm(),
+    specifications:
+        draft && draft.specifications.length > 0
+            ? draft.specifications.map((spec) => ({ specKey: spec.specKey, specValue: spec.specValue }))
+            : [{ specKey: '', specValue: '' }],
+});
+
+/** Main button and its confirmation: a draft is submitted, a new product created. */
+const submitLabels = (isDraft: boolean, isSubmitting: boolean) => {
+    if (isSubmitting) return { submit: 'Saving...', confirm: 'Saving...' };
+    return isDraft ? { submit: 'Submit for Approval', confirm: 'Confirm & Submit' } : { submit: 'Create Product', confirm: 'Confirm & Create' };
+};
+
+/** A draft keeps only what was filled in, so only those GST fields are checked; the rest is asked for on submit. */
+const draftTaxErrors = (tax: ProductTaxForm, errors: Record<string, string>): Record<string, string> =>
+    Object.fromEntries(Object.entries(errors).filter(([field]) => (field === 'hsnSac' ? tax.hsnSac.trim() : tax.gstRate) !== ''));
 
 interface CreateProductModalProps {
     isOpen: boolean;
@@ -44,6 +88,10 @@ interface CreateProductModalProps {
     onClose: () => void;
     /** `costSummary`: one unit's cost and profit, shown to the approver (only for those who can see costs). */
     onSubmit: (payload: CreateProductRequest, costSummary?: ProductCostSummary) => Promise<boolean>;
+    /** Saves the form as a draft (only title and category needed). No "Save as draft" button when absent. */
+    onSaveDraft?: (payload: CreateProductRequest) => Promise<boolean>;
+    /** A saved draft to finish: the form opens filled with it, and submitting it builds its first unit. */
+    draft?: ProductResponse | null;
     /** Backend 400 field errors from the last save (e.g. `warranties[0].title`). */
     serverFieldErrors?: Record<string, string>;
     /** Every product, to pick the parents of an accessory from. */
@@ -60,40 +108,50 @@ export const CreateProductModal: React.FC<CreateProductModalProps> = ({
     serverFieldErrors,
     products = [],
     categories = [],
+    onSaveDraft,
+    draft = null,
 }) => {
-    const [title, setTitle] = useState('');
-    const [category, setCategory] = useState('');
+    // A draft fills the form once, when it opens (the page mounts one form per draft)
+    const [initial] = useState(() => initialValues(draft));
+    const [title, setTitle] = useState(initial.title);
+    const [category, setCategory] = useState(initial.category);
     // Shown once the field was left or a save was tried, not while the user is still on their way to it
     const [categoryTouched, setCategoryTouched] = useState(false);
-    const [tagline, setTagline] = useState('');
-    const [description, setDescription] = useState('');
-    const [price, setPrice] = useState<number | ''>('');
-    const [discountPercentage, setDiscountPercentage] = useState<number | ''>('');
+    const [tagline, setTagline] = useState(initial.tagline);
+    const [description, setDescription] = useState(initial.description);
+    const [price, setPrice] = useState<number | ''>(initial.price);
+    const [discountPercentage, setDiscountPercentage] = useState<number | ''>(initial.discountPercentage);
     // GST included in the price: which taxes apply and their rates
-    const [tax, setTax] = useState<ProductTaxForm>(emptyTaxForm);
-    const [accessory, setAccessory] = useState<AccessoryForm>(emptyAccessoryForm);
+    const [tax, setTax] = useState<ProductTaxForm>(initial.tax);
+    const [accessory, setAccessory] = useState<AccessoryForm>(initial.accessory);
 
     // Dynamic Image URLs (up to 5, starting with 1)
-    const [imageUrls, setImageUrls] = useState<string[]>(['']);
+    const [imageUrls, setImageUrls] = useState<string[]>(() => draftImages(draft));
 
     // Dynamic Specifications
-    const [specifications, setSpecifications] = useState<SpecificationDTO[]>([
-        { specKey: '', specValue: '' },
-    ]);
+    const [specifications, setSpecifications] = useState<SpecificationDTO[]>(initial.specifications);
 
     // Components (items) with their auto-added item warranties. Zero is allowed.
-    const [components, setComponents] = useState<ComponentFormRow[]>([]);
+    const [components, setComponents] = useState<ComponentFormRow[]>(() => toComponentRows(draft?.components));
+    // The first unit's barcode and its pieces' barcodes, one per piece of each component
+    const [units, setUnits] = useState<NewProductUnit[]>([]);
 
-    // Extra costs of one unit (manpower, software...): seen with PRODUCT_COST_VIEW, entered with PRODUCT_COST_EDIT
-    const [costRows, setCostRows] = useState<CostEntryRow[]>([]);
-    const { can } = useAccess();
-    const canSeeCosts = can('PRODUCT_COST_VIEW');
-    const canEditCosts = canSeeCosts && can('PRODUCT_COST_EDIT');
+    // Extra costs of one unit (manpower, software...): seen with PRODUCT_COST_VIEW, entered with PRODUCT_COST_EDIT.
+    // A draft's saved cost sheet is loaded and filled in when it arrives.
+    const { canSeeCosts, canEditCosts, savedSheet, costRows, setCostRows } = useEditCosts(draft, setComponents);
     const incomeTaxRate = useIncomeTaxRate(isOpen);
+    // A new form has nothing saved; a draft's costs are sent once its saved ones are known (so they're never wiped)
+    const costsKnown = !draft || !!savedSheet;
 
     const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
     // Warranties (product-level), including copies of the selected items' warranties. Zero is allowed.
     const { warranties, onChange: handleWarrantiesChange, reset: resetWarranties } = useProductWarranties(components, setFieldErrors);
+    // A draft's saved warranties (state adjusted during render, not in an effect)
+    const [warrantiesLoaded, setWarrantiesLoaded] = useState(!draft);
+    if (!warrantiesLoaded && draft) {
+        setWarrantiesLoaded(true);
+        resetWarranties(toProductWarrantyForms(draft.warranties));
+    }
     // Show backend field errors from the latest save inline (state adjusted during render, not in an effect).
     const [shownServerErrors, setShownServerErrors] = useState(serverFieldErrors);
     if (serverFieldErrors !== shownServerErrors) {
@@ -109,7 +167,11 @@ export const CreateProductModal: React.FC<CreateProductModalProps> = ({
     if (!isOpen) return null;
 
     const taxErrors = validateTaxForm(tax);
+    const labels = submitLabels(!!draft, isSubmitting);
     const categoryError = validateCategoryName(category);
+    const unitComponents = toUnitComponents(components);
+    const shownUnits = resizeUnits(units, NEW_PRODUCT_STOCK, unitComponents);
+    const unitsError = unitsProblem(shownUnits, NEW_PRODUCT_STOCK, unitComponents);
     const costPreview = previewCosts({
         price,
         discountPercentage,
@@ -127,6 +189,7 @@ export const CreateProductModal: React.FC<CreateProductModalProps> = ({
         Number(price) >= 0 &&
         components.every((row) => row.itemId !== null && !!row.quantity.trim()) &&
         warrantiesComplete(warranties) &&
+        unitsError === null &&
         Object.keys(taxErrors).length === 0;
 
     const handleAddImageUrl = () => {
@@ -161,6 +224,63 @@ export const CreateProductModal: React.FC<CreateProductModalProps> = ({
         setSpecifications(updated.length > 0 ? updated : [{ specKey: '', specValue: '' }]);
     };
 
+    // A draft needs only a title and a category; whatever else is filled in must be valid
+    const draftTaxProblems = draftTaxErrors(tax, taxErrors);
+    const canSaveDraft = !!onSaveDraft && title.trim() !== '' && categoryError === null && Object.keys(draftTaxProblems).length === 0;
+
+    /** The form as a request. A draft leaves out what isn't filled in yet and sends no unit barcodes. */
+    const buildPayload = (asDraft: boolean): CreateProductRequest => {
+        // Filter out empty specifications if any
+        const filteredSpecs = specifications.filter(
+            (spec) => spec.specKey.trim() !== '' || spec.specValue.trim() !== ''
+        );
+        // An existing draft is replaced as a whole (empty lists clear what was saved); a new product sends only what it has
+        const replaceAll = !!draft;
+        return {
+            title,
+            categoryName: resolveCategoryName(categories, category),
+            tagline: tagline || undefined,
+            description: description || undefined,
+            ...(asDraft && price === '' ? {} : { price: Number(price) || 0 }),
+            discountPercentage: discountPercentage !== '' ? Number(discountPercentage) : undefined,
+            ...toGstFields(tax),
+            stockQuantity: asDraft ? 0 : NEW_PRODUCT_STOCK,
+            // Always inactive: activation happens when Admin L2 approves the product.
+            enabled: false,
+            lastUpdateDescription: undefined,
+            image1Url: imageUrls[0] || undefined,
+            image2Url: imageUrls[1] || undefined,
+            image3Url: imageUrls[2] || undefined,
+            image4Url: imageUrls[3] || undefined,
+            image5Url: imageUrls[4] || undefined,
+            specifications: filteredSpecs.length > 0 || replaceAll ? filteredSpecs : undefined,
+            // Includes the warranties copied from the selected items. A new product never sends ids; a draft keeps its saved ones.
+            warranties: warranties.length > 0 || replaceAll ? toProductWarrantyRequests(warranties, replaceAll) : undefined,
+            components: components.length > 0 || replaceAll ? toComponentRequests(components, canEditCosts) : undefined,
+            ...(canEditCosts && costsKnown && (costRows.length > 0 || replaceAll) ? { costEntries: toCostEntryRequests(costRows) } : {}),
+            ...toAccessoryFields(accessory),
+            ...(asDraft ? {} : { newUnits: shownUnits }),
+        };
+    };
+
+    const handleSaveDraft = async () => {
+        setCategoryTouched(true);
+        if (!onSaveDraft || !canSaveDraft || isSubmitting) return;
+        // Item stock is checked when the draft is submitted, not now: nothing is taken from it yet
+        const clientErrors = {
+            ...validateComponentRows(components),
+            ...validateProductWarranties(warranties),
+            ...validateAccessoryForm(accessory),
+            ...(canEditCosts ? validateCostEntries(costRows) : {}),
+        };
+        setFieldErrors(clientErrors);
+        if (Object.keys(clientErrors).length > 0) return;
+        if (await onSaveDraft(buildPayload(true))) {
+            resetForm();
+            onClose();
+        }
+    };
+
     const handleInitialSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         if (!isFormValid) return;
@@ -174,40 +294,31 @@ export const CreateProductModal: React.FC<CreateProductModalProps> = ({
         setFieldErrors(clientErrors);
         if (Object.keys(clientErrors).length > 0) return;
 
-        // Filter out empty specifications if any
-        const filteredSpecs = specifications.filter(
-            (spec) => spec.specKey.trim() !== '' || spec.specValue.trim() !== ''
-        );
-
-        const payload: CreateProductRequest = {
-            title,
-            categoryName: resolveCategoryName(categories, category),
-            tagline: tagline || undefined,
-            description: description || undefined,
-            price: Number(price) || 0,
-            discountPercentage: discountPercentage !== '' ? Number(discountPercentage) : undefined,
-            ...toGstFields(tax),
-            stockQuantity: NEW_PRODUCT_STOCK,
-            // Always inactive: activation happens when Admin L2 approves the product.
-            enabled: false,
-            lastUpdateDescription: undefined,
-            image1Url: imageUrls[0] || undefined,
-            image2Url: imageUrls[1] || undefined,
-            image3Url: imageUrls[2] || undefined,
-            image4Url: imageUrls[3] || undefined,
-            image5Url: imageUrls[4] || undefined,
-            specifications: filteredSpecs.length > 0 ? filteredSpecs : undefined,
-            // New product: never send ids.
-            // New product: never send ids. Includes the warranties copied from the selected items.
-            warranties: warranties.length > 0 ? toProductWarrantyRequests(warranties, false) : undefined,
-            components: components.length > 0 ? toComponentRequests(components, canEditCosts) : undefined,
-            ...(canEditCosts && costRows.length > 0 ? { costEntries: toCostEntryRequests(costRows) } : {}),
-            ...toAccessoryFields(accessory),
-        };
-
-        setPendingPayload(payload);
+        setPendingPayload(buildPayload(false));
         setPendingCosts(canSeeCosts ? costPreview : null);
         setShowPreviewModal(true);
+    };
+
+    const resetForm = () => {
+        setTitle('');
+        setCategory('');
+        setCategoryTouched(false);
+        setTagline('');
+        setDescription('');
+        setPrice('');
+        setDiscountPercentage('');
+        setTax(emptyTaxForm());
+        setAccessory(emptyAccessoryForm());
+        setImageUrls(['']);
+        setSpecifications([{ specKey: '', specValue: '' }]);
+        resetWarranties([]);
+        setComponents([]);
+        setUnits([]);
+        setCostRows([]);
+        setPendingCosts(null);
+        setFieldErrors({});
+        setShowPreviewModal(false);
+        setPendingPayload(null);
     };
 
     const handleConfirmSubmit = async () => {
@@ -217,25 +328,7 @@ export const CreateProductModal: React.FC<CreateProductModalProps> = ({
         const costSummary = pendingCosts ? toCostSummary(pendingCosts) : undefined;
         const success = await (costSummary ? onSubmit(pendingPayload, costSummary) : onSubmit(pendingPayload));
         if (success) {
-            // Reset form fields and close modals
-            setTitle('');
-            setCategory('');
-            setCategoryTouched(false);
-            setTagline('');
-            setDescription('');
-            setPrice('');
-            setDiscountPercentage('');
-            setTax(emptyTaxForm());
-            setAccessory(emptyAccessoryForm());
-            setImageUrls(['']);
-            setSpecifications([{ specKey: '', specValue: '' }]);
-            resetWarranties([]);
-            setComponents([]);
-            setCostRows([]);
-            setPendingCosts(null);
-            setFieldErrors({});
-            setShowPreviewModal(false);
-            setPendingPayload(null);
+            resetForm();
             onClose();
         } else {
             // Back to the form so any inline (field) errors are visible.
@@ -249,7 +342,10 @@ export const CreateProductModal: React.FC<CreateProductModalProps> = ({
                 <div className="bg-white dark:bg-neutral-900 border border-black/10 dark:border-white/10 rounded-2xl w-full max-w-2xl overflow-hidden shadow-xl text-xs">
                     {/* Modal Header */}
                     <div className="flex items-center justify-between px-6 py-4 border-b border-black/10 dark:border-white/10">
-                        <h2 className="text-sm font-bold text-black dark:text-white">Create New Product</h2>
+                        <h2 className="text-sm font-bold text-black dark:text-white">
+                            {draft ? `Finish Draft #${draft.id}` : 'Create New Product'}
+                            <ProductVersionBadge product={draft} />
+                        </h2>
                         <button
                             onClick={onClose}
                             className="p-1 text-gray-400 hover:text-black dark:hover:text-white rounded-lg cursor-pointer"
@@ -260,6 +356,7 @@ export const CreateProductModal: React.FC<CreateProductModalProps> = ({
 
                     {/* Modal Form */}
                     <form onSubmit={handleInitialSubmit} className="p-6 space-y-4 max-h-[80vh] overflow-y-auto">
+                        <NewVersionNote product={draft} />
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div>
                                 <label className="block font-medium text-gray-700 dark:text-gray-300 mb-1">Title *</label>
@@ -338,7 +435,9 @@ export const CreateProductModal: React.FC<CreateProductModalProps> = ({
                                 >
                                     1
                                 </p>
-                                <p className="mt-1 text-[10px] text-gray-400">New products start with 1 unit. Use Add stock later.</p>
+                                <p className="mt-1 text-[10px] text-gray-400">
+                                    New products start with 1 unit, built when you submit (a draft holds none). Use Add stock later.
+                                </p>
                             </div>
                         </div>
 
@@ -439,6 +538,17 @@ export const CreateProductModal: React.FC<CreateProductModalProps> = ({
                             disabled={isSubmitting}
                         />
 
+                        <section aria-label="Unit barcodes" className="space-y-2">
+                            <h3 className="font-semibold text-gray-700 dark:text-gray-300">Barcodes</h3>
+                            <ProductUnitsInput
+                                id="new-product"
+                                units={shownUnits}
+                                onChange={setUnits}
+                                components={unitComponents}
+                                disabled={isSubmitting}
+                            />
+                        </section>
+
                         {canSeeCosts && (
                             <ProductCostingSection
                                 rows={costRows}
@@ -469,6 +579,12 @@ export const CreateProductModal: React.FC<CreateProductModalProps> = ({
                         <p role="note" className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-400">
                             New products are created <strong>inactive</strong> and sent for approval. The product
                             goes live once a catalog approver approves it.
+                            {onSaveDraft && (
+                                <>
+                                    {' '}Not finished yet? <strong>Save as draft</strong> needs only the title and category: nothing is
+                                    taken from item stock and nothing is sent for approval until you submit it.
+                                </>
+                            )}
                         </p>
 
                         {/* Footer Actions */}
@@ -480,12 +596,23 @@ export const CreateProductModal: React.FC<CreateProductModalProps> = ({
                             >
                                 Cancel
                             </button>
+                            {onSaveDraft && (
+                                <button
+                                    type="button"
+                                    onClick={() => void handleSaveDraft()}
+                                    disabled={!canSaveDraft || isSubmitting}
+                                    title={canSaveDraft ? 'Save what you have and finish it later' : 'Enter a title and a category to save a draft'}
+                                    className="px-4 py-2 border border-[#0071e3]/40 text-[#0071e3] hover:bg-[#0071e3]/10 rounded-xl font-medium transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    {draft ? 'Save Draft' : 'Save as Draft'}
+                                </button>
+                            )}
                             <button
                                 type="submit"
                                 disabled={!isFormValid || isSubmitting}
                                 className="px-4 py-2 bg-[#0071e3] hover:bg-[#0077ed] text-white rounded-xl font-medium transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                             >
-                                {isSubmitting ? 'Creating...' : 'Create Product'}
+                                {labels.submit}
                             </button>
                         </div>
                     </form>
@@ -542,7 +669,7 @@ export const CreateProductModal: React.FC<CreateProductModalProps> = ({
                             <div className="grid grid-cols-3 gap-2 bg-black/[0.02] dark:bg-white/[0.02] p-3 rounded-xl border border-black/5 dark:border-white/5">
                                 <div>
                                     <span className="text-gray-400 block">Price (incl. GST)</span>
-                                    <span className="font-bold text-black dark:text-white text-sm">₹{pendingPayload.price}</span>
+                                    <span className="font-bold text-black dark:text-white text-sm">₹{pendingPayload.price ?? 0}</span>
                                 </div>
                                 <div>
                                     <span className="text-gray-400 block">Discount</span>
@@ -631,6 +758,18 @@ export const CreateProductModal: React.FC<CreateProductModalProps> = ({
                                 <ComponentsPreview components={pendingPayload.components} />
                             )}
 
+                            {pendingPayload.newUnits?.map((unit) => (
+                                <div key={unit.barcode} data-testid="preview-unit-barcodes">
+                                    <span className="font-semibold text-gray-500 dark:text-gray-400 block mb-1">Unit barcode:</span>
+                                    <p className="font-mono text-black dark:text-white">{unit.barcode}</p>
+                                    {unit.parts.length > 0 && (
+                                        <p className="text-gray-500 font-mono break-all">
+                                            {unit.parts.flatMap((part) => part.barcodes).join(', ')}
+                                        </p>
+                                    )}
+                                </div>
+                            ))}
+
                             {pendingPayload.accessory && (
                                 <div data-testid="preview-accessory">
                                     <span className="font-semibold text-gray-500 dark:text-gray-400 block mb-1">Accessory:</span>
@@ -676,7 +815,7 @@ export const CreateProductModal: React.FC<CreateProductModalProps> = ({
                                 onClick={handleConfirmSubmit}
                                 className="px-4 py-2 bg-[#0071e3] hover:bg-[#0077ed] text-white rounded-xl font-medium transition-colors cursor-pointer disabled:opacity-50"
                             >
-                                {isSubmitting ? 'Saving...' : 'Confirm & Create'}
+                                {labels.confirm}
                             </button>
                         </div>
                     </div>

@@ -1,5 +1,6 @@
 import React from 'react';
 import type { UnifiedApprovalItem } from '../types/approval.types';
+import { isOrderApprovalType } from '../utils/orderQueues';
 
 interface ApprovalMetricsProps {
   approvals: UnifiedApprovalItem[];
@@ -22,9 +23,9 @@ export const ApprovalMetrics: React.FC<ApprovalMetricsProps> = ({ approvals }) =
       </div>
       <div className="p-5 rounded-2xl bg-white dark:bg-neutral-900 border border-black/10 dark:border-white/10 shadow-sm">
         <p className="text-xs font-semibold text-gray-500 dark:text-neutral-400 uppercase">
-          Order / Payment Approvals
+          Quotations, Orders & Returns
         </p>
-        <p className="text-3xl font-bold mt-2 text-blue-500">{approvals.filter((a) => a.approvalType == 'ORDERS').length}</p>
+        <p className="text-3xl font-bold mt-2 text-blue-500">{approvals.filter((a) => isOrderApprovalType(a.approvalType)).length}</p>
       </div>
     </div>
   );
