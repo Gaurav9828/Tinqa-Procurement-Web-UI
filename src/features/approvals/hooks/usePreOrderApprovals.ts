@@ -11,9 +11,9 @@ export const PRE_ORDER_QUEUE_SIZE = 100;
 /**
  * Customer pre-orders waiting for approval (GET /admin/orders?status=PRE_ORDER_PENDING), oldest first. Loads only for
  * those who may approve them and read the order list. The approval itself happens on the order's page, which shows
- * stock readiness and payment.
+ * stock readiness and payment. `enabled`: load only while the hub's Pre-orders tab is open.
  */
-export const usePreOrderApprovals = () => {
+export const usePreOrderApprovals = ({ enabled = true }: { enabled?: boolean } = {}) => {
   const { canAll } = useAccess();
   const allowed = canAll('CUSTOMER_ORDER_PRE_ORDER_APPROVE', 'CUSTOMER_ORDER_VIEW');
   const notify = useNotify();
@@ -23,7 +23,7 @@ export const usePreOrderApprovals = () => {
   const [isLoading, setIsLoading] = useState(false);
 
   const refresh = useCallback(async () => {
-    if (!allowed) return;
+    if (!allowed || !enabled) return;
     const isCurrent = beginRequest();
     setIsLoading(true);
     try {
@@ -40,7 +40,7 @@ export const usePreOrderApprovals = () => {
     } finally {
       if (isCurrent()) setIsLoading(false);
     }
-  }, [allowed, beginRequest, notify]);
+  }, [allowed, enabled, beginRequest, notify]);
 
   useEffect(() => {
     refresh();

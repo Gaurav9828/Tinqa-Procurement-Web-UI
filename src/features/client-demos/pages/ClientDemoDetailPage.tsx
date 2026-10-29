@@ -5,7 +5,7 @@ import { StatusStepper } from '../../../components/ui/StatusStepper';
 import { ConfirmationModal } from '../../../components/ui/ConfirmationModal';
 import { useAccess } from '../../../hooks/useAccess';
 import { useApiAction } from '../../../hooks/useApiAction';
-import type { DemoDetail, DemoExpense, DemoMode, ExpenseKind } from '../types/clientDemo.types';
+import type { DemoDetail, DemoExpense, DemoMode, DemoUnit, ExpenseKind } from '../types/clientDemo.types';
 import { clientDemoApi } from '../api/clientDemoApi';
 import { useDemo } from '../hooks/useClientDemoData';
 import { useClientDemoActions } from '../hooks/useClientDemoActions';
@@ -14,6 +14,7 @@ import { DemoStatusBadge } from '../components/DemoStatusBadge';
 import { DemoBills } from '../components/DemoBills';
 import { DemoTimeline } from '../components/DemoTimeline';
 import { DemoOverview } from '../components/DemoOverview';
+import { DemoUnits } from '../components/DemoUnits';
 import { DemoActions, type DemoAction } from '../components/DemoActions';
 import { BillDialog } from '../components/BillDialog';
 import { ReasonDialog } from '../components/ReasonDialog';
@@ -23,6 +24,7 @@ import { approvalSummary, demoAbilities, isCorrection, nextStepHint, waitingFor 
 type Dialog =
   | { kind: 'bill'; expense: DemoExpense | null; initialKind: ExpenseKind; day: number | null }
   | { kind: 'remove-bill'; expense: DemoExpense }
+  | { kind: 'write-off'; unit: DemoUnit }
   | { kind: 'approve' | 'reject' | 'complete' | 'cancel' | 'reopen' | 'delete' }
   | null;
 
@@ -50,6 +52,13 @@ const DemoDialog: React.FC<{
         <ReasonDialog title="Remove this bill?" subtitle={`${inrAmount(dialog.expense.amount)} comes off the demo’s total.`} label="Reason"
           required={changeNeedsReason(demo.status)} confirmLabel="Remove bill" tone="danger" isSubmitting={busy} onClose={onClose}
           onConfirm={(reason) => done(actions.removeBill(demo.id, dialog.expense.id, reason || null))} />
+      );
+    case 'write-off':
+      return (
+        <ReasonDialog title={`Write off unit ${dialog.unit.barcode}?`}
+          subtitle={`${dialog.unit.productName ?? 'The unit'} did not come back from the demo. It leaves stock for good, with its parts.`}
+          label="What happened" confirmLabel="Write off" tone="danger" isSubmitting={busy} onClose={onClose}
+          onConfirm={(reason) => done(actions.writeOff(demo.id, dialog.unit.barcode, reason))} />
       );
     case 'approve':
       return (
@@ -116,7 +125,8 @@ const DemoProgress: React.FC<{ demo: DemoDetail; mode: DemoMode; blockedApprover
 /**
  * One client demo, step by step: its plan, the approval of its quotation, the bills of the visit day by day, the
  * approval of its completion (which books the total spent) and its timeline. Demo managers act on it here; approvers
- * decide here (from the Approvals Hub); attending staff open it from My Demos and record their own bills.
+ * decide here (from the Approvals Hub); attending staff open it from My Demos, record their own bills and hand the
+ * product units taken out and back.
  */
 export const ClientDemoDetailPage: React.FC<{ mode: DemoMode }> = ({ mode }) => {
   const { id: idParam } = useParams();
@@ -159,13 +169,18 @@ export const ClientDemoDetailPage: React.FC<{ mode: DemoMode }> = ({ mode }) => 
             <span className="font-mono text-sm text-gray-400">{demo.reference}</span>
             <DemoStatusBadge status={demo.status} />
           </h1>
-          <p className="text-gray-500 text-sm mt-0.5">{DEMO_TYPE_LABELS[demo.demoType]} · {demo.clientCategoryLabel} · {demo.city}</p>
+          <p className="text-gray-500 text-sm mt-0.5">
+            {DEMO_TYPE_LABELS[demo.demoType]} · {demo.clientCategoryLabel} · {demo.city}
+            {demo.clients.length > 1 && ` · +${demo.clients.length - 1} more ${demo.clients.length === 2 ? 'client' : 'clients'}`}
+          </p>
         </div>
         <DemoActions demo={demo} abilities={abilities} busy={actions.isSubmitting} onAction={act} />
       </div>
 
       <DemoProgress demo={demo} mode={mode} blockedApprover={abilities.blockedApprover} />
       <DemoOverview demo={demo} />
+      <DemoUnits demo={demo} canHandle={abilities.handleUnits} canWriteOff={abilities.writeOffUnits} busy={actions.isSubmitting} onHandOut={(barcodes) => actions.handOut(demo.id, barcodes)}
+        onHandBack={(barcodes) => actions.handBack(demo.id, barcodes)} onWriteOff={(unit) => setDialog({ kind: 'write-off', unit })} />
       <DemoBills
         demo={demo}
         canAdd={abilities.addBills}

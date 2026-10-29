@@ -67,6 +67,11 @@ export const OrderPreviewModal: React.FC<OrderPreviewModalProps> = ({ order, onC
               <p className="text-gray-500">
                 {order.orderQuantity} {order.unitType} @ ₹{order.unitPrice}
               </p>
+              {typeof order.additionalInfo?.priceChangeReason === 'string' && (
+                <p className="text-[10px] text-amber-700 dark:text-amber-400">
+                  Existing price ₹{Number(order.additionalInfo.mrp ?? 0).toFixed(2)}. Reason: {order.additionalInfo.priceChangeReason}
+                </p>
+              )}
             </div>
           </div>
 

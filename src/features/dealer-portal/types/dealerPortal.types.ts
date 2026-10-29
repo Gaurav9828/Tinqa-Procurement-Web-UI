@@ -26,6 +26,8 @@ export interface DealerItem {
   brand: string | null;
   sku: string;
   unitOfMeasure: string;
+  /** The item's existing price; quoting another price needs a reason. */
+  mrp: number | null;
 }
 
 /** The quotation terms a dealer may change. In a change only the proposed fields are set. */
@@ -106,6 +108,8 @@ export interface CreateQuotationRequest {
   taxBreakup?: Record<string, unknown>;
   expectedDelivery?: string;
   note?: string;
+  /** Required when unitPrice differs from the item's MRP. */
+  priceChangeReason?: string;
 }
 
 export type OrderDecision = 'ACCEPT' | 'REJECT';

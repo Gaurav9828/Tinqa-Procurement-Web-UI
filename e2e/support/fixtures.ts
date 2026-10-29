@@ -168,6 +168,8 @@ export const handlers = (session: Session): [string, RegExp, Handler][] => [
   ['GET', /^\/v1\/orders\/status\/\w+$/, () => ok([])],
   ['GET', /^\/v1\/orders\/\d+$/, () => notFound('ORDER_NOT_FOUND')],
   ['GET', /^\/v1\/documents$/, () => ok([])],
+  // Approvals hub badges: nothing waiting in any queue
+  ['GET', /^\/v1\/approvals\/summary$/, () => ok({})],
   ['GET', /^\/v1\/product-approvals$/, () => ok([])],
   ['GET', /^\/v1\/product-approvals\/latest$/, () => ok([])],
   // Barcodes: the Approvals hub's queue, a stock entry's or product's units, and a trace (none recorded)
@@ -185,6 +187,8 @@ export const handlers = (session: Session): [string, RegExp, Handler][] => [
   ['GET', /^\/v1\/admin\/client-demos$/, () => ok([])],
   ['GET', /^\/v1\/admin\/client-demos\/waiting$/, () => ok([])],
   ['GET', /^\/v1\/admin\/client-demos\/staff$/, () => ok([])],
+  ['GET', /^\/v1\/admin\/client-demos\/units$/, () => ok([])],
+  ['GET', /^\/v1\/admin\/client-demos\/units\/lookup$/, () => notFound('BARCODE_NOT_FOUND')],
   ['GET', /^\/v1\/admin\/client-demos\/\d+$/, () => notFound('RESOURCE_NOT_FOUND')],
   ['GET', /^\/v1\/client-demos\/mine$/, () => ok([])],
   ['GET', /^\/v1\/client-demos\/mine\/\d+$/, () => notFound('RESOURCE_NOT_FOUND')],
@@ -195,6 +199,7 @@ export const handlers = (session: Session): [string, RegExp, Handler][] => [
   ['GET', /^\/admin\/company\/profile$/, () => ok({ live: null, pendingChanges: [], myDrafts: [] })],
   ['GET', /^\/admin\/company\/profile\/versions$/, () => ok(page([]))],
   ['GET', /^\/admin\/company\/profile\/versions\/\d+$/, () => notFound('COMPANY_PROFILE_VERSION_NOT_FOUND')],
+  ['GET', /^\/admin\/approvals\/summary$/, () => ok({})],
   ['GET', /^\/admin\/orders$/, () => ok(page([]))],
   ['GET', /^\/admin\/orders\/tracking-statuses$/, () => ok(TRACKING_STATUSES)],
   ['GET', /^\/admin\/orders\/[^/]+$/, () => notFound('ORDER_NOT_FOUND')],
@@ -217,4 +222,5 @@ export const handlers = (session: Session): [string, RegExp, Handler][] => [
     fromName: null, replyTo: null, ready: false, updatedBy: null, updatedAt: null, pendingEmails: 0, failedEmails: 0,
   })],
   ['GET', /^\/products$/, () => ok([])],
+  ['GET', /^\/products\/active$/, () => ok([])],
 ];

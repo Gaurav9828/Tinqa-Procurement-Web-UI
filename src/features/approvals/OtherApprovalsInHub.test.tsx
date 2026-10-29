@@ -15,12 +15,14 @@ import type { AdminOrderSummary } from '../order-tracking/types/orderTracking.ty
 import type { CompanyProfileVersion } from '../company-profile/types/companyProfile.types';
 import type { Permission } from '../../config/access';
 import { APPROVAL_PERMISSIONS } from '../../config/access';
+import { ecommerceAxiosClient } from '../../api/ecommerceAxiosClient';
 
 vi.mock('../../api/axiosClient', () => ({ axiosClient: { get: vi.fn(), patch: vi.fn() } }));
 vi.mock('../../api/ecommerceAxiosClient', () => ({ ecommerceAxiosClient: { get: vi.fn(), patch: vi.fn() } }));
 vi.mock('../order-tracking/api/orderTrackingApi', () => ({ orderTrackingApi: { listOrders: vi.fn() } }));
 vi.mock('../company-profile/api/companyProfileApi', () => ({ companyProfileApi: { getOverview: vi.fn() } }));
 const tracking = vi.mocked(orderTrackingApi);
+const ecommerce = vi.mocked(ecommerceAxiosClient);
 const company = vi.mocked(companyProfileApi);
 
 const ok = <T,>(data: T) => ({ success: true, message: 'OK', errorCode: null, timestamp: '', path: '', data });
@@ -68,6 +70,7 @@ beforeEach(() => {
   } catch {
     // ignore
   }
+  ecommerce.get.mockResolvedValue({ data: ok({ PRE_ORDERS: 1, COMPANY_PROFILE: 2 }) });
   tracking.listOrders.mockResolvedValue(ok({ content: [PRE_ORDER], totalElements: 1, totalPages: 1, number: 0, size: 100 }) as never);
   company.getOverview.mockResolvedValue(
     ok({ live: null, pendingChanges: [PENDING_VERSION(), PENDING_VERSION({ id: 13, versionNo: 5, section: 'SHIPPING', createdBy: 'maker2', submittedBy: 'maker2' })], myDrafts: [] })
@@ -87,6 +90,9 @@ describe('Approvals hub: pre-orders and company profile', () => {
     const tab = await screen.findByRole('tab', { name: /Pre-orders/ });
     await waitFor(() => expect(tab).toHaveTextContent('1'));
     expect(screen.queryByRole('tab', { name: /Company profile/ })).not.toBeInTheDocument();
+    expect(ecommerce.get).toHaveBeenCalledWith('/admin/approvals/summary');
+    // Pre-orders is this approver's only tab, so it is open and its queue loads straight away
+    expect(tracking.listOrders).toHaveBeenCalledTimes(1);
     expect(tracking.listOrders).toHaveBeenCalledWith(expect.objectContaining({ status: 'PRE_ORDER_PENDING', sort: 'createdAt,asc' }));
     expect(company.getOverview).not.toHaveBeenCalled();
 

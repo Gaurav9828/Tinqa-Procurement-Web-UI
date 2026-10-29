@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { barcodeListError, isValidBarcode, normalizeBarcode, repeatedAcrossUnits, splitBarcodes } from './barcode';
 import { resizeUnits, toUnitComponents, unitsProblem } from './productUnits';
+import { fitToComponents, rememberedUnits, rememberUnits, updateRememberedUnits } from './rememberedUnits';
 
 describe('barcode rules (same as the backends)', () => {
   it('accepts 8-32 letters, digits and inner hyphens, compared upper-case', () => {
@@ -61,5 +62,23 @@ describe('product units', () => {
     expect(repeatedAcrossUnits([complete, reused])).toBe('BRD00001');
     expect(unitsProblem([complete, reused], 2, components)).toBe('BRD00001 is used more than once: every unit and piece has its own barcode.');
     expect(unitsProblem([complete], 2, components)).toBe('Enter the barcodes of 2 units.');
+  });
+});
+
+describe('unit barcodes kept for a resubmission', () => {
+  it('keeps them per product and follows stock changes', () => {
+    rememberUnits(5, [{ barcode: 'UNIT0001', parts: [] }]);
+    updateRememberedUnits(5, [{ barcode: 'UNIT0002', parts: [] }], ['UNIT0001']);
+    expect(rememberedUnits(5).map((unit) => unit.barcode)).toEqual(['UNIT0002']);
+    expect(rememberedUnits(6)).toEqual([]);
+    rememberUnits(5, []);
+    expect(rememberedUnits(5)).toEqual([]);
+  });
+
+  it('fits them to the components after an edit: dropped components go, quantities cut', () => {
+    const kept = [{ barcode: 'UNIT0001', parts: [{ itemId: 1, barcodes: ['PCE00001', 'PCE00002'] }, { itemId: 2, barcodes: ['PCE00003'] }] }];
+    expect(fitToComponents(kept, [{ itemId: 1, itemName: 'Board', quantity: 1 }, { itemId: 3, itemName: 'Fan', quantity: 1 }])).toEqual([
+      { barcode: 'UNIT0001', parts: [{ itemId: 1, barcodes: ['PCE00001'] }, { itemId: 3, barcodes: [] }] },
+    ]);
   });
 });

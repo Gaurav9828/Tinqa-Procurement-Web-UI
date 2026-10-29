@@ -17,6 +17,7 @@ import { getApiErrorMessage, getApiFieldErrors } from '../../../utils/apiError';
 import { buildApprovalSnapshot, buildApprovedUpdatePayload, snapshotFromRequest } from '../utils/productApproval';
 import { toProduct } from '../utils/productMapper';
 import type { NewProductUnit } from '../../barcodes/types/barcode.types';
+import { rememberUnits } from '../../barcodes/utils/rememberedUnits';
 
 export const PRODUCT_SUBMITTED_MESSAGE =
   'Product created and sent for approval. It stays inactive until it is approved.';
@@ -72,6 +73,8 @@ export const useProductActions = (onSuccessCallback?: () => void) => {
         onSuccessCallback?.();
         return true;
       }
+      // Kept so a resubmission after a rejection starts from these codes
+      rememberUnits(created.id, inactive.newUnits ?? []);
       try {
         const approval = await productApprovalApi.submit({
           ecommerceProductId: created.id,
@@ -245,6 +248,7 @@ export const useProductActions = (onSuccessCallback?: () => void) => {
           snapshot: buildApprovalSnapshot(product),
           ...(isResubmission ? { units: units ?? [] } : {}),
         });
+        if (res.success && isResubmission) rememberUnits(product.id, units ?? []);
         // Always tell the user the product stays inactive (not the server's generic text).
         return res.success ? { ...res, message: '' } : res;
       },

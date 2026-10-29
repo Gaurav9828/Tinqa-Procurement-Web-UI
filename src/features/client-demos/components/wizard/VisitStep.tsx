@@ -1,10 +1,11 @@
 import React from 'react';
 import { CommonTextArea } from '../../../../components/ui/FormInputs';
 import { CHOICE_TONE } from '../../../../components/ui/actionTones';
+import type { ProductResponse } from '../../../products-management/types/product.types';
 import type { DemoType, StaffMember } from '../../types/clientDemo.types';
-import { DEMO_TYPE_LABELS, MAX_DAYS, todayIso } from '../../utils/clientDemo';
+import { DEMO_TYPE_LABELS } from '../../utils/clientDemo';
+import { ProductPicker, type UnitWindow } from '../ProductPicker';
 import { StaffPicker } from '../StaffPicker';
-import { PlanField } from './PlanField';
 import type { PlanStepProps } from './planStepProps';
 
 const TYPE_HINTS: Record<DemoType, string> = {
@@ -12,13 +13,15 @@ const TYPE_HINTS: Record<DemoType, string> = {
   PROMOTION: 'Promoting products at their place',
 };
 
-/** Step 2: appointment or promotion, when and for how many days, and the attending staff. */
+/** Step 2: appointment or promotion, the agenda, the products shown (each unit by barcode) and the attending staff. */
 export const VisitStep: React.FC<PlanStepProps & {
-  isNew: boolean;
   staffOptions: StaffMember[];
   staffLoading: boolean;
   knownStaff: StaffMember[];
-}> = ({ isNew, staffOptions, staffLoading, knownStaff, ...props }) => {
+  productOptions: ProductResponse[];
+  productsLoading: boolean;
+  unitWindow: UnitWindow;
+}> = ({ staffOptions, staffLoading, knownStaff, productOptions, productsLoading, unitWindow, ...props }) => {
   const { form, errors, set } = props;
   return (
     <>
@@ -35,13 +38,10 @@ export const VisitStep: React.FC<PlanStepProps & {
         </div>
         {errors.demoType && <p className="text-rose-500">{errors.demoType}</p>}
       </div>
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <PlanField plan={props} name="startDate" label="Date" required type="date" min={isNew ? todayIso() : undefined} />
-        <PlanField plan={props} name="startTime" label="Time" required type="time" />
-        <PlanField plan={props} name="numberOfDays" label="Number of days" required type="number" min={1} max={MAX_DAYS} />
-      </div>
       <CommonTextArea label="Purpose / agenda" value={form.purpose} maxLength={1000} rows={2}
         placeholder="What will be shown or discussed" onChange={(e) => set('purpose', e.target.value)} />
+      <ProductPicker options={productOptions} isLoading={productsLoading} selected={form.products} errors={errors}
+        unitWindow={unitWindow} onChange={(products) => set('products', products)} />
       <StaffPicker options={staffOptions} isLoading={staffLoading} known={knownStaff}
         selected={form.staffEmployeeIds} error={errors.staffEmployeeIds} onChange={(ids) => set('staffEmployeeIds', ids)} />
     </>

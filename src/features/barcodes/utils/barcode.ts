@@ -57,6 +57,7 @@ export const BARCODE_STATUS_LABELS: Record<BarcodeStatus, string> = {
   FITTED: 'Fitted in a product',
   REMOVED: 'Removed from stock',
   WITHDRAWAL_PENDING: 'Being taken off',
+  ON_DEMO: 'Out on a client demo',
   VOID: 'Void',
 };
 
@@ -66,6 +67,7 @@ export const BARCODE_STATUS_STYLES: Record<BarcodeStatus, string> = {
   FITTED: 'bg-[#0071e3]/10 text-[#0071e3]',
   REMOVED: 'bg-rose-500/10 text-rose-700 dark:text-rose-400',
   WITHDRAWAL_PENDING: 'bg-amber-500/10 text-amber-700 dark:text-amber-400',
+  ON_DEMO: 'bg-purple-500/10 text-purple-700 dark:text-purple-400',
   VOID: 'bg-gray-500/10 text-gray-500',
 };
 
@@ -81,4 +83,6 @@ export const BARCODE_EVENT_LABELS: Record<BarcodeEventType, string> = {
   WITHDRAWAL_REJECTED: 'Count correction rejected: back in stock',
   CODE_CORRECTED: 'Barcode corrected',
   REVERSED: 'Change reversed',
+  DEMO_HANDED_OUT: 'Handed out to a client demo',
+  DEMO_RETURNED: 'Back from a client demo: in stock',
 };

@@ -1,6 +1,15 @@
 import { axiosClient } from '../../../api/axiosClient';
 import type { ApiResponse } from '../../../types/common.types';
-import type { DemoDetail, DemoMode, DemoPayload, DemoStatus, DemoSummary, ExpensePayload, StaffMember } from '../types/clientDemo.types';
+import type {
+  DemoDetail,
+  DemoMode,
+  DemoPayload,
+  DemoStatus,
+  DemoSummary,
+  DemoUnitOption,
+  ExpensePayload,
+  StaffMember,
+} from '../types/clientDemo.types';
 
 const BASE = '/v1/admin/client-demos';
 const MINE = '/v1/client-demos/mine';
@@ -28,6 +37,29 @@ export const clientDemoApi = {
 
   /** GET …/staff: employees who can be tagged as attending staff (DEMO_MANAGE). */
   staff: async (): Promise<ApiResponse<StaffMember[]>> => (await axiosClient.get<ApiResponse<StaffMember[]>>(`${BASE}/staff`)).data,
+
+  /**
+   * GET …/units: the product's units in stock, each saying whether it can be picked for a demo on these days (DEMO_MANAGE).
+   * `demoId`: the demo being changed, whose own units don't count as taken.
+   */
+  unitOptions: async (productId: number, startDate: string, days: number, demoId: number | null): Promise<ApiResponse<DemoUnitOption[]>> =>
+    (await axiosClient.get<ApiResponse<DemoUnitOption[]>>(`${BASE}/units`, { params: { productId, startDate, days, ...(demoId ? { demoId } : {}) } })).data,
+
+  /** GET …/units/lookup: one unit by its barcode (typed or scanned), with its product (DEMO_MANAGE). */
+  unitLookup: async (code: string, startDate: string, days: number, demoId: number | null): Promise<ApiResponse<DemoUnitOption>> =>
+    (await axiosClient.get<ApiResponse<DemoUnitOption>>(`${BASE}/units/lookup`, { params: { code, startDate, days, ...(demoId ? { demoId } : {}) } })).data,
+
+  /** POST …/{id}/units/hand-out: units leave stock on a day of the demo (DEMO_MANAGE, or DEMO_UNITS_HANDLE_OWN on your own). */
+  handOut: async (mode: DemoMode, id: number, barcodes: string[]): Promise<ApiResponse<DemoDetail>> =>
+    (await axiosClient.post<ApiResponse<DemoDetail>>(`${root(mode)}/${id}/units/hand-out`, { barcodes })).data,
+
+  /** POST …/{id}/units/hand-back: units come back into stock (DEMO_MANAGE, or DEMO_UNITS_HANDLE_OWN on your own). */
+  handBack: async (mode: DemoMode, id: number, barcodes: string[]): Promise<ApiResponse<DemoDetail>> =>
+    (await axiosClient.post<ApiResponse<DemoDetail>>(`${root(mode)}/${id}/units/hand-back`, { barcodes })).data,
+
+  /** POST …/{id}/units/write-off: a unit that did not come back leaves stock for good (DEMO_UNIT_WRITE_OFF, Super Admin). */
+  writeOff: async (id: number, barcode: string, reason: string): Promise<ApiResponse<DemoDetail>> =>
+    (await axiosClient.post<ApiResponse<DemoDetail>>(`${BASE}/${id}/units/write-off`, { barcode, reason })).data,
 
   /** GET /v1/client-demos/mine: the demos you attend (DEMO_VIEW_OWN). */
   mine: async (): Promise<ApiResponse<DemoSummary[]>> => (await axiosClient.get<ApiResponse<DemoSummary[]>>(MINE)).data,

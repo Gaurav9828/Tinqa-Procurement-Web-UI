@@ -89,7 +89,9 @@ describe('Approvals hub: new employees', () => {
 
     expect(await screen.findByText('New Employee: Riya Sharma')).toBeInTheDocument();
     const requested = procurement.get.mock.calls.map(([url]) => String(url));
-    expect(requested.every((url) => url.startsWith('/v1/admin/employees') || url.startsWith('/admin/profile-approvals'))).toBe(true);
+    const ownQueues = (url: string) =>
+      url === '/v1/approvals/summary' || url.startsWith('/v1/admin/employees') || url.startsWith('/admin/profile-approvals');
+    expect(requested.every(ownQueues)).toBe(true);
     expect(vi.mocked(ecommerceAxiosClient).get).not.toHaveBeenCalled();
   });
 

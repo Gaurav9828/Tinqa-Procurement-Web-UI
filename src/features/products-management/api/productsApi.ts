@@ -64,6 +64,12 @@ export const productApi = {
         return { ...body, data: Array.isArray(body.data) ? body.data.map(toProduct) : [] };
     },
 
+    /** GET /products/active (public): the products on sale now, in storefront order. */
+    getActiveProducts: async (): Promise<ProductResponse[]> => {
+        const response = await ecommerceAxiosClient.get<ApiResponse<ProductResponseDto[]>>(`${BASE_URL}/active`);
+        return Array.isArray(response.data.data) ? response.data.data.map(toProduct) : [];
+    },
+
     /**
      * One product, read from the list endpoint (the backend has no product-detail route).
      * Resolves to null when the product no longer exists.

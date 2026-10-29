@@ -15,12 +15,10 @@ import { ProductApprovalReviewModal } from '../products-management/components/Pr
 import { useProductActions } from '../products-management/hooks/useProductActions';
 import type { ProductApprovalResponse } from '../products-management/types/productApproval.types';
 import { RefundsQueue } from '../refunds/components/RefundsQueue';
-import { usePendingRefundCount } from '../refunds/hooks/usePendingRefundCount';
 import { useAccess } from '../../hooks/useAccess';
 import { VouchersPanel } from '../finance/components/VouchersPanel';
-import { usePendingVoucherCount } from '../finance/hooks/useFinanceData';
 import { DealerApprovalsPanel } from './components/DealerApprovalsPanel';
-import { useDealerApprovals } from './hooks/useDealerApprovals';
+import { useApprovalSummary } from './hooks/useApprovalSummary';
 import { PreOrderApprovalsPanel } from './components/PreOrderApprovalsPanel';
 import { usePreOrderApprovals } from './hooks/usePreOrderApprovals';
 import { CompanyProfileApprovalsPanel } from './components/CompanyProfileApprovalsPanel';
@@ -80,25 +78,19 @@ export const ApprovalsHub: React.FC = () => {
   };
   const availableTabs = TABS.filter(({ id }) => tabAllowed(id));
   const tab: HubTab = availableTabs.some(({ id }) => id === selectedTab) ? selectedTab : availableTabs[0]?.id ?? 'requests';
-  // Refunds live in their own tab; the count keeps them visible from the Requests tab.
-  const pendingRefunds = usePendingRefundCount();
-  const pendingRefundCount = pendingRefunds.count ?? 0;
-  const pendingVouchers = usePendingVoucherCount();
-  const pendingVoucherCount = pendingVouchers.count ?? 0;
-  const pendingDealers = useDealerApprovals({ quiet: true });
-  const preOrders = usePreOrderApprovals();
+  // Every badge comes from the approval summary (one call per backend); a queue's list loads only while its tab is open
+  const summary = useApprovalSummary();
+  const refreshSummary = summary.refresh;
+  const pendingRefundCount = summary.count('REFUNDS');
+  const preOrders = usePreOrderApprovals({ enabled: tab === 'pre-orders' });
   const companyProfile = useCompanyProfileApprovals();
-  const barcodeRequests = useBarcodeRequests({ quiet: true });
-  const waitingDemos = useWaitingDemos();
+  const barcodeRequests = useBarcodeRequests({ quiet: true, enabled: tab === 'barcodes' });
+  const waitingDemos = useWaitingDemos(tab === 'client-demos');
+  // Opening a tab loads its list afresh (its hook is enabled again); the summary refreshes every badge in the same go
   const selectTab = (next: HubTab) => {
     setTab(next);
-    pendingRefunds.refresh();
-    pendingVouchers.refresh();
-    pendingDealers.refresh();
-    preOrders.refresh();
-    companyProfile.refresh();
-    barcodeRequests.refresh();
-    waitingDemos.refresh();
+    refreshSummary();
+    if (next === 'company-profile') void companyProfile.refresh();
     try {
       sessionStorage.setItem(TAB_STORAGE_KEY, next);
     } catch {
@@ -110,20 +102,27 @@ export const ApprovalsHub: React.FC = () => {
     approvals,
     isLoading,
     isDownloading,
-    refreshApprovals,
+    refreshApprovals: reloadRequests,
     processPendingApproval,
-    downloadDocument } = useApprovals();
+    downloadDocument } = useApprovals({ enabled: tab === 'requests' });
+  const refreshApprovals = async () => {
+    refreshSummary();
+    await reloadRequests();
+  };
 
   // Each tab's badge, so nothing waiting is hidden behind another tab.
   const pendingCounts: Record<HubTab, { count: number; noun: string }> = {
-    requests: { count: approvals.length, noun: 'requests' },
+    requests: {
+      count: summary.count('DOCUMENTS', 'PROFILE_CHANGES', 'STOCK', 'QUOTATIONS', 'ORDERS', 'RETURNS', 'PRODUCTS', 'EMPLOYEES'),
+      noun: 'requests',
+    },
     refunds: { count: pendingRefundCount, noun: 'refunds' },
-    expenses: { count: pendingVoucherCount, noun: 'expenses' },
-    dealers: { count: pendingDealers.count, noun: 'dealer requests' },
-    'pre-orders': { count: preOrders.total, noun: 'pre-orders' },
-    'company-profile': { count: companyProfile.pending.length, noun: 'company profile changes' },
-    barcodes: { count: barcodeRequests.count, noun: 'barcode requests' },
-    'client-demos': { count: waitingDemos.data?.length ?? 0, noun: 'client demos' },
+    expenses: { count: summary.count('EXPENSES'), noun: 'expenses' },
+    dealers: { count: summary.count('DEALER_LOGINS', 'QUOTATION_CHANGES'), noun: 'dealer requests' },
+    'pre-orders': { count: summary.count('PRE_ORDERS'), noun: 'pre-orders' },
+    'company-profile': { count: summary.count('COMPANY_PROFILE'), noun: 'company profile changes' },
+    barcodes: { count: summary.count('BARCODES'), noun: 'barcode requests' },
+    'client-demos': { count: summary.count('CLIENT_DEMOS'), noun: 'client demos' },
   };
 
   // Every tab but Requests is one queue with its own panel
@@ -136,7 +135,11 @@ export const ApprovalsHub: React.FC = () => {
             isLoading={barcodeRequests.isLoading}
             isSubmitting={barcodeRequests.isSubmitting}
             onRefresh={barcodeRequests.refresh}
-            onDecide={barcodeRequests.decide}
+            onDecide={async (request, decision) => {
+              const ok = await barcodeRequests.decide(request, decision);
+              if (ok) refreshSummary();
+              return ok;
+            }}
           />
         );
       case 'client-demos':
@@ -146,16 +149,16 @@ export const ApprovalsHub: React.FC = () => {
       case 'company-profile':
         return <CompanyProfileApprovalsPanel pending={companyProfile.pending} isLoading={companyProfile.isLoading} onRefresh={companyProfile.refresh} />;
       case 'dealers':
-        return <DealerApprovalsPanel onChanged={pendingDealers.refresh} />;
+        return <DealerApprovalsPanel onChanged={refreshSummary} />;
       case 'refunds':
-        return <RefundsQueue onChanged={pendingRefunds.refresh} />;
+        return <RefundsQueue onChanged={refreshSummary} />;
       case 'expenses':
         return (
           <VouchersPanel
             title="Expenses awaiting approval"
             description="Expenses, shipping costs and other vouchers raised by the team. Approving posts the money to the company account; you can't approve what you raised."
             defaultStatus="SUBMITTED"
-            onChanged={pendingVouchers.refresh}
+            onChanged={refreshSummary}
           />
         );
       default:
@@ -258,6 +261,7 @@ export const ApprovalsHub: React.FC = () => {
         rejectionReason: isRejectDecision(confirmAction) ? pendingRejectionReason : 'Approved by Admin L2',
       });
       if (!ok) return; // keep the dialog open so the user can retry
+      refreshSummary();
 
       setIsConfirmOpen(false);
       setIsPreviewOpen(false);

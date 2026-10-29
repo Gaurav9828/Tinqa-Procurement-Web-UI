@@ -47,6 +47,7 @@ export const DemoTable: React.FC<{
                 </td>
                 <td className="py-2.5 pr-3">
                   <span className="font-semibold">{demo.clientName}</span>
+                  {demo.clientCount > 1 && <span className="text-gray-400"> +{demo.clientCount - 1} more</span>}
                   <span className="block text-[10px] text-gray-400">{demo.clientCategoryLabel} · {demo.city}</span>
                 </td>
                 <td className="py-2.5 pr-3 whitespace-nowrap">

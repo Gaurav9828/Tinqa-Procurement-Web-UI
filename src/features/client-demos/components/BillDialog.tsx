@@ -4,8 +4,10 @@ import { CommonInput, CommonSelect, CommonTextArea } from '../../../components/u
 import { DialogShell } from '../../finance/components/DialogShell';
 import { CHOICE_TONE, SOLID_TONE } from '../../../components/ui/actionTones';
 import type { DemoDetail, DemoExpense, ExpenseKind, ExpensePayload, MealType, TravelMode } from '../types/clientDemo.types';
-import { EXPENSE_KINDS, EXPENSE_KIND_LABELS, MEAL_LABELS, PATTERNS, TRAVEL_MODE_LABELS, changeNeedsReason, dayDate, formatDay, inrAmount } from '../utils/clientDemo';
-import { billFormOf, invoicePickerLabel, toExpensePayload, validateBill, type BillErrors, type BillForm } from '../utils/billForm';
+import { EXPENSE_KINDS, EXPENSE_KIND_LABELS, MEAL_LABELS, PATTERNS, TRAVEL_MODE_LABELS, addDays, changeNeedsReason, dayDate, formatDay, inrAmount } from '../utils/clientDemo';
+import { billFormOf, defaultDates, invoicePickerLabel, toExpensePayload, validateBill, type BillErrors, type BillForm } from '../utils/billForm';
+import { at, clashOf, demoBlocks, takenFor, type DateTimeSpan } from '../utils/timeBlocks';
+import { DateTimeRange } from './DateTimeRange';
 
 const KIND_ICONS: Record<ExpenseKind, React.ReactNode> = {
   STAY: <BedDouble className="w-3.5 h-3.5" />,
@@ -17,9 +19,10 @@ const KIND_ICONS: Record<ExpenseKind, React.ReactNode> = {
 const FILE_TYPES = '.pdf,.png,.jpg,.jpeg,.webp';
 
 /**
- * Adds or changes one bill of a demo: a night's stay (hotel, its location and GST details), a meal (which one, the
- * restaurant), a leg of travel (from, to, how, the ticket) or another cost (what and why). The invoice or ticket can be
- * attached now or later. Once the quotation is approved, changing a bill asks for the reason.
+ * Adds or changes one bill of a demo: a night's stay (hotel, its location and GST details, check-in and check-out), a
+ * meal (which one, the restaurant), a leg of travel (from, to, how, the ticket, departure and arrival) or another cost
+ * (what and why). The invoice or ticket can be attached now or later. Once the quotation is approved, changing a bill
+ * asks for the reason.
  */
 export const BillDialog: React.FC<{
   demo: DemoDetail;
@@ -30,16 +33,41 @@ export const BillDialog: React.FC<{
   onClose: () => void;
   onSave: (payload: ExpensePayload, file: File | null) => Promise<boolean>;
 }> = ({ demo, expense, initialKind = 'STAY', initialDay = null, isSubmitting, onClose, onSave }) => {
-  const [form, setForm] = useState<BillForm>(() => billFormOf(expense, initialKind, initialDay));
+  const [form, setForm] = useState<BillForm>(() => billFormOf(expense, initialKind, initialDay, demo));
   const [file, setFile] = useState<File | null>(null);
   const [errors, setErrors] = useState<BillErrors>({});
   const askReason = expense !== null && changeNeedsReason(demo.status);
   const { kind } = form;
+  // Time the demo's visits and other journeys (or, for a stay, other nights) already take
+  const taken = takenFor(demoBlocks(demo), expense ? `expense-${expense.id}` : '', kind === 'STAY' ? 'stay' : 'busy');
 
   const set = <K extends keyof BillForm>(key: K, value: BillForm[K]) => {
-    setForm((prev) => ({ ...prev, [key]: value }));
+    setForm((prev) => {
+      const next = { ...prev, [key]: value };
+      // Until times are given, the dates follow the day (a night ends the next day)
+      return (key === 'dayNumber' || key === 'kind') && !prev.startTime && !prev.endTime ? { ...next, ...defaultDates(next.kind, demo, next.dayNumber) } : next;
+    });
     setErrors((prev) => ({ ...prev, [key]: '' }));
   };
+  // A new start or end clears an end no longer after it, or one whose span now runs into taken time, to pick again
+  const changeSpan = (patch: Partial<DateTimeSpan>) => {
+    setForm((prev) => {
+      const next = { ...prev, ...patch };
+      const start = next.startDate && next.startTime ? at(next.startDate, next.startTime) : '';
+      const end = next.endDate && next.endTime ? at(next.endDate, next.endTime) : '';
+      return start && end && (end <= start || clashOf(taken, start, end)) ? { ...next, endTime: '' } : next;
+    });
+    setErrors((prev) => ({ ...prev, ...Object.fromEntries(Object.keys(patch).map((key) => [key, ''])) }));
+  };
+  // When a stay or journey starts (on its day or the day after, or any day of the trip without one) and ends (by the
+  // day after the trip), picked as one range; time already taken is shaded grey on the clock
+  const day = form.dayNumber ? dayDate(demo.startDate, Number(form.dayNumber)) : '';
+  const latest = addDays(dayDate(demo.startDate, demo.numberOfDays), 1);
+  const startDates = day ? [day, addDays(day, 1)] : Array.from({ length: demo.numberOfDays + 1 }, (_, i) => addDays(demo.startDate, i));
+  const startEnd = (start: string, end: string) => (
+    <DateTimeRange labels={[start, end]} value={form} onChange={changeSpan} startDates={startDates} latest={latest} taken={taken}
+      errors={{ start: errors.startDate || errors.startTime, end: errors.endDate || errors.endTime }} />
+  );
   const textField = (key: keyof BillForm, label: string, required = false, extra: Partial<React.ComponentProps<typeof CommonInput>> = {}) => (
     <CommonInput label={label} required={required} value={form[key]} error={errors[key]} onChange={(e) => set(key, e.target.value as never)} {...extra} />
   );
@@ -47,7 +75,7 @@ export const BillDialog: React.FC<{
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isSubmitting) return;
-    const invalid = validateBill(form, askReason, file);
+    const invalid = validateBill(form, demo, askReason, file, taken);
     if (Object.values(invalid).some(Boolean)) {
       setErrors(invalid);
       return;
@@ -104,6 +132,7 @@ export const BillDialog: React.FC<{
             <div className="sm:col-span-2">{textField('vendorAddress', 'Hotel address', false, { maxLength: 300 })}</div>
             {textField('vendorMapLink', 'Hotel location (Google Maps link)', false, { type: 'url', maxLength: 500, placeholder: 'https://maps.app.goo.gl/…' })}
             {textField('vendorGstin', 'Hotel GSTIN', false, { maxLength: 15, placeholder: '22AAAAA0000A1Z5' })}
+            {startEnd('Check-in', 'Check-out')}
           </div>
         )}
         {kind === 'FOOD' && (
@@ -118,6 +147,7 @@ export const BillDialog: React.FC<{
             {textField('fromPlace', 'From', true, { maxLength: 150 })}
             {textField('toPlace', 'To', true, { maxLength: 150 })}
             {textField('vendorName', 'Operator (airline, bus, cab…)', false, { maxLength: 150 })}
+            {startEnd('Departure', 'Arrival')}
           </div>
         )}
         {kind === 'OTHER' && (

@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest';
  * right for a hashed bundle, and nothing private is served. nginx drops the server's add_header lines in a location
  * that sets its own, so headers are checked per location the way nginx applies them.
  */
-const SNIPPETS: Record<string, string> = { '/etc/nginx/snippets/security-headers.conf': 'nginx-security-headers.conf' };
+const SNIPPETS: Record<string, string> = { '/etc/nginx/snippets/security-headers.conf': readFileSync('nginx-security-headers.conf', 'utf8') };
 // Written by the build: the include stands for this header (none in this app)
 const GENERATED: Record<string, string> = {};
 const REQUIRED_HEADERS = [
@@ -23,12 +23,16 @@ const KNOWN_GAPS: string[] = ['Content-Security-Policy'];
 
 const expand = (text: string): string =>
   text.replace(/include\s+(\S+);/g, (line, path: string) => {
-    if (SNIPPETS[path]) return expand(readFileSync(SNIPPETS[path], 'utf8'));
+    if (SNIPPETS[path]) return expand(SNIPPETS[path]);
     if (GENERATED[path]) return `add_header ${GENERATED[path]} "generated" always;`;
     return line;
   });
 
-const withoutComments = (text: string) => text.replace(/#.*$/gm, '');
+const withoutComments = (text: string) =>
+  text
+    .split('\n')
+    .map((line) => (line.includes('#') ? line.slice(0, line.indexOf('#')) : line))
+    .join('\n');
 const conf = withoutComments(expand(readFileSync('nginx.conf', 'utf8')));
 
 /** location blocks ("/assets/" -> body) and the server-level text outside them. */
@@ -36,7 +40,7 @@ const parse = () => {
   const locations = new Map<string, string>();
   let server = '';
   let i = 0;
-  const re = /location\s+([^{]+)\{/g;
+  const re = /location\s([^{]+)\{/g;
   for (let m = re.exec(conf); m; m = re.exec(conf)) {
     server += conf.slice(i, m.index);
     let depth = 1;

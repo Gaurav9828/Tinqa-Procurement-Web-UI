@@ -18,6 +18,10 @@ export interface DemoAbilities {
   deleteDraft: boolean;
   /** An approver who can't decide because they planned, sent or attend it. */
   blockedApprover: boolean;
+  /** Hand the product units out and back (the server says when; the endpoint of this view needs its permission). */
+  handleUnits: boolean;
+  /** Write off a unit that did not come back (Super Admin). */
+  writeOffUnits: boolean;
 }
 
 /** Whether the waiting completion is a correction of a completed (booked) demo. */
@@ -43,6 +47,16 @@ export const demoAbilities = (demo: DemoDetail, mode: DemoMode, can: (permission
     cancel: manageDemos && (status === 'DRAFT' || status === 'QUOTATION_PENDING' || status === 'APPROVED'),
     deleteDraft: manageDemos && status === 'DRAFT' && demo.submittedAt === null,
     blockedApprover: manager && waiting && can('DEMO_APPROVE') && !demo.decidableByYou,
+    ...unitAbilities(demo, manager, can),
+  };
+};
+
+// The demo units' hand-out, hand-back and write-off; each view's endpoint needs its own permission
+const unitAbilities = (demo: DemoDetail, manager: boolean, can: (permission: Permission) => boolean) => {
+  const handlePermission: Permission = manager ? 'DEMO_MANAGE' : 'DEMO_UNITS_HANDLE_OWN';
+  return {
+    handleUnits: demo.handlesUnits && can(handlePermission),
+    writeOffUnits: manager && demo.writesOffUnits && can('DEMO_UNIT_WRITE_OFF'),
   };
 };
 
@@ -77,7 +91,10 @@ export const nextStepHint = (demo: DemoDetail, mode: DemoMode): string => {
 /** What approving books, for the approve dialog. */
 export const approvalSummary = (demo: DemoDetail): string => {
   if (demo.status === 'QUOTATION_PENDING') {
-    return `Budget ${inrAmount(demo.proposedBudget)} for ${demo.numberOfDays} ${demo.numberOfDays === 1 ? 'day' : 'days'}. The attending staff are told.`;
+    const extra = demo.extraBudget > 0
+      ? ` (${inrAmount(demo.proposedBudget - demo.extraBudget)} day by day + ${inrAmount(demo.extraBudget)} extra: ${demo.extraBudgetReason})`
+      : '';
+    return `Budget ${inrAmount(demo.proposedBudget)}${extra} for ${demo.numberOfDays} ${demo.numberOfDays === 1 ? 'day' : 'days'}. The attending staff are told.`;
   }
   if (isCorrection(demo)) {
     return `${inrAmount(demo.total)} after correction; ${inrAmount(demo.total - demo.bookedTotal)} is booked as the difference.`;

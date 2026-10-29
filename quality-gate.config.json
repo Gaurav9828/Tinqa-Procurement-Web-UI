@@ -125,8 +125,8 @@
     "maxApiCallsPerPage": 8,
     "pageBudgets": {
       "/approvals": {
-        "max": 16,
-        "reason": "The hub counts every approval queue (13 calls, barcode requests and client demos included) when it opens, plus 3 app-shell calls (access, notifications, company profile). Raised from 15 to 16 for the client demos queue (agreed 2026-10-28). One summary endpoint on the backends would bring it to 3 calls."
+        "max": 11,
+        "reason": "3 app-shell calls (access, notifications, company profile) + 2 approval summaries (GET /v1/approvals/summary and /admin/approvals/summary: every tab badge, one SQL function per backend) + the open Requests tab's 6 queue lists. Other tabs load their list only when opened. Lowered from 16 on 2026-10-28; one Requests endpoint (optimization roadmap phase 1b) brings it to 6."
       }
     }
   },

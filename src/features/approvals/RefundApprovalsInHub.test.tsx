@@ -10,18 +10,22 @@ import { GlobalAlertContainer } from '../../components/ui/GlobalAlertContainer';
 import { ApprovalsHub } from './ApprovalsHub';
 import { useAuthStore } from '../../store/useAuthStore';
 import { axiosClient } from '../../api/axiosClient';
+import { ecommerceAxiosClient } from '../../api/ecommerceAxiosClient';
 import { refundApi } from '../refunds/api/refundApi';
 import type { Refund } from '../refunds/types/refund.types';
 import type { PageResponse } from '../../types/common.types';
 import { superAdminPermissions } from '../../test/access';
 
 vi.mock('../../api/axiosClient', () => ({ axiosClient: { get: vi.fn(), patch: vi.fn() } }));
-vi.mock('../../api/ecommerceAxiosClient', () => ({ ecommerceAxiosClient: { patch: vi.fn() } }));
+vi.mock('../../api/ecommerceAxiosClient', () => ({ ecommerceAxiosClient: { get: vi.fn(), patch: vi.fn() } }));
 vi.mock('../refunds/api/refundApi', () => ({
   refundApi: { listRefunds: vi.fn(), approveRefund: vi.fn(), rejectRefund: vi.fn(), syncRefund: vi.fn() },
 }));
 const procurement = vi.mocked(axiosClient);
 const refunds = vi.mocked(refundApi);
+const ecommerce = vi.mocked(ecommerceAxiosClient);
+// What GET /admin/approvals/summary reports for the refunds queue
+let waitingRefunds = 1;
 
 const REQUESTED: Refund = {
   id: 23,
@@ -72,6 +76,8 @@ beforeEach(() => {
   vi.clearAllMocks();
   procurement.get.mockResolvedValue({ data: { success: true, message: 'OK', data: [] } });
   refunds.listRefunds.mockResolvedValue(page([REQUESTED]));
+  waitingRefunds = 1;
+  ecommerce.get.mockImplementation(async () => ({ data: { success: true, message: 'OK', data: { REFUNDS: waitingRefunds } } }));
   useAuthStore.setState({
     token: 't',
     isAuthenticated: true,
@@ -94,6 +100,7 @@ describe('Approvals hub: refunds', () => {
     const table = await screen.findByRole('table', { name: 'Refunds' });
 
     refunds.listRefunds.mockResolvedValue(page([]));
+    waitingRefunds = 0;
     await user.click(within(table).getByRole('button', { name: 'Approve' }));
     await user.click(screen.getByRole('button', { name: 'Yes, Approve' }));
     await waitFor(() => expect(refunds.approveRefund).toHaveBeenCalledWith(23));
@@ -102,9 +109,11 @@ describe('Approvals hub: refunds', () => {
   });
 
   it('shows no refund prompt when nothing is waiting', async () => {
-    refunds.listRefunds.mockResolvedValue(page([]));
+    waitingRefunds = 0;
     renderHub();
-    await waitFor(() => expect(refunds.listRefunds).toHaveBeenCalledWith({ status: 'REQUESTED', page: 0, size: 1 }));
+    await waitFor(() => expect(ecommerce.get).toHaveBeenCalledWith('/admin/approvals/summary'));
+    // The Refunds tab isn't open, so its list isn't loaded
+    expect(refunds.listRefunds).not.toHaveBeenCalled();
     expect(screen.queryByRole('note', { name: 'Refunds awaiting approval' })).not.toBeInTheDocument();
   });
 });

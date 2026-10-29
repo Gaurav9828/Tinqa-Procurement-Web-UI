@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { clientDemoApi } from '../api/clientDemoApi';
 import type { ApiResponse } from '../../../types/common.types';
-import type { DemoDetail, DemoMode, DemoStatus, DemoSummary, StaffMember } from '../types/clientDemo.types';
+import type { DemoDetail, DemoMode, DemoStatus, DemoSummary, DemoUnitOption, StaffMember } from '../types/clientDemo.types';
 import { useNotify } from '../../../hooks/useNotify';
 import { useAccess } from '../../../hooks/useAccess';
 
@@ -59,10 +59,13 @@ export const useMyDemos = () => {
   return useLoad<DemoSummary[]>(clientDemoApi.mine, can('DEMO_VIEW_OWN'), 'Your client demos could not be loaded.');
 };
 
-/** GET …/waiting (DEMO_APPROVE): the Approvals Hub queue. Quiet: the hub shows its own empty state. */
-export const useWaitingDemos = () => {
+/**
+ * GET …/waiting (DEMO_APPROVE): the Approvals Hub queue, loaded while its tab is open (`enabled`). Quiet: the hub shows
+ * its own empty state.
+ */
+export const useWaitingDemos = (enabled = true) => {
   const { can } = useAccess();
-  return useLoad<DemoSummary[]>(clientDemoApi.waiting, can('DEMO_APPROVE'), 'Client demos awaiting approval could not be loaded.', true);
+  return useLoad<DemoSummary[]>(clientDemoApi.waiting, can('DEMO_APPROVE') && enabled, 'Client demos awaiting approval could not be loaded.', true);
 };
 
 /** One demo, as a manager (DEMO_VIEW) or as attending staff (DEMO_VIEW_OWN); nothing while there is no id. */
@@ -77,4 +80,14 @@ export const useDemo = (mode: DemoMode, id: number | null) => {
 export const useDemoStaffOptions = () => {
   const { can } = useAccess();
   return useLoad<StaffMember[]>(clientDemoApi.staff, can('DEMO_MANAGE'), 'The staff list could not be loaded.');
+};
+
+/**
+ * GET …/units (DEMO_MANAGE): a product's units in stock and whether each can be picked for the demo's days, loaded only
+ * while its unit list is open (`enabled`).
+ */
+export const useDemoUnitOptions = (productId: number, startDate: string, days: number, demoId: number | null, enabled: boolean) => {
+  const { can } = useAccess();
+  const load = useCallback(() => clientDemoApi.unitOptions(productId, startDate, days, demoId), [productId, startDate, days, demoId]);
+  return useLoad<DemoUnitOption[]>(load, can('DEMO_MANAGE') && enabled && startDate !== '', 'The product’s units could not be loaded.');
 };

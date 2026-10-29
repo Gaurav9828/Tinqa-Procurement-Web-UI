@@ -8,6 +8,8 @@ import { useAccess } from '../../../hooks/useAccess';
 import { CommonInput, CommonSelect } from '../../../components/ui/FormInputs'; // Adjust import path as needed
 import { unitSelectOptions } from '../../../constants/unitsOfMeasure';
 import { QuotationTaxFields } from './QuotationTaxFields';
+import { QuotedPriceFields } from './QuotedPriceFields';
+import { isPriceChanged } from '../utils/quotedPrice';
 import { emptyTaxForm, taxPayload, validateTaxForm, type TaxForm } from '../utils/quotationTax';
 
 interface CreateOrderModalProps {
@@ -18,19 +20,6 @@ interface CreateOrderModalProps {
   onClose: () => void;
   onSubmit: (formData: CreateOrderRequest) => void;
 }
-
-const calculatePriceVariance = (
-  mrp: number,
-  currentUnitPrice: number
-): { percent: string; isIncrease: boolean } | null => {
-  if (!mrp || !currentUnitPrice || mrp === 0) return null;
-  const diff = currentUnitPrice - mrp;
-  const percent = ((diff / mrp) * 100).toFixed(2);
-  return {
-    percent: Math.abs(Number(percent)).toFixed(2),
-    isIncrease: diff >= 0,
-  };
-};
 
 export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
   isOpen,
@@ -44,7 +33,9 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
   const [selectedItemId, setSelectedItemId] = useState<number | ''>('');
   const [selectedDealerId, setSelectedDealerId] = useState<number | ''>('');
   const [quantity, setQuantity] = useState<number | ''>('');
-  const [unitPrice, setUnitPrice] = useState<number | ''>('');
+  // Optional: left empty, the quotation uses the item's existing price (MRP).
+  const [newPrice, setNewPrice] = useState('');
+  const [priceReason, setPriceReason] = useState('');
   const [unitOfMeasure, setUnitOfMeasure] = useState<string>('PCS');
   const [shipmentPrice, setShipmentPrice] = useState<number | ''>(0);
   const [isUnitDisabled, setIsUnitDisabled] = useState<boolean>(false);
@@ -54,9 +45,6 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
 
   useEffect(() => {
     if (selectedItem) {
-      if (selectedItem.mrp) {
-        setUnitPrice(selectedItem.mrp);
-      }
       if (selectedItem.unitOfMeasure) {
         setUnitOfMeasure(selectedItem.unitOfMeasure);
         setIsUnitDisabled(true);
@@ -71,13 +59,16 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
   if (!isOpen) return null;
 
   const itemMrp = selectedItem?.mrp || 0;
-  const currentPrice = Number(unitPrice) || 0;
-  const priceVariance = calculatePriceVariance(itemMrp, currentPrice);
+  const hasNewPrice = newPrice.trim() !== '';
+  const currentPrice = hasNewPrice ? Number(newPrice) : itemMrp;
+  const priceChanged = isPriceChanged(itemMrp, newPrice);
   const isFormComplete =
     selectedItemId !== '' &&
     selectedDealerId !== '' &&
     Number(quantity) >= 1 &&
     currentPrice > 0 &&
+    currentPrice <= ORDER_LIMITS.MAX_UNIT_PRICE &&
+    (!priceChanged || !!priceReason.trim()) &&
     !!unitOfMeasure.trim() &&
     shipmentPrice !== '' &&
     Number(shipmentPrice) >= 0;
@@ -93,13 +84,13 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
       itemId: Number(selectedItemId),
       dealerId: Number(selectedDealerId),
       orderQuantity: Number(quantity),
-      // Always the item's MRP (the field is read-only), never a value typed into the form.
-      unitPrice: Number(selectedItem?.mrp ?? unitPrice),
+      unitPrice: currentPrice,
       unitType: unitOfMeasure.trim(),
       shipmentPrice: Number(shipmentPrice),
       orderDate: todayLocalIsoDate(),
       taxBreakup: taxPayload(tax),
-      additionalInfo: {},
+      // Approvers see the existing price and why it was changed.
+      additionalInfo: priceChanged ? { mrp: itemMrp, priceChangeReason: priceReason.trim() } : {},
     });
   };
 
@@ -147,7 +138,12 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
             placeholder="-- Choose Item --"
             value={selectedItemId}
             options={itemOptions}
-            onChange={(e) => setSelectedItemId(Number(e.target.value))}
+            onChange={(e) => {
+              setSelectedItemId(Number(e.target.value));
+              // A new item starts again from its own existing price.
+              setNewPrice('');
+              setPriceReason('');
+            }}
           />
 
           <CommonSelect
@@ -185,43 +181,17 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
             />
           </div>
 
+          <QuotedPriceFields
+            hasItem={!!selectedItem}
+            existingPrice={itemMrp}
+            newPrice={newPrice}
+            reason={priceReason}
+            priceChanged={priceChanged}
+            onNewPriceChange={setNewPrice}
+            onReasonChange={setPriceReason}
+          />
+
           <div className="grid grid-cols-2 gap-3">
-            <div>
-              <CommonInput
-                label="Unit Price (₹)"
-                type="number"
-                step="0.01"
-                min="0.01"
-                max={ORDER_LIMITS.MAX_UNIT_PRICE}
-                required
-                // Fixed to the selected item's MRP: not editable when creating an order.
-                disabled
-                placeholder={selectedItem ? undefined : 'Select an item'}
-                value={unitPrice}
-                onChange={() => undefined}
-                data-testid="order-unit-price"
-              />
-              <p className="mt-1 text-[11px] text-gray-400">
-                {selectedItem ? "Taken from the item's MRP." : 'Set from the item once you select one.'}
-              </p>
-
-              {/* Price Variance Badge */}
-              {selectedItem && priceVariance && Number(priceVariance.percent) !== 0 && (
-                <div className="mt-1.5 text-[11px] flex items-center gap-1.5 font-mono">
-                  <span className="text-gray-500 dark:text-neutral-400">MRP: ₹{itemMrp.toFixed(2)}</span>
-                  <span
-                    className={`px-1.5 py-0.5 rounded-md font-semibold ${
-                      priceVariance.isIncrease
-                        ? 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20'
-                        : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
-                    }`}
-                  >
-                    {priceVariance.isIncrease ? `+${priceVariance.percent}%` : `-${priceVariance.percent}%`} vs MRP
-                  </span>
-                </div>
-              )}
-            </div>
-
             <CommonInput
               label="Shipment Price (₹)"
               type="number"

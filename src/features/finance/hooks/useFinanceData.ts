@@ -184,27 +184,3 @@ export const useVoucherList = ({ status, category, submittedBy, reference, searc
   return useSearchableList(cache, load, enabled && can('EXPENSE_VIEW'), 'Vouchers could not be loaded.');
 };
 
-/** Vouchers awaiting approval, for the Approvals hub badge. Silent on failure; only approvers ask. */
-export const usePendingVoucherCount = () => {
-  const [count, setCount] = useState<number | null>(null);
-  const beginRequest = useLatestRequest();
-  const { canAll } = useAccess();
-  const allowed = canAll('EXPENSE_APPROVE', 'EXPENSE_VIEW');
-
-  const refresh = useCallback(async () => {
-    if (!allowed) return;
-    const isCurrent = beginRequest();
-    try {
-      const res = await financeApi.listVouchers({ status: 'SUBMITTED', page: 0, size: 1 });
-      if (isCurrent()) setCount(res.success && res.data ? res.data.totalElements : null);
-    } catch {
-      if (isCurrent()) setCount(null);
-    }
-  }, [beginRequest, allowed]);
-
-  useEffect(() => {
-    refresh();
-  }, [refresh]);
-
-  return { count, refresh };
-};

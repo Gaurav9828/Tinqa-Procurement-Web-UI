@@ -4,6 +4,7 @@ import type { ProductResponse } from '../types/product.types';
 import type { NewProductUnit } from '../../barcodes/types/barcode.types';
 import { ProductUnitsInput } from '../../barcodes/components/ProductUnitsInput';
 import { resizeUnits, toUnitComponents, unitsProblem } from '../../barcodes/utils/productUnits';
+import { fitToComponents, rememberedUnits } from '../../barcodes/utils/rememberedUnits';
 import { SOLID_TONE } from '../../../components/ui/actionTones';
 
 interface Props {
@@ -15,12 +16,14 @@ interface Props {
 
 /**
  * Resubmitting a rejected product rebuilds its units in stock: the rejection put their pieces back into item stock and
- * withdrew their barcodes, so each unit is scanned again with the pieces fitted into it.
+ * withdrew their barcodes, so each unit is sent again with the pieces fitted into it. The codes sent last time (kept in
+ * this browser) are filled in; the withdrawal freed them, so they can be sent again unchanged.
  */
 export const ResubmitProductModal: React.FC<Props> = ({ product, isSubmitting, onClose, onSubmit }) => {
-  const [units, setUnits] = useState<NewProductUnit[]>([]);
   const count = Math.max(0, product.stockQuantity);
   const components = toUnitComponents(product.components ?? []);
+  const [units, setUnits] = useState<NewProductUnit[]>(() => fitToComponents(rememberedUnits(product.id), components));
+  const prefilled = units.some((unit) => unit.barcode);
   const shown = resizeUnits(units, count, components);
   const problem = unitsProblem(shown, count, components);
 
@@ -48,10 +51,15 @@ export const ResubmitProductModal: React.FC<Props> = ({ product, isSubmitting, o
           }}
         >
           <p className="text-gray-500">
-            The rejection returned this product's component pieces to stock and withdrew its unit barcodes. Scan the{' '}
-            {count === 1 ? 'unit' : `${count} units`} in stock again, with the pieces fitted into each; they are taken from stock again and wait
-            for approval with the product.
+            The rejection returned this product's component pieces to stock and withdrew its unit barcodes. Confirm the{' '}
+            {count === 1 ? 'unit' : `${count} units`} in stock with the pieces fitted into each; they are taken from stock again and wait for
+            approval with the product.
           </p>
+          {prefilled && (
+            <p role="note" className="text-[11px] text-[#0071e3]" data-testid="resubmit-prefilled">
+              The barcodes entered last time are filled in. Change only those that differ; scan any still missing.
+            </p>
+          )}
           <ProductUnitsInput id="resubmit" units={shown} onChange={setUnits} components={components} disabled={isSubmitting} />
           <div className="flex justify-end gap-2 pt-2 border-t border-black/10 dark:border-white/10">
             <button type="button" onClick={onClose} className="px-4 py-2 rounded-xl bg-black/5 dark:bg-white/10 font-medium cursor-pointer">

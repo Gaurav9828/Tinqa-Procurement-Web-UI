@@ -83,6 +83,13 @@ export const useClientDemoActions = (mode: DemoMode, onDemo: (demo: DemoDetail) 
     decide: (demoId: number, decision: 'APPROVED' | 'REJECTED', reason: string | null) =>
       run(() => clientDemoApi.decide(demoId, decision, reason), decision === 'APPROVED' ? 'Approved.' : 'Rejected.',
         decision === 'APPROVED' ? 'It could not be approved.' : 'It could not be rejected.'),
+    handOut: (demoId: number, barcodes: string[]) =>
+      run(() => clientDemoApi.handOut(mode, demoId, barcodes), 'Handed out: the units are out of stock until they come back.',
+        'The units could not be handed out.'),
+    handBack: (demoId: number, barcodes: string[]) =>
+      run(() => clientDemoApi.handBack(mode, demoId, barcodes), 'Handed back: the units are in stock again.', 'The units could not be handed back.'),
+    writeOff: (demoId: number, barcode: string, reason: string) =>
+      run(() => clientDemoApi.writeOff(demoId, barcode, reason), 'Unit written off.', 'The unit could not be written off.'),
     reopen: (demoId: number, reason: string) =>
       run(() => clientDemoApi.reopen(demoId, reason), 'Reopened for correction.', 'The demo could not be reopened.'),
   };

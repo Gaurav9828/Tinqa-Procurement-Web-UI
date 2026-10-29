@@ -13,10 +13,14 @@ export const useBarcodeRequestAction = () => {
   return { isSubmitting, submit };
 };
 
-/** The barcode requests waiting for a Super Admin (BARCODE_APPROVE); nothing loads for anyone else. */
-export const useBarcodeRequests = (options: { quiet?: boolean } = {}) => {
+/**
+ * The barcode requests waiting for a Super Admin (BARCODE_APPROVE); nothing loads for anyone else. `enabled`: load only
+ * while the hub's Barcodes tab is open.
+ */
+export const useBarcodeRequests = (options: { quiet?: boolean; enabled?: boolean } = {}) => {
   const { can } = useAccess();
   const allowed = can('BARCODE_APPROVE');
+  const enabled = options.enabled ?? true;
   const notify = useNotify();
   const quiet = options.quiet ?? false;
   // null until the first load has answered; `version` asks for a fresh load
@@ -25,7 +29,7 @@ export const useBarcodeRequests = (options: { quiet?: boolean } = {}) => {
   const { isSubmitting, run } = useApiAction();
 
   useEffect(() => {
-    if (!allowed) return;
+    if (!allowed || !enabled) return;
     let current = true;
     const fail = (err: unknown) => {
       if (current && !quiet) notify.error(err, 'Barcode requests could not be loaded.');
@@ -43,7 +47,7 @@ export const useBarcodeRequests = (options: { quiet?: boolean } = {}) => {
     return () => {
       current = false;
     };
-  }, [allowed, version, notify, quiet]);
+  }, [allowed, enabled, version, notify, quiet]);
 
   const refresh = useCallback(() => setVersion((v) => v + 1), []);
 
@@ -57,5 +61,5 @@ export const useBarcodeRequests = (options: { quiet?: boolean } = {}) => {
   };
 
   const list = requests ?? [];
-  return { allowed, requests: list, count: list.length, isLoading: allowed && requests === null, isSubmitting, refresh, decide };
+  return { allowed, requests: list, count: list.length, isLoading: allowed && enabled && requests === null, isSubmitting, refresh, decide };
 };

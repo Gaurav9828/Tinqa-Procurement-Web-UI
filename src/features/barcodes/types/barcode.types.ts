@@ -4,7 +4,7 @@ import type { ApprovalStatus } from '../../../types/common.types';
 export type BarcodeUnitType = 'ITEM_UNIT' | 'PRODUCT_UNIT';
 
 /** Procurement BarcodeStatus. */
-export type BarcodeStatus = 'PENDING' | 'IN_STOCK' | 'FITTED' | 'REMOVED' | 'WITHDRAWAL_PENDING' | 'VOID';
+export type BarcodeStatus = 'PENDING' | 'IN_STOCK' | 'FITTED' | 'REMOVED' | 'WITHDRAWAL_PENDING' | 'ON_DEMO' | 'VOID';
 
 export type BarcodeEventType =
   | 'REGISTERED'
@@ -17,7 +17,9 @@ export type BarcodeEventType =
   | 'WITHDRAWAL_APPROVED'
   | 'WITHDRAWAL_REJECTED'
   | 'CODE_CORRECTED'
-  | 'REVERSED';
+  | 'REVERSED'
+  | 'DEMO_HANDED_OUT'
+  | 'DEMO_RETURNED';
 
 /** BarcodeDTOs.Unit */
 export interface BarcodeUnit {

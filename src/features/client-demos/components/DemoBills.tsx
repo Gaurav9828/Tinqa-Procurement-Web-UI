@@ -2,13 +2,20 @@ import React, { useState } from 'react';
 import { BedDouble, Bus, Download, Loader2, MapPin, Paperclip, Pencil, Plus, Receipt, Trash2, Utensils } from 'lucide-react';
 import { ICON_DANGER } from '../../../components/ui/actionTones';
 import type { DemoDetail, DemoExpense, ExpenseKind } from '../types/clientDemo.types';
-import { EXPENSE_KINDS, EXPENSE_KIND_LABELS, MEAL_LABELS, TRAVEL_MODE_LABELS, dayDate, formatDay, inrAmount } from '../utils/clientDemo';
+import { EXPENSE_KINDS, EXPENSE_KIND_LABELS, MEAL_LABELS, TRAVEL_MODE_LABELS, dayDate, formatDay, formatDayTime, formatTime, inrAmount } from '../utils/clientDemo';
 
 const KIND_ICONS: Record<ExpenseKind, React.ReactNode> = {
   STAY: <BedDouble className="w-3.5 h-3.5 text-indigo-500" />,
   FOOD: <Utensils className="w-3.5 h-3.5 text-orange-500" />,
   TRAVEL: <Bus className="w-3.5 h-3.5 text-sky-500" />,
   OTHER: <Receipt className="w-3.5 h-3.5 text-gray-500" />,
+};
+
+// "Check-in 30 Oct 2026, 6:00 pm · check-out 31 Oct 2026, 6:00 am" (dated), or the times alone (recorded before dates)
+const span = (expense: DemoExpense, start: string, end: string): React.ReactNode => {
+  if (!expense.startTime) return null;
+  const at = (date: string | null, time: string | null) => (date ? formatDayTime(date, time) : formatTime(time));
+  return <span className="block text-gray-500">{start} {at(expense.startDate, expense.startTime)} · {end.toLowerCase()} {at(expense.endDate, expense.endTime)}</span>;
 };
 
 const describe = (expense: DemoExpense): React.ReactNode => {
@@ -18,6 +25,7 @@ const describe = (expense: DemoExpense): React.ReactNode => {
         <>
           <span className="font-semibold">{expense.vendorName}</span>
           {expense.vendorAddress && <span className="text-gray-500"> · {expense.vendorAddress}</span>}
+          {span(expense, 'Check-in', 'Check-out')}
           {expense.vendorGstin && <span className="block text-gray-400 font-mono">GSTIN {expense.vendorGstin}</span>}
         </>
       );
@@ -33,6 +41,7 @@ const describe = (expense: DemoExpense): React.ReactNode => {
         <>
           <span className="font-semibold">{expense.fromPlace} → {expense.toPlace}</span>
           <span className="text-gray-500"> · {expense.travelMode ? TRAVEL_MODE_LABELS[expense.travelMode] : ''}{expense.vendorName ? ` (${expense.vendorName})` : ''}</span>
+          {span(expense, 'Departs', 'Arrives')}
         </>
       );
     case 'OTHER':

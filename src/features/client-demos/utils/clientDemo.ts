@@ -8,6 +8,9 @@ export const myDemoPath = (id: number) => `${MY_DEMOS_PATH}/${id}`;
 /** Mirrors the backend's ClientDemoDTOs limits. */
 export const MAX_DAYS = 60;
 export const MAX_STAFF = 30;
+export const MAX_VISITS = 20;
+export const MAX_PRODUCTS = 50;
+export const MAX_PRODUCT_UNITS = 1000;
 
 export const DEMO_TYPE_LABELS: Record<DemoType, string> = { APPOINTMENT: 'Appointment', PROMOTION: 'Promotion' };
 
@@ -23,6 +26,13 @@ export const CLIENT_CATEGORY_LABELS: Record<ClientCategory, string> = {
   PUBLIC_PLACE: 'Public Place',
   OTHER: 'Other',
 };
+
+/** Business clients, which may carry a legal name and GSTIN (mirrors the backend's ClientCategory.hasLegalDetails). */
+const LEGAL_CATEGORIES: ReadonlySet<ClientCategory> = new Set(['HOTEL', 'HOME_STAY', 'CORPORATE_OFFICE', 'HOSPITAL', 'CLINIC', 'RESTAURANT']);
+export const hasLegalDetails = (category: ClientCategory | ''): boolean => category !== '' && LEGAL_CATEGORIES.has(category);
+
+/** Clients staff can stay at, so their details can fill in a planned night. */
+export const offersStay = (category: ClientCategory | ''): boolean => category === 'HOTEL' || category === 'HOME_STAY';
 
 export const STATUS_LABELS: Record<DemoStatus, string> = {
   DRAFT: 'Draft',
@@ -76,6 +86,9 @@ export const EVENT_LABELS: Record<DemoEventType, string> = {
   COMPLETION_REJECTED: 'Completion rejected',
   REOPENED: 'Reopened for correction',
   CANCELLED: 'Cancelled',
+  UNITS_HANDED_OUT: 'Units handed out',
+  UNITS_HANDED_BACK: 'Units handed back',
+  UNIT_WRITTEN_OFF: 'Unit written off',
 };
 
 /** The workflow track on a demo's page; REOPENED sits on "Bills" again, CANCELLED greys the track. */
@@ -128,6 +141,13 @@ export const formatDay = (iso: string | null | undefined): string => {
 
 export const formatDateTime = (iso: string | null | undefined): string => (iso ? DAY_TIME.format(new Date(iso)) : '—');
 
+/** "10:30" or "10:30:00" → "10:30" (what a time input holds). */
+export const hhmm = (time: string | null | undefined): string => (time ? time.slice(0, 5) : '');
+
+/** "10:00 am – 1:00 pm" */
+export const formatSlot = (from: string | null | undefined, to: string | null | undefined): string =>
+  from && to ? `${formatTime(from)} – ${formatTime(to)}` : '—';
+
 /** "10:30" → "10:30 am" */
 export const formatTime = (time: string | null | undefined): string => {
   if (!time) return '—';
@@ -141,6 +161,20 @@ export const dayDate = (startDate: string, day: number): string => {
   const date = new Date(y, m - 1, d + day - 1);
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 };
+
+/** The ISO date some days after another (or before, when negative). */
+export const addDays = (iso: string, days: number): string => dayDate(iso, days + 1);
+
+/** Whole days from one ISO date to another. */
+export const daysBetween = (from: string, to: string): number => {
+  const [fy, fm, fd] = from.split('-').map(Number);
+  const [ty, tm, td] = to.split('-').map(Number);
+  return Math.round((Date.UTC(ty, tm - 1, td) - Date.UTC(fy, fm - 1, fd)) / 86_400_000);
+};
+
+/** "30 Oct 2026, 6:00 pm" from an ISO date and a time. */
+export const formatDayTime = (date: string | null | undefined, time: string | null | undefined): string =>
+  date && time ? `${formatDay(date)}, ${formatTime(time)}` : '—';
 
 export const todayIso = (): string => {
   const now = new Date();

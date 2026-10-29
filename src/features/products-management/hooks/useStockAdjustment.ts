@@ -6,6 +6,7 @@ import { useNotify } from '../../../hooks/useNotify';
 import { loadComponentCapacity, type ComponentCapacity } from '../utils/componentStock';
 import { getApiErrorMessage } from '../../../utils/apiError';
 import type { NewProductUnit } from '../../barcodes/types/barcode.types';
+import { updateRememberedUnits } from '../../barcodes/utils/rememberedUnits';
 
 /** The units the change builds (with their pieces) or takes out, by barcode. */
 export interface StockAdjustBarcodes {
@@ -111,6 +112,7 @@ export const useStockAdjustment = (
           ...buildStockUpdatePayload(latest, result.newStock, description),
           ...(mode === 'add' ? { newUnits: barcodes.newUnits ?? [] } : { removedUnits: barcodes.removedUnits ?? [] }),
         });
+        if (ok) updateRememberedUnits(productId, barcodes.newUnits, barcodes.removedUnits);
         return { ok };
       } finally {
         inFlight.current = false;

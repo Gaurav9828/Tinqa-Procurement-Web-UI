@@ -91,7 +91,9 @@ beforeEach(() => {
   } catch {
     // ignore
   }
-  procurement.get.mockResolvedValue({ data: { success: true, message: 'OK', data: [] } });
+  procurement.get.mockImplementation(async (url: string) => ({
+    data: { success: true, message: 'OK', data: url === '/v1/approvals/summary' ? { DEALER_LOGINS: 2, QUOTATION_CHANGES: 1 } : [] },
+  }));
   logins.listLogins.mockResolvedValue(ok([LOGIN(), LOGIN({ id: 2, dealerId: 8, dealerName: 'Own Dealer', createdBy: 9 })]));
   orders.listChangeRequests.mockResolvedValue(ok([CHANGE]));
   useAuthStore.setState({
@@ -109,6 +111,7 @@ describe('Approvals hub: dealers', () => {
 
     const tab = await screen.findByRole('tab', { name: /Dealers/ });
     await waitFor(() => expect(tab).toHaveTextContent('3'));
+    expect(logins.listLogins).not.toHaveBeenCalled();
     await user.click(tab);
 
     const changes = await screen.findByRole('region', { name: 'Quotation changes from dealers' });

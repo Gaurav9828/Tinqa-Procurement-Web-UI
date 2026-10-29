@@ -89,6 +89,7 @@ beforeEach(() => {
   }
   // GET /v1/orders?status=…&status=…: the orders in any of the statuses
   procurement.get.mockImplementation(async (url: string) => {
+    if (url === '/v1/approvals/summary') return { data: { success: true, message: 'OK', data: { QUOTATIONS: 1, ORDERS: 1, RETURNS: 1 } } };
     const [path, query = ''] = url.split('?');
     const statuses = path === '/v1/orders' ? (new URLSearchParams(query).getAll('status') as OrderStatus[]) : [];
     return { data: { success: true, message: 'OK', data: structuredClone(statuses.flatMap((status) => BY_STATUS[status] ?? [])) } };

@@ -118,6 +118,8 @@ export const PERMISSIONS = [
   'DEMO_MANAGE',
   'DEMO_APPROVE',
   'DEMO_COMPLETED_EDIT',
+  // A product unit that did not come back from a demo is written off by a Super Admin (Level 2)
+  'DEMO_UNIT_WRITE_OFF',
   // Platform
   'SYSTEM_SETTINGS_MANAGE',
   'AUDIT_LOG_VIEW',
@@ -127,6 +129,8 @@ export const PERMISSIONS = [
   'PAYSLIP_VIEW_OWN',
   'DEMO_VIEW_OWN',
   'DEMO_EXPENSE_RECORD_OWN',
+  // Hand out and back the product units taken on demos you attend, by barcode
+  'DEMO_UNITS_HANDLE_OWN',
   // Dealer portal: held only by dealer logins, always limited to the dealer's own records on the server
   'DEALER_PORTAL_VIEW',
   'DEALER_QUOTATION_SUBMIT',

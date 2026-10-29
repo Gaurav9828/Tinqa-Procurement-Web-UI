@@ -666,6 +666,16 @@ export const ApprovalPreviewModal: React.FC<PreviewModalProps> = ({
                 </p>
               )}
 
+              {typeof request.additionalInfo?.priceChangeReason === 'string' && (
+                <p className="text-sm rounded-xl bg-amber-500/10 border border-amber-500/20 px-3 py-2" data-testid="price-change-reason">
+                  <span className="text-xs text-gray-400 block">
+                    Price changed from the existing ₹{Number(request.additionalInfo.mrp ?? 0).toFixed(2)}
+                    {request.unitPrice != null && ` to ₹${request.unitPrice.toFixed(2)}`}: reason
+                  </span>
+                  {request.additionalInfo.priceChangeReason}
+                </p>
+              )}
+
               {/* Order Details */}
               <div className="grid grid-cols-2 gap-3">
 

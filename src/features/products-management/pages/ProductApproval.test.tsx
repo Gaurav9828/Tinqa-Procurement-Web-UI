@@ -15,6 +15,7 @@ import type { ProductResponseDto } from '../types/product.types';
 import type { ProductApprovalResponse, ProductApprovalStatus } from '../types/productApproval.types';
 import { fillGst } from './gstTestUtil';
 import { noBarcodes, scanUnitBarcodes } from './barcodeTestUtil';
+import { rememberedUnits, rememberUnits } from '../../barcodes/utils/rememberedUnits';
 import { DIORAMAS, fillCategory } from './categoryTestUtil';
 import { superAdminPermissions } from '../../../test/access';
 
@@ -282,6 +283,23 @@ describe('Product list shows the approval state and limits actions', () => {
     expect(await screen.findByText('Product resubmitted for approval. It stays inactive until approved.')).toBeInTheDocument();
     const submitted = procurement.post.mock.calls.at(-1)?.[1] as { units: { barcode: string }[] };
     expect(submitted.units).toHaveLength(products.find((p) => p.title === 'Rejected Router')!.stockQuantity!);
+  });
+
+  it('a resubmission fills in the unit barcodes sent last time', async () => {
+    // Sent with the product when it was created, before the rejection withdrew them
+    rememberUnits(3, [{ barcode: 'RR00000001', parts: [] }]);
+    const { user } = renderPage();
+    await screen.findByText('Rejected Router');
+    await waitForStates();
+    await user.click(within(row(3)).getByRole('button', { name: 'Resubmit Rejected Router for approval' }));
+    const dialog = screen.getByRole('dialog', { name: 'Resubmit Rejected Router for approval' });
+    expect(within(dialog).getByTestId('resubmit-prefilled')).toBeInTheDocument();
+    // Nothing to scan again: it goes straight back with the same code
+    await user.click(within(dialog).getByRole('button', { name: /Resubmit for approval/ }));
+    await waitFor(() => expect(stateOf(3)).toHaveAttribute('data-state', 'PENDING'));
+    const submitted = procurement.post.mock.calls.at(-1)?.[1] as { units: { barcode: string }[] };
+    expect(submitted.units.map((unit) => unit.barcode)).toEqual(['RR00000001']);
+    expect(rememberedUnits(3).map((unit) => unit.barcode)).toEqual(['RR00000001']);
   });
 
   it('a rejected product can be edited but not switched on; the reason is shown', async () => {

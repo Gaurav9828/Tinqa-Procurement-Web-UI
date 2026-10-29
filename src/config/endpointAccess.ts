@@ -135,10 +135,14 @@ export const PROCUREMENT_ENDPOINTS: readonly EndpointRule[] = [
   rule('GET', '/v1/payroll/my-payslips', 'PAYSLIP_VIEW_OWN'),
   rule('GET', '/v1/payroll/my-payslips/{id}/pdf', 'PAYSLIP_VIEW_OWN'),
   // Client demos (ClientDemoController): DEMO_MANAGE plans and runs them, DEMO_APPROVE (Level 2) decides, only a Super
-  // Admin reopens a completed one; attending staff read theirs and record their own bills under /v1/client-demos/mine
+  // Admin reopens a completed one; attending staff read theirs, record their own bills and hand the product units taken
+  // out and back under /v1/client-demos/mine
   rule('GET', '/v1/admin/client-demos', 'DEMO_VIEW'),
   rule('GET', '/v1/admin/client-demos/waiting', 'DEMO_APPROVE'),
   rule('GET', '/v1/admin/client-demos/staff', 'DEMO_MANAGE'),
+  // Picking a demo's product units by barcode (before /{id}: the first matching rule wins)
+  rule('GET', '/v1/admin/client-demos/units', 'DEMO_MANAGE'),
+  rule('GET', '/v1/admin/client-demos/units/lookup', 'DEMO_MANAGE'),
   rule('GET', '/v1/admin/client-demos/{id}', 'DEMO_VIEW'),
   rule('POST', '/v1/admin/client-demos', 'DEMO_MANAGE'),
   rule('PUT', '/v1/admin/client-demos/{id}', 'DEMO_MANAGE'),
@@ -149,6 +153,10 @@ export const PROCUREMENT_ENDPOINTS: readonly EndpointRule[] = [
   rule('POST', '/v1/admin/client-demos/{id}/cancel', 'DEMO_MANAGE'),
   rule('POST', '/v1/admin/client-demos/{id}/decision', 'DEMO_APPROVE'),
   rule('POST', '/v1/admin/client-demos/{id}/reopen', 'DEMO_COMPLETED_EDIT'),
+  // Units leave stock on the demo's days (here and on the storefront) and come back; a Super Admin writes one off
+  rule('POST', '/v1/admin/client-demos/{id}/units/hand-out', 'DEMO_MANAGE'),
+  rule('POST', '/v1/admin/client-demos/{id}/units/hand-back', 'DEMO_MANAGE'),
+  rule('POST', '/v1/admin/client-demos/{id}/units/write-off', 'DEMO_UNIT_WRITE_OFF'),
   rule('POST', '/v1/admin/client-demos/{id}/expenses', 'DEMO_MANAGE'),
   rule('PUT', '/v1/admin/client-demos/{id}/expenses/{expenseId}', 'DEMO_MANAGE'),
   rule('DELETE', '/v1/admin/client-demos/{id}/expenses/{expenseId}', 'DEMO_MANAGE'),
@@ -161,6 +169,8 @@ export const PROCUREMENT_ENDPOINTS: readonly EndpointRule[] = [
   rule('DELETE', '/v1/client-demos/mine/{id}/expenses/{expenseId}', 'DEMO_EXPENSE_RECORD_OWN'),
   rule('POST', '/v1/client-demos/mine/{id}/expenses/{expenseId}/invoice', 'DEMO_EXPENSE_RECORD_OWN'),
   rule('GET', '/v1/client-demos/mine/{id}/expenses/{expenseId}/invoice', 'DEMO_VIEW_OWN'),
+  rule('POST', '/v1/client-demos/mine/{id}/units/hand-out', 'DEMO_UNITS_HANDLE_OWN'),
+  rule('POST', '/v1/client-demos/mine/{id}/units/hand-back', 'DEMO_UNITS_HANDLE_OWN'),
   // Documents: listing everyone's needs DOCUMENT_VIEW; your own documents (by id or user) follow an owner rule
   rule('GET', '/v1/documents', 'DOCUMENT_VIEW'),
   rule('PATCH', '/v1/documents/{id}/approval', 'DOCUMENT_APPROVE'),

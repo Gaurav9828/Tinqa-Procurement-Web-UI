@@ -105,7 +105,7 @@ beforeEach(() => {
   portal.getOrders.mockResolvedValue(
     ok([order(1, 'QUOTATION'), order(2, 'PENDING', { changeable: false }), order(3, 'SHIPPED'), order(4, 'DELIVERED'), order(5, 'CANCELLED')])
   );
-  portal.getItems.mockResolvedValue(ok([{ id: 5, name: 'Copper wire', brand: null, sku: 'CW-1', unitOfMeasure: 'PCS' }]));
+  portal.getItems.mockResolvedValue(ok([{ id: 5, name: 'Copper wire', brand: null, sku: 'CW-1', unitOfMeasure: 'PCS', mrp: 90 }]));
   portal.getProfile.mockResolvedValue(ok(PROFILE));
 });
 
@@ -117,7 +117,7 @@ describe('Dealer portal', () => {
     expect(opens(superAdminPermissions('ADMIN_L2'))).not.toContain('dealer-quotations');
   });
 
-  it('lists open quotations and creates one with the dealer’s own price', async () => {
+  it('lists open quotations and creates one with the dealer’s own price and the reason for it', async () => {
     const user = userEvent.setup();
     portal.createQuotation.mockResolvedValue(ok(order(9, 'QUOTATION')));
     renderAt('/dealer/quotations');
@@ -132,11 +132,19 @@ describe('Dealer portal', () => {
     await waitFor(() => expect(within(dialog).getByRole('option', { name: /Copper wire/ })).toBeInTheDocument());
     await user.selectOptions(within(dialog).getByLabelText(/Item/), '5');
     await user.type(within(dialog).getByLabelText(/Quantity/), '20');
-    await user.type(within(dialog).getByLabelText(/Unit price/), '95');
+    // The item's existing price is shown read-only; the reason opens only for a different price
+    expect(within(dialog).getByLabelText(/Existing price/)).toHaveValue(90);
+    expect(within(dialog).getByLabelText(/Existing price/)).toBeDisabled();
+    expect(within(dialog).getByLabelText(/Reason for the new price/)).toBeDisabled();
+    await user.type(within(dialog).getByLabelText(/New quoted price/), '95');
     await user.clear(within(dialog).getByLabelText(/Shipment price/));
     await user.type(within(dialog).getByLabelText(/Shipment price/), '100');
     expect(within(dialog).getByTestId('quotation-total')).toHaveTextContent('₹2,000.00');
-    await user.click(within(dialog).getByRole('button', { name: 'Create quotation' }));
+    expect(within(dialog).getByTestId('order-price-difference')).toHaveTextContent('+₹5.00');
+    const create = within(dialog).getByRole('button', { name: 'Create quotation' });
+    expect(create).toBeDisabled();
+    await user.type(within(dialog).getByLabelText(/Reason for the new price/), 'Copper went up');
+    await user.click(create);
 
     await waitFor(() =>
       expect(portal.createQuotation).toHaveBeenCalledWith({
@@ -147,10 +155,28 @@ describe('Dealer portal', () => {
         shipmentPrice: 100,
         expectedDelivery: undefined,
         note: undefined,
+        priceChangeReason: 'Copper went up',
       })
     );
     // The dealer is never part of the request: the server takes it from the signed-in account
     expect(portal.createQuotation.mock.calls[0][0]).not.toHaveProperty('dealerId');
+  });
+
+  it('quotes the item’s existing price when no new price is given, without a reason', async () => {
+    const user = userEvent.setup();
+    portal.createQuotation.mockResolvedValue(ok(order(9, 'QUOTATION')));
+    renderAt('/dealer/quotations');
+
+    await user.click(await screen.findByRole('button', { name: /New quotation/ }));
+    const dialog = await screen.findByRole('dialog', { name: 'New quotation' });
+    await waitFor(() => expect(within(dialog).getByRole('option', { name: /Copper wire/ })).toBeInTheDocument());
+    await user.selectOptions(within(dialog).getByLabelText(/Item/), '5');
+    await user.type(within(dialog).getByLabelText(/Quantity/), '10');
+    expect(within(dialog).getByTestId('quotation-total')).toHaveTextContent('₹900.00');
+    await user.click(within(dialog).getByRole('button', { name: 'Create quotation' }));
+
+    await waitFor(() => expect(portal.createQuotation).toHaveBeenCalledWith(expect.objectContaining({ unitPrice: 90 })));
+    expect(portal.createQuotation.mock.calls[0][0].priceChangeReason).toBeUndefined();
   });
 
   it('sends only the changed fields of a quotation, with the reason, for approval', async () => {
@@ -188,7 +214,8 @@ describe('Dealer portal', () => {
     await waitFor(() => expect(within(dialog).getByRole('option', { name: /Copper wire/ })).toBeInTheDocument());
     await user.selectOptions(within(dialog).getByLabelText(/Item/), '5');
     await user.type(within(dialog).getByLabelText(/Quantity/), '20');
-    await user.type(within(dialog).getByLabelText(/Unit price/), '95');
+    await user.type(within(dialog).getByLabelText(/New quoted price/), '95');
+    await user.type(within(dialog).getByLabelText(/Reason for the new price/), 'Copper went up');
     await user.clear(within(dialog).getByLabelText(/Shipment price/));
     await user.type(within(dialog).getByLabelText(/Shipment price/), '100');
 

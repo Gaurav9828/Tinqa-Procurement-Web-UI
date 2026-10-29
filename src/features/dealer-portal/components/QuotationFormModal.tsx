@@ -19,6 +19,8 @@ import {
   validateTaxForm,
   type TaxForm,
 } from '../../order-management/utils/quotationTax';
+import { QuotedPriceFields } from '../../order-management/components/QuotedPriceFields';
+import { isPriceChanged } from '../../order-management/utils/quotedPrice';
 
 interface QuotationFormModalProps {
   /** Without an order the form creates a quotation; with one it proposes a change to it. */
@@ -77,17 +79,23 @@ export const QuotationFormModal: React.FC<QuotationFormModalProps> = ({
   const isChange = !!order;
   const [form, setForm] = useState<FormState>(() => fromOrder(order));
   const [reason, setReason] = useState('');
+  const [priceReason, setPriceReason] = useState('');
   const [tax, setTax] = useState<TaxForm>(() => taxFormFrom(order?.taxBreakup));
   const set = <K extends keyof FormState>(key: K, value: FormState[K]) => setForm((current) => ({ ...current, [key]: value }));
 
+  const selectedItem = items.find((item) => item.id === form.itemId);
+  // A new quotation starts from the item's existing price: an empty price quotes it, any other price needs a reason.
+  const existingPrice = isChange ? 0 : selectedItem?.mrp ?? 0;
+  const priceChanged = isPriceChanged(existingPrice, form.unitPrice);
+  const priceText = form.unitPrice.trim() === '' && existingPrice > 0 ? String(existingPrice) : form.unitPrice;
   const quantity = Number(form.orderQuantity);
-  const unitPrice = Number(form.unitPrice);
+  const unitPrice = Number(priceText);
   const shipmentPrice = Number(form.shipmentPrice);
   const isValid =
     form.itemId !== '' &&
     quantity > 0 &&
     quantity <= ORDER_LIMITS.MAX_QUANTITY &&
-    form.unitPrice.trim() !== '' &&
+    priceText.trim() !== '' &&
     unitPrice >= 0 &&
     unitPrice <= ORDER_LIMITS.MAX_UNIT_PRICE &&
     form.shipmentPrice.trim() !== '' &&
@@ -100,6 +108,7 @@ export const QuotationFormModal: React.FC<QuotationFormModalProps> = ({
 
   const change = useMemo(() => (order ? changedFields(form, tax, order) : null), [form, tax, order]);
   const hasChange = !change || Object.keys(change).length > 0;
+  const priceJustified = !priceChanged || !!priceReason.trim();
 
   // The current item stays listed even if it is no longer offered, so a change form never loses it.
   const itemOptions = useMemo(() => {
@@ -115,12 +124,19 @@ export const QuotationFormModal: React.FC<QuotationFormModalProps> = ({
 
   const chooseItem = (itemId: number) => {
     const item = items.find((candidate) => candidate.id === itemId);
-    setForm((current) => ({ ...current, itemId, unitType: item?.unitOfMeasure || current.unitType }));
+    setForm((current) => ({
+      ...current,
+      itemId,
+      unitType: item?.unitOfMeasure || current.unitType,
+      // A new quotation starts again from the new item's own existing price.
+      ...(isChange ? {} : { unitPrice: '' }),
+    }));
+    if (!isChange) setPriceReason('');
   };
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (!isValid || !taxValid || !hasChange || form.itemId === '') return;
+    if (!isValid || !taxValid || !hasChange || !priceJustified || form.itemId === '') return;
     const ok = order
       ? await onRequestChange(order.id, { ...change, reason: reason.trim() || undefined })
       : await onCreate({
@@ -132,6 +148,7 @@ export const QuotationFormModal: React.FC<QuotationFormModalProps> = ({
           ...(tax.enabled ? { taxBreakup: taxPayload(tax) } : {}),
           expectedDelivery: form.expectedDelivery || undefined,
           note: form.note.trim() || undefined,
+          priceChangeReason: priceChanged ? priceReason.trim() : undefined,
         });
     if (ok) onClose();
   };
@@ -205,19 +222,33 @@ export const QuotationFormModal: React.FC<QuotationFormModalProps> = ({
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <CommonInput
-            label="Unit price (₹)"
-            aria-label="Unit price (₹)"
-              type="number"
-              min="0"
-              step="0.01"
-              max={ORDER_LIMITS.MAX_UNIT_PRICE}
-              required
-              placeholder="0.00"
-              value={form.unitPrice}
-              onChange={(event) => set('unitPrice', event.target.value)}
+          {!isChange && (
+            <QuotedPriceFields
+              hasItem={!!selectedItem}
+              existingPrice={existingPrice}
+              newPrice={form.unitPrice}
+              reason={priceReason}
+              priceChanged={priceChanged}
+              onNewPriceChange={(value) => set('unitPrice', value)}
+              onReasonChange={setPriceReason}
             />
+          )}
+
+          <div className="grid grid-cols-2 gap-3">
+            {isChange && (
+              <CommonInput
+              label="Unit price (₹)"
+              aria-label="Unit price (₹)"
+                type="number"
+                min="0"
+                step="0.01"
+                max={ORDER_LIMITS.MAX_UNIT_PRICE}
+                required
+                placeholder="0.00"
+                value={form.unitPrice}
+                onChange={(event) => set('unitPrice', event.target.value)}
+              />
+            )}
             <CommonInput
             label="Shipment price (₹)"
             aria-label="Shipment price (₹)"
@@ -285,7 +316,7 @@ export const QuotationFormModal: React.FC<QuotationFormModalProps> = ({
             </button>
             <button
               type="submit"
-              disabled={isSubmitting || !isValid || !taxValid || !hasChange}
+              disabled={isSubmitting || !isValid || !taxValid || !hasChange || !priceJustified}
               className={`px-4 py-2 text-xs font-semibold rounded-xl transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${SOLID_TONE.primary}`}
             >
               {isSubmitting ? 'Sending…' : isChange ? 'Send for approval' : 'Create quotation'}

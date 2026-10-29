@@ -70,7 +70,10 @@ beforeEach(() => {
     request({}),
     request({ id: 2, requestType: 'ASSIGNMENT', barcodeId: null, currentCode: null, newCode: null, codes: ['OLD00001', 'OLD00002'], reason: 'Old stock' }),
   ];
-  procurement.get.mockImplementation(async (url: string) => ok(url === '/v1/barcodes/requests' ? pending : []));
+  procurement.get.mockImplementation(async (url: string) => {
+    if (url === '/v1/approvals/summary') return ok({ BARCODES: pending.length });
+    return ok(url === '/v1/barcodes/requests' ? pending : []);
+  });
   procurement.patch.mockImplementation(async (url: string, body: unknown) => {
     const id = Number(/requests\/(\d+)\/decision/.exec(url)?.[1]);
     pending = pending.filter((entry) => entry.id !== id);
@@ -87,6 +90,8 @@ describe('Approvals hub: barcodes', () => {
 
     const tab = await screen.findByRole('tab', { name: /Barcodes/ });
     await waitFor(() => expect(tab).toHaveTextContent('2'));
+    // The badge comes from the summary; the list loads only once the tab is opened
+    expect(barcodeRequestCalls()).toHaveLength(0);
     await user.click(tab);
     const panel = await screen.findByRole('region', { name: 'Barcode requests awaiting approval' });
     expect(within(panel).getByText(/barcode BOARD0001 → BOARD0009/)).toBeInTheDocument();

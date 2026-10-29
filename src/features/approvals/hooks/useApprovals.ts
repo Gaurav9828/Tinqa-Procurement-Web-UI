@@ -39,7 +39,8 @@ const decideOrder = (item: ApprovalItem, id: number, payload: ProcessApprovalPay
         reason: isRejectDecision(payload.decision) ? payload.rejectionReason?.trim() : undefined,
       });
 
-export const useApprovals = () => {
+/** `enabled`: load only while the Requests tab is open (its badge comes from the approval summary). */
+export const useApprovals = ({ enabled = true }: { enabled?: boolean } = {}) => {
   const [approvals, setApprovals] = useState<UnifiedApprovalItem[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isDownloading, setIsDownloading] = useState<boolean>(false);
@@ -50,7 +51,7 @@ export const useApprovals = () => {
   const notify = useNotify();
 
   const fetchAllApprovals = useCallback(async () => {
-    if (!canAny(...REQUEST_QUEUE_PERMISSIONS)) return;
+    if (!enabled || !canAny(...REQUEST_QUEUE_PERMISSIONS)) return;
     // Each queue loads only for someone who can decide it and read the list it comes from (the endpoint's own
     // permission); the rest stay empty
     const ifAllowed = <T,>(permission: Permission | Permission[], load: () => Promise<T[]>): Promise<T[]> =>
@@ -140,7 +141,7 @@ export const useApprovals = () => {
     } finally {
       if (isCurrent()) setIsLoading(false);
     }
-  }, [can, canAny, beginRequest, notify]);
+  }, [enabled, can, canAny, beginRequest, notify]);
 
   useEffect(() => {
     fetchAllApprovals();
