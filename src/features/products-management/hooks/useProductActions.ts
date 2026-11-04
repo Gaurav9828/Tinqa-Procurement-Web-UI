@@ -16,6 +16,7 @@ import { useNotify } from '../../../hooks/useNotify';
 import { getApiErrorMessage, getApiFieldErrors } from '../../../utils/apiError';
 import { buildApprovalSnapshot, buildApprovedUpdatePayload, snapshotFromRequest } from '../utils/productApproval';
 import { toProduct } from '../utils/productMapper';
+import { versionLabel } from '../utils/productVersion';
 import type { NewProductUnit } from '../../barcodes/types/barcode.types';
 import { rememberUnits } from '../../barcodes/utils/rememberedUnits';
 
@@ -136,8 +137,8 @@ export const useProductActions = (onSuccessCallback?: () => void) => {
       }
       const created = toProduct(res.data);
       notify.success(
-        `Version ${created.versionNumber} of "${product.title}" created as a draft (#${created.id}). Change what you need, then submit it ` +
-          `for approval. Version ${product.versionNumber} keeps selling until the new version is approved and turned on.`
+        `${versionLabel(created)} of "${product.title}" created as a draft (#${created.id}). Give it its own model name, change what you ` +
+          `need, then submit it for approval. ${versionLabel(product)} keeps selling until the new version is approved and turned on.`
       );
       onSuccessCallback?.();
       return created;

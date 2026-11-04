@@ -3,6 +3,7 @@
 // the order confirmed; the customer is emailed the receipt and, when new, a link to set their password.
 import type { Gender } from '../../../types/common.types';
 import type { OrderItemSummary, OrderPaymentAttempt } from '../../order-tracking/types/orderTracking.types';
+import type { BarcodeStatus } from '../../barcodes/types/barcode.types';
 
 /** StoreCustomerDTO.AddressDTO */
 export interface StoreCustomerAddress {
@@ -74,6 +75,17 @@ export interface StoreProduct {
   unitPrice: number;
   stock: number;
   gstRate: number | null;
+}
+
+/** The product on a scanned unit's barcode (Procurement GET /v1/store-sales/units/lookup). */
+export interface StoreUnit {
+  barcode: string;
+  productId: number;
+  productTitle: string | null;
+  status: BarcodeStatus;
+  inStock: boolean;
+  /** Why the unit isn't on the shelf, when it isn't. */
+  note: string | null;
 }
 
 export interface StoreSaleLine {

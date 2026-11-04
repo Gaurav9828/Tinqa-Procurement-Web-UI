@@ -26,6 +26,16 @@ export const validateProductPayload = (
     if (taglineError) return taglineError;
   }
 
+  // Software and its version: single lines, both or neither (checked in the form; utils/productSoftware)
+  if (payload.softwareName) {
+    const softwareError = sanitizeText(payload.softwareName, 100, "Software name");
+    if (softwareError) return softwareError;
+  }
+  if (payload.softwareVersion) {
+    const versionError = sanitizeText(payload.softwareVersion, 50, "Software version");
+    if (versionError) return versionError;
+  }
+
   // 3. Description
   if (payload.description) {
     const descError = sanitizeText(payload.description, 2000, "Description");

@@ -2,8 +2,10 @@ import { axiosClient } from '../axiosClient';
 import type { AccessCatalog, MyAccess } from '../../config/access';
 import type { ApiResponse } from '../../types/common.types';
 
-// The catalog only changes with a backend deploy, so one copy per page load is enough
+// The catalog changes with a backend deploy or when an admin edits a custom role (invalidateCatalog), so one copy per
+// page load is enough otherwise
 let catalogRequest: Promise<AccessCatalog> | null = null;
+const catalogListeners = new Set<() => void>();
 
 export const accessService = {
   /** The signed-in user's access as of now (designation and level changes apply immediately). */
@@ -24,6 +26,23 @@ export const accessService = {
         });
     }
     return catalogRequest;
+  },
+
+  /**
+   * A custom role was created, changed or removed: forget the cached catalog and tell every mounted
+   * useAccessCatalog to load it again (they share one request).
+   */
+  invalidateCatalog: () => {
+    catalogRequest = null;
+    catalogListeners.forEach((listener) => listener());
+  },
+
+  /** Calls `listener` after invalidateCatalog(); returns the unsubscribe function. */
+  onCatalogInvalidated: (listener: () => void): (() => void) => {
+    catalogListeners.add(listener);
+    return () => {
+      catalogListeners.delete(listener);
+    };
   },
 
   /** Test hook: forget the cached catalog. */

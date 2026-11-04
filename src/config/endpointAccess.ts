@@ -123,6 +123,8 @@ export const PROCUREMENT_ENDPOINTS: readonly EndpointRule[] = [
   rule('GET', '/v1/barcodes/products/{id}', 'BARCODE_VIEW'),
   rule('POST', '/v1/barcodes/requests', 'BARCODE_REQUEST'),
   rule('GET', '/v1/barcodes/requests', 'BARCODE_APPROVE'),
+  // Store sales: the product on a scanned unit's barcode, without the registry behind it
+  rule('GET', '/v1/store-sales/units/lookup', 'STORE_ORDER_CREATE'),
   rule('PATCH', '/v1/barcodes/requests/{id}/decision', 'BARCODE_APPROVE'),
   // Salaries (PayrollController): recorded by PAYMENT_RECORD, confirmed by PAYMENT_APPROVE; own payslips for everyone
   rule('GET', '/v1/admin/payroll/years/{year}', 'PAYMENT_VIEW'),
@@ -171,6 +173,41 @@ export const PROCUREMENT_ENDPOINTS: readonly EndpointRule[] = [
   rule('GET', '/v1/client-demos/mine/{id}/expenses/{expenseId}/invoice', 'DEMO_VIEW_OWN'),
   rule('POST', '/v1/client-demos/mine/{id}/units/hand-out', 'DEMO_UNITS_HANDLE_OWN'),
   rule('POST', '/v1/client-demos/mine/{id}/units/hand-back', 'DEMO_UNITS_HANDLE_OWN'),
+  // Custom roles (docs/outreach-meetings-roles.md § 1); GET /v1/access/catalog only needs a signed-in user
+  rule('GET', '/v1/access/roles', 'ROLE_VIEW'),
+  rule('GET', '/v1/access/roles/grantable-groups', 'ROLE_MANAGE'),
+  rule('POST', '/v1/access/roles', 'ROLE_MANAGE'),
+  rule('PUT', '/v1/access/roles/{id}', 'ROLE_MANAGE'),
+  rule('DELETE', '/v1/access/roles/{id}', 'ROLE_MANAGE'),
+  // Client outreach (docs/outreach-meetings-roles.md § 2): editing a contact and its proofs is the logger's own (server)
+  rule('GET', '/v1/outreach/businesses', 'OUTREACH_VIEW'),
+  rule('GET', '/v1/outreach/businesses/{id}', 'OUTREACH_VIEW'),
+  rule('POST', '/v1/outreach/businesses', 'OUTREACH_LOG'),
+  rule('PUT', '/v1/outreach/businesses/{id}', 'OUTREACH_LOG'),
+  rule('GET', '/v1/outreach/businesses/{id}/contacts', 'OUTREACH_VIEW'),
+  rule('POST', '/v1/outreach/businesses/{id}/contacts', 'OUTREACH_LOG'),
+  rule('GET', '/v1/outreach/contacts', 'OUTREACH_VIEW'),
+  rule('PUT', '/v1/outreach/contacts/{id}', 'OUTREACH_LOG'),
+  rule('POST', '/v1/outreach/contacts/{id}/proofs', 'OUTREACH_LOG'),
+  rule('GET', '/v1/outreach/contacts/{id}/proofs/{proofId}', 'OUTREACH_VIEW'),
+  rule('DELETE', '/v1/outreach/contacts/{id}/proofs/{proofId}', 'OUTREACH_LOG'),
+  rule('GET', '/v1/outreach/summary', 'OUTREACH_VIEW'),
+  rule('GET', '/v1/outreach/follow-ups', 'OUTREACH_VIEW'),
+  // Meetings (docs/outreach-meetings-roles.md §3). GET /v1/meetings/{id} (MEETING_VIEW_ALL, or MEETING_VIEW_OWN as its
+  // organiser or an attendee) and GET /v1/meetings/{id}/feedback (the organiser, or MEETING_VIEW_ALL) take either, so the
+  // server decides them; the organiser-only writes also need MEETING_SCHEDULE
+  rule('GET', '/v1/meetings', 'MEETING_VIEW_ALL'),
+  rule('GET', '/v1/meetings/mine', 'MEETING_VIEW_OWN'),
+  rule('GET', '/v1/meetings/invitable-staff', 'MEETING_SCHEDULE'),
+  rule('GET', '/v1/meetings/busy', 'MEETING_SCHEDULE'),
+  rule('POST', '/v1/meetings', 'MEETING_SCHEDULE'),
+  rule('PUT', '/v1/meetings/{id}', 'MEETING_SCHEDULE'),
+  rule('POST', '/v1/meetings/{id}/attendees', 'MEETING_SCHEDULE'),
+  rule('POST', '/v1/meetings/{id}/cancel', 'MEETING_SCHEDULE'),
+  rule('POST', '/v1/meetings/{id}/complete', 'MEETING_SCHEDULE'),
+  rule('POST', '/v1/meetings/{id}/decline', 'MEETING_RESPOND_OWN'),
+  rule('GET', '/v1/meetings/{id}/feedback/mine', 'MEETING_RESPOND_OWN'),
+  rule('POST', '/v1/meetings/{id}/feedback', 'MEETING_RESPOND_OWN'),
   // Documents: listing everyone's needs DOCUMENT_VIEW; your own documents (by id or user) follow an owner rule
   rule('GET', '/v1/documents', 'DOCUMENT_VIEW'),
   rule('PATCH', '/v1/documents/{id}/approval', 'DOCUMENT_APPROVE'),
@@ -185,6 +222,7 @@ export const ECOMMERCE_ENDPOINTS: readonly EndpointRule[] = [
   rule('PUT', '/products/display-order', 'PRODUCT_PUBLISH'),
   // A new draft version of a sold product (its components are locked)
   rule('POST', '/products/{id}/new-version', 'PRODUCT_CREATE'),
+  rule('GET', '/products/description-reference', 'PRODUCT_VIEW'),
   rule('PATCH', '/products/{id}/stock', 'STOREFRONT_STOCK_UPDATE'),
   // Product categories (new ones are created with POST/PUT /products via categoryName)
   rule('GET', '/admin/product-categories', 'PRODUCT_VIEW'),
@@ -240,6 +278,16 @@ export const ECOMMERCE_ENDPOINTS: readonly EndpointRule[] = [
   rule('GET', '/admin/customers/{id}/cart', 'CUSTOMER_VIEW'),
   rule('GET', '/admin/customers/{id}/tickets', 'CUSTOMER_VIEW'),
   rule('PATCH', '/admin/customers/{id}', 'CUSTOMER_UPDATE'),
+  // Promo codes (docs/promo-codes.md › Staff); the customers' /promo-codes/** endpoints are the storefront's
+  rule('GET', '/admin/promo-codes', 'PROMO_CODE_VIEW'),
+  rule('GET', '/admin/promo-codes/code-suggestion', 'PROMO_CODE_MANAGE'),
+  rule('GET', '/admin/promo-codes/{id}', 'PROMO_CODE_VIEW'),
+  rule('GET', '/admin/promo-codes/{id}/redemptions', 'PROMO_CODE_VIEW'),
+  rule('POST', '/admin/promo-codes', 'PROMO_CODE_MANAGE'),
+  rule('PUT', '/admin/promo-codes/{id}', 'PROMO_CODE_MANAGE'),
+  rule('PATCH', '/admin/promo-codes/{id}/status', 'PROMO_CODE_MANAGE'),
+  rule('DELETE', '/admin/promo-codes/{id}', 'PROMO_CODE_MANAGE'),
+  rule('POST', '/admin/promo-codes/{id}/restore', 'PROMO_CODE_MANAGE'),
   // Company profile
   rule('GET', '/admin/company/profile', 'COMPANY_PROFILE_VIEW'),
   rule('GET', '/admin/company/profile/versions', 'COMPANY_PROFILE_VIEW'),
@@ -273,6 +321,30 @@ export const ECOMMERCE_ENDPOINTS: readonly EndpointRule[] = [
   rule('POST', '/admin/finance/vouchers/{id}/approve', 'EXPENSE_APPROVE'),
   rule('POST', '/admin/finance/vouchers/{id}/reject', 'EXPENSE_APPROVE'),
   rule('POST', '/admin/finance/vouchers/{id}/reverse', 'EXPENSE_APPROVE'),
+  // Careers (docs/careers.md › Staff API); the public /careers/** endpoints are the storefront's
+  rule('GET', '/admin/careers/settings', 'CAREER_OPENING_VIEW'),
+  rule('PUT', '/admin/careers/settings', 'STOREFRONT_FEATURE_TOGGLE'),
+  rule('GET', '/admin/careers/categories', 'CAREER_OPENING_VIEW'),
+  rule('GET', '/admin/careers/openings', 'CAREER_OPENING_VIEW'),
+  rule('GET', '/admin/careers/openings/{id}', 'CAREER_OPENING_VIEW'),
+  rule('POST', '/admin/careers/openings', 'CAREER_OPENING_MANAGE'),
+  rule('PUT', '/admin/careers/openings/{id}', 'CAREER_OPENING_MANAGE'),
+  rule('POST', '/admin/careers/openings/{id}/publish', 'CAREER_OPENING_MANAGE'),
+  rule('POST', '/admin/careers/openings/{id}/close', 'CAREER_OPENING_MANAGE'),
+  rule('GET', '/admin/careers/applications', 'CAREER_APPLICATION_VIEW'),
+  rule('GET', '/admin/careers/applications/{id}', 'CAREER_APPLICATION_VIEW'),
+  rule('GET', '/admin/careers/applications/{id}/resume', 'CAREER_APPLICATION_VIEW'),
+  rule('POST', '/admin/careers/applications/{id}/match', 'CAREER_APPLICATION_SCREEN'),
+  rule('POST', '/admin/careers/applications/{id}/shortlist', 'CAREER_APPLICATION_SCREEN'),
+  rule('POST', '/admin/careers/applications/{id}/select', 'CAREER_APPLICATION_SCREEN'),
+  rule('POST', '/admin/careers/applications/{id}/reject', 'CAREER_APPLICATION_SCREEN'),
+  rule('POST', '/admin/careers/applications/{id}/withdraw', 'CAREER_APPLICATION_SCREEN'),
+  rule('POST', '/admin/careers/applications/{id}/decision/approve', 'CAREER_DECISION_APPROVE'),
+  rule('POST', '/admin/careers/applications/{id}/decision/return', 'CAREER_DECISION_APPROVE'),
+  rule('POST', '/admin/careers/applications/{id}/interviews', 'CAREER_APPLICATION_SCREEN'),
+  rule('PUT', '/admin/careers/applications/{id}/interviews/{interviewId}', 'CAREER_APPLICATION_SCREEN'),
+  rule('POST', '/admin/careers/applications/{id}/interviews/{interviewId}/cancel', 'CAREER_APPLICATION_SCREEN'),
+  rule('POST', '/admin/careers/applications/{id}/interviews/{interviewId}/outcome', 'CAREER_APPLICATION_SCREEN'),
 ];
 
 const toPattern = (path: string) => new RegExp(`^${path.replace(/\{[^}]+\}/g, '[^/]+')}/?$`);

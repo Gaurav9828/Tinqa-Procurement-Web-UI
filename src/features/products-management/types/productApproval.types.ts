@@ -11,7 +11,12 @@ export type ProductApprovalDecision = Exclude<ProductApprovalStatus, 'PENDING'>;
 /** What the reviewer sees: a copy of the product as submitted (the Ecommerce product may change later). */
 export interface ProductApprovalSnapshot extends Partial<ProductGstFields> {
   title: string;
+  /** The version's own model name; absent on snapshots taken before model names existed. */
+  modelName?: string | null;
   tagline?: string | null;
+  /** The software it runs and its version; absent without software and on snapshots taken before it was recorded. */
+  softwareName?: string | null;
+  softwareVersion?: string | null;
   /** Absent on snapshots taken before categories existed. */
   categoryName?: string | null;
   price: number;

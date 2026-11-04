@@ -140,6 +140,15 @@ const financeOverview = (url: URL) => ({
   integrity: { balanced: true, accountBalance: 0, ledgerCashTotal: 0, accountEntryCount: 0, ledgerEntryCount: 0 },
 });
 
+// A promo code as POST /admin/promo-codes answers it (docs/promo-codes.md › Staff)
+const PROMO_CODE = {
+  id: 1, code: 'TINQA7KQ3MZP', description: 'E2E offer', discountType: 'PERCENTAGE', discountPercentage: 20, amountOff: null, customerScope: 'ALL', customerCount: 0,
+  productScope: 'ALL', productCount: 0, maxUnitsPerProduct: null, usageLimitPerCustomer: 1, totalUsageLimit: null,
+  startsOn: '2026-11-04', expiresOn: '2099-12-31', active: true, status: 'ACTIVE', timesUsed: 0, totalDiscountGiven: 0,
+  createdBy: 'e2e.admin', createdAt: '2026-11-04T10:00:00', updatedBy: null, updatedAt: '2026-11-04T10:00:00',
+  deletedBy: null, deletedAt: null, customers: [], products: [],
+};
+
 const TRACKING_STATUSES = ['ORDER_RECEIVED', 'CONFIRMED', 'PACKED', 'OUT_FOR_DELIVERY', 'DELIVERED', 'CANCELLED'].map((status) => ({ status, stage: status }));
 
 /**
@@ -177,6 +186,7 @@ export const handlers = (session: Session): [string, RegExp, Handler][] => [
   ['GET', /^\/v1\/barcodes$/, () => ok([])],
   ['GET', /^\/v1\/barcodes\/products\/\d+$/, () => ok([])],
   ['GET', /^\/v1\/barcodes\/trace\/[^/]+$/, () => notFound('BARCODE_NOT_FOUND')],
+  ['GET', /^\/v1\/store-sales\/units\/lookup$/, () => notFound('BARCODE_NOT_FOUND')],
   ['GET', /^\/v1\/admin\/payroll\/years\/(\d+)$/, (m) => ok({ year: Number(m[1]), months: [], approvedNetPay: 0 })],
   ['GET', /^\/v1\/admin\/payroll\/years\/(\d+)\/months\/(\d+)$/, (m) => ok({
     year: Number(m[1]), month: Number(m[2]), open: false, payableEmployees: 0, notRecorded: 0, pendingApproval: 0, approved: 0,
@@ -192,6 +202,27 @@ export const handlers = (session: Session): [string, RegExp, Handler][] => [
   ['GET', /^\/v1\/admin\/client-demos\/\d+$/, () => notFound('RESOURCE_NOT_FOUND')],
   ['GET', /^\/v1\/client-demos\/mine$/, () => ok([])],
   ['GET', /^\/v1\/client-demos\/mine\/\d+$/, () => notFound('RESOURCE_NOT_FOUND')],
+  // Meetings: none scheduled, nobody to invite, no feedback waiting; an unknown meeting answers 404 as the backend does
+  ['GET', /^\/v1\/meetings$/, () => ok(page([]))],
+  ['GET', /^\/v1\/meetings\/mine$/, () => ok(page([]))],
+  ['GET', /^\/v1\/meetings\/invitable-staff$/, () => ok(page([]))],
+  ['GET', /^\/v1\/meetings\/busy$/, () => ok([])],
+  ['GET', /^\/v1\/meetings\/\d+$/, () => notFound('MEETING_NOT_FOUND')],
+  ['GET', /^\/v1\/meetings\/\d+\/feedback(\/mine)?$/, () => notFound('MEETING_NOT_FOUND')],
+  // Custom roles: none yet (the role list and the groups the admin may grant)
+  ['GET', /^\/v1\/access\/roles$/, () => ok([])],
+  ['GET', /^\/v1\/access\/roles\/grantable-groups$/, () => ok([])],
+  // Client outreach: no businesses or contacts yet; an unknown business or proof answers 404
+  ['GET', /^\/v1\/outreach\/summary$/, () => ok({
+    totalContacts: 0, businessesContacted: 0, newBusinesses: 0, demoRequests: 0, followUpsDue: 0, byDay: [], byExecutive: [],
+    byChannel: {}, byInterest: {},
+  })],
+  ['GET', /^\/v1\/outreach\/businesses$/, () => ok(page([]))],
+  ['GET', /^\/v1\/outreach\/businesses\/\d+$/, () => notFound('RESOURCE_NOT_FOUND')],
+  ['GET', /^\/v1\/outreach\/businesses\/\d+\/contacts$/, () => ok(page([], 10))],
+  ['GET', /^\/v1\/outreach\/contacts$/, () => ok(page([]))],
+  ['GET', /^\/v1\/outreach\/contacts\/\d+\/proofs\/\d+$/, () => notFound('RESOURCE_NOT_FOUND')],
+  ['GET', /^\/v1\/outreach\/follow-ups$/, () => ok(page([], 10))],
   ['GET', /^\/v1\/dealer-portal\/quotations$/, () => ok([])],
   ['GET', /^\/v1\/dealer-portal\/orders$/, () => ok([])],
   // E-commerce
@@ -213,6 +244,16 @@ export const handlers = (session: Session): [string, RegExp, Handler][] => [
   ['GET', /^\/admin\/profile-approvals$/, () => ok([])],
   ['GET', /^\/admin\/customers$/, () => ok(page([]))],
   ['GET', /^\/admin\/customers\/\d+(\/(cart|orders|tickets))?$/, () => notFound('CUSTOMER_NOT_FOUND')],
+  // Promo codes: none yet; the create form's code suggestion; an unknown code answers 404 as the backend does
+  ['GET', /^\/admin\/promo-codes$/, () => ok(page([]))],
+  ['GET', /^\/admin\/promo-codes\/code-suggestion$/, () => ok({ code: 'TINQA7KQ3MZP' })],
+  ['GET', /^\/admin\/promo-codes\/\d+$/, () => notFound('PROMO_CODE_NOT_FOUND')],
+  ['GET', /^\/admin\/promo-codes\/\d+\/redemptions$/, () => notFound('PROMO_CODE_NOT_FOUND')],
+  ['POST', /^\/admin\/promo-codes$/, () => ok(PROMO_CODE)],
+  ['PUT', /^\/admin\/promo-codes\/\d+$/, () => notFound('PROMO_CODE_NOT_FOUND')],
+  ['PATCH', /^\/admin\/promo-codes\/\d+\/status$/, () => notFound('PROMO_CODE_NOT_FOUND')],
+  ['DELETE', /^\/admin\/promo-codes\/\d+$/, () => notFound('PROMO_CODE_NOT_FOUND')],
+  ['POST', /^\/admin\/promo-codes\/\d+\/restore$/, () => notFound('PROMO_CODE_NOT_FOUND')],
   ['GET', /^\/admin\/reviews$/, () => ok(page([]))],
   ['GET', /^\/admin\/store-sales\/products$/, () => ok([])],
   ['GET', /^\/admin\/product-categories$/, () => ok([])],
@@ -221,6 +262,16 @@ export const handlers = (session: Session): [string, RegExp, Handler][] => [
     enabled: false, smtpHost: null, smtpPort: null, security: 'STARTTLS', username: null, passwordSet: false, fromAddress: null,
     fromName: null, replyTo: null, ready: false, updatedBy: null, updatedAt: null, pendingEmails: 0, failedEmails: 0,
   })],
+  // Careers: no openings or applicants yet; an unknown opening or application answers 404 as the backend does
+  ['GET', /^\/admin\/careers\/settings$/, () => ok({ enabled: true, updatedBy: null, updatedAt: null })],
+  ['GET', /^\/admin\/careers\/categories$/, () => ok([])],
+  ['GET', /^\/admin\/careers\/openings$/, () => ok(page([]))],
+  ['GET', /^\/admin\/careers\/openings\/\d+$/, () => notFound('CAREER_OPENING_NOT_FOUND')],
+  ['GET', /^\/admin\/careers\/applications$/, () => ok(page([]))],
+  ['GET', /^\/admin\/careers\/applications\/\d+$/, () => notFound('CAREER_APPLICATION_NOT_FOUND')],
+  ['GET', /^\/admin\/careers\/applications\/\d+\/resume$/, () => notFound('CAREER_APPLICATION_NOT_FOUND')],
   ['GET', /^\/products$/, () => ok([])],
   ['GET', /^\/products\/active$/, () => ok([])],
+  // Description suggestions (only on "Suggest" in the product form): nothing found
+  ['GET', /^\/products\/description-reference$/, () => ok(null)],
 ];

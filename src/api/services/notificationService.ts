@@ -17,6 +17,8 @@ export interface UnreadCountResponse {
   errorCode: string;
   data: {
     unreadCount: number;
+    /** Meetings waiting for the caller's feedback (the My Meetings badge); 0 without MEETING_VIEW_OWN */
+    meetingFeedbackPending?: number;
   };
   timestamp: string;
   path: string;
@@ -33,9 +35,13 @@ export interface NotificationsListResponse {
 
 export const notificationService = {
   // Get unread notification count
-  getUnreadCount: async (): Promise<number> => {
+  // Get the unread count, and the meetings waiting for my feedback, in the one call every page makes
+  getUnreadCounts: async (): Promise<{ unreadCount: number; meetingFeedbackPending: number }> => {
     const response = await axiosClient.get<UnreadCountResponse>(`/v1/notifications/unread-count`);
-    return response.data?.data?.unreadCount ?? 0;
+    return {
+      unreadCount: response.data?.data?.unreadCount ?? 0,
+      meetingFeedbackPending: response.data?.data?.meetingFeedbackPending ?? 0,
+    };
   },
 
   // Get all notifications

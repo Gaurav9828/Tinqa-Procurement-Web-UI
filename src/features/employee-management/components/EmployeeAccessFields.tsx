@@ -6,6 +6,8 @@ import {
   EMPLOYEE_ROLE_OPTIONS,
   creationNeedsApproval,
   designationHasApprovalLevel,
+  designationPickerOptions,
+  designationText,
   employeeRoleLabel,
   findDesignation,
   isEmployeeRole,
@@ -21,6 +23,8 @@ interface Props {
   /** The level the record has on the server (edit mode); null when creating. */
   savedRole: string | null;
   savedDesignation: string | null;
+  /** The saved designation's label (edit mode), shown when it is no longer offered (a deactivated custom role). */
+  savedDesignationLabel?: string | null;
   /** The department the record has on the server (edit mode); shown until a designation is picked. */
   savedDepartment?: string | null;
   isEditMode: boolean;
@@ -59,6 +63,7 @@ export const EmployeeAccessFields: React.FC<Props> = ({
   role,
   savedRole,
   savedDesignation,
+  savedDesignationLabel = null,
   savedDepartment = null,
   isEditMode,
   isSelfLocked,
@@ -75,14 +80,7 @@ export const EmployeeAccessFields: React.FC<Props> = ({
   const levelLocked = !!designation && !!catalog && !designationHasApprovalLevel(catalog, designation);
   const levelEditable = !isSelfLocked && canApproveEmployees && isAdminAccount && !levelLocked;
 
-  const designationOptions = (catalog?.designations ?? []).map((entry) => {
-    const restricted = entry.code === 'SUPER_ADMIN' && !canApproveEmployees && savedDesignation !== 'SUPER_ADMIN';
-    return {
-      value: entry.code,
-      label: restricted ? `${entry.label} (needs an employee approver)` : entry.label,
-      disabled: restricted,
-    };
-  });
+  const designationOptions = designationPickerOptions(catalog, canApproveEmployees, savedDesignation, savedDesignationLabel);
 
   const selected = findDesignation(catalog, designation);
   const { granted, withheld } = previewGroups(catalog, designation, role);
@@ -123,7 +121,7 @@ export const EmployeeAccessFields: React.FC<Props> = ({
             name="designation"
             readOnly
             disabled
-            value={selected?.label ?? (catalog ? designation || 'Not assigned' : 'Loading designations…')}
+            value={designationText(catalog, designation, savedDesignation, savedDesignationLabel)}
             onChange={() => {}}
             error={errors.designation}
           />

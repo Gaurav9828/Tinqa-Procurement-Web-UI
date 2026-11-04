@@ -13,4 +13,6 @@ Specific to this app:
 - API-call budgets per page: `quality-gate.config.json`. Every endpoint a page calls needs a fixture in
   `e2e/support/fixtures.ts`.
 - E2E runs against the built bundle: run `vite build`, then `npx playwright test`, then `node scripts/e2e-gate.mjs`.
+- Testing rules are section 4 of `docs/engineering-rules.md`. `node scripts/test-all.mjs --e2e` runs every suite of
+  all four services (Docker must be running) and prints the status table to report.
 - Behaviour users notice also updates `src/features/user-guide/content/guideContent.ts` (its changelog and version).

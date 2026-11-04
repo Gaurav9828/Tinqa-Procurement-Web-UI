@@ -1,3 +1,4 @@
+import { axiosClient } from '../../../api/axiosClient';
 import { ecommerceAxiosClient } from '../../../api/ecommerceAxiosClient';
 import type { ApiResponse, PageResponse } from '../../../types/common.types';
 import type { EmailCodeSent, EmailVerificationApi, EmailVerified } from '../../../types/emailVerification.types';
@@ -11,6 +12,7 @@ import type {
   StoreSale,
   StoreSaleLine,
   StoreSaleListParams,
+  StoreUnit,
 } from '../types/storeSale.types';
 
 // Paths are relative to VITE_ECOMMERCE_API_BASE_URL (which already includes `/api`).
@@ -61,6 +63,15 @@ export const storeSaleApi = {
   /** GET /api/admin/store-sales/products — every product on sale now (filtered in the browser). */
   listProducts: async (): Promise<ApiResponse<StoreProduct[]>> => {
     const response = await ecommerceAxiosClient.get<ApiResponse<StoreProduct[]>>(`${BASE_URL}/products`);
+    return response.data;
+  },
+
+  /**
+   * Procurement GET /api/v1/store-sales/units/lookup?code= — the product on a scanned unit's barcode. Agents can't
+   * see the barcode registry; this answers only which product it is (404 BARCODE_NOT_FOUND, 409 for a piece).
+   */
+  lookupUnit: async (code: string): Promise<ApiResponse<StoreUnit>> => {
+    const response = await axiosClient.get<ApiResponse<StoreUnit>>('/v1/store-sales/units/lookup', { params: { code } });
     return response.data;
   },
 

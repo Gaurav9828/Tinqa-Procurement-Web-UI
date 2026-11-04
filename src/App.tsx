@@ -10,6 +10,7 @@ import { GlobalErrorBoundary } from './components/ErrorBoundary';
 import { GlobalErrorPage } from './pages/ErrorPage';
 import { GlobalAlertContainer } from './components/ui/GlobalAlertContainer';
 import { HomeRedirect, RedirectIfAuthenticated, RequireAuth, RequireNavAccess } from './auth/RouteGuards';
+import { RequireMeetingAccess } from './features/meetings/components/RequireMeetingAccess';
 
 // Feature modules are code-split so the login screen does not ship every admin page.
 const ProfilePage = lazy(() => import('./pages/ProfilePage').then((m) => ({ default: m.ProfilePage })));
@@ -44,6 +45,7 @@ const SupportTicketDetailPage = lazy(() =>
 const CustomersPage = lazy(() =>
   import('./features/customer-management/pages/CustomersPage').then((m) => ({ default: m.CustomersPage }))
 );
+const PromoCodesPage = lazy(() => import('./features/promo-codes/pages/PromoCodesPage').then((m) => ({ default: m.PromoCodesPage })));
 const CustomerDetailPage = lazy(() =>
   import('./features/customer-management/pages/CustomerDetailPage').then((m) => ({ default: m.CustomerDetailPage }))
 );
@@ -91,6 +93,25 @@ const ClientDemoDetailPage = lazy(() =>
   import('./features/client-demos/pages/ClientDemoDetailPage').then((m) => ({ default: m.ClientDemoDetailPage }))
 );
 const MyDemosPage = lazy(() => import('./features/client-demos/pages/MyDemosPage').then((m) => ({ default: m.MyDemosPage })));
+const ClientOutreachPage = lazy(() =>
+  import('./features/client-outreach/pages/ClientOutreachPage').then((m) => ({ default: m.ClientOutreachPage }))
+);
+const OutreachBusinessPage = lazy(() =>
+  import('./features/client-outreach/pages/OutreachBusinessPage').then((m) => ({ default: m.OutreachBusinessPage }))
+);
+const MyMeetingsPage = lazy(() => import('./features/meetings/pages/MyMeetingsPage').then((m) => ({ default: m.MyMeetingsPage })));
+const MeetingDetailPage = lazy(() => import('./features/meetings/pages/MeetingDetailPage').then((m) => ({ default: m.MeetingDetailPage })));
+const MeetingEditorPage = lazy(() => import('./features/meetings/pages/MeetingEditorPage').then((m) => ({ default: m.MeetingEditorPage })));
+const MeetingFeedbackPage = lazy(() => import('./features/meetings/pages/MeetingFeedbackPage').then((m) => ({ default: m.MeetingFeedbackPage })));
+const CareersPage = lazy(() => import('./features/careers/pages/CareersPage').then((m) => ({ default: m.CareersPage })));
+const CareersApplicantsPage = lazy(() => import('./features/careers/pages/ApplicantsPages').then((m) => ({ default: m.ApplicantsPage })));
+const OpeningApplicantsPage = lazy(() =>
+  import('./features/careers/pages/ApplicantsPages').then((m) => ({ default: m.OpeningApplicantsPage }))
+);
+const OpeningEditorPage = lazy(() => import('./features/careers/pages/OpeningEditorPage').then((m) => ({ default: m.OpeningEditorPage })));
+const ApplicationDetailPage = lazy(() =>
+  import('./features/careers/pages/ApplicationDetailPage').then((m) => ({ default: m.ApplicationDetailPage }))
+);
 const UserGuidePage = lazy(() => import('./features/user-guide/pages/UserGuidePage').then((m) => ({ default: m.UserGuidePage })));
 
 const PageLoader: React.FC = () => (
@@ -176,6 +197,10 @@ export const App: React.FC = () => {
                   <Route path="customers" element={<CustomersPage />} />
                   <Route path="customers/:customerId" element={<CustomerDetailPage />} />
                 </Route>
+                {/* Promo codes: viewers read them; creating, editing and switching off needs PROMO_CODE_MANAGE */}
+                <Route element={<RequireNavAccess navId="promo-codes" />}>
+                  <Route path="promo-codes" element={<PromoCodesPage />} />
+                </Route>
                 <Route element={<RequireNavAccess navId="support-tickets" />}>
                   <Route path="support-tickets" element={<SupportTicketsPage />} />
                   <Route path="support-tickets/:referenceNumber" element={<SupportTicketDetailPage />} />
@@ -215,6 +240,8 @@ export const App: React.FC = () => {
                 {/* Client demos & meetings: scheduled step by step, decided on the demo's page; attending staff under My Demos */}
                 <Route element={<RequireNavAccess navId="client-demos" />}>
                   <Route path="client-demos" element={<ClientDemosPage />} />
+                </Route>
+                <Route element={<RequireNavAccess navId="client-demos" requires={['DEMO_VIEW']} />}>
                   <Route path="client-demos/:id" element={<ClientDemoDetailPage mode="manager" />} />
                 </Route>
                 <Route element={<RequireNavAccess navId="client-demos" requires={['DEMO_MANAGE']} />}>
@@ -224,6 +251,38 @@ export const App: React.FC = () => {
                 <Route element={<RequireNavAccess navId="my-demos" />}>
                   <Route path="my-demos" element={<MyDemosPage />} />
                   <Route path="my-demos/:id" element={<ClientDemoDetailPage mode="attendee" />} />
+                </Route>
+                {/* Client outreach: businesses we pitch to and every contact with them */}
+                <Route element={<RequireNavAccess navId="client-outreach" />}>
+                  <Route path="client-outreach" element={<ClientOutreachPage />} />
+                  <Route path="client-outreach/businesses/:id" element={<OutreachBusinessPage />} />
+                </Route>
+                {/* Meetings: listed under Client Demos & Meetings › Meetings and My Meetings; a meeting's page opens from either and from emailed links */}
+                <Route element={<RequireNavAccess navId="my-meetings" />}>
+                  <Route path="my-meetings" element={<MyMeetingsPage />} />
+                </Route>
+                <Route element={<RequireMeetingAccess requires={['MEETING_SCHEDULE']} />}>
+                  <Route path="meetings/new" element={<MeetingEditorPage key="new" />} />
+                  <Route path="meetings/:id/edit" element={<MeetingEditorPage key="edit" />} />
+                </Route>
+                <Route element={<RequireMeetingAccess requires={['MEETING_VIEW_ALL', 'MEETING_VIEW_OWN']} />}>
+                  <Route path="meetings/:id" element={<MeetingDetailPage />} />
+                </Route>
+                <Route element={<RequireMeetingAccess requires={['MEETING_RESPOND_OWN']} />}>
+                  <Route path="meetings/:id/feedback" element={<MeetingFeedbackPage />} />
+                </Route>
+                {/* Careers: openings and their applicants; posting needs CAREER_OPENING_MANAGE */}
+                <Route element={<RequireNavAccess navId="careers" />}>
+                  <Route path="careers" element={<CareersPage />} />
+                  <Route path="careers/applicants" element={<CareersApplicantsPage />} />
+                  <Route path="careers/applications/:id" element={<ApplicationDetailPage />} />
+                </Route>
+                <Route element={<RequireNavAccess navId="careers" requires={['CAREER_OPENING_VIEW']} />}>
+                  <Route path="careers/openings/:id" element={<OpeningApplicantsPage />} />
+                </Route>
+                <Route element={<RequireNavAccess navId="careers" requires={['CAREER_OPENING_MANAGE']} />}>
+                  <Route path="careers/openings/new" element={<OpeningEditorPage key="new" />} />
+                  <Route path="careers/openings/:id/edit" element={<OpeningEditorPage key="edit" />} />
                 </Route>
                 <Route element={<RequireNavAccess navId="complaints" />}>
                   <Route path="complaints" element={<Placeholder title="Complaints & Claims Container" />} />

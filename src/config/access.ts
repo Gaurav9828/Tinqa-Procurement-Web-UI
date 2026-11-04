@@ -16,6 +16,9 @@ export const PERMISSIONS = [
   'EMPLOYEE_APPROVE',
   'EMPLOYEE_DELETE',
   'EMPLOYEE_PROFILE_CHANGE_APPROVE',
+  // Custom roles (e.g. Marketing Executive) built from the permission groups the admin holds (docs/outreach-meetings-roles.md)
+  'ROLE_VIEW',
+  'ROLE_MANAGE',
   // Dealers
   'DEALER_VIEW',
   'DEALER_CREATE',
@@ -90,6 +93,12 @@ export const PERMISSIONS = [
   'CUSTOMER_VIEW',
   'CUSTOMER_CHANGE_REQUEST',
   'CUSTOMER_UPDATE',
+  // Promo codes (docs/promo-codes.md): group PROMO_CODE_READ "Promo codes - view" (Super Admin, Store Manager, Store
+  // Sales Agent, Customer Support, Finance Manager, Financial Auditor) sees the codes to tell customers which one to
+  // use; PROMO_CODE_MANAGE (SYSTEM_ADMINISTRATION, Super Admin Level 2 only, never in a custom role) creates, edits
+  // and switches them off
+  'PROMO_CODE_VIEW',
+  'PROMO_CODE_MANAGE',
   // Company profile
   'COMPANY_PROFILE_VIEW',
   'COMPANY_PROFILE_EDIT',
@@ -120,17 +129,39 @@ export const PERMISSIONS = [
   'DEMO_COMPLETED_EDIT',
   // A product unit that did not come back from a demo is written off by a Super Admin (Level 2)
   'DEMO_UNIT_WRITE_OFF',
+  // Client outreach: every call, email and WhatsApp message with a business we pitch to
+  'OUTREACH_VIEW',
+  'OUTREACH_LOG',
+  // Meetings: scheduled without approval; the organiser cancels, replaces decliners and completes them
+  'MEETING_VIEW_ALL',
+  'MEETING_SCHEDULE',
+  // Careers (Procurement catalog groups RECRUITMENT_READ "Careers - view openings and applications",
+  // RECRUITMENT_MANAGEMENT "Careers - post openings, screen applicants and schedule interviews" and RECRUITMENT_APPROVAL
+  // "Careers - confirm shortlists and selections", approval level): Level 1 screens and shortlists, a different
+  // Level 2 confirms every shortlist and selection (docs/careers.md)
+  'CAREER_OPENING_VIEW',
+  'CAREER_APPLICATION_VIEW',
+  'CAREER_OPENING_MANAGE',
+  'CAREER_APPLICATION_SCREEN',
+  'CAREER_DECISION_APPROVE',
   // Platform
   'SYSTEM_SETTINGS_MANAGE',
   'AUDIT_LOG_VIEW',
+  // Hide the website's Careers tab and bring it back (Super Admin, Level 2)
+  'STOREFRONT_FEATURE_TOGGLE',
   // In-app user guide and its per-role PDF downloads (Super Admin, Store Manager)
   'USER_GUIDE_VIEW',
-  // Every employee: their own payslips (My Payslips), and the client demos they are tagged on (My Demos)
+  // Every employee: their own payslips (My Payslips)
   'PAYSLIP_VIEW_OWN',
+  // Staff whose role goes on client demos (group CLIENT_DEMO_ATTENDANCE: Super Admin, Store Manager, Finance Manager,
+  // Sales Agent): the demos they are tagged on (My Demos) and their own bills there. Riders and others have none
   'DEMO_VIEW_OWN',
   'DEMO_EXPENSE_RECORD_OWN',
   // Hand out and back the product units taken on demos you attend, by barcode
   'DEMO_UNITS_HANDLE_OWN',
+  // Meetings you are invited to: decline within 24 hours of the invite, give feedback once completed
+  'MEETING_VIEW_OWN',
+  'MEETING_RESPOND_OWN',
   // Dealer portal: held only by dealer logins, always limited to the dealer's own records on the server
   'DEALER_PORTAL_VIEW',
   'DEALER_QUOTATION_SUBMIT',
@@ -155,7 +186,15 @@ export const DESIGNATIONS = [
   'SALES_AGENT',
 ] as const;
 
-export type Designation = (typeof DESIGNATIONS)[number];
+/** A designation built into the backend (Procurement `DesignationAccess`). */
+export type BuiltInDesignation = (typeof DESIGNATIONS)[number];
+
+/**
+ * A designation code: a built-in one, or a custom role an admin created (e.g. `MARKETING_EXECUTIVE`, listed by
+ * GET /v1/access/catalog). Custom codes are only known at run time, so any string is accepted; built-ins keep their
+ * literal types for autocompletion.
+ */
+export type Designation = BuiltInDesignation | (string & {});
 
 /** Admin levels. Level 1 never holds approval-level groups; Level 2 holds every group of its designation. */
 export type AdminLevel = 'ADMIN_L1' | 'ADMIN_L2';
@@ -183,6 +222,7 @@ export const APPROVAL_PERMISSIONS: readonly Permission[] = [
   'DEALER_QUOTATION_CHANGE_APPROVE',
   'CUSTOMER_ORDER_PRE_ORDER_APPROVE',
   'DEMO_APPROVE',
+  'CAREER_DECISION_APPROVE',
 ];
 
 const PERMISSION_SET: ReadonlySet<string> = new Set(PERMISSIONS);
@@ -190,7 +230,8 @@ const DESIGNATION_SET: ReadonlySet<string> = new Set(DESIGNATIONS);
 
 export const isPermission = (value: unknown): value is Permission => typeof value === 'string' && PERMISSION_SET.has(value);
 
-export const isDesignation = (value: unknown): value is Designation => typeof value === 'string' && DESIGNATION_SET.has(value);
+export const isBuiltInDesignation = (value: unknown): value is BuiltInDesignation =>
+  typeof value === 'string' && DESIGNATION_SET.has(value);
 
 /** Server catalog (GET /v1/access/catalog). */
 export interface DesignationEntry {
@@ -201,6 +242,12 @@ export interface DesignationEntry {
   description: string;
   /** Groups held at Level 2; Level 1 holds these minus the approval-level ones. */
   groups: string[];
+  /** A custom role created by an admin (Employee Management › Roles & permissions); built-ins are false. */
+  custom?: boolean;
+  /** The catalog lists active roles only; kept for completeness. */
+  active?: boolean;
+  /** The custom role's id; null for built-ins. */
+  id?: number | null;
 }
 
 export interface PermissionGroupEntry {

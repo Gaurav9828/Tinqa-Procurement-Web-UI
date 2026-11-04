@@ -7,7 +7,7 @@ import type { ProductResponse } from '../types/product.types';
 import type { ProductApprovalResponse } from '../types/productApproval.types';
 import { getApprovalPermissions, type ProductApprovalState } from '../utils/productApproval';
 import { ProductRatingSummary } from '../../reviews/components/ProductRatingSummary';
-import { newVersionBlockedReason, nextVersionNumber, nextVersionOf, versionLabel } from '../utils/productVersion';
+import { formatVersion, newVersionBlockedReason, newerVersionsOf, nextVersionNumberOfName, versionLabel } from '../utils/productVersion';
 
 export interface ProductActionAccess {
   /** PRODUCT_UPDATE */
@@ -51,18 +51,19 @@ interface ProductTableProps {
   onCreateVersion?: (product: ProductResponse) => void;
 }
 
-/** Version ("v2", with the newer one on hover) and "Sold" next to a product's title. */
-const VersionBadges: React.FC<{ product: ProductResponse; newerVersion: ProductResponse | null }> = ({ product, newerVersion }) => (
+/** "v0.2, v0.3 (#41)": the versions adapted or copied from a product. */
+const describeVersions = (versions: readonly ProductResponse[]) => versions.map((v) => `${versionLabel(v)} (#${v.id})${v.draft ? ' — draft' : ''}`).join(', ');
+
+/** Version ("v0.2", with the newer ones on hover) and "Sold" next to a product's title. */
+const VersionBadges: React.FC<{ product: ProductResponse; newerVersions: readonly ProductResponse[] }> = ({ product, newerVersions }) => (
   <>
-    {(product.versionNumber > 1 || newerVersion) && (
-      <span
-        data-testid={`product-version-${product.id}`}
-        className="px-1.5 py-0.5 rounded-md bg-[#0071e3]/10 text-[#0071e3] dark:text-blue-400 text-[10px] font-semibold"
-        title={newerVersion ? `Replaced by ${versionLabel(newerVersion)} (#${newerVersion.id}) once that one is turned on` : undefined}
-      >
-        {versionLabel(product)}
-      </span>
-    )}
+    <span
+      data-testid={`product-version-${product.id}`}
+      className="px-1.5 py-0.5 rounded-md bg-[#0071e3]/10 text-[#0071e3] dark:text-blue-400 text-[10px] font-semibold"
+      title={newerVersions.length > 0 ? `Turned off when one of ${describeVersions(newerVersions)} is turned on` : undefined}
+    >
+      {versionLabel(product)}
+    </span>
     {product.sold && (
       <span
         className="px-1.5 py-0.5 rounded-md bg-amber-500/10 text-amber-700 dark:text-amber-400 text-[10px] font-medium"
@@ -105,7 +106,7 @@ const EditButton: React.FC<{ product: ProductResponse; canEdit: boolean; blocked
   );
 };
 
-/** Copies a sold product into a new draft version (only one newer version per product). */
+/** Copies a sold product into a new draft version (one waiting draft copy at a time). */
 const NewVersionButton: React.FC<{ product: ProductResponse; allProducts: ProductResponse[]; onCreateVersion: (product: ProductResponse) => void }> = ({
   product,
   allProducts,
@@ -117,7 +118,7 @@ const NewVersionButton: React.FC<{ product: ProductResponse; allProducts: Produc
       onClick={() => !blocked && onCreateVersion(product)}
       disabled={!!blocked}
       className="p-1.5 hover:bg-blue-500/10 rounded-lg text-gray-500 hover:text-[#0071e3] dark:text-white cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent"
-      title={blocked ?? `Create Version ${nextVersionNumber(product, allProducts)} (to change components)`}
+      title={blocked ?? `Create ${formatVersion(nextVersionNumberOfName(product.title, allProducts))} (to change components)`}
       aria-label={`Create a new version of ${product.title}`}
     >
       <CopyPlus className="w-3.5 h-3.5" />
@@ -205,7 +206,7 @@ export const ProductTable: React.FC<ProductTableProps> = ({
                 canSubmit: actions.canSubmit && state.canSubmit,
                 canApplyUpdate: actions.canPublish && state.canApplyUpdate,
               };
-              const newerVersion = nextVersionOf(product, allProducts);
+              const newerVersions = newerVersionsOf(product, allProducts);
               return (
               <tr
                 key={product.id}
@@ -229,7 +230,7 @@ export const ProductTable: React.FC<ProductTableProps> = ({
                 <td className="p-3 font-medium text-black dark:text-white">
                   <div className="flex flex-wrap items-center gap-1.5">
                     {product.title}
-                    <VersionBadges product={product} newerVersion={newerVersion} />
+                    <VersionBadges product={product} newerVersions={newerVersions} />
                     {product.accessory && (
                       <span
                         className="px-1.5 py-0.5 rounded-md bg-violet-500/10 text-violet-700 dark:text-violet-300 text-[10px] font-medium"
@@ -247,11 +248,12 @@ export const ProductTable: React.FC<ProductTableProps> = ({
                       </span>
                     )}
                   </div>
+                  <div data-testid={`product-model-${product.id}`} className="text-[10px] text-gray-500 dark:text-gray-400">
+                    {product.modelName ? `Model ${product.modelName}` : <span className="text-amber-600 dark:text-amber-400">No model name yet</span>}
+                  </div>
                   {product.tagline && <div className="text-[10px] text-gray-400">{product.tagline}</div>}
-                  {newerVersion && (
-                    <div className="text-[10px] text-[#0071e3] dark:text-blue-400">
-                      Newer: {versionLabel(newerVersion)} (#{newerVersion.id}){newerVersion.draft ? ' — draft' : ''}
-                    </div>
+                  {newerVersions.length > 0 && (
+                    <div className="text-[10px] text-[#0071e3] dark:text-blue-400">Newer: {describeVersions(newerVersions)}</div>
                   )}
                 </td>
                 <td className="p-3">

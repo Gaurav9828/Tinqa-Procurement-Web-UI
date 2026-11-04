@@ -1,9 +1,10 @@
 import React, { useMemo, useState } from 'react';
-import { Loader2, Minus, PackageSearch, Plus } from 'lucide-react';
+import { Barcode, Loader2, Minus, PackageSearch, Plus } from 'lucide-react';
 import { CommonInput } from '../../../components/ui/FormInputs';
 import { formatCurrency } from '../../order-tracking/utils/orderTracking.utils';
-import type { StoreProduct } from '../types/storeSale.types';
+import type { StoreProduct, StoreUnit } from '../types/storeSale.types';
 import { MAX_QUANTITY_PER_PRODUCT } from '../utils/storeSale.constants';
+import { useUnitLookup } from '../hooks/useUnitLookup';
 
 interface Props {
   products: StoreProduct[];
@@ -12,24 +13,55 @@ interface Props {
   onQuantity: (productId: number, quantity: number) => void;
 }
 
-/** Step 2: what they buy. Searching filters the loaded list; out-of-stock products are booked as pre-orders. */
+/** Which product the scanned unit is, and why it isn't on the shelf when it isn't. */
+const ScannedUnit: React.FC<{ unit: StoreUnit; product: StoreProduct | undefined }> = ({ unit, product }) => (
+  <p role="status" className="text-xs text-gray-600 dark:text-gray-300 flex items-center gap-1.5">
+    <Barcode className="w-3.5 h-3.5 text-[#0071e3]" />
+    <span>
+      <span className="font-mono">{unit.barcode}</span> is a unit of{' '}
+      <span className="font-semibold">{product?.title ?? unit.productTitle ?? `product ${unit.productId}`}</span>
+      {!product && ', which is not on sale now'}.
+      {unit.note && <span className="text-amber-600"> {unit.note}</span>}
+    </span>
+  </p>
+);
+
+const emptyMessage = (onSale: number, scanned: boolean) => {
+  if (onSale === 0) return 'No products are on sale.';
+  return scanned ? 'Nothing to add for this barcode.' : 'No products match the search.';
+};
+
+/**
+ * Step 2: what they buy. Searching filters the loaded list by name; a unit's barcode (scanned or typed) that matches no
+ * name shows the product it belongs to. Out-of-stock products are booked as pre-orders.
+ */
 export const ProductPicker: React.FC<Props> = ({ products, isLoading, quantities, onQuantity }) => {
   const [search, setSearch] = useState('');
-  const shown = useMemo(() => {
+  const byName = useMemo(() => {
     const needle = search.trim().toLowerCase();
     return needle ? products.filter((product) => product.title.toLowerCase().includes(needle)) : products;
   }, [products, search]);
+  const barcode = useUnitLookup(search, products.length > 0 && byName.length === 0);
+  const scanned = barcode.unit ? products.find((product) => product.id === barcode.unit?.productId) : undefined;
+  let shown = byName;
+  if (barcode.unit) shown = scanned ? [scanned] : [];
 
   return (
     <section aria-label="Products" className="apple-card p-5 space-y-4">
       <h2 className="text-sm font-semibold flex items-center gap-2">
         <PackageSearch className="w-4 h-4 text-[#0071e3]" /> 2. Products
       </h2>
-      <CommonInput label="Search products" type="search" value={search} onChange={(event) => setSearch(event.target.value)} maxLength={100} />
+      <CommonInput label="Search products" type="search" value={search} placeholder="Product name, or scan a barcode" maxLength={100}
+        onChange={(event) => setSearch(event.target.value)}
+        onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); barcode.flush(); } }} />
+      {barcode.unit && <ScannedUnit unit={barcode.unit} product={scanned} />}
+      {barcode.isLookingUp && (
+        <p className="text-xs text-gray-500 flex items-center gap-2"><Loader2 className="w-3.5 h-3.5 animate-spin" /> Looking up the barcode…</p>
+      )}
       {isLoading ? (
         <Loader2 className="w-4 h-4 animate-spin text-gray-400" />
       ) : shown.length === 0 ? (
-        <p className="text-xs text-gray-500">{products.length === 0 ? 'No products are on sale.' : 'No products match the search.'}</p>
+        !barcode.isLookingUp && <p className="text-xs text-gray-500">{emptyMessage(products.length, !!barcode.unit)}</p>
       ) : (
         <ul className="divide-y divide-black/5 dark:divide-white/5 max-h-[420px] overflow-y-auto" aria-label="Products on sale">
           {shown.map((product) => {

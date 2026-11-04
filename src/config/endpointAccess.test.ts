@@ -28,6 +28,12 @@ describe('endpoint access table', () => {
     expect(procurement('get', '/v1/admin/employees/pending-approvals')).toBe('EMPLOYEE_APPROVE');
     expect(procurement('get', '/v1/admin/employees/7')).toBe('EMPLOYEE_VIEW');
     expect(ecommerce('get', '/admin/orders/tracking-statuses')).toBe('CUSTOMER_ORDER_VIEW');
+    expect(ecommerce('get', '/admin/promo-codes/code-suggestion')).toBe('PROMO_CODE_MANAGE');
+    expect(ecommerce('get', '/admin/promo-codes/12')).toBe('PROMO_CODE_VIEW');
+    expect(ecommerce('get', '/admin/promo-codes/12/redemptions?page=0')).toBe('PROMO_CODE_VIEW');
+    expect(ecommerce('patch', '/admin/promo-codes/12/status')).toBe('PROMO_CODE_MANAGE');
+    expect(ecommerce('delete', '/admin/promo-codes/12')).toBe('PROMO_CODE_MANAGE');
+    expect(ecommerce('post', '/admin/promo-codes/12/restore')).toBe('PROMO_CODE_MANAGE');
   });
 
   it('leaves endpoints without a fixed permission to the backend', () => {

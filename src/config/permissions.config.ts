@@ -10,6 +10,8 @@ export interface NavigationItem {
   iconName: string;
   /** Opens for a user holding any of these. The sidebar and the router both use it, so they never disagree. */
   requires: readonly Permission[];
+  /** 'header': shown as an icon in the top bar (beside the bell) instead of in the sidebar. */
+  placement?: 'header';
 }
 
 export const APP_NAVIGATION: NavigationItem[] = [
@@ -82,6 +84,15 @@ export const APP_NAVIGATION: NavigationItem[] = [
     requires: ['CUSTOMER_VIEW'],
   },
   {
+    // Promo codes customers type at checkout: PROMO_CODE_VIEW sees the codes, their customers, products, limits and
+    // use history; PROMO_CODE_MANAGE (Super Admin, Level 2) creates, edits and switches them off or on
+    id: 'promo-codes',
+    label: 'Promo Codes',
+    path: '/promo-codes',
+    iconName: 'TicketPercent',
+    requires: ['PROMO_CODE_VIEW'],
+  },
+  {
     id: 'support-tickets',
     label: 'Support Tickets',
     path: '/support-tickets',
@@ -149,20 +160,49 @@ export const APP_NAVIGATION: NavigationItem[] = [
   },
   {
     // Visits to clients for demos and promotions: DEMO_MANAGE plans them step by step and records their bills,
-    // DEMO_APPROVE (Level 2) approves quotations and completions; completions are booked as travel & conveyance
+    // DEMO_APPROVE (Level 2) approves quotations and completions; completions are booked as travel & conveyance.
+    // Its Meetings tab needs MEETING_VIEW_ALL (Fulfillment and Financial Auditor hold meetings but not demos)
     id: 'client-demos',
     label: 'Client Demos & Meetings',
     path: '/client-demos',
     iconName: 'Presentation',
-    requires: ['DEMO_VIEW'],
+    requires: ['DEMO_VIEW', 'MEETING_VIEW_ALL'],
   },
   {
-    // Every employee: the client demos they are tagged on, and their own hotel, food and travel bills on them
+    // Calls, emails, WhatsApp messages and visits with businesses we pitch to: OUTREACH_VIEW reads the log and its
+    // summary, OUTREACH_LOG adds businesses and logs contacts (each logger edits only their own)
+    id: 'client-outreach',
+    label: 'Client Outreach',
+    path: '/client-outreach',
+    iconName: 'PhoneCall',
+    requires: ['OUTREACH_VIEW'],
+  },
+  {
+    // Job openings on the storefront's Careers tab and their applicants: CAREER_OPENING_MANAGE posts openings,
+    // CAREER_APPLICATION_SCREEN screens and interviews, CAREER_DECISION_APPROVE (Level 2) confirms shortlists and selections
+    id: 'careers',
+    label: 'Careers',
+    path: '/careers',
+    iconName: 'Briefcase',
+    requires: ['CAREER_OPENING_VIEW', 'CAREER_APPLICATION_VIEW'],
+  },
+  {
+    // Staff whose role goes on demos (CLIENT_DEMO_ATTENDANCE): the client demos they are tagged on, and their own
+    // hotel, food and travel bills on them. Delivery riders and other non-field roles don't see it
     id: 'my-demos',
     label: 'My Demos',
     path: '/my-demos',
     iconName: 'MapPin',
     requires: ['DEMO_VIEW_OWN'],
+  },
+  {
+    // Every employee: meetings they organise or are invited to; decline within 24 hours of the invite, feedback once completed
+    id: 'my-meetings',
+    label: 'My Meetings',
+    path: '/my-meetings',
+    iconName: 'Groups',
+    requires: ['MEETING_VIEW_OWN'],
+    placement: 'header',
   },
   {
     // Every employee: their own payslips of confirmed months

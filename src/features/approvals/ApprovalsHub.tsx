@@ -27,8 +27,9 @@ import { BarcodeRequestsPanel } from '../barcodes/components/BarcodeRequestsPane
 import { useBarcodeRequests } from '../barcodes/hooks/useBarcodeRequests';
 import { ClientDemoApprovalsPanel } from '../client-demos/components/ClientDemoApprovalsPanel';
 import { useWaitingDemos } from '../client-demos/hooks/useClientDemoData';
+import { CareerApprovalsPanel } from '../careers/components/CareerApprovalsPanel';
 
-type HubTab = 'requests' | 'refunds' | 'expenses' | 'dealers' | 'pre-orders' | 'company-profile' | 'barcodes' | 'client-demos';
+type HubTab = 'requests' | 'refunds' | 'expenses' | 'dealers' | 'pre-orders' | 'company-profile' | 'barcodes' | 'client-demos' | 'careers';
 const TAB_STORAGE_KEY = 'approvals.tab';
 
 /** Remembered per browser tab, so Back from an order opened in the refunds queue returns to it. */
@@ -50,6 +51,7 @@ const TABS: { id: HubTab; label: string }[] = [
   { id: 'company-profile', label: 'Company profile' },
   { id: 'barcodes', label: 'Barcodes' },
   { id: 'client-demos', label: 'Client demos' },
+  { id: 'careers', label: 'Careers' },
 ];
 
 export const ApprovalsHub: React.FC = () => {
@@ -70,6 +72,8 @@ export const ApprovalsHub: React.FC = () => {
         return can('BARCODE_APPROVE');
       case 'client-demos':
         return can('DEMO_APPROVE');
+      case 'careers':
+        return canAll('CAREER_DECISION_APPROVE', 'CAREER_APPLICATION_VIEW');
       case 'dealers':
         return canAny('DEALER_LOGIN_APPROVE', 'DEALER_QUOTATION_CHANGE_APPROVE');
       default:
@@ -123,6 +127,7 @@ export const ApprovalsHub: React.FC = () => {
     'company-profile': { count: summary.count('COMPANY_PROFILE'), noun: 'company profile changes' },
     barcodes: { count: summary.count('BARCODES'), noun: 'barcode requests' },
     'client-demos': { count: summary.count('CLIENT_DEMOS'), noun: 'client demos' },
+    careers: { count: summary.count('CAREER_DECISIONS'), noun: 'shortlists and selections' },
   };
 
   // Every tab but Requests is one queue with its own panel
@@ -142,6 +147,8 @@ export const ApprovalsHub: React.FC = () => {
             }}
           />
         );
+      case 'careers':
+        return <CareerApprovalsPanel enabled={tab === 'careers'} onChanged={refreshSummary} />;
       case 'client-demos':
         return <ClientDemoApprovalsPanel demos={waitingDemos.data ?? []} isLoading={waitingDemos.isLoading} onRefresh={waitingDemos.refresh} />;
       case 'pre-orders':
@@ -283,7 +290,8 @@ export const ApprovalsHub: React.FC = () => {
           </h1>
           <p className="text-gray-500 dark:text-neutral-400 text-sm mt-1">
             Every request waiting for your decision: documents, profile updates, new employees, stock, dealer quotations,
-            orders, returns, products, refunds, expenses, dealers, pre-orders, the company profile and barcodes.
+            orders, returns, products, refunds, expenses, dealers, pre-orders, the company profile, barcodes, client demos and careers
+            shortlists and selections.
           </p>
         </div>
         {tab === 'requests' && (

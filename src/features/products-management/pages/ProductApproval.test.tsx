@@ -14,7 +14,7 @@ import { useAuthStore } from '../../../store/useAuthStore';
 import type { ProductResponseDto } from '../types/product.types';
 import type { ProductApprovalResponse, ProductApprovalStatus } from '../types/productApproval.types';
 import { fillGst } from './gstTestUtil';
-import { noBarcodes, scanUnitBarcodes } from './barcodeTestUtil';
+import { noBarcodes, scanUnitBarcodes, openFormTab, fillFrontImage, imagesInFolder } from './barcodeTestUtil';
 import { rememberedUnits, rememberUnits } from '../../barcodes/utils/rememberedUnits';
 import { DIORAMAS, fillCategory } from './categoryTestUtil';
 import { superAdminPermissions } from '../../../test/access';
@@ -41,6 +41,7 @@ const httpError = (status: number, message: string) => {
 const product = (id: number, title: string, enabled: boolean): ProductResponseDto => ({
   id,
   title,
+  modelName: `M-${id}`,
   category: DIORAMAS,
   price: 1000 + id,
   hsnSac: '9405',
@@ -194,8 +195,10 @@ describe('Creating a product needs approval', () => {
     await screen.findByText('Legacy Lamp');
     await user.click(screen.getByRole('button', { name: /Create Product/ }));
     await user.type(screen.getByPlaceholderText('Product Title'), 'Touch Panel');
+    await user.type(screen.getByLabelText(/Model name/), 'MDL-3');
+    await openFormTab(user, 'Price & GST');
     await user.type(screen.getByPlaceholderText('0.00'), '2999');
-    await user.type(screen.getByPlaceholderText('Image Address'), 'https://cdn.tinqa.com/panel.png');
+    await fillFrontImage(user);
     await fillGst(user);
     await fillCategory(user);
   await fillCategory(user);
@@ -434,6 +437,40 @@ describe('Updating an approved product needs approval', () => {
     await waitFor(() => expect(stateOf(6)).toHaveAttribute('data-state', 'UPDATE_PENDING'));
     expect(within(row(6)).getByText('Approved Adapter')).toBeInTheDocument(); // live product unchanged
     expect(within(row(6)).getByTitle(/Changes are waiting for a catalog approver/)).toBeDisabled();
+  });
+
+  it('a replaced image needs its description, and the approver sees both changes', async () => {
+    const { user } = renderPage();
+    await waitForStates();
+    await user.click(within(row(6)).getByTitle('Edit Product'));
+    await openFormTab(user, 'Images & specs');
+    // Saved before descriptions and image names existed: kept as it is, without a description, while its standard
+    // file isn't in the folder
+    await waitFor(() => expect(screen.getByTestId('image-slot-1-note')).toHaveTextContent(/kept until approvedadapter_v0\.1_1 is in the folder/));
+    expect(screen.getByRole('img', { name: 'Front view' })).toHaveAttribute('src', 'https://cdn.tinqa.com/6.png');
+    // Once it is, it replaces the old one
+    imagesInFolder('https://cdn.tinqa.com/products/approvedadapter_v0.1_1.png');
+    const folder = screen.getByLabelText('Image folder address');
+    await user.clear(folder);
+    await user.type(folder, 'https://cdn.tinqa.com/products');
+    await waitFor(() => expect(screen.getByRole('img', { name: 'Front view' })).toHaveAttribute('src', 'https://cdn.tinqa.com/products/approvedadapter_v0.1_1.png'));
+    const review = screen.getByRole('button', { name: 'Review & Request Approval' });
+    expect(review).toBeDisabled();
+    await user.type(screen.getByLabelText('Image 1 (front view) description'), 'The adapter from the front, plug folded.');
+    await user.click(review);
+    await user.click(await screen.findByRole('button', { name: 'Send for Approval' }));
+
+    await waitFor(() => expect(procurement.post).toHaveBeenCalledTimes(1));
+    expect(procurement.post.mock.calls[0][1]).toMatchObject({
+      proposedChanges: expect.objectContaining({
+        image1Url: 'https://cdn.tinqa.com/products/approvedadapter_v0.1_1.png',
+        image1Description: 'The adapter from the front, plug folded.',
+      }),
+      changeSummary: [
+        { label: 'Image 1 (front view) URL', oldValue: 'https://cdn.tinqa.com/6.png', newValue: 'https://cdn.tinqa.com/products/approvedadapter_v0.1_1.png' },
+        { label: 'Image 1 (front view) description', oldValue: 'None', newValue: 'The adapter from the front, plug folded.' },
+      ],
+    });
   });
 
   it('Admin L2 approval applies the changes, keeping the live stock', async () => {

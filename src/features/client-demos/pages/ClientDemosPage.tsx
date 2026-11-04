@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { CalendarPlus, RefreshCw } from 'lucide-react';
 import { CommonInput, CommonSelect } from '../../../components/ui/FormInputs';
 import { useAccess } from '../../../hooks/useAccess';
 import { useDemoList } from '../hooks/useClientDemoData';
 import { DemoTable } from '../components/DemoTable';
+import { MeetingsPanel } from '../../meetings/components/MeetingsPanel';
 import type { DemoStatus } from '../types/clientDemo.types';
 import { CLIENT_DEMOS_PATH, STATUS_LABELS, demoPath, inrAmount } from '../utils/clientDemo';
 
@@ -21,10 +22,10 @@ const endOfMonth = (iso: string) => {
 };
 
 /**
- * Client Demos & Meetings: every visit to a client for a demo appointment or a promotion, filtered by when it starts
- * and its status. Demo managers schedule new ones here, step by step.
+ * Demos tab: every visit to a client for a demo appointment or a promotion, filtered by when it starts and its status.
+ * Demo managers schedule new ones here, step by step.
  */
-export const ClientDemosPage: React.FC = () => {
+const DemosPanel: React.FC = () => {
   const { can } = useAccess();
   const [from, setFrom] = useState(() => shift(-1));
   const [to, setTo] = useState(() => endOfMonth(shift(2)));
@@ -35,15 +36,12 @@ export const ClientDemosPage: React.FC = () => {
   const booked = demos.filter((demo) => demo.status === 'COMPLETED').reduce((sum, demo) => sum + demo.bookedTotal, 0);
 
   return (
-    <div className="space-y-6 p-6 max-w-7xl mx-auto">
+    <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight text-black dark:text-white">Client Demos & Meetings</h1>
-          <p className="text-gray-500 dark:text-neutral-400 text-sm mt-1 max-w-3xl">
-            Demos and promotions at hotels, offices, hospitals and other clients: planned as a quotation, approved, their stay, food and
-            travel bills recorded, and the completion approved before the costs are booked as travel & conveyance.
-          </p>
-        </div>
+        <p className="text-gray-500 dark:text-neutral-400 text-sm max-w-3xl">
+          Demos and promotions at hotels, offices, hospitals and other clients: planned as a quotation, approved, their stay, food and
+          travel bills recorded, and the completion approved before the costs are booked as travel & conveyance.
+        </p>
         {can('DEMO_MANAGE') && (
           <Link to={`${CLIENT_DEMOS_PATH}/new`}
             className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-[#0071e3] hover:bg-[#0077ed] text-white text-sm font-semibold">
@@ -82,6 +80,42 @@ export const ClientDemosPage: React.FC = () => {
           actionLabel={(demo) => (demo.decidableByYou ? 'Review' : 'Open')}
           empty={list.loadFailed ? 'The client demos could not be loaded.' : 'No demos start in this period.'} />
       </section>
+    </div>
+  );
+};
+
+type Tab = 'demos' | 'meetings';
+
+/**
+ * Client Demos & Meetings: two tabs, Demos (DEMO_VIEW) and Meetings (MEETING_VIEW_ALL), each shown only to those who
+ * may open it. Only the open tab is rendered, so a hidden tab fetches nothing. `?tab=meetings` opens Meetings.
+ */
+export const ClientDemosPage: React.FC = () => {
+  const { can } = useAccess();
+  const [params, setParams] = useSearchParams();
+  const tabs = ([['demos', 'Demos', can('DEMO_VIEW')], ['meetings', 'Meetings', can('MEETING_VIEW_ALL')]] as const)
+    .filter(([, , allowed]) => allowed)
+    .map(([id, label]) => ({ id: id as Tab, label }));
+  const asked = params.get('tab');
+  const tab = tabs.find((item) => item.id === asked)?.id ?? tabs[0]?.id;
+
+  return (
+    <div className="space-y-6 p-6 max-w-7xl mx-auto">
+      <h1 className="text-3xl font-bold tracking-tight text-black dark:text-white">Client Demos & Meetings</h1>
+      {tabs.length > 1 && (
+        <div role="tablist" aria-label="Demos or meetings" className="inline-flex p-1 rounded-xl bg-black/5 dark:bg-white/5">
+          {tabs.map((item) => (
+            <button key={item.id} type="button" role="tab" aria-selected={tab === item.id}
+              onClick={() => setParams(item.id === 'demos' ? {} : { tab: item.id }, { replace: true })}
+              className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-colors cursor-pointer ${
+                tab === item.id ? 'bg-white dark:bg-neutral-800 text-black dark:text-white shadow-sm' : 'text-gray-500 hover:text-black dark:hover:text-white'}`}>
+              {item.label}
+            </button>
+          ))}
+        </div>
+      )}
+      {tab === 'demos' && <DemosPanel />}
+      {tab === 'meetings' && <MeetingsPanel />}
     </div>
   );
 };

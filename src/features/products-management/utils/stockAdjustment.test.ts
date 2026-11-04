@@ -30,6 +30,7 @@ const PRODUCT: ProductResponse = {
   accessoryBenefits: [],
   draft: false,
   versionNumber: 1,
+  modelName: null,
   previousVersionId: null,
   sold: false,
   accessoryFor: [],

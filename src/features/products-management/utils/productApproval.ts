@@ -100,6 +100,9 @@ export const APPROVAL_STATE_LABELS: Record<ProductApprovalState, string> = {
 /** Copy of the product for the reviewer. */
 export const buildApprovalSnapshot = (
   product: Pick<ProductResponse, 'title' | 'tagline' | 'price' | 'discountPercentage' | 'stockQuantity' | 'image1Url'> & Partial<ProductGstFields> & {
+    modelName?: string | null;
+    softwareName?: string | null;
+    softwareVersion?: string | null;
     specifications?: unknown[] | null;
     categoryName?: string | null;
     category?: { name: string } | null;
@@ -110,7 +113,10 @@ export const buildApprovalSnapshot = (
   }
 ): ProductApprovalSnapshot => ({
   title: product.title,
+  modelName: product.modelName ?? null,
   tagline: product.tagline ?? null,
+  softwareName: product.softwareName?.trim() || null,
+  softwareVersion: product.softwareVersion?.trim() || null,
   categoryName: product.categoryName ?? product.category?.name ?? null,
   price: Number(product.price),
   discountPercentage: product.discountPercentage ?? null,
@@ -146,7 +152,10 @@ export const snapshotFromRequest = (
 ): ProductApprovalSnapshot => {
   const snapshot = buildApprovalSnapshot({
     title: payload.title ?? '',
+    modelName: payload.modelName ?? null,
     tagline: payload.tagline ?? null,
+    softwareName: payload.softwareName ?? null,
+    softwareVersion: payload.softwareVersion ?? null,
     categoryName: payload.categoryName ?? null,
     price: Number(payload.price ?? 0),
     discountPercentage: payload.discountPercentage ?? null,

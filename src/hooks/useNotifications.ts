@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { notificationService } from '../api/services/notificationService';
 import { useNotify } from './useNotify';
 import type { NotificationItem } from '../api/services/notificationService';
+import { setPendingFeedbackCount } from '../features/meetings/hooks/useMeetingData';
 
 export const useNotifications = () => {
   const [unreadCount, setUnreadCount] = useState<number>(0);
@@ -12,11 +13,12 @@ export const useNotifications = () => {
   // Ref to guarantee the initial unread count API call only runs ONCE
   const hasFetchedRef = useRef<boolean>(false);
 
-  // Fetch unread count only
+  // Fetch unread count only (it also carries the My Meetings feedback badge, so that badge costs no call)
   const fetchUnreadCount = useCallback(async () => {
     try {
-      const count = await notificationService.getUnreadCount();
-      setUnreadCount(count);
+      const counts = await notificationService.getUnreadCounts();
+      setUnreadCount(counts.unreadCount);
+      setPendingFeedbackCount(counts.meetingFeedbackPending);
     } catch {
       // Badge count is non-critical; keep the last known value.
     }

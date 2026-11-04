@@ -16,7 +16,7 @@ import type { ItemResponse } from '../../item-management/types/item.types';
 import type { ProductResponseDto } from '../types/product.types';
 import type { ProductProfit } from '../types/costing.types';
 import { fillGst } from './gstTestUtil';
-import { noBarcodes, scanUnitBarcodes } from './barcodeTestUtil';
+import { noBarcodes, scanUnitBarcodes, openFormTab, fillFrontImage } from './barcodeTestUtil';
 import { DIORAMAS, fillCategory } from './categoryTestUtil';
 
 /**
@@ -48,6 +48,7 @@ const MOTHERBOARD: ItemResponse = {
 const LOCK: ProductResponseDto = {
   id: 1,
   title: 'Smart Lock',
+  modelName: 'SL-1',
   category: DIORAMAS,
   price: 11800,
   hsnSac: '9405',
@@ -147,8 +148,10 @@ const openCreate = async (user: User) => {
   await screen.findByText('Smart Lock');
   await user.click(screen.getByRole('button', { name: /Create Product/ }));
   await user.type(screen.getByPlaceholderText('Product Title'), 'Smart Lock Pro');
+  await user.type(screen.getByLabelText(/Model name/), 'MDL-4');
+  await openFormTab(user, 'Price & GST');
   await user.type(screen.getByPlaceholderText('0.00'), '11800');
-  await user.type(screen.getByPlaceholderText('Image Address'), 'https://cdn.tinqa.com/lock.png');
+  await fillFrontImage(user);
   await fillGst(user);
   await fillCategory(user);
 };
@@ -179,6 +182,7 @@ describe('Product costing', () => {
   it('fills the component cost from its purchase price, adds manpower with its reason and previews profit after tax', async () => {
     const { user } = renderPage();
     await openCreate(user);
+    await openFormTab(user, 'Components & barcodes');
     const row = await addMotherboard(user);
 
     // Stock is used oldest first, so the next unit's landed cost is suggested
@@ -186,6 +190,7 @@ describe('Product costing', () => {
     expect(within(row).getByTestId('component-line-cost')).toHaveTextContent('× 2 = ₹3,000.00');
     expect(within(row.parentElement!).getByTestId('component-cost-hint')).toHaveTextContent('next unit ₹1,500.00 · average ₹1,520.00 · last bought ₹1,550.00 (PO-9)');
 
+    await openFormTab(user, 'Costs');
     await user.click(within(costing()).getByRole('button', { name: '+ Manpower' }));
     const manpower = within(costing()).getByRole('group', { name: 'Extra cost 1' });
     expect(within(manpower).getByLabelText('Cost *')).toHaveValue('Manpower');
@@ -234,10 +239,13 @@ describe('Product costing', () => {
     });
     const { user } = renderPage();
     await openCreate(user);
+    await openFormTab(user, 'Components & barcodes');
     const row = await addMotherboard(user);
     expect(within(row).getByLabelText('Unit cost (₹)')).toHaveValue('');
+    await openFormTab(user, 'Costs');
     expect(within(earns()).getByText('1 component has no unit cost yet, so the cost is understated.')).toBeInTheDocument();
 
+    await openFormTab(user, 'Components & barcodes');
     await user.type(within(row).getByLabelText('Unit cost (₹)'), '12.345');
     await scanUnitBarcodes(user);
     await user.click(screen.getAllByRole('button', { name: 'Create Product' }).at(-1)!);
@@ -272,6 +280,7 @@ describe('Product costing', () => {
     });
     const { user } = renderPage();
     await openCreate(user);
+    await openFormTab(user, 'Components & barcodes');
     const row = await addMotherboard(user);
     expect(within(row).queryByLabelText('Unit cost (₹)')).not.toBeInTheDocument();
     expect(screen.queryByRole('group', { name: 'Costing' })).not.toBeInTheDocument();

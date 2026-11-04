@@ -1,4 +1,4 @@
-import type { Designation } from '../../../config/access';
+import type { BuiltInDesignation } from '../../../config/access';
 
 /**
  * The user guide: what every role does and how work moves between them. The User Guide page and its PDF downloads
@@ -10,7 +10,7 @@ import type { Designation } from '../../../config/access';
  */
 
 /** Everyone the guide can be written for: the ten designations, plus dealers signed in to their portal. */
-export type GuideRoleId = Designation | 'DEALER';
+export type GuideRoleId = BuiltInDesignation | 'DEALER';
 
 /** People and systems that take part in a flow without being a role of this app. */
 export type GuideExternalActor = 'CUSTOMER' | 'SYSTEM';
@@ -66,10 +66,106 @@ export interface GuideChange {
 }
 
 /** Bump with every guide update; printed on the page and on every PDF. */
-export const GUIDE_VERSION = '2.28';
-export const GUIDE_UPDATED = '2026-10-29';
+export const GUIDE_VERSION = '2.44';
+export const GUIDE_UPDATED = '2026-11-04';
 
 export const GUIDE_CHANGELOG: GuideChange[] = [
+  {
+    date: '2026-11-04',
+    changes: [
+      'Promo Codes › New promo code and Edit: the discount can now be a percentage or an amount in rupees (above ₹0, at most ₹1,000), never both. Choose "Percentage (%)" or "Amount (₹)" under "Discount as"; the other box is then disabled and cleared. An amount is taken off the list price of each unit the promo works on and, like a percentage, replaces the product\'s own discount (₹1,000 at 5 % off with a ₹200 promo costs ₹800). A unit is never made free. The list shows 20% or ₹200; at checkout the customer sees "20% off" or "₹200 off each".',
+      'Promo Codes (Super Admin, Level 2): a code can now be deleted, from the list or the code, after confirming. A deleted code disappears from the list and nobody can use it; orders already placed keep their discount and its use history stays. Choose "Deleted" in the Status filter to find it and press Restore: it comes back as it was (switched on or off) and can be edited again. Its code stays taken, so a new code can\'t reuse it.',
+      'Promo Codes › New promo code and Edit: with chosen products, each product now has its own units right after it: "All units" or a number (RudraX on 1: three RudraX in the cart get the promo on one; the other two keep their normal price). With all products, one "Units per product" number still applies to every product. Codes made before keep their units on each chosen product.',
+      'Promo Codes › Edit: the code itself (e.g. TINQADIWALI26) can never be changed once created, used or not. Everything else can: the discount, the customers, the products and their units, the limits, the dates and switching it on or off.',
+      'New Promo Codes menu (Super Admin, Store Manager, Store Sales Agent, Customer Support, Finance Manager, Financial Auditor): every promo code with its status (Active, Scheduled, Expired, Used up, Switched off), discount, who and which products it is for, its dates, how often it was used and the discount it gave. Search by the start of the code (e.g. TINQA7K) and filter by status. Open a code to see its customers, products and limits; "Use history" lists every order that used it, with the customer, the units discounted and the discount (a cancelled order gives its use back). Tell customers which code to use: the website never shows or suggests one.',
+      'Promo Codes › New promo code (Super Admin, Level 2): the code is suggested (TINQA + 8 characters); keep it, press "Suggest another" or type your own (TINQA followed by 3 to 15 capital letters or digits). Set the discount % (above 0, below 100), the customers (all, or chosen ones by search) and the products (all, or chosen ones), on how many units of each product it works (empty = every unit; with 1, three RudraX get the promo on one), uses per customer (one time, 2, unlimited or a number), total uses (unlimited or a number) and how long it is valid (6 months, 1 year, 2 years or your own dates, both days included). The promo replaces the product\'s own discount, it is never added to it: ₹1,000 at 5 % off with a 20 % promo costs ₹800, not ₹750.',
+      'Promo Codes (Super Admin, Level 2): edit a code, or switch it off (after confirming) and back on, from the list or the code. Once a code has been used, the code itself can\'t change; its other settings can, for later orders.',
+    ],
+  },
+  {
+    date: '2026-11-04',
+    changes: [
+      'Store Sales › New sale: the Search products box also takes a unit\'s barcode. Scan it (or type it and press Enter) and the product it belongs to is shown, ready to add. Names still match as you type. A unit that is not in stock, a product that is not on sale and a component piece\'s barcode are each named, and an unknown barcode says so. The agent sees only which product the unit is, not its parts or where they came from.',
+    ],
+  },
+  {
+    date: '2026-11-03',
+    changes: [
+      'My Demos is now only for the roles that go on client demos: Super Admin, Store Manager, Finance & Accounts Manager and Store Sales Agent (their new permission group "Client demos - attend demos"). Delivery riders, fleet coordinators, warehouse, support, catalog, dealer and audit staff no longer see it. Only staff in these roles are offered as attending staff when a demo is planned, and the server refuses anyone else. Someone already tagged on a demo stays on it. A custom role can include the group to send its holders on demos.',
+      'Products can now name the software they run and its version (optional), e.g. TinQa OS 2.1.0, like iOS on a phone. Create and Edit Product › Basics has a highlighted Software box: fill in both the name and the version, or leave both empty. A new version starts with the software of the one it is copied or adapted from. Changes are listed for the approver like any other change.',
+      'On the website, the product view now lists the Highlights once, as a checklist under the description, followed by one Specifications list with the software and its version and the warranty. A specification that only repeats a highlight (e.g. "Lighting: Warm-white LED" next to the highlight "Warm-white LED sunrise cycle") is left out, so write each fact once.',
+    ],
+  },
+  {
+    date: '2026-11-03',
+    changes: [
+      'In the 3D store, a product\'s other pictures are now looked through right on its own display on the table: when the visitor taps a product, walks up to it, or Aura is telling them about it, arrows appear either side of its photo, above its name and price, to go to the next or previous picture (the big screen follows). The separate picture strip at the top of the screen is gone. Every other product keeps its main photo, and a product with one picture shows no arrows.',
+    ],
+  },
+  {
+    date: '2026-11-03',
+    changes: [
+      'Edit Product now looks and works exactly like Create Product: the same wide form in parts (Basics, Price & GST, Images & specs, Components & barcodes, Costs, Warranties, Accessory), the same field layout, Back / Next with "Step x of y", and the same markers for a part that has an error or still needs something. It opens on Basics; "Product is Enabled" is in Basics and the stock (changed only with Add/Reduce stock) in Price & GST. A save the server refuses opens the part with the error. "Nothing changed yet" shows until you change something.',
+      'Image names no longer have spaces, dashes or other symbols: the product name\'s letters and digits run together, then _version, then _image number. "Rudra X" v0.1 gives rudrax_v0.1_1, "Tail-X 200" gives tailx200_v0.1_1. Pictures named the old way (e.g. rudra-x_v0.1_1) must be renamed; images already saved stay as they are until replaced.',
+    ],
+  },
+  {
+    date: '2026-11-03',
+    changes: [
+      'Product images are now found for you. In Images & specs, type only the image folder address once (e.g. http://localhost:3000/public/products; it is remembered on this computer). Each of the five views shows its image name, made from the product name, its version and its slot, which can\'t be edited: image 1 of RudraX v0.1 is rudrax_v0.1_1, image 2 rudrax_v0.1_2, and so on (spaces and symbols are left out: "Rudra X" gives rudrax_v0.1_1). There is nothing to add or type per image.',
+      'Each view looks for its picture in the folder under its name, as .png, .jpg, .jpeg or .webp, and shows it when found; describe each picture found. A view whose picture isn\'t there shows a blank picture and its name: select the name, copy it and rename your file to it. Back in the form after renaming, it is found by itself. Only pictures found are saved; image 1 is required.',
+      'Renaming a product or creating a new version gives its images the new names (e.g. rudrax_v0.2_1), so rename the files too. When you save, the server checks every new or changed image is named this way, for the version it actually gives the product, and says which name it expects if not.',
+      'Images saved before names were made automatically stay as they are, marked in amber, until a picture with the standard name is in the folder; then that one is used.',
+      'Create Product (and Finish Draft) is now a wide form in parts, one tab at a time: Basics (title, tagline, model, category, description), Price & GST, Images & specs, Components & barcodes, Costs (only if you can see costs), Warranties and Accessory. Move with the tabs on the left, or Back and Next. Each tab shows a dot: amber while something there is still needed to create or submit the product, green when it is all filled in, red when a field there has an error. "Still needed" next to the main button lists the parts left. Save as draft works from every tab, and nothing typed is lost when you switch. If a save finds a problem, the form opens the tab that has it.',
+      'Product descriptions now follow one template, so every product reads alike on the website and Aura can compare them: Overview (the theme, in 1–2 sentences), The Story (why the subject matters), Technology (how the LEDs and AI bring it alive), Craftsmanship (materials, scale, finish), Perfect For (who it suits and where it fits) and Highlights (3–5 short points, one per line). Each section has its own box with a hint and a suggested length; empty sections are left out, and the whole description is still at most 2,000 characters.',
+      '"Suggest descriptions" in the product form: type what the miniature shows (the title is filled in, e.g. Kedarnath) and press Suggest. TinQa looks it up on Wikipedia (free, once per subject) and writes three versions from it and the product\'s tagline and specifications: Heritage (leads with the story), Technology (leads with the LED and AI experience) and Gift & décor (leads with who it is for). "Use the … version" fills every section, and "Undo suggestion" puts back what you had. Check every claim and rewrite in your own words before saving. Nothing found, or the lookup unavailable? The versions are written from the product\'s own details and The Story is left for you.',
+      'Descriptions written before the template open in Overview: move each part into its section the next time you edit the product. On the website they show as before until then.',
+      'Product images now follow one theme, so every product looks alike: image 1 is always the front view, 2 the side view, 3 the back view, 4 a close-up of the detail and 5 the product in use (or in a room, to show its size). Create and Edit Product show the five slots with what to photograph in each; leave a slot empty if you have no picture for it, and the others stay in their places. Image 1 is required.',
+      'Each image needs a description of what that picture shows of the product (up to 400 characters), e.g. "From the side: the frame is only 4 cm deep, so it hangs flat." It is required for every image of a new product or submitted draft, and for any image you add or replace. Images saved before this keep working without one until they are replaced; a description, once given, can be changed but not removed. A change of image or description is listed for the approver like any other change.',
+      'On the website each picture\'s description is its caption in the product view. In the 3D store, Aura walks the visitor through a product\'s pictures: she puts each one on the big screen, in the order above, and reads out its description ("Show me the pictures", "the back of it", "next picture").',
+    ],
+  },
+  {
+    date: '2026-10-31',
+    changes: [
+      'Meetings: nobody can be in two meetings at once. A meeting takes one day, from a start to an end time picked on the clock (hour, then minute). Time when you or anyone you invite is already in another scheduled meeting is greyed out on the clock and listed under it. If an invitee added later is busy at the chosen time, an amber warning names them, the other meeting and its time, and the meeting can\'t be scheduled until you pick another time or invite someone else. The same applies when you change a meeting\'s time or invite more people. People who declined or were replaced, and cancelled or completed meetings, don\'t count.',
+    ],
+  },
+  {
+    date: '2026-10-31',
+    changes: [
+      'My Meetings has moved from the side menu to the top bar: the meeting (group of people) icon beside the notification bell opens it. A green count on the icon shows the meetings still waiting for your feedback.',
+      'Client Outreach (new menu): keep a record of every call, email, WhatsApp message or visit to a business you pitch to, such as a hotel. Look the business up first to see who contacted it before, when, what they said and how often they asked for a demo. Each entry has a summary, their response, how it went (Excellent to Worse), their interest (Interested, Maybe, Later, Not interested) and the next step: call back, demo or meeting requested, with a date. Email or WhatsApp screenshots can be attached as proof. On the follow-up day you get a reminder at 9 am. The summary shows how many businesses each executive contacted per day. A business can\'t be added twice with the same phone or email.',
+      'Custom roles: an admin who manages employees can create a new role, such as Marketing Executive, in Employee Management › Roles & permissions, by picking permission groups. You can only give groups you hold yourself. Level 1 and Level 2 work as for the built-in roles. A role that employees hold can be deactivated but not deleted. Changes reach its employees when they next sign in.',
+      'Meetings: Client Demos & Meetings now has a Demos tab and a Meetings tab. Store Managers, Finance & Accounts Managers, Fulfillment staff, Financial Auditors and Super Admins schedule online meetings (paste the Meet, Teams or Zoom link) or face-to-face meetings (place, address and Google Maps link), with the subject, description, client and attendees. No approval is needed; TinQa gives each meeting an ID such as MTG-2026-0001.',
+      'Invitees are emailed and notified at once, and again 24 hours before the meeting. An invitee can decline with a reason only within 24 hours of being invited; after that they must attend. The organiser can invite someone else in place of a person who declined, edit or cancel the meeting, and mark it completed. Every attendee is then asked for feedback (agenda, feedback, what was decided, whether a deal was confirmed). My Meetings (the meeting icon beside the bell) shows your meetings, with a badge for feedback still to give.',
+    ],
+  },
+  {
+    date: '2026-10-31',
+    changes: [
+      'Products now have a model name and a version. Every product needs its own model name (e.g. RX-200) to be created or submitted; no two products can share one, whatever the capitals. A draft may wait for it. Products created earlier have none until they are next edited, and the list shows "No model name yet" for them.',
+      'Products with the same title are versions of one product: the first is v0.1, then v0.2 … v0.9, v1.0, v1.1 and so on. The version is given automatically when the product is saved and is shown next to the model name in the form and in the list. Renaming a product makes it the newest version of its new title.',
+      'Adapt a new version from an existing one: in Create Product, start typing the title (or a model name). Every version with a matching title or model name is listed, e.g. RudraX v0.1 and RudraX v0.2; pick any of them and the whole form is filled with its description, price, GST, images, specifications, components, warranties, costs and accessory settings. Change what is different, enter the new model name and scan the unit, then create it as usual. "Start blank" empties the form again. When the new version is approved and turned on, the version it was adapted from is turned off.',
+      'The model name and version ("Model RX-200 · Version v0.2") are written at the bottom of the product\'s description on the website, so customers can tell the versions apart. The product form shows the line under the description as you type.',
+      '"Create new version" of a sold product now gives the copy the next version of its title (e.g. v0.3). Give the copy its own model name before submitting it. A version can be copied again once its earlier copy has been submitted.',
+      'Approvers see the model name of a product waiting for approval, and a model name change in the list of changes.',
+    ],
+  },
+  {
+    date: '2026-10-30',
+    changes: [
+      'New Careers menu (Super Admin, Store Manager, Catalog Specialist): post job openings for the website\'s Careers tab and work through the people who apply. Each opening gets its job ID (JOB-2026-0007) automatically. Fill in the title, team (pick one or type a new one), location, work mode, employment type, experience and salary range (show the salary on the website or keep it hidden), positions, summary, description, responsibilities, must-have requirements, nice-to-haves, benefits, skills, education and the deadline; a preview shows the card as candidates will see it. Openings are saved as drafts, then published, closed and reopened. A deadline that has passed can\'t be published.',
+      'Careers › an opening (or All applicants): every applicant with their status, résumé match, experience and next interview. Filter by status (New, Awaiting L2, Shortlisted, Interviewing, Selected, Rejected, Withdrawn) and by match (Strong, Weak, No match), search by name, email, phone or reference, and sort by newest, oldest, best match or experience.',
+      'Careers › Careers tab on the website: shows whether the website shows the Careers tab, and who changed it last. Only a Super Admin at Level 2 can hide it (after confirming) or show it again. While it is hidden the tab, the open roles and the apply form disappear from the website and nobody can apply; openings and applicants stay here to work on.',
+      'Candidates need no account on the website, but before they can send an application they confirm their email with a 5-digit code we email them, so every hiring email reaches the right person. The application shows "Email verified" with the time.',
+      'Careers › an application: the candidate\'s details, links, cover note and current and expected CTC; the résumé PDF, shown on the page when you press Show résumé (and downloadable); the timeline; and every email sent to the candidate.',
+      'Résumé match: the portal compares the résumé\'s text with the opening in your browser (skills 50 %, requirements 25 %, experience 15 %, education 5 %, nice-to-haves 5 %) and labels it Strong (70 or more, green), Weak (40–69, amber) or No match (grey). It understands common names for the same skill (AutoCAD and Auto CAD, STM32 as a microcontroller, SAP MM as ERP…) and shows the skills found and missing, how the experience fits and why. It is saved the first time a screener opens the application; Re-run match saves it again. A scanned résumé without text says "Résumé has no readable text — review manually".',
+      'Hiring steps: Level 1 shortlists (with a note) and a Level 2 approver confirms it; then interviews are scheduled; once an interview is passed, Level 1 selects the candidate and a Level 2 approver confirms that too. Reject (with a reason, emailing the candidate unless you untick it) or mark withdrawn at any step. Nobody confirms a shortlist or selection they asked for.',
+      'Interviews take place on Microsoft Teams, Google Meet or Zoom, by phone or in person, not in TinQa. Create the meeting there, paste its link (any https link), pick the date and time on the clock, the duration and time zone (India by default), and add interviewers and notes for the candidate. TinQa emails the candidate the details with a calendar invite, and again when it is rescheduled or cancelled. Record each interview\'s outcome (passed, failed or no-show) with a 1–5 rating and feedback.',
+      'Approvals Hub › Careers (Level 2): shortlists and selections waiting for you, oldest first, with who asked, their note and the résumé match. Approve or Return (with a note) here, or open the application.',
+    ],
+  },
   {
     date: '2026-10-29',
     changes: [
@@ -248,13 +344,15 @@ const ROLE_LIST: RoleGuide[] = [
     id: 'SUPER_ADMIN',
     name: 'Super Admin',
     summary: 'Runs the whole portal: staff accounts, access, settings and every approval.',
-    menu: ['finance', 'approvals', 'orders', 'store-sales', 'order-tracking', 'customers', 'support-tickets', 'reviews',
-      'employees', 'items', 'barcodes', 'products', 'dealers', 'payments', 'client-demos', 'my-demos', 'my-payslips', 'company-profile',
+    menu: ['finance', 'approvals', 'orders', 'store-sales', 'order-tracking', 'customers', 'promo-codes', 'support-tickets', 'reviews',
+      'employees', 'items', 'barcodes', 'products', 'dealers', 'payments', 'client-demos', 'client-outreach', 'careers', 'my-demos', 'my-meetings', 'my-payslips', 'company-profile',
       'user-guide'],
     hasApprovalLevel: true,
     does: [
       'Create employees with a designation and level, edit them, and request their removal',
       'See what every designation holds (Employee Management › Roles & permissions) and change an employee\'s access',
+      'Create custom roles such as Marketing Executive (Employee Management › Roles & permissions › New role): a name, department, description and the permission groups it carries, from the groups you hold yourself; see how many employees hold each role, edit or deactivate a custom role, and delete one nobody holds. Built-in roles cannot be changed',
+      'Log calls, emails, WhatsApp messages and visits with the businesses we pitch to (Client Outreach): add a business (one already on file by phone or email opens instead), log each contact with how it went, their interest and the next step with its follow-up date, attach screenshots or PDFs as proof, edit your own contacts, and work through My follow-ups; the summary shows contacts per day and per executive for any period',
       'Everything every other staff role can do',
       'Open the User Guide and download a role\'s PDF to hand to a colleague',
       'Set up the mail server and sender of customer emails, and send a test (Company Profile › Email, Level 2)',
@@ -264,6 +362,8 @@ const ROLE_LIST: RoleGuide[] = [
       'Schedule client demos and meetings and record their bills, like a Finance Manager (Client Demos & Meetings)',
       'Reopen a completed client demo for correction, with a reason (Level 2): only a Super Admin changes a completed demo, and the correction is approved again',
       'Write off a product unit that did not come back from a client demo, with the reason (Level 2): it leaves stock for good',
+      'Post job openings and screen applicants, schedule interviews and record their outcomes (Careers)',
+      'Create promo codes for every customer or chosen ones, on every product or chosen ones (each with its own units: all or a number), with the discount (a percentage, or an amount of at most ₹1,000 off each unit), uses and dates; edit everything but the code, switch them off or back on, delete and restore them (Promo Codes, Level 2)',
     ],
     approves: [
       'New employee accounts, employee deletions and profile changes',
@@ -273,33 +373,39 @@ const ROLE_LIST: RoleGuide[] = [
       'Barcode corrections, and barcodes for stock received before barcodes were recorded (Approvals Hub › Barcodes): only a Level 2 Super Admin changes a locked barcode',
       'Delete anyone\'s company profile draft',
       'Client demo quotations, completions and corrections (Approvals Hub › Client demos), except demos you planned, sent or attend',
+      'Careers shortlists and selections (Approvals Hub › Careers), except those you asked for',
     ],
     tips: [
       'You never approve your own request: a second Super Admin (Level 2) decides on what you prepare.',
       'Access is never granted one button at a time. Change the designation or level instead.',
+      'A custom role in use cannot be deleted: deactivate it instead. Its employees keep it; nobody new gets it. Changes to a role\'s groups apply when its employees next sign in.',
     ],
   },
   {
     id: 'STORE_MANAGER',
     name: 'Store Manager',
     summary: 'Owns the online store: catalog, stock, customer orders, refunds, support, reviews and the company profile.',
-    menu: ['finance', 'approvals', 'store-sales', 'order-tracking', 'customers', 'support-tickets', 'reviews', 'items',
-      'barcodes', 'products', 'payments', 'my-demos', 'my-payslips', 'company-profile', 'user-guide'],
+    menu: ['finance', 'approvals', 'store-sales', 'order-tracking', 'customers', 'promo-codes', 'support-tickets', 'reviews', 'items',
+      'barcodes', 'products', 'payments', 'client-demos', 'client-outreach', 'careers', 'my-demos', 'my-meetings', 'my-payslips', 'company-profile', 'user-guide'],
     hasApprovalLevel: true,
     does: [
       'Create and edit items (with warranties) and products, submit them for approval and publish approved ones',
       'Save unfinished products as drafts, and create a new version of a sold product to change its components',
+      'Give every product its own model name, and adapt a new version (v0.2, v0.3…) from any earlier one by picking it in the title',
       'Set the order products appear in on the storefront by dragging them in Products Management',
       'Enter each product\'s costs (component costs, manpower, software…) and see its profit before and after tax, per unit and on delivered orders',
       'Move customer orders forward, update tracking and accept pre-orders once stock is there',
       'Book store sales for walk-in customers, like a Store Sales Agent, and follow every agent\'s sales',
       'Request refunds, reply to support tickets, publish or hide reviews',
       'Look up customers with their orders, carts and tickets, and ask the Super Admin to correct their details',
+      'Look up promo codes to tell a customer which one to use: who and which products each is for, its limits and dates, and the orders that used it (Promo Codes, view only)',
       'Trace any piece or product unit by its barcode (Barcode Tracking) and ask a Super Admin to correct a barcode',
       'Draft company profile changes, upload documents, raise expenses',
+      'Post job openings, screen applicants, schedule interviews and record their outcomes (Careers)',
+      'Log calls, emails, WhatsApp messages and visits with the businesses we pitch to (Client Outreach): add a business (one already on file by phone or email opens instead), log each contact with how it went, their interest and the next step with its follow-up date, attach screenshots or PDFs as proof, edit your own contacts, and work through My follow-ups; the summary shows contacts per day and per executive for any period',
       'Open the User Guide and download a role\'s PDF to hand to a colleague',
     ],
-    approves: ['Products and their changes before they go live, seeing each one\'s cost, margin and profit after tax (approving a new product locks its unit barcodes)', 'Stock entries (approving locks the barcode of each passed unit)', 'Refunds', 'Company profile changes'],
+    approves: ['Products and their changes before they go live, seeing each one\'s cost, margin and profit after tax (approving a new product locks its unit barcodes)', 'Stock entries (approving locks the barcode of each passed unit)', 'Refunds', 'Company profile changes', 'Careers shortlists and selections (Approvals Hub › Careers), except those you asked for'],
     tips: [
       'Pre-orders can be accepted at Level 1 too: Approvals Hub › Pre-orders.',
       'Dealers and procurement orders belong to the Dealer Manager; they are not in your menu.',
@@ -309,7 +415,7 @@ const ROLE_LIST: RoleGuide[] = [
     id: 'DEALER_MANAGER',
     name: 'Dealer Manager',
     summary: 'Buys from suppliers: dealers, their web logins, quotations and procurement orders.',
-    menu: ['finance', 'approvals', 'orders', 'items', 'barcodes', 'products', 'dealers', 'payments', 'my-demos', 'my-payslips'],
+    menu: ['finance', 'approvals', 'orders', 'items', 'barcodes', 'products', 'dealers', 'payments', 'my-meetings', 'my-payslips'],
     hasApprovalLevel: true,
     does: [
       'Onboard, edit, activate or deactivate dealers and assign them item categories',
@@ -342,7 +448,7 @@ const ROLE_LIST: RoleGuide[] = [
     id: 'CATALOG_SPECIALIST',
     name: 'Catalog Specialist',
     summary: 'Builds and maintains the product catalog.',
-    menu: ['finance', 'items', 'barcodes', 'products', 'my-demos', 'my-payslips'],
+    menu: ['finance', 'items', 'barcodes', 'products', 'careers', 'my-meetings', 'my-payslips'],
     hasApprovalLevel: false,
     does: [
       'Create, edit and delete items and item categories, including their warranties. Each new item gets its SKU automatically (TQ-yyyyMMdd-0001, numbered per day); it can\'t be changed',
@@ -356,8 +462,12 @@ const ROLE_LIST: RoleGuide[] = [
       'Submit products for approval and publish approved ones to the storefront',
       'Save an unfinished product as a draft (only title and category needed) and finish it later',
       'Create a new version of a sold product to change its components',
+      'Give every product its own model name, and adapt a new version (v0.2, v0.3…) from any earlier one by picking it in the title',
       'Set the order products appear in on the storefront by dragging them in Products Management, for the whole catalog or one category',
+      'Add the five standard product images (front, side, back, close-up, in use), each with a description of what it shows; type only the image folder, and each image is found there by its name from the product name and version (rudrax_v0.1_1.png)',
+      'Write each description in the template (Overview, The Story, Technology, Craftsmanship, Perfect For, Highlights), starting from one of three suggested versions if you like',
       'View stock, upload documents',
+      'Post job openings, screen applicants, schedule interviews and record their outcomes (Careers); a Level 2 Super Admin or Store Manager confirms each shortlist and selection',
     ],
     approves: [],
     tips: [
@@ -371,7 +481,10 @@ const ROLE_LIST: RoleGuide[] = [
       'A component left without a cost is flagged: the profit shown is then too high. Shipping is not part of the product\'s cost; it is added to each order when it ships.',
       'Changing the components of a product that has not been sold: switch it off first. With 1 unit in stock, the same save rebuilds that unit — its old pieces go back to item stock and you scan the rebuilt unit\'s barcodes. A rejected product already gave its pieces back, so its components change freely; when you resubmit, the barcodes entered last time are filled in and only the new components\' pieces are scanned. With more units, reduce the stock to 1 (or 0) first.',
       'Not sure of every detail yet? Save the product as a draft. Its components can change as often as you like until you submit it; its first unit is built (and its barcodes scanned) only when you submit.',
-      'Once a product has been sold, its components are locked for good. Use "Create Version 2" (in the product form or the list): change the copy, submit it, and once it is approved and turned on the old version is switched off by itself. Orders already placed keep pointing at the version they bought.',
+      'Once a product has been sold, its components are locked for good. Use "Create new version" (in the product form or the list): give the copy its own model name, change it, submit it, and once it is approved and turned on the old version is switched off by itself. Orders already placed keep pointing at the version they bought.',
+      'Making v0.2 of a product? Don\'t start from scratch: type its title in Create Product and pick the version to adapt from (any version, not only the newest). Everything is copied; change only what differs and give it a new model name. Each version keeps its own model name for good, so pick one that tells the versions apart, e.g. RX-100, RX-200.',
+      'Photograph every product the same way, slot by slot: a plain background for the front, side and back views, then one close-up of the finest detail and one picture in use. Describe what a shopper should notice in each picture, not what it is called ("The brass bell hangs from a hand-carved beam" rather than "Back view"): Aura reads it out while the picture is on the big screen.',
+      'Describing a product: press "Suggest descriptions" and name what the miniature shows as Wikipedia would ("Kedarnath Temple" rather than a model name like "RudraX"). Pick the closest of the three versions, then make it yours: keep facts you can check, and list in Technology and Highlights only what this product really has. Aura compares products by their Overview, Perfect For and Highlights, so keep those short and specific.',
       'A wrong barcode can\'t be fixed once approved: tell your Store Manager or the warehouse (Fulfillment); they ask for the correction in Barcode Tracking and a Super Admin decides.',
     ],
   },
@@ -379,7 +492,7 @@ const ROLE_LIST: RoleGuide[] = [
     id: 'FULFILLMENT_SPECIALIST',
     name: 'Fulfillment & Warehouse',
     summary: 'Receives stock and picks, packs and ships customer orders.',
-    menu: ['finance', 'approvals', 'order-tracking', 'items', 'barcodes', 'products', 'my-demos', 'my-payslips'],
+    menu: ['finance', 'approvals', 'order-tracking', 'items', 'barcodes', 'products', 'client-demos', 'my-meetings', 'my-payslips'],
     hasApprovalLevel: false,
     does: [
       'Receive any delivered purchase order into stock, scanning one barcode for each unit that passed testing, correct an entry\'s quantities, set storefront stock',
@@ -398,7 +511,7 @@ const ROLE_LIST: RoleGuide[] = [
     id: 'DELIVERY_RIDER',
     name: 'Delivery Rider',
     summary: 'Delivers orders to the customer\'s door.',
-    menu: ['order-tracking', 'my-demos', 'my-payslips'],
+    menu: ['order-tracking', 'my-meetings', 'my-payslips'],
     hasApprovalLevel: false,
     does: [
       'See customer orders and their shipping address',
@@ -411,7 +524,7 @@ const ROLE_LIST: RoleGuide[] = [
     id: 'FLEET_COORDINATOR',
     name: 'Fleet Coordinator',
     summary: 'The riders\' senior: plans deliveries and keeps tracking up to date.',
-    menu: ['finance', 'order-tracking', 'my-demos', 'my-payslips'],
+    menu: ['finance', 'order-tracking', 'my-meetings', 'my-payslips'],
     hasApprovalLevel: false,
     does: [
       'Record the same door-step outcomes as a rider',
@@ -425,12 +538,13 @@ const ROLE_LIST: RoleGuide[] = [
     id: 'CUSTOMER_SUPPORT',
     name: 'Customer Support',
     summary: 'Helps customers with tickets, orders and refunds.',
-    menu: ['order-tracking', 'customers', 'support-tickets', 'items', 'barcodes', 'products', 'my-demos', 'my-payslips'],
+    menu: ['order-tracking', 'customers', 'promo-codes', 'support-tickets', 'items', 'barcodes', 'products', 'my-meetings', 'my-payslips'],
     hasApprovalLevel: false,
     does: [
       'View, reply to and change the status of support tickets; suggested replies help you answer quickly',
       'Open a customer (Customer Management) to see everything they bought and when, what is still in their cart and their tickets, then email or call them',
       'Ask for a correction to a customer\'s details (Request change); the Super Admin makes it',
+      'Look up promo codes to tell a customer which one to use: who and which products each is for, its limits and dates, and the orders that used it (Promo Codes, view only)',
       'Look up the customer\'s order, payment and products from the ticket',
       'Request a refund and re-check its status with the payment gateway',
       'Trace a customer\'s device by its barcode: every part inside it, with its batch, purchase order and dealer (Barcode Tracking)',
@@ -445,7 +559,7 @@ const ROLE_LIST: RoleGuide[] = [
     id: 'FINANCIAL_AUDITOR',
     name: 'Financial Auditor',
     summary: 'Checks the books. Read-only everywhere.',
-    menu: ['finance', 'orders', 'store-sales', 'order-tracking', 'barcodes', 'payments', 'my-demos', 'my-payslips'],
+    menu: ['finance', 'orders', 'store-sales', 'order-tracking', 'promo-codes', 'barcodes', 'payments', 'client-demos', 'my-meetings', 'my-payslips'],
     hasApprovalLevel: false,
     does: [
       'View the company account overview, ledger, expenses and vouchers',
@@ -455,6 +569,7 @@ const ROLE_LIST: RoleGuide[] = [
       'View every month\'s salary payments and download any payslip (Payments & Chalans)',
       'View refunds, customer and procurement orders, documents',
       'See every agent\'s store sales (Store Sales)',
+      'See every promo code, the orders that used it and the discount it gave (Promo Codes, view only)',
       'Trace any piece or product unit by its barcode, with its full history (Barcode Tracking)',
     ],
     approves: [],
@@ -464,7 +579,7 @@ const ROLE_LIST: RoleGuide[] = [
     id: 'FINANCE_MANAGER',
     name: 'Finance Manager',
     summary: 'Runs company money: expenses, vouchers, payments and reports.',
-    menu: ['finance', 'approvals', 'orders', 'store-sales', 'order-tracking', 'payments', 'client-demos', 'my-demos', 'my-payslips'],
+    menu: ['finance', 'approvals', 'orders', 'store-sales', 'order-tracking', 'promo-codes', 'payments', 'client-demos', 'client-outreach', 'my-demos', 'my-meetings', 'my-payslips'],
     levelTwoMenu: ['approvals'],
     hasApprovalLevel: true,
     does: [
@@ -475,7 +590,9 @@ const ROLE_LIST: RoleGuide[] = [
       'Track GST payable each month (Accounts & Finance › GST) and record GST paid to the government as a GST payment voucher',
       'View refunds, customer and procurement orders, documents',
       'See every agent\'s store sales and how they were paid (Store Sales)',
+      'See every promo code, the orders that used it and the discount it gave (Promo Codes, view only)',
       'Schedule client demos and meetings step by step: every client visited at its own time, the products to demo (each unit taken by its barcode), the attending staff and a day-by-day quotation (travel, night stay and meals, plus any justified extra); send it for approval, record each day\'s stay, food, travel and other bills with their invoices, and send the visit for completion (Client Demos & Meetings)',
+      'Log calls, emails, WhatsApp messages and visits with the businesses we pitch to (Client Outreach): add a business (one already on file by phone or email opens instead), log each contact with how it went, their interest and the next step with its follow-up date, attach screenshots or PDFs as proof, edit your own contacts, and work through My follow-ups; the summary shows contacts per day and per executive for any period',
     ],
     approves: [
       'Expenses and vouchers: approve, reject or reverse (approving posts them to the ledger)',
@@ -492,12 +609,14 @@ const ROLE_LIST: RoleGuide[] = [
     id: 'SALES_AGENT',
     name: 'Store Sales Agent',
     summary: 'Sells devices at a store or in the market, for cash or online payment.',
-    menu: ['store-sales', 'my-demos', 'my-payslips'],
+    menu: ['store-sales', 'promo-codes', 'my-demos', 'my-meetings', 'my-payslips'],
     hasApprovalLevel: false,
     does: [
       'Find a walk-in customer by mobile number or email, or register them with their delivery address',
-      'Add products, get the total from the server and book the order: cash you received, or online by the customer',
+      'Add products (search by name, or scan a unit\'s barcode into the search box), get the total from the server and book the order: cash you received, or online by the customer',
       'Follow your own sales and whether the customer\'s email went out (Store Sales › My sales)',
+      'Look up promo codes to tell a customer which one to use: who and which products each is for, its limits and dates, and the orders that used it (Promo Codes, view only)',
+      'Go on the client demos you are tagged on: hand the product units out and back, and record your own stay, food and travel bills (My Demos)',
     ],
     approves: [],
     tips: [
@@ -506,6 +625,7 @@ const ROLE_LIST: RoleGuide[] = [
       'A customer who lost the set-password link (it works for 15 minutes) uses "Forgot password" on the website sign-in page.',
       'If the total changed since you got it, the new total is shown: agree it with the customer and book again.',
       'Customers can\'t cancel or return a cash sale online; they come back to the store or contact customer support.',
+      'Store sales don\'t take promo codes yet: a customer who has a code uses it when ordering on the website.',
     ],
   },
   {
@@ -543,6 +663,9 @@ export const EXTERNAL_ACTOR_NAMES: Record<GuideExternalActor, string> = { CUSTOM
 
 const ANY_STAFF: GuideActor[] = ['SUPER_ADMIN', 'STORE_MANAGER', 'DEALER_MANAGER', 'CATALOG_SPECIALIST', 'FULFILLMENT_SPECIALIST',
   'DELIVERY_RIDER', 'FLEET_COORDINATOR', 'CUSTOMER_SUPPORT', 'FINANCIAL_AUDITOR', 'FINANCE_MANAGER', 'SALES_AGENT'];
+
+/** The roles that go on client demos (Procurement group CLIENT_DEMO_ATTENDANCE); only they can be tagged on one. */
+const DEMO_ATTENDEES: GuideActor[] = ['SUPER_ADMIN', 'STORE_MANAGER', 'FINANCE_MANAGER', 'SALES_AGENT'];
 
 export const GUIDE_FLOWS: GuideFlow[] = [
   {
@@ -636,11 +759,11 @@ export const GUIDE_FLOWS: GuideFlow[] = [
     summary: 'Products go live only after a Level 2 Store Manager approves them.',
     steps: [
       { who: ['CATALOG_SPECIALIST', 'STORE_MANAGER', 'SUPER_ADMIN'], label: 'Catalog Specialist', kind: 'maker', text: 'Creates the item, with one or more categories, attributes and warranties.', where: 'Item Management' },
-      { who: ['CATALOG_SPECIALIST', 'STORE_MANAGER', 'SUPER_ADMIN'], label: 'Catalog Specialist', kind: 'maker', text: 'Optionally saves the product as a draft first (title and category are enough) and finishes it later; a draft holds no stock and is not sent for approval. To change the components of a product that has already been sold, creates a new version of it instead: a draft copy whose components can change.', where: 'Products Management › Save as draft · Create new version' },
+      { who: ['CATALOG_SPECIALIST', 'STORE_MANAGER', 'SUPER_ADMIN'], label: 'Catalog Specialist', kind: 'maker', text: 'Enters the product with its own model name (its version, v0.1, v0.2…, is given by its title), or adapts it from an earlier version picked in the title. Optionally saves the product as a draft first (title and category are enough) and finishes it later; a draft holds no stock and is not sent for approval. To change the components of a product that has already been sold, creates a new version of it instead: a draft copy whose components can change.', where: 'Products Management › Save as draft · Create new version' },
       { who: ['CATALOG_SPECIALIST', 'STORE_MANAGER', 'SUPER_ADMIN'], label: 'Catalog Specialist', kind: 'maker', text: 'Creates the product from items (components), its category (an existing one or a new one), GST-inclusive price, GST rate and HSN/SAC, and warranties, scans the first unit\'s barcode and the barcode of every component piece fitted into it, and submits it for approval. An accessory also lists the products it is offered with and the extra discount with each.', where: 'Products Management' },
       { who: ['CATALOG_SPECIALIST', 'STORE_MANAGER', 'SUPER_ADMIN'], label: 'Catalog Specialist', kind: 'maker', text: 'Enters what one unit costs: each component\'s unit cost (filled from its purchase price) and extra costs such as manpower or software with their reasons, and checks the profit before and after tax shown in the form.', where: 'Products Management › Costing & profit' },
       { who: ['STORE_MANAGER', 'SUPER_ADMIN'], label: 'Store Manager · Level 2', kind: 'checker', text: 'Reviews the snapshot, including the GST split of the price, one unit\'s cost, margin and profit after tax, and the unit and piece barcodes, and approves, which activates the product and locks its barcodes.', where: 'Approvals Hub › Requests', otherwise: 'Reject → back with a reason; its pieces return to stock. Fix and resubmit; the barcodes entered last time are filled in' },
-      { who: ['CATALOG_SPECIALIST', 'STORE_MANAGER', 'SUPER_ADMIN'], label: 'Catalog Specialist', kind: 'maker', text: 'Publishes it to the storefront. Later edits go for approval again; the live product stays unchanged until approved. Turning on a new version turns the previous version off.', where: 'Products Management' },
+      { who: ['CATALOG_SPECIALIST', 'STORE_MANAGER', 'SUPER_ADMIN'], label: 'Catalog Specialist', kind: 'maker', text: 'Publishes it to the storefront. Later edits go for approval again; the live product stays unchanged until approved. Turning on a new version turns off the version it was adapted or copied from.', where: 'Products Management' },
       { who: ['CUSTOMER'], label: 'Customer', kind: 'end', text: 'Can buy it.' },
     ],
   },
@@ -761,7 +884,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
     summary: 'An agent sells to a walk-in customer; cash they received counts at once, and the customer is emailed.',
     steps: [
       { who: ['SALES_AGENT', 'STORE_MANAGER', 'SUPER_ADMIN'], label: 'Store Sales Agent', kind: 'maker', text: 'Finds the customer by mobile number or email, or registers them with a delivery address (no password) after verifying their email with the 5-digit code sent to it.', where: 'Store Sales › New sale' },
-      { who: ['SALES_AGENT', 'STORE_MANAGER', 'SUPER_ADMIN'], label: 'Store Sales Agent', kind: 'maker', text: 'Adds the products, gets the total and books the order: cash received (with the receipt number) or online. The sale is credited to them.', where: 'Store Sales › New sale' },
+      { who: ['SALES_AGENT', 'STORE_MANAGER', 'SUPER_ADMIN'], label: 'Store Sales Agent', kind: 'maker', text: 'Adds the products (found by name, or by scanning a unit\'s barcode into the search box), gets the total and books the order: cash received (with the receipt number) or online. The sale is credited to them.', where: 'Store Sales › New sale' },
       { who: ['SYSTEM'], label: 'Company ledger', kind: 'end', text: 'Cash: the order is paid and confirmed at once, and the sale, shipping and GST collected are booked naming the agent. Fulfilment continues as for any order; the tax invoice is issued when it ships.' },
       { who: ['SYSTEM'], label: 'Customer email', kind: 'end', text: 'The customer is emailed the order, the receipt (PDF), how to sign in and track it, and for a new customer their user ID and a "Set my password" link (works once, for 15 minutes).', where: 'Store Sales › My sales shows whether it was sent' },
       { who: ['CUSTOMER'], label: 'Customer', kind: 'external', text: 'Sets their password through the link (or "Forgot password" later); for an online sale, pays from their account.' },
@@ -814,15 +937,85 @@ export const GUIDE_FLOWS: GuideFlow[] = [
     title: 'Client demo or meeting',
     summary: 'A visit to a client is planned as a quotation, approved, its bills recorded day by day, and its completion approved before the costs are booked as travel.',
     steps: [
-      { who: ['FINANCE_MANAGER', 'SUPER_ADMIN'], label: 'Finance Manager', kind: 'maker', text: 'Schedules the trip step by step: the start date and number of days, then each client visited (kind of place, name, its own phone and email, address, PIN code (which fills in the city and state) and Google Maps location, contact person, legal name and GSTIN for businesses, and the day and time there, picked on the clock; visits never overlap, and the same client is never visited twice in a row on a day), Appointment or Promotion, the products to demo with each unit taken picked by its barcode (scanned, typed, or ticked from the product\'s units in stock; a unit another demo has on those days can\'t be picked), the attending staff, and the quotation: day by day, the optional journeys (as many as needed, one after another, each with its departure and arrival picked as one range (the day, then the time on the clock), in an order that can be changed by dragging, where time already taken by a visit or another journey is greyed out), night stay (a hotel client of the trip or another hotel, with check-in and check-out picked as one range) and meals with their expected amounts; the proposed budget is their total plus any extra, which needs its reason and breakup. Saves it as a draft or sends the quotation for approval.', where: 'Client Demos & Meetings › Schedule a demo' },
+      { who: ['FINANCE_MANAGER', 'SUPER_ADMIN'], label: 'Finance Manager', kind: 'maker', text: 'Schedules the trip step by step: the start date and number of days, then each client visited (kind of place, name, its own phone and email, address, PIN code (which fills in the city and state) and Google Maps location, contact person, legal name and GSTIN for businesses, and the day and time there, picked on the clock; visits never overlap, and the same client is never visited twice in a row on a day), Appointment or Promotion, the products to demo with each unit taken picked by its barcode (scanned, typed, or ticked from the product\'s units in stock; a unit another demo has on those days can\'t be picked), the attending staff (only Super Admins, Store Managers, Finance Managers and Store Sales Agents go on demos, so only they are offered), and the quotation: day by day, the optional journeys (as many as needed, one after another, each with its departure and arrival picked as one range (the day, then the time on the clock), in an order that can be changed by dragging, where time already taken by a visit or another journey is greyed out), night stay (a hotel client of the trip or another hotel, with check-in and check-out picked as one range) and meals with their expected amounts; the proposed budget is their total plus any extra, which needs its reason and breakup. Saves it as a draft or sends the quotation for approval.', where: 'Client Demos & Meetings › Schedule a demo' },
       { who: ['FINANCE_MANAGER', 'SUPER_ADMIN'], label: 'Finance Manager · Level 2', kind: 'checker', text: 'Approves the budget before the visit. Nobody approves a demo they planned, sent or attend. The attending staff are told.', where: 'Approvals Hub › Client demos', otherwise: 'Reject with a reason → back to draft to fix and send again. Changing the budget or number of days of an approved demo sends it back here' },
-      { who: ANY_STAFF, label: 'Attending staff', kind: 'maker', text: 'On the demo\'s days, scan the product units you take and Hand out: they leave stock (also on the storefront, so nobody can buy them meanwhile). After the demo, scan them back and Hand back: they are in stock again.', where: 'My Demos › the demo › Units taken', otherwise: 'A unit already sold online can\'t be handed out: pick another unit in the plan' },
-      { who: ANY_STAFF, label: 'Attending staff', kind: 'maker', text: 'While the visit runs, record your own stay, food and travel bills for each day, with the invoice or ticket (PDF or photo). Invoices for the planned stays and meals are attached here too.', where: 'My Demos' },
+      { who: DEMO_ATTENDEES, label: 'Attending staff', kind: 'maker', text: 'On the demo\'s days, scan the product units you take and Hand out: they leave stock (also on the storefront, so nobody can buy them meanwhile). After the demo, scan them back and Hand back: they are in stock again.', where: 'My Demos › the demo › Units taken', otherwise: 'A unit already sold online can\'t be handed out: pick another unit in the plan' },
+      { who: DEMO_ATTENDEES, label: 'Attending staff', kind: 'maker', text: 'While the visit runs, record your own stay, food and travel bills for each day, with the invoice or ticket (PDF or photo). Invoices for the planned stays and meals are attached here too.', where: 'My Demos' },
       { who: ['FINANCE_MANAGER', 'SUPER_ADMIN'], label: 'Finance Manager', kind: 'maker', text: 'Keeps every bill of the visit (stay, food, travel, other costs with their reason) and, after the visit and once every unit taken is handed back, sends it for completion with the outcome. Changes to recorded bills need a reason; the demo\'s timeline keeps them all.', where: 'Client Demos & Meetings › the demo' },
       { who: ['FINANCE_MANAGER', 'SUPER_ADMIN'], label: 'Finance Manager · Level 2', kind: 'checker', text: 'Checks the bills and invoices against the budget and approves the completion.', where: 'Approvals Hub › Client demos', otherwise: 'Reject with a reason → back to the running demo to correct its bills' },
       { who: ['SYSTEM'], label: 'TinQa', kind: 'end', text: 'The total spent is booked in Accounts & Finance under Travel & conveyance, dated the last day of the visit.' },
       { who: ['SUPER_ADMIN'], label: 'Super Admin · Level 2', kind: 'maker', text: 'Writes off, with the reason, a unit that did not come back from the demo (lost or damaged): it leaves stock for good with its parts, and the demo can then be completed.', where: 'Client Demos & Meetings › the demo › Units taken' },
       { who: ['SUPER_ADMIN'], label: 'Super Admin · Level 2', kind: 'maker', text: 'Only a Super Admin changes a completed demo: Reopen for correction with a reason, correct it, and send it for approval again. When it is approved, only the difference to what was booked is booked.', where: 'Client Demos & Meetings › the demo', otherwise: 'Until the correction is approved, what was booked stays booked' },
+    ],
+  },
+  {
+    id: 'custom-role',
+    title: 'Creating a custom role',
+    summary: 'A Super Admin builds a new designation, such as Marketing Executive, from the permission groups they hold, then gives it to employees.',
+    steps: [
+      { who: ['SUPER_ADMIN'], label: 'Super Admin', kind: 'maker', text: 'Opens Roles & permissions and presses New role: enters its name (its code is made from it and never changes), department and description, and ticks the permission groups it carries. Only groups you hold yourself are offered; groups marked Level 2 only reach Level 2 employees only, and self-service is always included.', where: 'Employee Management › Roles & permissions' },
+      { who: ['SUPER_ADMIN'], label: 'Super Admin', kind: 'maker', text: 'Gives the role to an employee like any other designation, when creating them or under Manage access.', where: 'Employee Management' },
+      { who: ['SUPER_ADMIN'], label: 'Super Admin', kind: 'maker', text: 'Edits the role\'s groups when the job changes (its employees get them at their next sign-in), deactivates a role no longer given, or deletes one nobody holds.', where: 'Employee Management › Roles & permissions', otherwise: 'A role still held by employees cannot be deleted: deactivate it instead' },
+      { who: [...ANY_STAFF], label: 'Employee', kind: 'end', text: 'Signs in to the menu the role\'s groups open.' },
+    ],
+  },
+  {
+    id: 'client-outreach',
+    title: 'Client outreach',
+    summary: 'Every call, email, WhatsApp message and visit with a business we pitch to is logged, with how it went and when to follow up.',
+    steps: [
+      { who: ['SUPER_ADMIN', 'STORE_MANAGER', 'FINANCE_MANAGER'], label: 'Outreach executive', kind: 'maker', text: 'Searches the business by name, phone or email; adds it when it is new (a business already on file by phone or email is opened instead, so nobody pitches it twice by mistake).', where: 'Client Outreach › Businesses' },
+      { who: ['SUPER_ADMIN', 'STORE_MANAGER', 'FINANCE_MANAGER'], label: 'Outreach executive', kind: 'maker', text: 'Logs the contact: channel, date and time, who they spoke with, what was discussed and the response, how it went, their interest and the next action. A call back, demo or meeting needs its follow-up date and time. Screenshots, photos or PDFs (up to 5, 5 MB each) can be attached as proof. Only the person who logged a contact edits it.', where: 'Client Outreach › the business › Log contact' },
+      { who: ['SYSTEM'], label: 'TinQa', kind: 'external', text: 'At 9:00 on the follow-up day, reminds the person who logged it.' },
+      { who: ['SUPER_ADMIN', 'STORE_MANAGER', 'FINANCE_MANAGER'], label: 'Outreach executive', kind: 'end', text: 'Works through My follow-ups and logs the next contact; the summary shows contacts per day and per executive, demo requests and follow-ups due for any period.', where: 'Client Outreach' },
+    ],
+  },
+  {
+    id: 'meeting-schedule',
+    title: 'Scheduling a meeting',
+    summary: 'An online or face-to-face meeting with a client, business, dealer or the team is scheduled without approval; the invitees are emailed, and the organiser completes it afterwards so everyone gives feedback.',
+    steps: [
+      { who: ['SUPER_ADMIN', 'STORE_MANAGER', 'FINANCE_MANAGER', 'FULFILLMENT_SPECIALIST', 'FINANCIAL_AUDITOR'], label: 'Organiser', kind: 'maker', text: 'Chooses Online (creates the meeting on Google Meet, Teams or Zoom first and pastes its https link) or Face-to-face (the place, its address and optionally its Google Maps link). Adds the meeting name, subject, description and type (Client, B2B, Business-to-dealer, Client-to-client, Internal or Other), the client or business with a short description and contact, the day and the start and end on the clock (the same day, at most 12 hours; time when the organiser or an invitee is already in another meeting is greyed out), and searches for the staff to invite. Anyone already in another meeting at that time is named in a warning, and the meeting can\'t be saved until the time or the invitees change. The meeting ID (MTG-year-number) is generated on save.', where: 'Client Demos & Meetings › Meetings › Schedule meeting' },
+      { who: ['SYSTEM'], label: 'TinQa', kind: 'end', text: 'Emails each invitee the invite with a calendar file and tells them in the app. 24 hours before the start, everyone still invited is reminded.' },
+      { who: ['SUPER_ADMIN', 'STORE_MANAGER', 'FINANCE_MANAGER', 'FULFILLMENT_SPECIALIST', 'FINANCIAL_AUDITOR'], label: 'Organiser', kind: 'maker', text: 'While it is scheduled: edits it (a change of time, place or link emails the attendees again), invites more people, or invites someone in place of an attendee who declined.', where: 'the meeting › Edit / Invite more / Invite replacement', otherwise: 'Cancel meeting with a reason: every attendee is emailed and told' },
+      { who: ['SUPER_ADMIN', 'STORE_MANAGER', 'FINANCE_MANAGER', 'FULFILLMENT_SPECIALIST', 'FINANCIAL_AUDITOR'], label: 'Organiser', kind: 'maker', text: 'Once the meeting has started, marks it completed: every attendee who did not decline, the organiser included, is asked for feedback. The organiser and anyone who sees every meeting read all the feedback on the meeting\'s page.', where: 'the meeting › Mark completed' },
+    ],
+  },
+  {
+    id: 'meeting-attend',
+    title: 'Attending a meeting',
+    summary: 'An invitee may decline within 24 hours of the invite, with a reason; after that they must attend, and give their feedback once the meeting is completed.',
+    steps: [
+      { who: ANY_STAFF, label: 'Invitee', kind: 'maker', text: 'Opens the meeting from the email, the notification or My Meetings: its time, the join link or the place with its map, the subject and who else is invited.', where: 'My Meetings › the meeting' },
+      { who: ANY_STAFF, label: 'Invitee', kind: 'maker', text: 'Can\'t go? Declines with a reason, within 24 hours of being invited (never after the start); the page shows until when. After that you must attend. The organiser is told and may invite someone instead.', where: 'the meeting › Decline' },
+      { who: ANY_STAFF, label: 'Attendee', kind: 'maker', text: 'Once the organiser marks the meeting completed, gives feedback: the agenda, how it went, what was decided, whether a deal was confirmed (with notes), the meeting type and a rating from Excellent to Worse. My Meetings shows a count until it is given; once sent it is final and read-only.', where: 'My Meetings › Give feedback' },
+    ],
+  },
+  {
+    id: 'careers',
+    title: 'Hiring through Careers',
+    summary: 'A job opening is posted on the website, candidates apply with a PDF résumé, and each shortlist and selection is confirmed by a Level 2 approver. The candidate is emailed at every step.',
+    steps: [
+      { who: ['STORE_MANAGER', 'CATALOG_SPECIALIST', 'SUPER_ADMIN'], label: 'Store Manager / Catalog Specialist', kind: 'maker', text: 'Writes the opening (team, location, work mode, experience, optional salary, requirements, skills, deadline…) and publishes it. The job ID is given automatically.', where: 'Careers › New opening' },
+      { who: ['CUSTOMER'], label: 'Candidate', kind: 'external', text: 'Applies on the website\'s Careers tab without an account: confirms their email with a 5-digit code, attaches a PDF résumé and is emailed a reference number.' },
+      { who: ['STORE_MANAGER', 'CATALOG_SPECIALIST', 'SUPER_ADMIN'], label: 'Store Manager / Catalog Specialist', kind: 'maker', text: 'Opens the application: reads the résumé on the page and the résumé match (Strong, Weak or No match, with the skills found and missing), then shortlists it with a note, or rejects it.', where: 'Careers › the opening › the applicant', otherwise: 'Reject with a reason; the candidate is emailed unless unticked' },
+      { who: ['STORE_MANAGER', 'SUPER_ADMIN'], label: 'Store Manager · Level 2', kind: 'checker', text: 'Confirms the shortlist; the candidate is emailed. Nobody confirms what they asked for.', where: 'Approvals Hub › Careers', otherwise: 'Return with a note → back to the screener' },
+      { who: ['STORE_MANAGER', 'CATALOG_SPECIALIST', 'SUPER_ADMIN'], label: 'Store Manager / Catalog Specialist', kind: 'maker', text: 'Creates the meeting on Teams, Google Meet or Zoom (or plans a phone call or a visit), schedules the interview with its link, and records each outcome with a rating and feedback. The candidate is emailed the link with a calendar invite, and on every change.', where: 'Careers › the applicant › Schedule interview' },
+      { who: ['STORE_MANAGER', 'CATALOG_SPECIALIST', 'SUPER_ADMIN'], label: 'Store Manager / Catalog Specialist', kind: 'maker', text: 'Once an interview is passed, selects the candidate with a note.', where: 'Careers › the applicant › Select' },
+      { who: ['STORE_MANAGER', 'SUPER_ADMIN'], label: 'Store Manager · Level 2', kind: 'checker', text: 'Confirms the selection.', where: 'Approvals Hub › Careers', otherwise: 'Return with a note → back to interviewing' },
+      { who: ['SYSTEM'], label: 'TinQa', kind: 'end', text: 'The candidate is emailed that they are selected. Résumés of candidates who were not selected and did not join the talent pool are deleted after the retention period.' },
+    ],
+  },
+  {
+    id: 'promo-codes',
+    title: 'Promo codes',
+    summary: 'The Super Admin creates a code; senior staff look it up and tell the customer, who types it at checkout. The website never shows or suggests a code.',
+    steps: [
+      { who: ['SUPER_ADMIN'], label: 'Super Admin · Level 2', kind: 'maker', text: 'Creates the code: keeps the suggested one (TINQA + 8 characters), presses Suggest another or types their own (TINQA + 3 to 15 capital letters or digits). Sets the discount as a percentage or as an amount off each unit (at most ₹1,000), one of the two (either replaces the product\'s own discount, never adds to it), all or chosen customers, all or chosen products (each chosen product with its units: all units or a number; for all products one units-per-product number, empty = every unit), uses per customer, total uses and the dates (6 months, 1 year, 2 years or custom). The code can\'t be changed afterwards.', where: 'Promo Codes › New promo code' },
+      { who: ['SUPER_ADMIN', 'STORE_MANAGER', 'SALES_AGENT', 'CUSTOMER_SUPPORT', 'FINANCE_MANAGER', 'FINANCIAL_AUDITOR'], label: 'Senior staff', kind: 'maker', text: 'Look the code up (search by its start, filter by status) and open it to check who and which products it is for, its limits and dates, then tell the customer which code to use. Nobody but the Super Admin changes a code.', where: 'Promo Codes › the code' },
+      { who: ['CUSTOMER'], label: 'Customer', kind: 'external', text: 'Sees the promo code box at checkout only while a code is open to them, types the code and sees the discount in the order summary. One code per order.' },
+      { who: ['SYSTEM'], label: 'TinQa', kind: 'end', text: 'Keeps each use with its order and the discount it gave (Promo Codes › the code › Use history). A cancelled order gives its use back; a delivered or returned one keeps it.' },
+      { who: ['SUPER_ADMIN'], label: 'Super Admin · Level 2', kind: 'maker', text: 'Edits everything but the code itself (customers, products and their units, limits, dates; the new settings apply to later orders), switches it off after confirming and back on, or deletes it: hidden and unusable, kept with its orders, found under the Deleted filter and restored from there.', where: 'Promo Codes › the code › Edit · Switch off · Delete · Restore' },
     ],
   },
   {

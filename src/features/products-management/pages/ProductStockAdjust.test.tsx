@@ -60,7 +60,7 @@ const toReadDto = (p: StoredProduct): ProductResponseDto => {
     });
   const { specRows: _rows, lastUpdateDescription, ...rest } = p;
   void _rows;
-  return { ...rest, last_update_description: lastUpdateDescription, specs, userGuide: [...guide].map(([title, content]) => ({ title, content })) };
+  return { ...rest, modelName: `M-${p.id}`, last_update_description: lastUpdateDescription, specs, userGuide: [...guide].map(([title, content]) => ({ title, content })) };
 };
 
 const LAMP: StoredProduct = {

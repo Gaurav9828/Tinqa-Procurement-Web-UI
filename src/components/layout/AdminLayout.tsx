@@ -32,7 +32,11 @@ import {
   BookOpen,
   ScanBarcode,
   Presentation,
-  MapPin
+  MapPin,
+  Briefcase,
+  CalendarClock,
+  PhoneCall,
+  TicketPercent
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useThemeStore } from '../../store/useThemeStore';
@@ -41,11 +45,17 @@ import { authService } from '../../api/services/authService';
 import { useAccess } from '../../hooks/useAccess';
 import { useAccessSync } from '../../auth/useAccessSync';
 import { NotificationBell } from '../../components/notifications/NotificationBell';
+import { GroupsIcon } from '../../components/ui/GroupsIcon';
 import { usePendingCompanyChangeBadge } from '../../features/company-profile/hooks/useCompanyProfileData';
+import { usePendingFeedbackCount } from '../../features/meetings/hooks/useMeetingData';
 
 // Comprehensive Icon mapping dictionary
 const ICON_MAP: Record<string, LucideIcon> = {
+  PhoneCall,
+  TicketPercent,
   CheckCircle2,
+  CalendarClock,
+  Briefcase,
   Presentation,
   MapPin,
   Package,
@@ -102,12 +112,21 @@ export const AdminLayout: React.FC = () => {
   // Dealer logins see only their own portal: no admin level, no management modules
   const isDealer = can('DEALER_PORTAL_VIEW');
   // Only the modules the user's permissions open
-  const visibleNavItems = useMemo(() => authorizedNavigation(), [authorizedNavigation]);
+  const authorizedItems = useMemo(() => authorizedNavigation(), [authorizedNavigation]);
+  // Header items (My Meetings) sit in the top bar beside the bell; the rest fill the sidebar
+  const visibleNavItems = useMemo(() => authorizedItems.filter((item) => item.placement !== 'header'), [authorizedItems]);
+  const myMeetingsNav = authorizedItems.find((item) => item.id === 'my-meetings');
   const levelLabel = level === 'ADMIN_L2' ? 'Level 2' : level === 'ADMIN_L1' ? 'Level 1' : isDealer ? null : level;
 
   // "1" next to Company Profile while a change waits for approval.
   const hasCompanyProfileNav = visibleNavItems.some((item) => item.id === 'company-profile');
   const companyChangePending = usePendingCompanyChangeBadge(hasCompanyProfileNav);
+  // Meetings waiting for my feedback, on the My Meetings icon (one count when the app opens, and after feedback is given)
+  const meetingFeedbackPending = usePendingFeedbackCount(Boolean(myMeetingsNav));
+  const meetingsWord = meetingFeedbackPending === 1 ? 'meeting waits' : 'meetings wait';
+  const myMeetingsLabel = meetingFeedbackPending > 0
+    ? `My Meetings: ${meetingFeedbackPending} ${meetingsWord} for your feedback`
+    : 'My Meetings';
 
   const userInitial = user?.username ? user.username.charAt(0).toUpperCase() : 'A';
 
@@ -132,6 +151,27 @@ export const AdminLayout: React.FC = () => {
         <div className="flex items-center gap-3">
           {/* Notification Bell Icon */}
           <NotificationBell />
+
+          {/* My Meetings Icon */}
+          {myMeetingsNav && (
+            <NavLink
+              to={myMeetingsNav.path}
+              title={myMeetingsNav.label}
+              aria-label={myMeetingsLabel}
+              className={({ isActive }) =>
+                `p-2.5 rounded-full transition-colors cursor-pointer relative ${
+                  isActive ? 'bg-[#0071e3]/10 text-[#0071e3] dark:text-blue-400' : 'hover:bg-black/5 dark:hover:bg-white/10 text-slate-700 dark:text-gray-300'
+                }`
+              }
+            >
+              <GroupsIcon className="w-5 h-5" />
+              {meetingFeedbackPending > 0 && (
+                <span className="absolute top-1.5 right-1.5 min-w-[18px] h-[18px] px-1 bg-emerald-600 text-white text-[10px] font-bold rounded-full flex items-center justify-center leading-none border-2 border-white dark:border-black">
+                  {meetingFeedbackPending > 99 ? '99+' : meetingFeedbackPending}
+                </span>
+              )}
+            </NavLink>
+          )}
 
           {/* Theme Toggle Button */}
           <button
@@ -180,10 +220,13 @@ export const AdminLayout: React.FC = () => {
       {/* Main Layout Container */}
       <div className="flex flex-1 max-w-[1600px] w-full mx-auto px-4 sm:px-6 py-6 gap-6">
         <aside className="w-64 hidden md:block shrink-0">
-          <div className="bg-white dark:bg-[#161617] rounded-2xl p-3 sticky top-20 flex flex-col gap-1 border border-black/10 dark:border-white/10 shadow-sm transition-colors duration-200">
-            <p className="px-3 py-2 text-[11px] font-bold tracking-wider text-gray-400 dark:text-neutral-500 uppercase select-none">
+          {/* Capped to the window so the module list scrolls with the mouse wheel instead of running off-screen */}
+          <div className="bg-white dark:bg-[#161617] rounded-2xl p-3 sticky top-20 max-h-[calc(100dvh-6rem)] flex flex-col border border-black/10 dark:border-white/10 shadow-sm transition-colors duration-200">
+            <p className="shrink-0 px-3 py-2 text-[11px] font-bold tracking-wider text-gray-400 dark:text-neutral-500 uppercase select-none">
               {isDealer ? 'Dealer Portal' : 'Management Modules'}
             </p>
+
+            <nav className="flex-1 min-h-0 overflow-y-auto overscroll-contain flex flex-col gap-1 pt-1 -mx-1 px-1">
 
             {visibleNavItems.length === 0 && (
               <p className="px-3 py-2 text-xs text-gray-500 dark:text-neutral-400">
@@ -232,6 +275,7 @@ export const AdminLayout: React.FC = () => {
                 </NavLink>
               );
             })}
+            </nav>
           </div>
         </aside>
 

@@ -179,6 +179,16 @@ export interface ProductCategory {
 export interface CreateProductRequest extends Partial<ProductGstFields>, AccessoryFields {
     title: string;
     /**
+     * This version's own model name, unique ignoring case (max 100). Required except on a draft; on update omitted =
+     * left as it is.
+     */
+    modelName?: string;
+    /**
+     * Create only: the version this product was adapted from (its values were copied into the form). It is turned off
+     * when this one is turned on. The version number itself comes from the title (see utils/productVersion).
+     */
+    parentProductId?: number;
+    /**
      * true = save as a draft: only title and category are required, stock stays 0 and nothing is built or sent for
      * approval. On a draft, false = submit it (full checks, its first unit is built). Omitted = a draft stays a draft.
      */
@@ -189,6 +199,12 @@ export interface CreateProductRequest extends Partial<ProductGstFields>, Accesso
      */
     categoryName?: string;
     tagline?: string;
+    /**
+     * Optional: the software the product runs (firmware, app or operating system) and its version, e.g. "TinQa OS" and
+     * "2.1.0" (utils/productSoftware). Both or neither. On update omitted = kept as saved; '' clears it.
+     */
+    softwareName?: string;
+    softwareVersion?: string;
     description?: string;
     /** Required, except on a draft. */
     price?: number;
@@ -198,6 +214,16 @@ export interface CreateProductRequest extends Partial<ProductGstFields>, Accesso
     image3Url?: string;
     image4Url?: string;
     image5Url?: string;
+    /**
+     * What each image shows (at most IMAGE_DESCRIPTION_MAX characters; each slot holds one view, see
+     * utils/productImages.ts). Required for every image of a submitted product, except one saved before descriptions
+     * existed and kept as it is. On update omitted = kept while the image stays the same; '' clears it.
+     */
+    image1Description?: string;
+    image2Description?: string;
+    image3Description?: string;
+    image4Description?: string;
+    image5Description?: string;
     enabled: boolean;
     stockQuantity: number;
     lastUpdateDescription?: string;
@@ -244,7 +270,14 @@ export interface UpdateProductStatusRequest {
 export interface ProductResponseDto {
     id: number;
     title: string;
+    /** Null on drafts not given one yet and on products saved before model names existed. */
+    modelName?: string | null;
+    /** e.g. "v0.2" (versionNumber in its shown form). */
+    versionLabel?: string | null;
     tagline?: string | null;
+    /** The software it runs and its version; both null (or absent) on products without software. */
+    softwareName?: string | null;
+    softwareVersion?: string | null;
     /** Null only if the category row is missing. */
     category?: ProductCategory | null;
     description?: string | null;
@@ -258,6 +291,11 @@ export interface ProductResponseDto {
     image3Url?: string | null;
     image4Url?: string | null;
     image5Url?: string | null;
+    image1Description?: string | null;
+    image2Description?: string | null;
+    image3Description?: string | null;
+    image4Description?: string | null;
+    image5Description?: string | null;
     enabled: boolean;
     stockQuantity: number | null;
     last_update_description?: string | null;
@@ -283,9 +321,9 @@ export interface ProductResponseDto {
     accessories?: AccessoryLinkResponse[] | null;
     /** Saved but not finished: disabled, no stock, not sent for approval yet. */
     draft?: boolean | null;
-    /** 1 for the first version; a new version copied from a sold product counts up. */
+    /** In tenths, counted per product name: 1 = v0.1, 10 = v1.0. */
     versionNumber?: number | null;
-    /** The product this version was copied from. */
+    /** The version this one was adapted or copied from. */
     previousVersionId?: number | null;
     /** On at least one order: its components are locked (changes go into a new version). */
     sold?: boolean | null;
@@ -295,7 +333,12 @@ export interface ProductResponseDto {
 export interface ProductResponse extends Partial<ProductGstFields> {
     id: number;
     title: string;
+    /** This version's own model name (unique); null on drafts not given one yet and on older products. */
+    modelName: string | null;
     tagline: string | null;
+    /** The software it runs and its version; both null on products without software. */
+    softwareName?: string | null;
+    softwareVersion?: string | null;
     /** Null only if the category row is missing. */
     category?: ProductCategory | null;
     description: string | null;
@@ -306,6 +349,12 @@ export interface ProductResponse extends Partial<ProductGstFields> {
     image3Url: string | null;
     image4Url: string | null;
     image5Url: string | null;
+    /** What each image shows; null when it has none (images saved before descriptions existed). */
+    image1Description?: string | null;
+    image2Description?: string | null;
+    image3Description?: string | null;
+    image4Description?: string | null;
+    image5Description?: string | null;
     enabled: boolean;
     stockQuantity: number;
     lastUpdateDescription: string | null;
@@ -327,7 +376,9 @@ export interface ProductResponse extends Partial<ProductGstFields> {
     accessories: AccessoryLinkResponse[];
     /** Saved but not finished: disabled, no stock, not sent for approval yet (see utils/productVersion). */
     draft: boolean;
+    /** In tenths, counted per product name: 1 = v0.1, 10 = v1.0 (see utils/productVersion). */
     versionNumber: number;
+    /** The version this one was adapted or copied from. */
     previousVersionId: number | null;
     /** On at least one order: its components can't change any more; a new version is made instead. */
     sold: boolean;

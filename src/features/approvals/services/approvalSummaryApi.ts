@@ -29,6 +29,8 @@ export const ECOMMERCE_QUEUES = {
   EXPENSES: ['EXPENSE_APPROVE', 'EXPENSE_VIEW'],
   PRE_ORDERS: ['CUSTOMER_ORDER_PRE_ORDER_APPROVE', 'CUSTOMER_ORDER_VIEW'],
   COMPANY_PROFILE: ['COMPANY_PROFILE_APPROVE', 'COMPANY_PROFILE_VIEW'],
+  // Shortlists and selections waiting for a Level 2 approver (SHORTLIST_PENDING + SELECTION_PENDING)
+  CAREER_DECISIONS: ['CAREER_DECISION_APPROVE', 'CAREER_APPLICATION_VIEW'],
 } as const satisfies Record<string, readonly Permission[]>;
 
 export type ApprovalQueueName = keyof typeof PROCUREMENT_QUEUES | keyof typeof ECOMMERCE_QUEUES;

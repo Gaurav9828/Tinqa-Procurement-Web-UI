@@ -36,6 +36,7 @@ const product = (id: number, title: string, extra: Partial<ProductResponse> = {}
   accessoryBenefits: [],
   draft: false,
   versionNumber: 1,
+  modelName: null,
   previousVersionId: null,
   sold: false,
   accessoryFor: [],

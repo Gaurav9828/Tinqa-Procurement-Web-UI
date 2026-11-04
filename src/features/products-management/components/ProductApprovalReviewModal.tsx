@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { Ban, CheckCircle2, Loader2, ShieldCheck, X, XCircle } from 'lucide-react';
 import type { ProductApprovalDecision, ProductApprovalResponse } from '../types/productApproval.types';
 import { DECISION_REASON_MAX } from '../utils/productApproval';
+import { softwareLine } from '../utils/productSoftware';
+import type { ProductApprovalSnapshot } from '../types/productApproval.types';
 import { describeGst } from '../utils/productTax';
 import { ProductTaxBreakdown } from './ProductTaxBreakdown';
 import { formatWarrantyDuration, formatWarrantyType } from '../../item-management/utils/itemWarranty';
@@ -127,7 +129,9 @@ export const ProductApprovalReviewModal: React.FC<Props> = ({ request, isSubmitt
             )}
             <div className="min-w-0">
               <p className="text-sm font-semibold text-black dark:text-white">{snapshot.title}</p>
+              {snapshot.modelName && <p className="text-gray-500" data-testid="approval-model">Model: {snapshot.modelName}</p>}
               {snapshot.tagline && <p className="text-gray-500">{snapshot.tagline}</p>}
+              <SnapshotSoftware snapshot={snapshot} />
               {snapshot.categoryName && <p className="text-gray-500" data-testid="approval-category">Category: {snapshot.categoryName}</p>}
               <p className="text-[10px] text-gray-400 font-mono">Product #{request.ecommerceProductId}</p>
             </div>
@@ -326,4 +330,10 @@ export const ProductApprovalReviewModal: React.FC<Props> = ({ request, isSubmitt
       </div>
     </div>
   );
+};
+
+/** The software the product runs, as submitted; nothing without software. */
+const SnapshotSoftware: React.FC<{ snapshot: Pick<ProductApprovalSnapshot, 'softwareName' | 'softwareVersion'> }> = ({ snapshot }) => {
+  const line = softwareLine(snapshot.softwareName, snapshot.softwareVersion);
+  return line ? <p className="text-gray-500" data-testid="approval-software">Software: {line}</p> : null;
 };

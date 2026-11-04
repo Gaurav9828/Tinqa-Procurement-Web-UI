@@ -14,7 +14,7 @@ import { axiosClient } from '../../../api/axiosClient';
 import type { ItemResponse, ItemWarrantyResponse } from '../../item-management/types/item.types';
 import type { ProductComponentRequest, ProductComponentResponse, ProductResponseDto } from '../types/product.types';
 import { fillGst } from './gstTestUtil';
-import { noBarcodes, scanUnitBarcodes } from './barcodeTestUtil';
+import { noBarcodes, scanUnitBarcodes, openFormTab, fillFrontImage } from './barcodeTestUtil';
 import { DIORAMAS, fillCategory } from './categoryTestUtil';
 import { signInAsSuperAdmin } from '../../../test/access';
 
@@ -93,6 +93,7 @@ const toComponents = (requests: ProductComponentRequest[]): ProductComponentResp
 const LAPTOP: ProductResponseDto = {
   id: 1,
   title: 'Laptop X',
+  modelName: 'LX-1',
   category: DIORAMAS,
   price: 59999,
   hsnSac: '8471',
@@ -193,9 +194,11 @@ const openCreate = async (user: User) => {
   await screen.findByText('Laptop X');
   await user.click(screen.getByRole('button', { name: /Create Product/ }));
   await user.type(screen.getByPlaceholderText('Product Title'), 'Laptop Y');
+  await user.type(screen.getByLabelText(/Model name/), 'MDL-5');
+  await openFormTab(user, 'Price & GST');
   await user.type(screen.getByPlaceholderText('0.00'), '64999');
   expect(screen.getByTestId('new-product-stock')).toHaveTextContent('1'); // fixed on creation
-  await user.type(screen.getByPlaceholderText('Image Address'), 'https://cdn.tinqa.com/y.png');
+  await fillFrontImage(user);
   await fillGst(user);
   await fillCategory(user);
 };
@@ -205,9 +208,11 @@ const submitCreate = async (user: User) => {
   await user.click(screen.getAllByRole('button', { name: 'Create Product' }).at(-1)!);
 };
 
+// The edit form opens on Basics, as the create form does; these tests start where the components are
 const openEdit = async (user: User) => {
   await screen.findByText('Laptop X');
   await user.click(screen.getAllByRole('button', { name: 'Edit Product' })[0]);
+  await openFormTab(user, 'Components & barcodes');
 };
 const productWarranties = () => screen.getByRole('region', { name: 'Warranties' });
 const productWarrantyCards = () => within(productWarranties()).queryAllByRole('group', { name: /^Warranty \d+$/ });
@@ -236,12 +241,14 @@ describe('Create product: components auto-add their item warranties', () => {
   it('adds the selected items’ active warranties grouped per item and sends them with the product', async () => {
     const { user } = renderPage();
     await openCreate(user);
+    await openFormTab(user, 'Components & barcodes');
     expect(within(section()).getByText('No components added.')).toBeInTheDocument();
 
     await addComponent(user, '7');
     await itemLoaded(1);
     expect(statusOf(1)).toHaveTextContent('2 item warranties added to the product warranties below');
     const titles = () => productWarrantyCards().map((c) => c.textContent);
+    await openFormTab(user, 'Warranties');
     expect(titles()).toEqual([
       expect.stringContaining('Motherboard'),
       expect.stringContaining('Motherboard'),
@@ -253,6 +260,7 @@ describe('Create product: components auto-add their item warranties', () => {
     expect(copyTitle).not.toHaveTextContent('3 Years Manufacturer Warranty');
     expect(procurement.get).toHaveBeenCalledWith('/v1/admin/items/7/warranties');
 
+    await openFormTab(user, 'Components & barcodes');
     await addComponent(user, '8');
     await itemLoaded(2);
     expect(statusOf(2)).toHaveTextContent('This item has no active warranties.');
@@ -301,16 +309,20 @@ describe('Create product: components auto-add their item warranties', () => {
   it('swapping or removing an item swaps or removes its warranties', async () => {
     const { user } = renderPage();
     await openCreate(user);
+    await openFormTab(user, 'Components & barcodes');
     await addComponent(user, '7');
     await itemLoaded(1);
 
     await user.selectOptions(itemSelect(1), '9');
     await itemLoaded(1);
+    await openFormTab(user, 'Warranties');
     expect(productWarrantyCards().map((c) => c.textContent)).toEqual([expect.stringContaining('Display')]);
 
+    await openFormTab(user, 'Components & barcodes');
     await addComponent(user, '7');
     await itemLoaded(2);
     await user.click(within(section()).getByRole('button', { name: 'Remove component 2' }));
+    await openFormTab(user, 'Warranties');
     expect(productWarrantyCards().map((c) => c.textContent)).toEqual([expect.stringContaining('Display')]);
 
     await submitCreate(user);
@@ -324,12 +336,14 @@ describe('Create product: components auto-add their item warranties', () => {
     warrantyDelays[7] = new Promise((r) => (release = r));
     const { user } = renderPage();
     await openCreate(user);
+    await openFormTab(user, 'Components & barcodes');
     await addComponent(user, '7');
     expect(within(row(1)).getByRole('status')).toHaveTextContent('Loading item details');
     await user.selectOptions(itemSelect(1), '9');
     await itemLoaded(1);
     release();
     await new Promise((r) => setTimeout(r, 0));
+    await openFormTab(user, 'Warranties');
     expect(productWarrantyCards().map((c) => c.textContent)).toEqual([expect.stringContaining('Display')]);
   });
 
@@ -337,6 +351,7 @@ describe('Create product: components auto-add their item warranties', () => {
     delete itemWarranties[9]; // fake Procurement error for item 9
     const { user } = renderPage();
     await openCreate(user);
+    await openFormTab(user, 'Components & barcodes');
     await addComponent(user);
     await addComponent(user, '9');
     expect(await within(row(2)).findByText('Procurement service unavailable')).toBeInTheDocument();
@@ -358,6 +373,7 @@ describe('Create product: components auto-add their item warranties', () => {
     available[9] = 0; // e.g. its stock came from an order that isn't delivered yet
     const { user } = renderPage();
     await openCreate(user);
+    await openFormTab(user, 'Components & barcodes');
     await addComponent(user, '9');
     expect(await within(row(1)).findByTestId('component-stock')).toHaveTextContent('Out of stock');
     expect(quantitySelect(1)).toBeDisabled();
@@ -369,12 +385,14 @@ describe('Create product: components auto-add their item warranties', () => {
   it('copies the selected items’ warranties into the product warranties and sends them with the product', async () => {
     const { user } = renderPage();
     await openCreate(user);
+    await openFormTab(user, 'Components & barcodes');
     await addComponent(user, '7');
     await itemLoaded(1);
     await addComponent(user, '9');
     await itemLoaded(2);
 
     // The product Warranties section now has the items' warranties, marked with their item.
+    await openFormTab(user, 'Warranties');
     const copies = productWarrantyCards();
     expect(copies.map((c) => c.textContent)).toEqual([
       expect.stringContaining('From Motherboard'),
@@ -408,20 +426,26 @@ describe('Create product: components auto-add their item warranties', () => {
   it('changing or removing an item removes the product warranties it added', async () => {
     const { user } = renderPage();
     await openCreate(user);
+    await openFormTab(user, 'Components & barcodes');
     await addComponent(user, '7');
     await itemLoaded(1);
     await addComponent(user, '9');
     await itemLoaded(2);
     const summaries = () => productWarrantyCards().map((c) => within(c).getByTestId('warranty-summary').textContent);
+    await openFormTab(user, 'Warranties');
     expect(summaries()).toEqual(['Manufacturer · 3 Years · ASUS', 'Parts · 6 Months', 'Replacement · 1 Year · BOE']);
 
     // Removing the Motherboard component removes its copies.
+    await openFormTab(user, 'Components & barcodes');
     await user.click(within(section()).getByRole('button', { name: 'Remove component 1' }));
+    await openFormTab(user, 'Warranties');
     expect(summaries()).toEqual(['Replacement · 1 Year · BOE']);
 
     // Changing the Display row's item swaps its copies.
+    await openFormTab(user, 'Components & barcodes');
     await user.selectOptions(itemSelect(1), '7');
     await itemLoaded(1);
+    await openFormTab(user, 'Warranties');
     expect(productWarrantyCards().map((c) => c.textContent)).toEqual([
       expect.stringContaining('From Motherboard'),
       expect.stringContaining('From Motherboard'),
@@ -431,8 +455,10 @@ describe('Create product: components auto-add their item warranties', () => {
   it('copied item warranties are read-only: no editing, no toggling, no removing them directly', async () => {
     const { user } = renderPage();
     await openCreate(user);
+    await openFormTab(user, 'Components & barcodes');
     await addComponent(user, '9');
     await itemLoaded(1);
+    await openFormTab(user, 'Warranties');
     const copy = productWarrantyCards()[0];
     await user.click(within(copy).getByRole('button', { name: /Expand warranty 1/ }));
 
@@ -474,6 +500,7 @@ describe('Edit product components', () => {
     await waitFor(() => expect(quantityValues(1)).toEqual(['1', '2'])); // 1 + floor(4 / 3)
     expect(quantityValues(2)).toEqual(['1', '2', '3', '4', '5']); // 2 + floor(10 / 3)
 
+    await openFormTab(user, 'Basics');
     const title = screen.getByDisplayValue('Laptop X');
     await user.clear(title);
     await user.type(title, 'Laptop X Pro');
@@ -490,9 +517,12 @@ describe('Edit product components', () => {
     db[0].stockQuantity = 0; // components can only change with no unit in stock
     const { user } = renderPage();
     await openEdit(user);
+    await openFormTab(user, 'Warranties');
     expect(productWarrantyCards()).toHaveLength(0);
+    await openFormTab(user, 'Components & barcodes');
     await addComponent(user, '9');
     await itemLoaded(3);
+    await openFormTab(user, 'Warranties');
     expect(productWarrantyCards()).toHaveLength(1);
     expect(productWarrantyCards()[0]).toHaveTextContent('From Display');
     await user.click(screen.getByRole('button', { name: 'Review & Update' }));
@@ -569,6 +599,51 @@ describe('Edit product components', () => {
     const alerts = within(screen.getByRole('list', { name: 'Notifications' }));
     expect(alerts.getByText('Component quantity can have at most 11 digits and 3 decimal places')).toBeInTheDocument();
     expect(screen.queryByText('Request validation failed.')).not.toBeInTheDocument();
+  });
+});
+
+describe('Edit form layout', () => {
+  beforeEach(mockDirectEditApprovals);
+
+  it('has the same parts, steps and footer as the create form, and opens the part a server error is in', async () => {
+    ecom.put.mockRejectedValueOnce(
+      httpError(400, {
+        success: false,
+        message: 'Request validation failed.',
+        errorCode: 'VALIDATION_FAILED',
+        errors: [{ field: 'components[1].quantity', message: 'Component quantity can have at most 11 digits and 3 decimal places' }],
+      })
+    );
+    db[0].stockQuantity = 0; // components can only change with no unit in stock
+    const { user } = renderPage();
+    const parts = () => screen.getAllByRole('tab').map((tab) => tab.textContent);
+    await screen.findByText('Laptop X');
+    await user.click(screen.getByRole('button', { name: /Create Product/ }));
+    const createParts = parts();
+    expect(screen.getByText(`Step 1 of ${createParts.length}`)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+
+    await user.click(screen.getAllByRole('button', { name: 'Edit Product' })[0]);
+    expect(parts()).toEqual(createParts);
+    expect(screen.getByRole('tab', { name: /Basics/ })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByText(`Step 1 of ${createParts.length}`)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Back/ })).toBeDisabled();
+    // Nothing to send yet, and it says so
+    expect(screen.getByRole('button', { name: 'Review & Update' })).toBeDisabled();
+    expect(screen.getByTestId('edit-product-unchanged')).toHaveTextContent('Nothing changed yet');
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+    expect(screen.getByRole('tab', { name: /Price & GST/ })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByText(`Step 2 of ${createParts.length}`)).toBeInTheDocument();
+
+    await openFormTab(user, 'Components & barcodes');
+    await waitFor(() => expect(quantitySelect(2)).toBeEnabled());
+    await user.selectOptions(quantitySelect(2), '3');
+    await openFormTab(user, 'Basics');
+    await user.click(screen.getByRole('button', { name: 'Review & Update' }));
+    await user.click(await screen.findByRole('button', { name: 'Confirm & Update' }));
+    await waitFor(() => expect(screen.getByRole('tab', { name: /Components & barcodes/ })).toHaveAttribute('aria-selected', 'true'));
+    expect(screen.getByRole('tab', { name: /Components & barcodes/ })).toHaveAccessibleName(/has errors/);
+    expect(within(row(2)).getByText('Component quantity can have at most 11 digits and 3 decimal places')).toBeInTheDocument();
   });
 });
 

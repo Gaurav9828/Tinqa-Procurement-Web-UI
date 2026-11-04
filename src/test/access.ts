@@ -22,6 +22,9 @@ export const APPROVAL_LEVEL_PERMISSIONS: readonly Permission[] = [
   'AUDIT_LOG_VIEW',
   'COMPANY_PROFILE_DRAFT_DELETE_ANY',
   'DEMO_COMPLETED_EDIT',
+  'CAREER_DECISION_APPROVE',
+  'STOREFRONT_FEATURE_TOGGLE',
+  'PROMO_CODE_MANAGE',
 ];
 
 /** What a dealer login holds (Procurement's DEALER_PORTAL group), and nothing else. */

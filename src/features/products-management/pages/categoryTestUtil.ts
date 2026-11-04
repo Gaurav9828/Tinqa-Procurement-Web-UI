@@ -1,3 +1,4 @@
+import { openFormTab } from './barcodeTestUtil';
 import { screen } from '@testing-library/react';
 import type userEvent from '@testing-library/user-event';
 import type { ProductCategory } from '../types/product.types';
@@ -7,6 +8,7 @@ export const DIORAMAS: ProductCategory = { id: 1, name: 'Dioramas', slug: 'diora
 
 /** Picks (or creates) the product form's required category. */
 export const fillCategory = async (user: ReturnType<typeof userEvent.setup>, name = 'Dioramas') => {
+  await openFormTab(user, 'Basics');
   const field = screen.getByRole('combobox', { name: 'Category *' });
   await user.clear(field);
   await user.type(field, name);

@@ -12,7 +12,7 @@ import { ecommerceAxiosClient } from '../../../api/ecommerceAxiosClient';
 import { mockDirectEditApprovals } from './directEditApprovals.testUtil';
 import type { ProductResponseDto, WarrantyRequest, WarrantyResponse } from '../types/product.types';
 import { fillGst } from './gstTestUtil';
-import { scanUnitBarcodes } from './barcodeTestUtil';
+import { scanUnitBarcodes, openFormTab, fillFrontImage } from './barcodeTestUtil';
 import { DIORAMAS, fillCategory } from './categoryTestUtil';
 import { signInAsSuperAdmin } from '../../../test/access';
 
@@ -96,6 +96,7 @@ const MIGRATED = saved(11, '6 Month Extended Warranty', {
 const LAMP: ProductResponseDto = {
   id: 1,
   title: 'SummitX',
+  modelName: 'SX-1',
   category: DIORAMAS,
   tagline: 'Smart lamp',
   description: 'A lamp',
@@ -110,7 +111,7 @@ const LAMP: ProductResponseDto = {
   userGuide: [],
   warranties: [saved(10, '1 Year Manufacturer Warranty'), MIGRATED],
 };
-const PLUG: ProductResponseDto = { ...LAMP, id: 2, title: 'Smart Plug', specs: [], warranties: [saved(20, 'Plug Warranty')] };
+const PLUG: ProductResponseDto = { ...LAMP, id: 2, title: 'Smart Plug', modelName: 'SP-1', specs: [], warranties: [saved(20, 'Plug Warranty')] };
 
 const installFakeBackend = () => {
   http.get.mockImplementation(async (url: string) => {
@@ -195,11 +196,14 @@ const openCreate = async (user: User) => {
   await screen.findByText('SummitX');
   await user.click(screen.getByRole('button', { name: /Create Product/ }));
   await user.type(screen.getByPlaceholderText('Product Title'), 'Desk Fan');
+  await user.type(screen.getByLabelText(/Model name/), 'MDL-2');
+  await openFormTab(user, 'Price & GST');
   await user.type(screen.getByPlaceholderText('0.00'), '2499');
-  await user.type(screen.getByPlaceholderText('Image Address'), 'https://cdn.tinqa.com/fan.png');
+  await fillFrontImage(user);
   await fillGst(user);
   await fillCategory(user);
   expect(screen.getByTestId('new-product-stock')).toHaveTextContent('1'); // stock is fixed at 1 on creation
+  await openFormTab(user, 'Warranties');
 };
 /** The page header and the modal footer both have a "Create Product" button; the modal's is last. */
 // Every unit carries a barcode: the new unit's is scanned first
@@ -208,9 +212,11 @@ const submitCreate = async (user: User) => {
   await user.click(screen.getAllByRole('button', { name: 'Create Product' }).at(-1)!);
 };
 
+// The edit form opens on Basics, as the create form does
 const openEdit = async (user: User, index = 0) => {
   await screen.findByText('SummitX');
   await user.click(screen.getAllByRole('button', { name: 'Edit Product' })[index]);
+  await openFormTab(user, 'Warranties');
 };
 const saveEdit = async (user: User) => {
   await user.click(screen.getByRole('button', { name: 'Review & Update' }));
@@ -264,6 +270,7 @@ describe('Create product with typed warranties', () => {
 
     // The list reloads; the new product's edit form shows both saved warranties.
     await user.click((await screen.findAllByRole('button', { name: 'Edit Product' }))[2]);
+    await openFormTab(user, 'Warranties');
     expect(cards()).toHaveLength(2);
     expect(within(card(2)).getByTestId('warranty-summary')).toHaveTextContent('Extended · 6 Months');
   });
@@ -424,6 +431,7 @@ describe('Edit product typed warranties', () => {
   it('saving other changes sends the full, unchanged warranty list', async () => {
     const { user } = renderPage();
     await openEdit(user);
+    await openFormTab(user, 'Basics');
     const title = screen.getByDisplayValue('SummitX');
     await user.clear(title);
     await user.type(title, 'SummitX Pro');

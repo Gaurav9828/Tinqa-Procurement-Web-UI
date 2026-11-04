@@ -127,6 +127,42 @@
       "/approvals": {
         "max": 11,
         "reason": "3 app-shell calls (access, notifications, company profile) + 2 approval summaries (GET /v1/approvals/summary and /admin/approvals/summary: every tab badge, one SQL function per backend) + the open Requests tab's 6 queue lists. Other tabs load their list only when opened. Lowered from 16 on 2026-10-28; one Requests endpoint (optimization roadmap phase 1b) brings it to 6."
+      },
+      "/careers": {
+        "max": 6,
+        "reason": "Added 2026-10-30. 3 app-shell calls (access, notifications, company profile) + the openings page + the career categories (one shared, cached lookup for the team filter and the opening form). Raised 2026-10-30 to 6: the user asked for a Super Admin switch that hides the website's Careers tab, and the page shows its state (GET /admin/careers/settings, one primary-key read); no existing call carries it."
+      },
+      "/careers/applicants": {
+        "max": 4,
+        "reason": "Added 2026-10-30. 3 app-shell calls (access, notifications, company profile) + one page of applicants."
+      },
+      "/careers/openings/new": {
+        "max": 4,
+        "reason": "Added 2026-10-30. 3 app-shell calls (access, notifications, company profile) + the career categories for the team picker."
+      },
+      "/careers/openings/1": {
+        "max": 5,
+        "reason": "Added 2026-10-30 (e2e sample id 1). 3 app-shell calls (access, notifications, company profile) + the opening + one page of its applicants."
+      },
+      "/careers/openings/1/edit": {
+        "max": 5,
+        "reason": "Added 2026-10-30 (e2e sample id 1). 3 app-shell calls (access, notifications, company profile) + the opening + the career categories."
+      },
+      "/careers/applications/1": {
+        "max": 5,
+        "reason": "Added 2026-10-30 (e2e sample id 1). 3 app-shell calls (access, notifications, company profile) + the application + saving its résumé match the first time a screener opens it. The résumé PDF loads only when its preview is opened."
+      },
+      "/promo-codes": {
+        "max": 5,
+        "reason": "Added 2026-11-04. 3 app-shell calls (access, notifications, company profile) + one page of promo codes. Opening the Super Admin's create form adds the code suggestion (GET /admin/promo-codes/code-suggestion, once per form; the journey test opens it). A code's detail and its use history load only when opened."
+      },
+      "/client-outreach": {
+        "max": 5,
+        "reason": "Added 2026-10-31. 3 app-shell calls (access, notifications, company profile; the My Meetings badge rides on the notifications count) + the outreach summary (GET /v1/outreach/summary, one SQL statement for every tile and table) + one page of businesses (the open tab). The follow-ups tab loads only when opened."
+      },
+      "/client-outreach/businesses/1": {
+        "max": 5,
+        "reason": "Added 2026-10-31 (e2e sample id 1). 3 app-shell calls (access, notifications, company profile; the My Meetings badge rides on the notifications count) + the business + one page of its contact history. Proof files load only when opened or previewed."
       }
     }
   },

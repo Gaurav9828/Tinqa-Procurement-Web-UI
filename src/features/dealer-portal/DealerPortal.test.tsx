@@ -53,7 +53,8 @@ const order = (id: number, orderStatus: OrderStatus, extra: Partial<DealerOrder>
   taxBreakup: {},
   orderStatus,
   orderDate: '2026-10-10',
-  expectedDelivery: '2026-10-30',
+  // Far in the future: the change form refuses a delivery date before today, so a near date expires the test.
+  expectedDelivery: '2099-12-31',
   actualDelivery: orderStatus === 'DELIVERED' ? '2026-10-18' : null,
   createdAt: '2026-10-10T10:00:00',
   note: null,

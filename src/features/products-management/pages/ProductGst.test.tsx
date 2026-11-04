@@ -6,7 +6,7 @@ import { configureStore } from '@reduxjs/toolkit';
 import alertReducer from '../../../store/alertSlice';
 import { signInAsSuperAdmin } from '../../../test/access';
 import { fillCategory } from './categoryTestUtil';
-import { scanUnitBarcodes } from './barcodeTestUtil';
+import { scanUnitBarcodes, openFormTab, fillFrontImage } from './barcodeTestUtil';
 import { CreateProductModal } from '../components/CreateProductModal';
 import type { CreateProductRequest } from '../types/product.types';
 
@@ -38,6 +38,8 @@ describe('product GST (price includes GST, charged by place of supply)', () => {
   it('requires the GST rate and HSN/SAC before the product can be saved', async () => {
     const { user } = renderCreate();
     await user.type(screen.getByPlaceholderText('Product Title'), 'Rudraa X1');
+    await user.type(screen.getByLabelText(/Model name/), 'MDL-6');
+    await openFormTab(user, 'Price & GST');
     await user.type(screen.getByPlaceholderText('0.00'), '59999');
     expect(within(gst()).getByText('Choose the GST rate.')).toBeInTheDocument();
     expect(within(gst()).getByText('HSN/SAC is required on GST invoices.')).toBeInTheDocument();
@@ -51,11 +53,14 @@ describe('product GST (price includes GST, charged by place of supply)', () => {
   it('shows the in-state (CGST + SGST) and inter-state (IGST) split, and sends the rate after the preview', async () => {
     const { user, onSubmit } = renderCreate();
     await user.type(screen.getByPlaceholderText('Product Title'), 'Rudraa X1');
+    await user.type(screen.getByLabelText(/Model name/), 'MDL-7');
+    await openFormTab(user, 'Price & GST');
     await user.type(screen.getByPlaceholderText('0.00'), '59999');
     await user.selectOptions(screen.getByLabelText('GST rate *'), '18');
     await user.type(screen.getByLabelText('HSN / SAC code *'), '9405');
     await fillCategory(user, 'Spare parts');
 
+    await openFormTab(user, 'Price & GST');
     const split = within(gst()).getByRole('region', { name: 'Invoice split per unit' });
     expect(within(split).getByTestId('intra-taxable')).toHaveTextContent('₹50,846.62');
     expect(within(split).getByTestId('intra-cgst')).toHaveTextContent('₹4,576.19');
@@ -67,6 +72,7 @@ describe('product GST (price includes GST, charged by place of supply)', () => {
     expect(split).toHaveTextContent('CGST @ 9%');
     expect(split).toHaveTextContent('IGST @ 18%');
 
+    await fillFrontImage(user);
     await scanUnitBarcodes(user);
     await user.click(screen.getByRole('button', { name: 'Create Product' }));
     expect(screen.getByTestId('preview-gst')).toHaveTextContent('GST 18% · HSN/SAC 9405');
@@ -79,6 +85,7 @@ describe('product GST (price includes GST, charged by place of supply)', () => {
 
   it('splits the discounted selling price', async () => {
     const { user } = renderCreate();
+    await openFormTab(user, 'Price & GST');
     await user.type(screen.getByPlaceholderText('0.00'), '1000');
     await user.type(screen.getByPlaceholderText('0'), '10');
     await user.selectOptions(screen.getByLabelText('GST rate *'), '18');

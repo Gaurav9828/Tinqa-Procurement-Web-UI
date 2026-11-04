@@ -207,7 +207,7 @@ export const EmployeeFormModal: React.FC<Props> = ({
     (!canChooseRole || isEditMode || isEmployeeRole(formData.role));
 
   // Shown once something is picked, so a fresh form isn't covered in errors.
-  const designationError = formData.designation ? validateDesignation(formData.designation, !isEditMode) : null;
+  const designationError = formData.designation ? validateDesignation(formData.designation, !isEditMode, catalog, employeeToEdit?.designation ?? null) : null;
 
   const computedWorkEmail = isEditMode
     ? undefined
@@ -371,7 +371,7 @@ export const EmployeeFormModal: React.FC<Props> = ({
     const lastNameErr = Validator.validateField(formData.lastName, FORM_RULES.lastName);
     if (lastNameErr) return setValidationError(lastNameErr);
 
-    const designationErr = validateDesignation(formData.designation, !isEditMode);
+    const designationErr = validateDesignation(formData.designation, !isEditMode, catalog, employeeToEdit?.designation ?? null);
     if (designationErr) return setValidationError(designationErr);
 
     if (!isEditMode && canChooseRole && !isEmployeeRole(formData.role)) {
@@ -716,6 +716,7 @@ export const EmployeeFormModal: React.FC<Props> = ({
                 role={formData.role}
                 savedRole={employeeToEdit?.role ?? null}
                 savedDesignation={employeeToEdit?.designation ?? null}
+                savedDesignationLabel={employeeToEdit?.designationLabel ?? null}
                 savedDepartment={employeeToEdit?.department ?? null}
                 isEditMode={isEditMode}
                 isSelfLocked={isSelfLocked}

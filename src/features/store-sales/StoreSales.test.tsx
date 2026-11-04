@@ -8,6 +8,7 @@ import alertReducer from '../../store/alertSlice';
 import { GlobalAlertContainer } from '../../components/ui/GlobalAlertContainer';
 import { useAuthStore } from '../../store/useAuthStore';
 import type { Permission } from '../../config/access';
+import { createEndpointMatcher, PROCUREMENT_ENDPOINTS } from '../../config/endpointAccess';
 import { StoreSalesPage } from './pages/StoreSalesPage';
 import { storeSaleApi } from './api/storeSaleApi';
 import type { StoreCustomer, StoreSale } from './types/storeSale.types';
@@ -16,6 +17,7 @@ vi.mock('./api/storeSaleApi', () => {
   const storeSaleApi = {
     findCustomer: vi.fn(), registerCustomer: vi.fn(), addAddress: vi.fn(), listProducts: vi.fn(), quote: vi.fn(),
     placeOrder: vi.fn(), listMySales: vi.fn(), listAllSales: vi.fn(), sendEmailCode: vi.fn(), confirmEmailCode: vi.fn(),
+    lookupUnit: vi.fn(),
   };
   return {
     storeSaleApi,
@@ -187,5 +189,80 @@ describe('Store sales', () => {
     await user.type(screen.getByLabelText('Seller login (exact)'), 'ravi.agent');
     await user.click(screen.getByRole('button', { name: 'Filter' }));
     await waitFor(() => expect(api.listAllSales).toHaveBeenLastCalledWith(expect.objectContaining({ soldBy: 'ravi.agent', page: 0 })));
+  });
+
+  describe('product search by barcode', () => {
+    const PRODUCTS = [
+      { id: 3, title: 'Smart switch', imageUrl: null, listPrice: 1180, discountPercentage: 0, unitPrice: 1180, stock: 4, gstRate: 18 },
+      { id: 5, title: 'Door sensor', imageUrl: null, listPrice: 590, discountPercentage: 0, unitPrice: 590, stock: 2, gstRate: 18 },
+    ];
+    const productList = () => screen.findByRole('list', { name: 'Products on sale' });
+
+    beforeEach(() => {
+      api.listProducts.mockResolvedValue(ok(PRODUCTS));
+      signIn('ravi.agent', ['STORE_CUSTOMER_REGISTER', 'STORE_ORDER_CREATE', 'STORE_ORDER_VIEW']);
+    });
+
+    it('shows the product of a scanned unit (Enter, as scanners send) and asks only once per code', async () => {
+      api.lookupUnit.mockResolvedValue(ok({ barcode: 'DS-0000123', productId: 5, productTitle: 'Door sensor', status: 'IN_STOCK', inStock: true, note: null }));
+      const user = userEvent.setup();
+      renderPage();
+      await productList();
+
+      const search = screen.getByLabelText('Search products');
+      await user.type(search, 'ds-0000123{Enter}');
+      expect(api.lookupUnit).toHaveBeenCalledWith('DS-0000123');
+      const list = await productList();
+      await waitFor(() => expect(within(list).queryByText('Smart switch')).not.toBeInTheDocument());
+      expect(within(list).getByText('Door sensor')).toBeInTheDocument();
+      expect(screen.getByRole('status')).toHaveTextContent('DS-0000123 is a unit of Door sensor.');
+      await user.click(within(list).getByRole('button', { name: 'One more Door sensor' }));
+      expect(within(list).getByRole('group', { name: 'Quantity of Door sensor' })).toHaveTextContent('1');
+
+      // The same unit scanned again is answered from memory
+      await user.clear(search);
+      await user.type(search, 'DS-0000123{Enter}');
+      expect(await screen.findByRole('status')).toHaveTextContent('Door sensor');
+      expect(api.lookupUnit).toHaveBeenCalledTimes(1);
+    });
+
+    it('matches names in the browser without asking the server', async () => {
+      const user = userEvent.setup();
+      renderPage();
+      await productList();
+
+      await user.type(screen.getByLabelText('Search products'), 'switch{Enter}');
+      const list = await productList();
+      expect(within(list).getByText('Smart switch')).toBeInTheDocument();
+      expect(within(list).queryByText('Door sensor')).not.toBeInTheDocument();
+      // Not shaped like a barcode, and no name matches: still no call
+      await user.clear(screen.getByLabelText('Search products'));
+      await user.type(screen.getByLabelText('Search products'), 'lamp{Enter}');
+      expect(screen.getByText('No products match the search.')).toBeInTheDocument();
+      expect(api.lookupUnit).not.toHaveBeenCalled();
+    });
+
+    it('says when a scanned unit is out of stock or its product is not on sale', async () => {
+      api.lookupUnit.mockImplementation(async (code: string) => code === 'DS-0000124'
+        ? ok({ barcode: code, productId: 5, productTitle: 'Door sensor', status: 'ON_DEMO' as const, inStock: false, note: 'This unit is out on a client demo.' })
+        : ok({ barcode: code, productId: 99, productTitle: 'Old hub', status: 'IN_STOCK' as const, inStock: true, note: null }));
+      const user = userEvent.setup();
+      renderPage();
+      await productList();
+      const search = screen.getByLabelText('Search products');
+
+      await user.type(search, 'DS-0000124{Enter}');
+      expect(await screen.findByRole('status')).toHaveTextContent('This unit is out on a client demo.');
+      expect(within(await productList()).getByText('Door sensor')).toBeInTheDocument();
+
+      await user.clear(search);
+      await user.type(search, 'HUB-0000001{Enter}');
+      expect(await screen.findByRole('status')).toHaveTextContent('HUB-0000001 is a unit of Old hub, which is not on sale now.');
+      expect(screen.getByText('Nothing to add for this barcode.')).toBeInTheDocument();
+    });
+
+    it('needs the permission to book store orders', () => {
+      expect(createEndpointMatcher(PROCUREMENT_ENDPOINTS)('GET', '/v1/store-sales/units/lookup')).toBe('STORE_ORDER_CREATE');
+    });
   });
 });

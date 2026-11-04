@@ -41,7 +41,7 @@ const AccessEditor: React.FC<Props & { employee: EmployeeResponse }> = ({ employ
     isEmployeeRole(employee.role) && !designationHasApprovalLevel(catalog, nextDesignation) ? 'ADMIN_L1' : payload.role ?? employee.role;
 
   const describe = (code: string, level: string | null | undefined) =>
-    `${findDesignation(catalog, code)?.label ?? (code || 'No designation')} · ${employeeRoleLabel(level) ?? 'no level'}`;
+    `${findDesignation(catalog, code)?.label ?? ((code === employee.designation && employee.designationLabel) || code || 'No designation')} · ${employeeRoleLabel(level) ?? 'no level'}`;
 
   const save = async () => {
     const result = await onSave(employee.id, payload);
@@ -93,6 +93,7 @@ const AccessEditor: React.FC<Props & { employee: EmployeeResponse }> = ({ employ
             role={role}
             savedRole={employee.role ?? null}
             savedDesignation={employee.designation}
+            savedDesignationLabel={employee.designationLabel ?? null}
             savedDepartment={employee.department}
             isEditMode
             isSelfLocked={isSelf}

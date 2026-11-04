@@ -32,6 +32,7 @@ const okBody = <T,>(data: T, message = 'OK') => ({ data: { success: true, messag
 const product = (id: number, title: string, category: ProductCategory): ProductResponseDto => ({
   id,
   title,
+  modelName: `M-${id}`,
   category,
   tagline: null,
   description: 'A product',
@@ -87,7 +88,8 @@ const renderPage = () => {
 };
 
 const listedTitles = () =>
-  screen.getAllByTestId(/^product-row-/).map((row) => within(row).getAllByRole('cell')[1].textContent?.trim());
+  // The title alone: the cell also shows the version and model name
+  screen.getAllByTestId(/^product-row-/).map((row) => within(row).getAllByRole('cell')[1].firstElementChild?.firstChild?.textContent?.trim());
 
 const handle = (title: string) =>
   screen.getByRole('button', { name: (name) => name.startsWith(`Move ${title}, position`) });

@@ -59,6 +59,7 @@ describe('snapshot', () => {
   it('copies what the reviewer needs from the create request', () => {
     const snapshot = snapshotFromRequest({
       title: 'Touch Panel',
+      modelName: 'TP-7',
       categoryName: 'Spare parts',
       price: 2999,
       hsnSac: '9405',
@@ -72,7 +73,10 @@ describe('snapshot', () => {
     });
     expect(snapshot).toEqual({
       title: 'Touch Panel',
+      modelName: 'TP-7',
       tagline: null,
+      softwareName: null,
+      softwareVersion: null,
       categoryName: 'Spare parts',
       price: 2999,
       discountPercentage: null,
@@ -84,6 +88,13 @@ describe('snapshot', () => {
       warranties: [{ title: 'Motherboard', warrantyType: 'MANUFACTURER', durationValue: 1, durationUnit: 'YEARS', isActive: true }],
       specificationCount: 1,
     });
+  });
+
+  it('copies the software and its version, trimmed, for the reviewer', () => {
+    const snapshot = snapshotFromRequest({ title: 'Touch Panel', price: 2999, stockQuantity: 1, softwareName: ' TinQa OS ', softwareVersion: '2.1.0 ' });
+    expect(snapshot).toMatchObject({ softwareName: 'TinQa OS', softwareVersion: '2.1.0' });
+    const cleared = snapshotFromRequest({ title: 'Touch Panel', price: 2999, stockQuantity: 1, softwareName: '', softwareVersion: '' });
+    expect(cleared).toMatchObject({ softwareName: null, softwareVersion: null });
   });
 });
 

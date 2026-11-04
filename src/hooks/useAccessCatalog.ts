@@ -5,7 +5,8 @@ import type { AccessCatalog } from '../config/access';
 import { getApiErrorMessages } from '../utils/apiError';
 
 /**
- * The server's access catalog (designations, groups, permissions), loaded once per page load and shared.
+ * The server's access catalog (designations incl. active custom roles, groups, permissions), loaded once per page load
+ * and shared; loaded again after a custom role changes.
  * `error` is a user-facing message when it couldn't be loaded.
  */
 export const useAccessCatalog = () => {
@@ -32,6 +33,9 @@ export const useAccessCatalog = () => {
       cancelled = true;
     };
   }, [attempt]);
+
+  // A custom role changed (Employee Management › Roles & permissions): load the new catalog
+  useEffect(() => accessService.onCatalogInvalidated(() => setAttempt((n) => n + 1)), []);
 
   return { catalog, error, isLoading: !catalog && !error, retry: () => setAttempt((n) => n + 1) };
 };

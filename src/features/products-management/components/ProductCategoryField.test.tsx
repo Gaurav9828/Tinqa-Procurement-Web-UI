@@ -6,7 +6,7 @@ import { configureStore } from '@reduxjs/toolkit';
 import alertReducer from '../../../store/alertSlice';
 import { signInAsSuperAdmin } from '../../../test/access';
 import { CreateProductModal } from './CreateProductModal';
-import { scanUnitBarcodes } from '../pages/barcodeTestUtil';
+import { scanUnitBarcodes, openFormTab, fillFrontImage } from '../pages/barcodeTestUtil';
 import type { CreateProductRequest, ProductCategory } from '../types/product.types';
 
 // The form's lookups (items and stock for the cost sheet, costing settings): empty, these tests are about other fields
@@ -38,9 +38,13 @@ const renderCreate = () => {
 
 const fillRequired = async (user: ReturnType<typeof userEvent.setup>) => {
   await user.type(screen.getByPlaceholderText('Product Title'), 'Lens cleaner');
+  await user.type(screen.getByLabelText(/Model name/), 'MDL-1');
+  await openFormTab(user, 'Price & GST');
   await user.type(screen.getByPlaceholderText('0.00'), '299');
   await user.selectOptions(screen.getByLabelText('GST rate *'), '18');
   await user.type(screen.getByLabelText('HSN / SAC code *'), '3405');
+  await fillFrontImage(user);
+  await openFormTab(user, 'Basics');
 };
 
 const submit = async (user: ReturnType<typeof userEvent.setup>) => {

@@ -1,0 +1,105 @@
+/**
+ * Skill names as people write them, grouped under one canonical name, for a hardware manufacturing company. Each
+ * alias is written as the matcher normalises text (normaliseText): lower case, `c++` → `cpp`, `c#` → `csharp`,
+ * `.net` → `dotnet`, `gd&t` → `gdt`, every other symbol a space. A skill listed on an opening is found in a résumé when
+ * any alias of its group is there; a skill outside the table is looked for as written.
+ *
+ * An alias may sit in more than one group (STM32 is both itself and a microcontroller); a skill named exactly like a
+ * group's canonical name uses that group.
+ */
+export const SKILL_SYNONYMS: Record<string, readonly string[]> = {
+  // Electronics and embedded
+  electronics: ['electronics', 'electronic circuits', 'circuit design', 'analog electronics', 'digital electronics', 'analog circuits', 'ece'],
+  'embedded systems': ['embedded', 'embedded systems', 'embedded system', 'firmware', 'firmware development', 'embedded software', 'embedded c'],
+  firmware: ['firmware', 'firmware development', 'embedded software', 'embedded c', 'bare metal'],
+  c: ['c', 'embedded c', 'c programming', 'c language', 'ansi c'],
+  cpp: ['cpp', 'cplusplus', 'modern cpp', 'cpp11', 'cpp14', 'cpp17'],
+  rtos: ['rtos', 'freertos', 'free rtos', 'real time operating system', 'real time operating systems', 'zephyr', 'threadx', 'vxworks', 'keil rtx'],
+  microcontrollers: ['microcontroller', 'microcontrollers', 'mcu', 'mcus', '8051', 'pic', 'avr', 'arm cortex', 'cortex m', 'stm32', 'esp32', 'arduino', 'msp430'],
+  stm32: ['stm32', 'stm 32', 'stm32cubeide', 'stm32cube', 'stm32 cube'],
+  esp32: ['esp32', 'esp 32', 'esp8266', 'esp idf', 'espidf'],
+  arduino: ['arduino', 'arduino ide'],
+  iot: ['iot', 'internet of things', 'mqtt'],
+  'communication protocols': ['uart', 'spi', 'i2c', 'can bus', 'can protocol', 'modbus', 'rs485', 'rs232'],
+  'pcb design': ['pcb', 'pcb design', 'pcb layout', 'printed circuit board', 'altium', 'kicad', 'eagle', 'orcad', 'schematic capture'],
+  altium: ['altium', 'altium designer'],
+  kicad: ['kicad', 'ki cad'],
+  eagle: ['eagle', 'eagle cad', 'autodesk eagle'],
+  smt: ['smt', 'surface mount', 'surface mount technology', 'smd', 'pick and place', 'reflow'],
+  soldering: ['soldering', 'solder', 'hand soldering', 'wave soldering', 'reflow soldering', 'rework', 'ipc a 610', 'ipc 610'],
+  'testing and debugging': ['oscilloscope', 'multimeter', 'logic analyzer', 'logic analyser', 'debugging', 'functional testing'],
+  plc: ['plc', 'plcs', 'programmable logic controller', 'ladder logic', 'siemens s7', 'allen bradley'],
+  scada: ['scada', 'hmi', 'wincc'],
+  // Mechanical and production
+  solidworks: ['solidworks', 'solid works'],
+  autocad: ['autocad', 'auto cad', 'acad'],
+  catia: ['catia', 'catia v5'],
+  creo: ['creo', 'pro e', 'proe', 'pro engineer'],
+  cad: ['cad', 'solidworks', 'solid works', 'autocad', 'auto cad', 'catia', 'creo', 'inventor', 'siemens nx', 'fusion 360'],
+  gdt: ['gdt', 'geometric dimensioning and tolerancing', 'geometric dimensioning', 'geometric tolerancing'],
+  cnc: ['cnc', 'cnc machine', 'cnc machines', 'cnc machining', 'cnc programming', 'cnc operator', 'g code', 'fanuc', 'vmc', 'hmc', 'cnc lathe', 'turning centre', 'turning center'],
+  vmc: ['vmc', 'vertical machining centre', 'vertical machining center'],
+  lathe: ['lathe', 'cnc lathe', 'turning', 'turner', 'conventional lathe'],
+  'drawing reading': ['drawing reading', 'blueprint reading', 'engineering drawings', 'technical drawings', 'read drawings'],
+  'measuring instruments': ['vernier', 'micrometer', 'height gauge', 'bore gauge', 'cmm', 'measuring instruments'],
+  assembly: ['assembly', 'assembly line', 'product assembly', 'mechanical assembly', 'electronic assembly'],
+  // Quality
+  'quality assurance': ['quality assurance', 'qa', 'quality control', 'qc', 'inspection', 'incoming inspection'],
+  'iso 9001': ['iso 9001', 'iso9001', 'iso 9001 2015', 'qms', 'quality management system'],
+  'six sigma': ['six sigma', '6 sigma', 'lean six sigma', 'green belt', 'black belt', 'dmaic'],
+  '5s': ['5s', '5 s'],
+  kaizen: ['kaizen', 'continuous improvement'],
+  lean: ['lean', 'lean manufacturing', 'tpm', 'kanban'],
+  spc: ['spc', 'statistical process control', 'control charts'],
+  fmea: ['fmea', 'pfmea', 'dfmea', 'failure mode and effects analysis', 'failure mode effects analysis'],
+  'root cause analysis': ['root cause analysis', 'rca', '8d', 'why why analysis', 'fishbone'],
+  // Supply chain
+  'sap mm': ['sap mm', 'sap materials management', 'sap mm module'],
+  sap: ['sap', 'sap erp', 'sap mm', 'sap pp', 'sap sd', 'sap fico', 's4hana', 's 4hana', 'sap hana'],
+  erp: ['erp', 'sap', 'sap erp', 'oracle erp', 'tally erp', 'odoo', 'microsoft dynamics', 'navision'],
+  procurement: ['procurement', 'purchasing', 'purchase', 'sourcing', 'vendor management', 'supplier management', 'buyer', 'vendor development'],
+  inventory: ['inventory', 'inventory management', 'inventory control', 'stock control', 'warehouse management', 'store keeping', 'stores', 'material management'],
+  'supply chain': ['supply chain', 'scm', 'supply chain management', 'logistics'],
+  // Sales and accounts
+  sales: ['sales', 'business development', 'b2b sales', 'channel sales', 'key account management', 'selling', 'field sales', 'dealer management'],
+  crm: ['crm', 'salesforce', 'zoho crm', 'hubspot'],
+  tally: ['tally', 'tally erp', 'tally erp 9', 'tally prime'],
+  gst: ['gst', 'goods and services tax', 'gstr', 'gst returns', 'gst filing'],
+  tds: ['tds', 'tax deducted at source'],
+  accounting: ['accounting', 'accounts', 'bookkeeping', 'book keeping', 'finance and accounts', 'accounts payable', 'accounts receivable'],
+  excel: ['excel', 'ms excel', 'microsoft excel', 'advanced excel', 'spreadsheets'],
+  // Software
+  javascript: ['javascript', 'js', 'ecmascript', 'es6'],
+  typescript: ['typescript'],
+  react: ['react', 'reactjs', 'react js', 'react native'],
+  nodejs: ['nodejs', 'node js', 'node'],
+  java: ['java', 'core java', 'java 8', 'java 17', 'j2ee'],
+  spring: ['spring', 'spring boot', 'springboot', 'spring framework'],
+  sql: ['sql', 'mysql', 'postgresql', 'postgres', 'oracle sql', 'ms sql', 'mssql', 'sql server', 't sql', 'plsql', 'pl sql'],
+  python: ['python', 'python3', 'django', 'flask', 'pandas'],
+  csharp: ['csharp', 'dotnet'],
+  html: ['html', 'html5'],
+  css: ['css', 'css3', 'tailwind', 'sass'],
+  git: ['git', 'github', 'gitlab', 'bitbucket'],
+  docker: ['docker', 'containers', 'kubernetes'],
+  aws: ['aws', 'amazon web services'],
+};
+
+/** Degrees as normalised text, so "B.E." and "BTech" both count; used for the education part. */
+export const DEGREE_SYNONYMS: Record<string, readonly string[]> = {
+  'b tech': ['btech', 'b tech', 'b e', 'bachelor of engineering', 'bachelor of technology'],
+  'm tech': ['mtech', 'm tech', 'm e', 'master of engineering', 'master of technology'],
+  diploma: ['diploma', 'polytechnic'],
+  iti: ['iti', 'industrial training institute'],
+  'b sc': ['bsc', 'b sc', 'bachelor of science'],
+  'm sc': ['msc', 'm sc', 'master of science'],
+  'b com': ['bcom', 'b com', 'bachelor of commerce'],
+  'm com': ['mcom', 'm com', 'master of commerce'],
+  bca: ['bca', 'bachelor of computer applications'],
+  mca: ['mca', 'master of computer applications'],
+  mba: ['mba', 'pgdm', 'master of business administration'],
+  bba: ['bba', 'bachelor of business administration'],
+  ca: ['ca', 'chartered accountant', 'ca inter', 'cma', 'icwa'],
+  phd: ['phd', 'doctorate'],
+  graduate: ['graduate', 'graduation', 'bachelor', 'bachelors', 'degree'],
+};

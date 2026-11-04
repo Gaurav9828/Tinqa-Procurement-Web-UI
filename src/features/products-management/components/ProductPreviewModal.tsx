@@ -8,6 +8,11 @@ import { describeGst } from '../utils/productTax';
 import { ProductTaxBreakdown } from './ProductTaxBreakdown';
 import { describeAccessory } from '../utils/accessoryForm';
 import { ProductProfitPanel } from './ProductProfitPanel';
+import { ProductVersionBadge } from './ProductVersionBadge';
+import { ProductDescriptionView } from './ProductDescriptionView';
+import { modelLine } from '../utils/productVersion';
+import { softwareLine } from '../utils/productSoftware';
+import { ProductImagesView } from './ProductImagesView';
 
 interface ProductPreviewModalProps {
   product: ProductResponse | null;
@@ -23,6 +28,7 @@ export const ProductPreviewModal: React.FC<ProductPreviewModalProps> = ({ produc
         <div className="flex items-center justify-between px-6 py-4 border-b border-black/10 dark:border-white/10">
           <div className="flex items-center gap-2">
             <h2 className="font-bold text-black dark:text-white text-sm">{product.title}</h2>
+            <ProductVersionBadge product={product} />
             <span className={`px-2 py-0.5 text-[10px] font-semibold rounded-full border ${product.enabled ? 'bg-emerald-500/15 text-emerald-600 border-emerald-500/30' : 'bg-rose-500/15 text-rose-600 border-rose-500/30'}`}>
               {product.enabled ? 'ENABLED' : 'DISABLED'}
             </span>
@@ -39,6 +45,11 @@ export const ProductPreviewModal: React.FC<ProductPreviewModalProps> = ({ produc
           {product.category && (
             <p className="text-gray-500 dark:text-gray-400">
               Category: <span className="font-medium text-black dark:text-white">{product.category.name}</span>
+            </p>
+          )}
+          {softwareLine(product.softwareName, product.softwareVersion) && (
+            <p className="text-gray-500 dark:text-gray-400" data-testid="preview-software">
+              Software: <span className="font-medium text-black dark:text-white">{softwareLine(product.softwareName, product.softwareVersion)}</span>
             </p>
           )}
 
@@ -68,10 +79,12 @@ export const ProductPreviewModal: React.FC<ProductPreviewModalProps> = ({ produc
             <ProductTaxBreakdown price={product.price} discountPercentage={product.discountPercentage} gst={product} />
           </div>
 
-          {product.description && (
+          {(product.description || product.modelName) && (
             <div>
               <h4 className="font-semibold text-gray-700 dark:text-gray-300 mb-1">Description</h4>
-              <p className="text-gray-600 dark:text-gray-300 leading-relaxed">{product.description}</p>
+              <ProductDescriptionView description={product.description} />
+              {/* Written at the bottom of the description on the storefront */}
+              <p data-testid="preview-model-line" className="mt-1 text-gray-500">{modelLine(product.modelName, product.versionNumber)}</p>
             </div>
           )}
 
@@ -121,14 +134,7 @@ export const ProductPreviewModal: React.FC<ProductPreviewModalProps> = ({ produc
             </div>
           )}
 
-          {product.image1Url && (
-            <div>
-              <h4 className="font-semibold text-gray-700 dark:text-gray-300 mb-1">Primary Image Asset</h4>
-              <a href={product.image1Url} target="_blank" rel="noreferrer" className="text-[#0071e3] underline truncate block">
-                {product.image1Url}
-              </a>
-            </div>
-          )}
+          <ProductImagesView product={product} />
         </div>
 
         <div className="flex items-center justify-end px-6 py-3 border-t border-black/10 dark:border-white/10">

@@ -8,6 +8,7 @@ import type {
     UpdateProductStatusRequest,
 } from '../types/product.types';
 import { toProduct } from '../utils/productMapper';
+import type { DescriptionReference } from '../utils/descriptionSuggestions';
 
 /**
  * Ecommerce BE ProductController (/api/products) supports exactly:
@@ -18,6 +19,7 @@ import { toProduct } from '../utils/productMapper';
  *   PATCH  /products/{id}/status  { isEnabled }      (ADMIN_L1/L2)
  *   PUT    /products/display-order { productIds }   storefront order (PRODUCT_PUBLISH)
  *   POST   /products/{id}/new-version  copy a submitted product into a new draft version (PRODUCT_CREATE)
+ *   GET    /products/description-reference?subject=  Wikipedia facts for description suggestions (PRODUCT_VIEW)
  * There is no GET or DELETE on /products/{id} — calling them returns 405 METHOD_NOT_ALLOWED.
  */
 const BASE_URL = '/products';
@@ -78,5 +80,16 @@ export const productApi = {
         const res = await productApi.getAllProducts();
         if (!res.success) throw new Error(res.message || 'Failed to load products.');
         return res.data.find((product) => product.id === id) ?? null;
+    },
+
+    /**
+     * Facts about what a miniature shows (e.g. "Kedarnath"), from a free Wikipedia lookup the backend makes and caches.
+     * Null when nothing was found. Only called when the specialist asks for suggestions.
+     */
+    getDescriptionReference: async (subject: string): Promise<DescriptionReference | null> => {
+        const response = await ecommerceAxiosClient.get<ApiResponse<DescriptionReference | null>>(`${BASE_URL}/description-reference`, {
+            params: { subject },
+        });
+        return response.data.data ?? null;
     },
 };
