@@ -8,6 +8,7 @@ import { formatCurrency, formatDateTime } from '../../order-tracking/utils/order
 import { useApiAction } from '../../../hooks/useApiAction';
 import { useAuthStore } from '../../../store/useAuthStore';
 import { CommonTextArea } from '../../../components/ui/FormInputs';
+import { QuotedPriceCheck } from '../../order-management/components/QuotedPriceCheck';
 import { SOLID_TONE } from '../../../components/ui/actionTones';
 
 type Target = { kind: 'login'; supplierId: number } | { kind: 'change'; id: number };
@@ -126,7 +127,17 @@ export const SupplierApprovalsPanel: React.FC<{ onChanged?: () => void }> = ({ o
                   </p>
                 )}
               </div>
-              {change.note && (
+              {change.changes.unitPrice != null && (
+                <QuotedPriceCheck
+                  quotedLabel="Proposed"
+                  quotedPrice={change.changes.unitPrice}
+                  itemPrice={change.itemPrice ?? null}
+                  previousPrice={change.previous.unitPrice ?? null}
+                  reason={change.note}
+                  unitType={change.changes.unitType ?? change.previous.unitType}
+                />
+              )}
+              {change.note && change.changes.unitPrice == null && (
                 <p className="text-sm rounded-xl bg-gray-50 dark:bg-white/5 px-3 py-2">
                   <span className="text-xs text-gray-400 block">Supplier's reason</span>
                   {change.note}

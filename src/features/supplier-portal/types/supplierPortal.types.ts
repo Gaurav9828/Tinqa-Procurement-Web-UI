@@ -35,6 +35,8 @@ export interface SupplierItem {
 export interface QuotationTerms {
   itemId?: number | null;
   itemName?: string | null;
+  /** Display-only: the MRP of the item a change switches to */
+  itemMrp?: number | null;
   orderQuantity?: number | null;
   unitType?: string | null;
   unitPrice?: number | null;
@@ -101,7 +103,18 @@ export interface SupplierOrder {
   awaitingYourResponse: boolean;
   /** Confirmed and not yet shipped: you can mark it as shipped. */
   shippable: boolean;
+  /** Payments for this order waiting for you to confirm you received them. */
+  paymentsToConfirm: number;
+  /** Your own entries asking you to pay money back (REPAYMENT_DUE, or REPAYMENT_MISSING: send it again). */
+  repaymentsDue: number;
+  /** Returns of failed pieces waiting for your answer (AWAITING_SUPPLIER) or for you to confirm they arrived (IN_TRANSIT). */
+  returnsToAnswer: number;
   pendingChange: SupplierChange | null;
+  /**
+   * Every term TinQa changed from what you quoted, what you quoted beside what it is now; empty when nothing changed or
+   * the procurement team prepared the quotation. Accepting the order then needs changesAccepted.
+   */
+  changedByTinqa?: TermChange[] | null;
   /** Only on GET /orders/{id}. */
   history?: SupplierStatusStep[] | null;
   changes?: SupplierChange[] | null;
@@ -125,12 +138,24 @@ export interface CreateQuotationRequest {
   priceChangeReason?: string;
 }
 
+/** One term TinQa changed from what the supplier quoted (Procurement SupplierQuotedTerms.TermChange); values are ready to show. */
+export interface TermChange {
+  field:
+    | 'ITEM' | 'ORDER_QUANTITY' | 'UNIT_TYPE' | 'UNIT_PRICE' | 'SHIPMENT_PRICE' | 'TOTAL_PRICE' | 'GST' | 'EXPECTED_DELIVERY'
+    | 'ADVANCE_PERCENT' | 'MIDTERM_PERCENT' | 'FINAL_PERCENT' | 'PAYMENT_METHOD';
+  label: string;
+  quoted: string;
+  current: string;
+}
+
 export type OrderDecision = 'ACCEPT' | 'REJECT';
 
 /** The supplier's answer to an order awaiting them; a rejection needs a reason. */
 export interface OrderResponseRequest {
   decision: OrderDecision;
   reason?: string;
+  /** Accepting an order whose terms TinQa changed (changedByTinqa) needs the supplier's agreement. */
+  changesAccepted?: boolean;
 }
 
 /** Only the fields being changed, plus why. */

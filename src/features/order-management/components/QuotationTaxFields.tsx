@@ -23,6 +23,67 @@ interface Props {
 
 const SUPPLY_TYPES = Object.keys(SUPPLY_TYPE_LABELS) as SupplyType[];
 
+/** "CGST @ 9%", or just "CGST" until a rate is chosen. */
+const atRate = (name: string, rate: number | null) => (rate === null ? name : `${name} @ ${rate}%`);
+
+const optionTone = (selected: boolean, invalid: boolean) => {
+  if (selected) return 'border-[#0071e3] bg-[#0071e3]/[0.08] text-black dark:text-white font-semibold';
+  if (invalid) return 'border-red-500/70 text-gray-700 dark:text-gray-200';
+  return 'border-black/15 dark:border-white/20 text-gray-700 dark:text-gray-200 hover:border-[#0071e3]/60 hover:bg-[#0071e3]/[0.04]';
+};
+
+/** The required CGST + SGST / IGST choice, shown as two clickable cards with a round selector each. */
+const SupplyTypeChoice: React.FC<{
+  value: SupplyType | '';
+  invalid: boolean;
+  disabled?: boolean;
+  onSelect: (type: SupplyType) => void;
+}> = ({ value, invalid, disabled, onSelect }) => (
+  <div className="space-y-1.5">
+    <p className="text-xs font-medium text-gray-600 dark:text-gray-300 flex items-center gap-1 px-1">
+      How GST applies <span className="text-red-500 font-bold" aria-hidden="true">*</span>
+      <span className="font-normal text-gray-500">— choose one</span>
+    </p>
+    <div
+      role="radiogroup"
+      aria-label="How GST applies"
+      aria-required="true"
+      aria-invalid={invalid || undefined}
+      className="grid grid-cols-1 sm:grid-cols-2 gap-2"
+    >
+      {SUPPLY_TYPES.map((type) => {
+        const selected = value === type;
+        // ! beats the global `* { cursor: default }` rule in index.css
+        const cursor = disabled ? '[&,&_*]:cursor-not-allowed! opacity-60' : '[&,&_*]:cursor-pointer!';
+        return (
+          <label
+            key={type}
+            className={`group flex items-center gap-2.5 px-3 py-2.5 rounded-xl border-2 text-xs transition-colors has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-[#0071e3]/50 ${cursor} ${optionTone(selected, invalid)}`}
+          >
+            <input
+              type="radio"
+              name="quotationSupplyType"
+              value={type}
+              checked={selected}
+              onChange={() => onSelect(type)}
+              className="sr-only"
+            />
+            <span
+              aria-hidden="true"
+              className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-2 ${
+                selected ? 'border-[#0071e3]' : 'border-gray-400 dark:border-gray-500 group-hover:border-[#0071e3]/70'
+              }`}
+            >
+              {selected && <span className="h-2 w-2 rounded-full bg-[#0071e3]" />}
+            </span>
+            <span>{SUPPLY_TYPE_LABELS[type]}</span>
+          </label>
+        );
+      })}
+    </div>
+  </div>
+);
+
 /**
  * The optional GST breakup of a quotation: supply type, rate, HSN/SAC and cess, with CGST/SGST or IGST worked out from
  * the rate (or typed to match the supplier's rounding). Shows the bill the supplier's invoice will be checked against.
@@ -34,6 +95,7 @@ export const QuotationTaxFields: React.FC<Props> = ({ value, onChange, taxable, 
   const calculated = calculateTax(taxablePaise, { ...value, cgst: '', igst: '' });
   const intra = value.supplyType === 'INTRA_STATE';
   const rate = value.gstRate === '' ? null : Number(value.gstRate);
+  const halfRate = rate === null ? null : rate / 2;
 
   return (
     <fieldset className="space-y-3 rounded-xl border border-black/10 dark:border-white/10 p-3" aria-label="GST breakup" disabled={disabled}>
@@ -46,29 +108,13 @@ export const QuotationTaxFields: React.FC<Props> = ({ value, onChange, taxable, 
 
       {value.enabled && (
         <>
-          <div role="radiogroup" aria-label="How GST applies" className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
-            {SUPPLY_TYPES.map((type) => (
-              <label
-                key={type}
-                className={`flex items-center gap-2 px-3 py-2 rounded-xl border text-xs cursor-pointer ${
-                  value.supplyType === type
-                    ? 'border-[#0071e3] bg-[#0071e3]/[0.06] text-black dark:text-white font-semibold'
-                    : 'border-black/10 dark:border-white/10 text-gray-600 dark:text-gray-300'
-                }`}
-              >
-                <input
-                  type="radio"
-                  name="quotationSupplyType"
-                  value={type}
-                  checked={value.supplyType === type}
-                  onChange={() => set({ supplyType: type, cgst: '', igst: '' })}
-                  className="sr-only"
-                />
-                {SUPPLY_TYPE_LABELS[type]}
-              </label>
-            ))}
-          </div>
-          {errors['taxBreakup.supplyType'] && <p className="text-[11px] text-red-500 font-medium">{errors['taxBreakup.supplyType']}</p>}
+          <SupplyTypeChoice
+            value={value.supplyType}
+            invalid={Boolean(errors['taxBreakup.supplyType'])}
+            disabled={disabled}
+            onSelect={(type) => set({ supplyType: type, cgst: '', igst: '' })}
+          />
+          {errors['taxBreakup.supplyType'] && <p className="text-[11px] text-red-500 font-medium px-1">{errors['taxBreakup.supplyType']}</p>}
           {supplierState && <p className="text-[10px] text-gray-500 px-1">Supplier's state on record: {supplierState}</p>}
 
           <div className="grid grid-cols-2 gap-3">
@@ -98,7 +144,7 @@ export const QuotationTaxFields: React.FC<Props> = ({ value, onChange, taxable, 
             {intra ? (
               <>
                 <CommonInput
-                  label={`CGST${rate !== null ? ` @ ${rate / 2}%` : ''}`}
+                  label={atRate('CGST', halfRate)}
                   aria-label="CGST"
                   inputMode="decimal"
                   placeholder={calculated ? (calculated.cgst / 100).toFixed(2) : '0.00'}
@@ -107,7 +153,7 @@ export const QuotationTaxFields: React.FC<Props> = ({ value, onChange, taxable, 
                   onChange={(event) => set({ cgst: event.target.value })}
                 />
                 <CommonInput
-                  label={`SGST${rate !== null ? ` @ ${rate / 2}%` : ''}`}
+                  label={atRate('SGST', halfRate)}
                   aria-label="SGST"
                   readOnly
                   title="Always equal to CGST"
@@ -118,7 +164,7 @@ export const QuotationTaxFields: React.FC<Props> = ({ value, onChange, taxable, 
             ) : (
               <div className="col-span-2">
                 <CommonInput
-                  label={`IGST${rate !== null ? ` @ ${rate}%` : ''}`}
+                  label={atRate('IGST', rate)}
                   aria-label="IGST"
                   inputMode="decimal"
                   disabled={!value.supplyType}

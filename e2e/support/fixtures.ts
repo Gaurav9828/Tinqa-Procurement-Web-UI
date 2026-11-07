@@ -26,6 +26,7 @@ const SUPPLIER_PORTAL: readonly string[] = [
   'SUPPLIER_QUOTATION_CHANGE_REQUEST',
   'SUPPLIER_ORDER_RESPOND',
   'SUPPLIER_ORDER_SHIP',
+  'SUPPLIER_PAYMENT_CONFIRM',
 ];
 const superAdminPermissions = PERMISSIONS.filter((p) => !SUPPLIER_PORTAL.includes(p));
 
@@ -179,6 +180,18 @@ export const handlers = (session: Session): [string, RegExp, Handler][] => [
   // Payments to suppliers (SupplierPaymentController): the Approvals Hub queue, and an order's payments
   ['GET', /^\/v1\/orders\/payments$/, () => ok([])],
   ['GET', /^\/v1\/orders\/\d+\/payments$/, () => notFound('ORDER_NOT_FOUND')],
+  // The Finance Manager's payments to make, and an order's flow history (opened on demand)
+  ['GET', /^\/v1\/orders\/payments\/to-make$/, () => ok([])],
+  ['GET', /^\/v1\/orders\/\d+\/timeline$/, () => notFound('ORDER_NOT_FOUND')],
+  ['GET', /^\/v1\/orders\/payments\/\d+\/proofs\/\d+$/, () => notFound('RESOURCE_NOT_FOUND')],
+  // Money suppliers paid back, for the Finance Manager to check, and the checks (Approvals Hub › Supplier repayments)
+  ['GET', /^\/v1\/orders\/payments\/repayments-to-check$/, () => ok([])],
+  ['PATCH', /^\/v1\/orders\/payments\/\d+\/repayment-check$/, () => notFound('RESOURCE_NOT_FOUND')],
+  // Returns of failed pieces: the Super Admin's queue, an order's returns (opened on demand) and their steps
+  ['GET', /^\/v1\/orders\/returns\/waiting$/, () => ok([])],
+  ['GET', /^\/v1\/orders\/\d+\/returns$/, () => notFound('ORDER_NOT_FOUND')],
+  ['POST', /^\/v1\/orders\/\d+\/returns$/, () => notFound('ORDER_NOT_FOUND')],
+  ['PATCH', /^\/v1\/orders\/returns\/\d+\/(decision|resend|cancel|dispatch)$/, () => notFound('RESOURCE_NOT_FOUND')],
   ['GET', /^\/v1\/documents$/, () => ok([])],
   // Approvals hub badges: nothing waiting in any queue
   ['GET', /^\/v1\/approvals\/summary$/, () => ok({})],
@@ -229,6 +242,15 @@ export const handlers = (session: Session): [string, RegExp, Handler][] => [
   ['GET', /^\/v1\/supplier-portal\/quotations$/, () => ok([])],
   ['GET', /^\/v1\/supplier-portal\/orders$/, () => ok([])],
   ['GET', /^\/v1\/supplier-portal\/orders\/\d+\/payments$/, () => notFound('ORDER_NOT_FOUND')],
+  // The supplier answers a payment waiting for them (only from an open order view, never on load)
+  ['PATCH', /^\/v1\/supplier-portal\/payments\/\d+\/receipt$/, () => notFound('RESOURCE_NOT_FOUND')],
+  ['GET', /^\/v1\/supplier-portal\/orders\/\d+\/timeline$/, () => notFound('ORDER_NOT_FOUND')],
+  ['GET', /^\/v1\/supplier-portal\/payments\/\d+\/proofs\/\d+$/, () => notFound('RESOURCE_NOT_FOUND')],
+  // The supplier pays money back and answers returns of failed pieces (only from an open order view)
+  ['GET', /^\/v1\/supplier-portal\/orders\/\d+\/returns$/, () => notFound('ORDER_NOT_FOUND')],
+  ['POST', /^\/v1\/supplier-portal\/payments\/\d+\/repayment$/, () => notFound('RESOURCE_NOT_FOUND')],
+  ['POST', /^\/v1\/supplier-portal\/orders\/\d+\/repayments$/, () => notFound('ORDER_NOT_FOUND')],
+  ['PATCH', /^\/v1\/supplier-portal\/returns\/\d+\/(response|received)$/, () => notFound('RESOURCE_NOT_FOUND')],
   // E-commerce
   ['GET', /^\/company\/profile$/, () => ok({ brandName: 'TinQa', adminLoginHeadline: 'Procurement, sales & delivery — one workspace.' })],
   ['GET', /^\/admin\/company\/profile$/, () => ok({ live: null, pendingChanges: [], myDrafts: [] })],
@@ -242,6 +264,8 @@ export const handlers = (session: Session): [string, RegExp, Handler][] => [
   ['GET', /^\/admin\/refunds$/, () => ok(page([]))],
   ['GET', /^\/admin\/finance\/overview$/, (_m, url) => ok(financeOverview(url))],
   ['GET', /^\/admin\/finance\/vouchers$/, () => ok(page([]))],
+  // Finance › Supplier money: no supplier repayments confirmed yet
+  ['GET', /^\/admin\/finance\/supplier-receipts$/, () => ok(page([]))],
   ['GET', /^\/admin\/finance\/categories$/, () => ok([])],
   ['GET', /^\/admin\/support\/queries$/, () => ok(page([]))],
   ['GET', /^\/admin\/support\/queries\/[^/]+$/, () => notFound('TICKET_NOT_FOUND')],

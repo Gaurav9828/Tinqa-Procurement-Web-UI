@@ -5,14 +5,15 @@ import { VouchersPanel } from '../components/VouchersPanel';
 import { LedgerPanel } from '../components/LedgerPanel';
 import { GstPanel } from '../components/GstPanel';
 import { ProductProfitTable } from '../components/ProductProfitTable';
+import { SupplierMoneyPanel } from '../components/SupplierMoneyPanel';
 
-type Tab = 'overview' | 'profit' | 'gst' | 'expenses' | 'ledger';
+type Tab = 'overview' | 'profit' | 'gst' | 'expenses' | 'ledger' | 'supplier-money';
 const TAB_KEY = 'finance.tab';
 
 const readTab = (): Tab => {
   try {
     const saved = sessionStorage.getItem(TAB_KEY);
-    return saved === 'profit' || saved === 'gst' || saved === 'expenses' || saved === 'ledger' ? saved : 'overview';
+    return saved === 'profit' || saved === 'gst' || saved === 'expenses' || saved === 'ledger' || saved === 'supplier-money' ? saved : 'overview';
   } catch {
     return 'overview';
   }
@@ -20,7 +21,8 @@ const readTab = (): Tab => {
 
 /**
  * Accounts & Finance: the company account's analytics (Overview), the profit each product made (Product profit), GST charged, paid and payable (GST), its expenses and
- * other vouchers (Expenses) and every posted entry (Ledger). Each tab shows only for those allowed to use it.
+ * other vouchers (Expenses), every posted entry (Ledger) and the money suppliers paid back (Supplier money). Each tab
+ * shows only for those allowed to use it, and loads only while it is open.
  */
 export const FinancePage: React.FC = () => {
   const { can, canAny } = useAccess();
@@ -31,6 +33,7 @@ export const FinancePage: React.FC = () => {
     { id: 'gst' as const, label: 'GST', allowed: can('FINANCE_REPORT_VIEW') },
     { id: 'expenses' as const, label: 'Expenses & vouchers', allowed: canAny('EXPENSE_VIEW', 'EXPENSE_SUBMIT') },
     { id: 'ledger' as const, label: 'Ledger', allowed: can('FINANCE_REPORT_VIEW') },
+    { id: 'supplier-money' as const, label: 'Supplier money', allowed: can('FINANCE_REPORT_VIEW') },
   ].filter((t) => t.allowed);
   const tab = tabs.some((t) => t.id === selected) ? selected : tabs[0]?.id;
 
@@ -75,6 +78,7 @@ export const FinancePage: React.FC = () => {
         />
       )}
       {tab === 'ledger' && <LedgerPanel />}
+      {tab === 'supplier-money' && <SupplierMoneyPanel />}
     </div>
   );
 };

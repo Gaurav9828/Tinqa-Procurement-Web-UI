@@ -25,6 +25,17 @@ describe('endpoint access table', () => {
     expect(procurement('get', '/v1/orders/change-requests?status=PENDING')).toBe('SUPPLIER_QUOTATION_CHANGE_APPROVE');
     expect(procurement('get', '/v1/orders/12/change-requests')).toBe('PROCUREMENT_ORDER_VIEW');
     expect(procurement('get', '/v1/orders/12')).toBe('PROCUREMENT_ORDER_VIEW');
+    // Returns of failed pieces and repayments (supplier-returns-and-repayments.md)
+    expect(procurement('get', '/v1/orders/returns/waiting')).toBe('SUPPLIER_RETURN_APPROVE');
+    expect(procurement('get', '/v1/orders/12/returns')).toBe('PROCUREMENT_ORDER_VIEW');
+    expect(procurement('post', '/v1/orders/12/returns')).toBe('SUPPLIER_RETURN_REQUEST');
+    expect(procurement('patch', '/v1/orders/returns/3/dispatch')).toBe('SUPPLIER_RETURN_REQUEST');
+    expect(procurement('get', '/v1/orders/payments/repayments-to-check')).toBe('SUPPLIER_PAYMENT_RECORD');
+    expect(procurement('patch', '/v1/orders/payments/7/repayment-check')).toBe('SUPPLIER_PAYMENT_RECORD');
+    expect(procurement('post', '/v1/supplier-portal/payments/7/repayment')).toBe('SUPPLIER_REPAYMENT_SUBMIT');
+    expect(procurement('post', '/v1/supplier-portal/orders/1/repayments')).toBe('SUPPLIER_REPAYMENT_SUBMIT');
+    expect(procurement('get', '/v1/supplier-portal/orders/1/returns')).toBe('SUPPLIER_PORTAL_VIEW');
+    expect(procurement('patch', '/v1/supplier-portal/returns/3/received')).toBe('SUPPLIER_RETURN_RESPOND');
     expect(procurement('get', '/v1/admin/employees/pending-approvals')).toBe('EMPLOYEE_APPROVE');
     expect(procurement('get', '/v1/admin/employees/7')).toBe('EMPLOYEE_VIEW');
     expect(ecommerce('get', '/admin/orders/tracking-statuses')).toBe('CUSTOMER_ORDER_VIEW');

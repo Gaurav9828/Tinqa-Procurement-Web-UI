@@ -1,14 +1,19 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { CheckCircle2, Clock, Loader2, Pencil, Truck, Undo2, X, XCircle } from 'lucide-react';
 import { supplierPortalApi } from '../api/supplierPortalApi';
 import type { SupplierChange, SupplierOrder, OrderResponseRequest } from '../types/supplierPortal.types';
 import { SupplierStatusBadge } from './SupplierStatusBadge';
 import { ChangeDiff } from './ChangeDiff';
+import { TinqaChanges } from './TinqaChanges';
+import { CommonCheckbox } from '../../../components/ui/FormInputs';
 import { PrintMenu } from '../../printing/components/PrintMenu';
 import { TaxBreakupSummary } from '../../order-management/components/TaxBreakupSummary';
 import { OrderPaymentsPanel } from '../../order-management/components/OrderPaymentsPanel';
+import { OrderTimeline } from '../../order-management/components/OrderTimeline';
+import { SupplierReturnsPanel } from '../../order-management/components/SupplierReturnsPanel';
+import { RETURN_STAGES } from '../../order-management/types/supplierReturn.types';
+import { PaymentPlanBreakup } from '../../order-management/components/PaymentPlanBreakup';
 import { PAYMENT_STAGES, describePlan } from '../../order-management/utils/paymentPlan';
-import { supplierStatusLabel } from '../utils/supplierOrderStage';
 import { formatCurrency, formatDateTime } from '../../order-tracking/utils/orderTracking.utils';
 import { formatDate } from '../../finance/utils/period';
 import { formatUnit } from '../../../constants/unitsOfMeasure';
@@ -28,11 +33,16 @@ interface SupplierOrderDetailModalProps {
   onRespond: (order: SupplierOrder, payload: OrderResponseRequest) => Promise<boolean>;
   /** Mark a confirmed order as shipped; resolves true when it was saved. */
   onShip: (order: SupplierOrder) => Promise<boolean>;
+  /** After the supplier answers a payment, pays money back or answers a return: the list's flags change. */
+  onPaymentsChanged?: () => void;
 }
 
 const REASON_MAX_LENGTH = 500;
 
-/** Accept the order, or reject it with a reason the procurement team will see. */
+/**
+ * Accept the order, or reject it with a reason the procurement team will see. When TinQa changed what the supplier
+ * quoted, Accept stays off until they tick that they agree to those changes (the server checks it too).
+ */
 const ResponsePanel: React.FC<{
   order: SupplierOrder;
   isSubmitting: boolean;
@@ -41,6 +51,8 @@ const ResponsePanel: React.FC<{
   const [rejecting, setRejecting] = useState(false);
   const [reason, setReason] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const changed = (order.changedByTinqa ?? []).length > 0;
+  const [agreed, setAgreed] = useState(false);
 
   const reject = async () => {
     const text = reason.trim();
@@ -63,6 +75,14 @@ const ResponsePanel: React.FC<{
           The procurement team approved it. Accept to confirm you will supply it, or reject it and say why.
         </p>
       </div>
+      {changed && !rejecting && (
+        <CommonCheckbox
+          label={<span className="text-xs">I have checked what TinQa changed from my quotation (shown above) and I agree to it.</span>}
+          checked={agreed}
+          disabled={isSubmitting}
+          onChange={setAgreed}
+        />
+      )}
       {rejecting ? (
         <div className="space-y-2">
           <label htmlFor="supplier-reject-reason" className="text-xs font-semibold">
@@ -116,8 +136,9 @@ const ResponsePanel: React.FC<{
           </button>
           <button
             type="button"
-            disabled={isSubmitting}
-            onClick={() => onRespond(order, { decision: 'ACCEPT' })}
+            disabled={isSubmitting || (changed && !agreed)}
+            title={changed && !agreed ? 'Tick that you agree to TinQa’s changes first' : undefined}
+            onClick={() => onRespond(order, changed ? { decision: 'ACCEPT', changesAccepted: true } : { decision: 'ACCEPT' })}
             className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold cursor-pointer disabled:opacity-50 ${SOLID_TONE.approve}`}
           >
             <CheckCircle2 className="w-3.5 h-3.5" /> Accept order
@@ -196,11 +217,18 @@ export const SupplierOrderDetailModal: React.FC<SupplierOrderDetailModalProps> =
   onWithdrawChange,
   onRespond,
   onShip,
+  onPaymentsChanged,
 }) => {
   const { can } = useAccess();
   const notify = useNotify();
   const [order, setOrder] = useState<SupplierOrder | null>(null);
   const [failed, setFailed] = useState(false);
+  // Pieces confirmed as arrived create a repayment ask: the payments are read again, and the list's flags
+  const [paymentsRound, setPaymentsRound] = useState(0);
+  const returnsChanged = useCallback(() => {
+    setPaymentsRound((n) => n + 1);
+    onPaymentsChanged?.();
+  }, [onPaymentsChanged]);
 
   useEffect(() => {
     if (!can('SUPPLIER_PORTAL_VIEW')) return;
@@ -266,6 +294,9 @@ export const SupplierOrderDetailModal: React.FC<SupplierOrderDetailModalProps> =
 
           {order && (
             <>
+              {(order.changedByTinqa ?? []).length > 0 && (
+                <TinqaChanges changes={order.changedByTinqa ?? []} awaitingResponse={order.awaitingYourResponse} />
+              )}
               <dl className="grid grid-cols-2 sm:grid-cols-3 gap-4">
                 <Fact label="Item">
                   {order.itemName}
@@ -288,6 +319,9 @@ export const SupplierOrderDetailModal: React.FC<SupplierOrderDetailModalProps> =
                 {describePlan(order) ?? 'None: paid after the delivered units are tested'}
               </p>
               <div className="rounded-xl bg-gray-50 dark:bg-white/5 px-3 py-2">
+                <PaymentPlanBreakup plan={order} totalPrice={order.totalPrice} taxBreakup={order.taxBreakup} />
+              </div>
+              <div className="rounded-xl bg-gray-50 dark:bg-white/5 px-3 py-2">
                 <TaxBreakupSummary taxBreakup={order.taxBreakup} totalPrice={order.totalPrice} />
                 <p className="text-[10px] text-gray-400 mt-1">Your invoice for this order is checked against these figures when it is delivered.</p>
               </div>
@@ -298,7 +332,17 @@ export const SupplierOrderDetailModal: React.FC<SupplierOrderDetailModalProps> =
                 </p>
               )}
 
-              <OrderPaymentsPanel orderId={order.id} enabled={PAYMENT_STAGES.has(order.orderStatus)} view="supplier" />
+              <OrderPaymentsPanel key={`payments-${paymentsRound}`} orderId={order.id} enabled={PAYMENT_STAGES.has(order.orderStatus)} view="supplier" onChanged={onPaymentsChanged} />
+
+              {(RETURN_STAGES.has(order.orderStatus) || order.returnsToAnswer > 0) && (
+                <SupplierReturnsPanel
+                  key={`returns-${order.id}`}
+                  orderId={order.id}
+                  view="supplier"
+                  defaultOpen={order.returnsToAnswer > 0}
+                  onChanged={returnsChanged}
+                />
+              )}
 
               {order.awaitingYourResponse && can('SUPPLIER_ORDER_RESPOND') && (
                 <ResponsePanel key={order.id} order={order} isSubmitting={isSubmitting} onRespond={onRespond} />
@@ -350,20 +394,8 @@ export const SupplierOrderDetailModal: React.FC<SupplierOrderDetailModalProps> =
                 </section>
               )}
 
-              {(order.history ?? []).length > 0 && (
-                <section aria-label="Status history">
-                  <h3 className="text-sm font-semibold mb-2">Progress</h3>
-                  <ol className="space-y-2 border-l border-black/10 dark:border-white/10 pl-4">
-                    {(order.history ?? []).map((step, index) => (
-                      <li key={`${step.toStatus}-${index}`} className="text-sm">
-                        <span className="font-medium">{supplierStatusLabel(step.toStatus)}</span>
-                        <span className="text-xs text-gray-400 ml-2">{formatDateTime(step.changedAt)}</span>
-                        {step.reason && <p className="text-xs text-gray-500">Reason: {step.reason}</p>}
-                      </li>
-                    ))}
-                  </ol>
-                </section>
-              )}
+              {/* Every step so far: your quotation, its approvals, your answers, shipping and the payments sent to you */}
+              <OrderTimeline key={`${order.id}-${version}`} orderId={order.id} view="supplier" />
 
               {pastChanges.length > 0 && (
                 <section aria-label="Earlier changes" className="space-y-3">

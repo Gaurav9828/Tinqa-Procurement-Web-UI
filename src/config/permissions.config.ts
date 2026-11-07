@@ -115,12 +115,19 @@ export const APP_NAVIGATION: NavigationItem[] = [
     requires: ['EMPLOYEE_VIEW'],
   },
   {
-    // Stock Management lives inside Item Management (/item/stocks), not in the sidebar; either view opens the module.
     id: 'items',
     label: 'Item Management',
     path: '/item',
     iconName: 'Tag',
-    requires: ['ITEM_VIEW', 'STOCK_VIEW'],
+    requires: ['ITEM_VIEW'],
+  },
+  {
+    // Stock batches, quantities and stock approvals: its own module beside Item Management (it was /item/stocks)
+    id: 'stocks',
+    label: 'Stock Management',
+    path: '/stocks',
+    iconName: 'Boxes',
+    requires: ['STOCK_VIEW'],
   },
   {
     // Trace any piece or product unit by its barcode: batch, purchase order, supplier, the product it is in, its parts

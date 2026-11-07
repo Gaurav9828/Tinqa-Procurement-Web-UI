@@ -37,10 +37,16 @@ export const PERMISSIONS = [
   'PROCUREMENT_ORDER_APPROVE',
   // Suppliers' changes to their quotations apply only once a Supplier Manager (either level) approves them
   'SUPPLIER_QUOTATION_CHANGE_APPROVE',
-  // Payments to suppliers against a quotation's payment plan, and refunds from them: recorded by one person, confirmed
-  // by another (Level 2). Seen by everyone with PROCUREMENT_ORDER_VIEW
+  // Payments to suppliers against a quotation's payment plan, and refunds from them. The Finance Manager requests a
+  // payment (RECORD), only the Super Admin approves it (APPROVE), then the Finance Manager pays it and gives the UTR /
+  // transaction ID / cheque number. Seen by everyone with PROCUREMENT_ORDER_VIEW
   'SUPPLIER_PAYMENT_RECORD',
   'SUPPLIER_PAYMENT_APPROVE',
+  // Failed-piece returns to the supplier: a Supplier Manager raises, dispatches, sends again or cancels a return
+  // (PROCUREMENT_ORDER_MANAGEMENT); only the Super Admin approves it (SUPPLIER_PAYMENT_APPROVAL). RECORD now also lets
+  // the Finance Manager ask for a reversal and check the money suppliers pay back
+  'SUPPLIER_RETURN_REQUEST',
+  'SUPPLIER_RETURN_APPROVE',
   // Catalog
   'ITEM_VIEW',
   'PRODUCT_VIEW',
@@ -175,6 +181,12 @@ export const PERMISSIONS = [
   'SUPPLIER_QUOTATION_CHANGE_REQUEST',
   'SUPPLIER_ORDER_RESPOND',
   'SUPPLIER_ORDER_SHIP',
+  // Confirm whether a payment recorded for your order reached you, whatever its method (it counts as paid only then)
+  'SUPPLIER_PAYMENT_CONFIRM',
+  // Accept or decline a return of failed pieces, and confirm the pieces arrived
+  'SUPPLIER_RETURN_RESPOND',
+  // Pay back what TinQa asks (a reversal, a return's pieces and shipping) and refunds due, with the UTR and a receipt
+  'SUPPLIER_REPAYMENT_SUBMIT',
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];
@@ -211,7 +223,7 @@ export const ADMIN_LEVEL_LABELS: Record<AdminLevel, string> = {
   ADMIN_L2: 'Level 2 (approver)',
 };
 
-/** Every approval action (and reviewing suppliers' quotations). Holding any of them opens the Approvals Hub. */
+/** Every approval action (and reviewing suppliers' quotations, and making approved payments). Holding any opens the Approvals Hub. */
 export const APPROVAL_PERMISSIONS: readonly Permission[] = [
   'EMPLOYEE_APPROVE',
   'EMPLOYEE_PROFILE_CHANGE_APPROVE',
@@ -228,6 +240,11 @@ export const APPROVAL_PERMISSIONS: readonly Permission[] = [
   'SUPPLIER_LOGIN_APPROVE',
   'SUPPLIER_QUOTATION_CHANGE_APPROVE',
   'SUPPLIER_PAYMENT_APPROVE',
+  // Returns of failed pieces to the supplier (Super Admin only)
+  'SUPPLIER_RETURN_APPROVE',
+  // The Finance Manager's "Payments to make" and "Supplier repayments" queues: approved payment requests to pay,
+  // payments not received, and money suppliers paid back to check
+  'SUPPLIER_PAYMENT_RECORD',
   'CUSTOMER_ORDER_PRE_ORDER_APPROVE',
   'DEMO_APPROVE',
   'CAREER_DECISION_APPROVE',

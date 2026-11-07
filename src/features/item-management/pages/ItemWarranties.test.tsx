@@ -482,11 +482,12 @@ describe('Edit item warranties', () => {
 });
 
 describe('Stock management entry point', () => {
-  it('opens from the Item Management toolbar instead of the sidebar', async () => {
+  it('is its own sidebar module, not a link in the Item Management toolbar', async () => {
     renderPage();
     await screen.findByText('Zenbook 14');
-    expect(screen.getByRole('link', { name: 'Stock Management' })).toHaveAttribute('href', '/item/stocks');
-    expect(APP_NAVIGATION.map((nav) => nav.id)).not.toContain('stocks');
+    expect(screen.queryByRole('link', { name: 'Stock Management' })).not.toBeInTheDocument();
+    expect(APP_NAVIGATION.find((nav) => nav.id === 'stocks')).toMatchObject({ path: '/stocks', requires: ['STOCK_VIEW'] });
+    expect(APP_NAVIGATION.find((nav) => nav.id === 'items')?.requires).toEqual(['ITEM_VIEW']);
   });
 });
 

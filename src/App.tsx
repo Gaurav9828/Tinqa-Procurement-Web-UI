@@ -211,14 +211,14 @@ export const App: React.FC = () => {
                 <Route element={<RequireNavAccess navId="employees" />}>
                   <Route path="employees" element={<EmployeeManagementPage />} />
                 </Route>
-                <Route element={<RequireNavAccess navId="items" requires={['ITEM_VIEW']} />}>
+                <Route element={<RequireNavAccess navId="items" />}>
                   <Route path="item" element={<ItemManagementPage />} />
                 </Route>
-                <Route element={<RequireNavAccess navId="items" requires={['STOCK_VIEW']} />}>
-                  <Route path="item/stocks" element={<StockManagementPage />} />
+                <Route element={<RequireNavAccess navId="stocks" />}>
+                  <Route path="stocks" element={<StockManagementPage />} />
                 </Route>
-                {/* Old sidebar link; stock management now lives under Item Management. */}
-                <Route path="stocks" element={<Navigate to="/item/stocks" replace />} />
+                {/* Old address from when Stock Management sat inside Item Management (older notifications link here). */}
+                <Route path="item/stocks" element={<Navigate to="/stocks" replace />} />
                 <Route element={<RequireNavAccess navId="barcodes" />}>
                   <Route path="barcodes" element={<BarcodeTrackingPage />} />
                 </Route>

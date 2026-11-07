@@ -1,3 +1,4 @@
+import type { PaymentMethod } from '../../order-management/utils/paymentPlan';
 import type { ApprovalStatus, OrderStatus } from "../../../types/common.types";
 import type { ProductApprovalResponse } from "../../products-management/types/productApproval.types";
 import type { EmployeeResponse } from "../../employee-management/types/employee.types";
@@ -82,6 +83,11 @@ export interface OrdersApprovalRequest {
   additionalInfo?: Record<string, unknown> | null;
   raisedBySupplier?: boolean;
   supplierChangePending?: boolean;
+  /** As the supplier quoted them (the list returns the whole order) */
+  taxBreakup?: Record<string, unknown> | null;
+  advancePercent?: number | null;
+  midtermPercent?: number | null;
+  expectedPaymentMethod?: PaymentMethod | null;
 }
 
 

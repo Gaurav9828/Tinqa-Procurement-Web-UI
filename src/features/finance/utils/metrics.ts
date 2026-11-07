@@ -145,6 +145,7 @@ export const SOURCE_LABELS = {
   PROCUREMENT_ORDER: 'Supplier purchase',
   PROCUREMENT_SALARY: 'Salary',
   PROCUREMENT_DEMO: 'Client demo',
+  PROCUREMENT_SUPPLIER_RECEIPT: 'Supplier repayment',
   VOUCHER: 'Voucher',
   REVERSAL: 'Reversal',
 } as const;

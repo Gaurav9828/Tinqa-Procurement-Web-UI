@@ -1,4 +1,7 @@
 import React from 'react';
+import { TaxBreakupSummary } from '../../order-management/components/TaxBreakupSummary';
+import { PaymentPlanBreakup } from '../../order-management/components/PaymentPlanBreakup';
+import { OrderTimeline } from '../../order-management/components/OrderTimeline';
 import {
   X,
   FileText,
@@ -27,6 +30,8 @@ import {
 
 import type { UnifiedApprovalItem } from '../types/approval.types';
 import { StockBarcodesPanel } from '../../barcodes/components/StockBarcodesPanel';
+import { QuotedPriceCheck } from '../../order-management/components/QuotedPriceCheck';
+import { readPriceNote } from '../../order-management/utils/quotedPrice';
 import { ORDER_QUEUES, isOrderApprovalType } from '../utils/orderQueues';
 
 export interface PreviewModalProps {
@@ -666,15 +671,18 @@ export const ApprovalPreviewModal: React.FC<PreviewModalProps> = ({
                 </p>
               )}
 
-              {typeof request.additionalInfo?.priceChangeReason === 'string' && (
-                <p className="text-sm rounded-xl bg-amber-500/10 border border-amber-500/20 px-3 py-2" data-testid="price-change-reason">
-                  <span className="text-xs text-gray-400 block">
-                    Price changed from the existing ₹{Number(request.additionalInfo.mrp ?? 0).toFixed(2)}
-                    {request.unitPrice != null && ` to ₹${request.unitPrice.toFixed(2)}`}: reason
-                  </span>
-                  {request.additionalInfo.priceChangeReason}
-                </p>
-              )}
+              {(() => {
+                const note = readPriceNote(request.additionalInfo, request.unitPrice);
+                return note && request.unitPrice != null ? (
+                  <QuotedPriceCheck
+                    quotedPrice={request.unitPrice}
+                    itemPrice={note.itemPrice}
+                    previousPrice={note.previousPrice}
+                    reason={note.reason}
+                    unitType={request.unitType}
+                  />
+                ) : null;
+              })()}
 
               {/* Order Details */}
               <div className="grid grid-cols-2 gap-3">
@@ -730,32 +738,26 @@ export const ApprovalPreviewModal: React.FC<PreviewModalProps> = ({
 
               </div>
 
-              {/* Total */}
-              <div className="p-4 rounded-xl border border-black/10 dark:border-white/10 bg-black/[0.02] dark:bg-white/[0.02]">
-
-                <div className="flex items-center justify-between">
-
-                  <span className="text-xs text-gray-500">
-                    Order Total
-                  </span>
-
-                  <span className="text-lg font-bold text-black dark:text-white">
-                    ₹{(
-                      (request.totalPrice || 0) +
-                      (request.shipmentPrice || 0)
-                    ).toLocaleString('en-IN')}
-                  </span>
-
+              {/* Everything the supplier quoted: price, GST, delivery and how they want to be paid */}
+              <div className="p-4 rounded-xl border border-black/10 dark:border-white/10 bg-black/[0.02] dark:bg-white/[0.02] space-y-3" data-testid="quotation-details">
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <span className="text-gray-500">Unit price</span>
+                  <span className="text-right font-medium">{request.unitPrice != null ? `₹${request.unitPrice.toLocaleString('en-IN')}` : 'N/A'}</span>
+                  <span className="text-gray-500">Expected delivery</span>
+                  <span className="text-right font-medium">{request.expectedDelivery ? formatTime(request.expectedDelivery) : 'Not given'}</span>
+                  <span className="text-gray-500">Total before GST (with shipment)</span>
+                  <span className="text-right text-lg font-bold text-black dark:text-white">₹{(request.totalPrice || 0).toLocaleString('en-IN')}</span>
                 </div>
-
+                <div className="pt-2 border-t border-black/10 dark:border-white/10">
+                  <TaxBreakupSummary taxBreakup={request.taxBreakup} totalPrice={request.totalPrice || 0} />
+                </div>
+                <div className="pt-2 border-t border-black/10 dark:border-white/10 space-y-1">
+                  <span className="text-[10px] text-gray-400 uppercase">Payment plan asked for</span>
+                  <PaymentPlanBreakup plan={request} totalPrice={request.totalPrice || 0} taxBreakup={request.taxBreakup} />
+                </div>
               </div>
 
-              <div className="flex items-center gap-2 text-xs text-gray-500 pt-2">
-                <Clock className="w-4 h-4 text-gray-400" />
-                <span>
-                  Order Date: {formatTime(request.orderDate)}
-                </span>
-              </div>
+              <OrderTimeline orderId={request.id} />
 
             </div>
           )}

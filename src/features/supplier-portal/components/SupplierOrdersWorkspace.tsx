@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { BellRing, Clock, Eye, Loader2, Pencil, Plus, RefreshCw } from 'lucide-react';
+import { AlertTriangle, BellRing, Clock, Eye, Loader2, Pencil, Plus, RefreshCw } from 'lucide-react';
 import { useSupplierOrders } from '../hooks/useSupplierOrders';
 import type { SupplierChange, SupplierOrder, OrderResponseRequest } from '../types/supplierPortal.types';
 import { supplierStage, type SupplierStage } from '../utils/supplierOrderStage';
@@ -180,6 +180,26 @@ export const SupplierOrdersWorkspace: React.FC<{ mode: Mode }> = ({ mode }) => {
                         <BellRing className="w-3 h-3" /> Needs your response
                       </span>
                     )}
+                    {order.awaitingYourResponse && (order.changedByTinqa ?? []).length > 0 && (
+                      <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-amber-600 dark:text-amber-400">
+                        <AlertTriangle className="w-3 h-3" /> Changed by TinQa
+                      </span>
+                    )}
+                    {order.paymentsToConfirm > 0 && (
+                      <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-amber-600 dark:text-amber-400">
+                        <BellRing className="w-3 h-3" /> Payment to confirm
+                      </span>
+                    )}
+                    {order.repaymentsDue > 0 && (
+                      <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-rose-600 dark:text-rose-400">
+                        <BellRing className="w-3 h-3" /> Money to pay back
+                      </span>
+                    )}
+                    {order.returnsToAnswer > 0 && (
+                      <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-amber-600 dark:text-amber-400">
+                        <BellRing className="w-3 h-3" /> Return to answer
+                      </span>
+                    )}
                     {order.pendingChange && (
                       <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-amber-600 dark:text-amber-400">
                         <Clock className="w-3 h-3" /> Change awaiting approval
@@ -237,6 +257,7 @@ export const SupplierOrdersWorkspace: React.FC<{ mode: Mode }> = ({ mode }) => {
           onWithdrawChange={withdraw}
           onRespond={respond}
           onShip={ship}
+          onPaymentsChanged={portal.refresh}
         />
       )}
     </div>

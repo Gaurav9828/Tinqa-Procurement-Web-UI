@@ -11,6 +11,8 @@ import { axiosClient } from '../../api/axiosClient';
 import { supplierPortalApi } from './api/supplierPortalApi';
 import { supplierPaymentApi } from '../order-management/api/supplierPaymentApi';
 import { paymentEntry, paymentSummary, paymentsOf } from '../order-management/test/paymentFixtures';
+import { supplierReturnApi } from '../order-management/api/supplierReturnApi';
+import { returnsOf, supplierReturn } from '../order-management/test/returnFixtures';
 import { SupplierQuotationsPage } from './pages/SupplierQuotationsPage';
 import { SupplierOrdersPage } from './pages/SupplierOrdersPage';
 import { ProfilePage } from '../../pages/ProfilePage';
@@ -38,14 +40,16 @@ vi.mock('./api/supplierPortalApi', () => ({
   },
 }));
 const portal = vi.mocked(supplierPortalApi);
-vi.mock('../order-management/api/supplierPaymentApi', () => ({ supplierPaymentApi: { forSupplier: vi.fn() } }));
+vi.mock('../order-management/api/supplierPaymentApi', () => ({ supplierPaymentApi: { forSupplier: vi.fn(), timeline: vi.fn() } }));
 const supplierPayments = vi.mocked(supplierPaymentApi);
+vi.mock('../order-management/api/supplierReturnApi', () => ({ supplierReturnApi: { forOrder: vi.fn(), respond: vi.fn(), received: vi.fn() } }));
+const supplierReturns = vi.mocked(supplierReturnApi);
 
 /** Opens one part (tab) of the quotation form. */
 const openTab = (user: ReturnType<typeof userEvent.setup>, dialog: HTMLElement, name: RegExp) =>
   user.click(within(dialog).getByRole('tab', { name }));
 
-/** How the supplier wants to be paid: the plan starts at 30 / 30 / 40, the method has to be chosen. */
+/** How the supplier wants to be paid: the plan starts at 30 / 20 / 50, the method has to be chosen. */
 const choosePaymentMethod = async (user: ReturnType<typeof userEvent.setup>, dialog: HTMLElement, method = 'BANK_TRANSFER') => {
   await openTab(user, dialog, /Payment plan/);
   await user.selectOptions(within(dialog).getByRole('combobox', { name: 'Expected payment method' }), method);
@@ -80,6 +84,9 @@ const order = (id: number, orderStatus: OrderStatus, extra: Partial<SupplierOrde
   changeable: orderStatus === 'QUOTATION',
   awaitingYourResponse: orderStatus === 'SUPPLIER_LEVEL_PENDING',
   shippable: orderStatus === 'CONFIRMED',
+  paymentsToConfirm: 0,
+  repaymentsDue: 0,
+  returnsToAnswer: 0,
   pendingChange: null,
   ...extra,
 });
@@ -164,7 +171,7 @@ describe('Supplier portal', () => {
     const create = within(dialog).getByRole('button', { name: 'Create quotation' });
     expect(create).toBeDisabled();
     await user.type(within(dialog).getByLabelText(/Reason for the new price/), 'Copper went up');
-    // The payment plan: 30 % advance and 30 % midterm to start with, the rest after testing; the method is chosen
+    // The payment plan: 30 % advance and 20 % midterm to start with, the rest (50 %) after testing; the method is chosen
     expect(create).toBeDisabled();
     await choosePaymentMethod(user, dialog, 'CHEQUE');
     await user.click(create);
@@ -177,7 +184,7 @@ describe('Supplier portal', () => {
         unitPrice: 95,
         shipmentPrice: 100,
         advancePercent: 30,
-        midtermPercent: 30,
+        midtermPercent: 20,
         expectedPaymentMethod: 'CHEQUE',
         expectedDelivery: undefined,
         note: undefined,
@@ -252,6 +259,10 @@ describe('Supplier portal', () => {
 
     await user.clear(within(dialog).getByLabelText(/Unit price/));
     await user.type(within(dialog).getByLabelText(/Unit price/), '90');
+    // A new unit price can't be sent without a reason; the last quoted price is shown beside it
+    expect(within(dialog).getByTestId('last-quoted-price')).toHaveTextContent('Last quoted ₹100.00');
+    expect(within(dialog).getByTestId('change-reason-needed')).toBeInTheDocument();
+    expect(send).toBeDisabled();
     // The reason sits with the delivery terms, in the last part
     await openTab(user, dialog, /Delivery & reason/);
     await user.type(within(dialog).getByLabelText(/Reason for the change/), 'Bulk');
@@ -321,7 +332,7 @@ describe('Supplier portal', () => {
   it('proposes a new payment plan as a change, with the final part worked out', async () => {
     const user = userEvent.setup();
     portal.requestChange.mockResolvedValue(
-      ok({ id: 42, changes: { advancePercent: 50 }, previous: { advancePercent: 30 }, proposedTotalPrice: 1050, reason: null, status: 'PENDING', requestedAt: '', decidedAt: null, decisionReason: null })
+      ok({ id: 42, changes: { advancePercent: 20 }, previous: { advancePercent: 30 }, proposedTotalPrice: 1050, reason: null, status: 'PENDING', requestedAt: '', decidedAt: null, decisionReason: null })
     );
     renderAt('/supplier/quotations');
     await user.click(await screen.findByRole('button', { name: 'Request a change to ORD-1' }));
@@ -329,12 +340,17 @@ describe('Supplier portal', () => {
     await openTab(user, dialog, /Payment plan/);
     const advance = within(dialog).getByRole('spinbutton', { name: /Advance/ });
     await user.clear(advance);
+    // 50 % advance + 30 % midterm leaves 20 % at the end: at least half must be paid after delivery
     await user.type(advance, '50');
     expect(within(dialog).getByTestId('plan-final-percent')).toHaveValue('20%');
+    expect(within(dialog).getByText(/advance and midterm together can be at most 50% \(they are 80%\)/)).toBeInTheDocument();
+    await user.clear(advance);
+    await user.type(advance, '20');
+    expect(within(dialog).getByTestId('plan-final-percent')).toHaveValue('50%');
     await user.selectOptions(within(dialog).getByRole('combobox', { name: 'Expected payment method' }), 'ONLINE');
     await user.click(within(dialog).getByRole('button', { name: 'Send for approval' }));
     await waitFor(() =>
-      expect(portal.requestChange).toHaveBeenCalledWith(1, { advancePercent: 50, expectedPaymentMethod: 'ONLINE', reason: undefined })
+      expect(portal.requestChange).toHaveBeenCalledWith(1, { advancePercent: 20, expectedPaymentMethod: 'ONLINE', reason: undefined })
     );
   });
 
@@ -359,9 +375,62 @@ describe('Supplier portal', () => {
     expect(panel.getByTestId('payment-paid')).toHaveTextContent('₹1,050.00');
     expect(panel.getByRole('alert')).toHaveTextContent('Refund due from the supplier: ₹200.00');
     expect(panel.getByRole('alert')).toHaveTextContent('2 failed; they go back to the supplier');
-    // The supplier only reads: nothing to record, confirm or change
-    expect(panel.queryByRole('button')).not.toBeInTheDocument();
+    // Nothing to record, confirm or change; the supplier pays the refund in their portal (supplier-returns-and-repayments.md § 1)
+    expect(panel.getAllByRole('button').map((b) => b.textContent)).toEqual(['Pay refund due']);
     expect(supplierPayments.forSupplier).toHaveBeenCalledWith(3);
+  });
+
+  it('shows the supplier their plan in rupees and the order’s flow history, with roles but no staff names', async () => {
+    const user = userEvent.setup();
+    supplierPayments.timeline.mockResolvedValue(ok({
+      orderId: 3,
+      orderNumber: 'ORD-3',
+      events: [
+        { id: 'status-1', at: '2026-10-01T10:00:00Z', kind: 'STATUS', title: 'Quotation submitted by you', detail: null, actorRole: 'Supplier', actorName: null, tone: 'DONE', branchId: null, branchTitle: null },
+        { id: 'status-2', at: '2026-10-02T10:00:00Z', kind: 'STATUS', title: 'Super Admin approved the order', detail: null, actorRole: 'Super Admin', actorName: null, tone: 'DONE', branchId: null, branchTitle: null },
+      ],
+    }) as never);
+    portal.getOrders.mockResolvedValue(ok([order(3, 'CONFIRMED')]));
+    portal.getOrder.mockResolvedValue(ok(order(3, 'CONFIRMED', { history: [] })));
+    renderAt('/supplier/orders');
+    await user.click(await screen.findByRole('button', { name: 'View ORD-3' }));
+    const dialog = within(await screen.findByRole('dialog', { name: 'Order ORD-3' }));
+    expect(dialog.getByRole('table', { name: 'Payment plan breakup' })).toBeInTheDocument();
+    expect(supplierPayments.timeline).not.toHaveBeenCalled();
+    await user.click(dialog.getByRole('button', { name: 'Flow history' }));
+    await waitFor(() => expect(supplierPayments.timeline).toHaveBeenCalledWith(3, 'supplier'));
+    const flow = within(await dialog.findByRole('list', { name: 'Order flow' }));
+    expect(flow.getByText('Super Admin approved the order')).toBeInTheDocument();
+    expect(flow.getAllByText(/Super Admin$|Supplier$/).length).toBeGreaterThan(0);
+  });
+
+  it('flags the orders with a payment waiting for the supplier to confirm', async () => {
+    portal.getOrders.mockResolvedValue(ok([order(3, 'SHIPPED', { paymentsToConfirm: 1 }), order(4, 'SHIPPED')]));
+    renderAt('/supplier/orders');
+    expect(await screen.findByText('Payment to confirm')).toBeInTheDocument();
+    expect(screen.getAllByText('Payment to confirm')).toHaveLength(1);
+  });
+
+  it('flags orders with money to pay back or a return to answer, and opens the return to answer', async () => {
+    const user = userEvent.setup();
+    portal.getOrders.mockResolvedValue(ok([order(3, 'SHIPPED', { repaymentsDue: 1 }), order(4, 'SHIPPED', { returnsToAnswer: 1 }), order(6, 'SHIPPED')]));
+    portal.getOrder.mockResolvedValue(ok(order(4, 'DELIVERED', { returnsToAnswer: 1, history: [] })));
+    supplierPayments.forSupplier.mockResolvedValue(paymentsOf(paymentSummary({ orderStatus: 'DELIVERED' }), []));
+    supplierReturns.forOrder.mockResolvedValue(ok(returnsOf([supplierReturn({ id: 9, orderId: 4, status: 'AWAITING_SUPPLIER', requestedByUsername: null })])) as never);
+    supplierReturns.respond.mockResolvedValue(ok(supplierReturn({ id: 9, status: 'ACCEPTED' })) as never);
+    renderAt('/supplier/orders');
+    expect(await screen.findByText('Money to pay back')).toBeInTheDocument();
+    expect(screen.getAllByText('Money to pay back')).toHaveLength(1);
+    expect(screen.getAllByText('Return to answer')).toHaveLength(1);
+    expect(within(screen.getByText('ORD-4').closest('tr')!).getByText('Return to answer')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'View ORD-4' }));
+    const card = within(await screen.findByRole('region', { name: 'Returns of failed pieces' }));
+    await waitFor(() => expect(supplierReturns.forOrder).toHaveBeenCalledWith(4, 'supplier'));
+    await user.click(await card.findByRole('button', { name: 'Accept return' }));
+    await waitFor(() => expect(supplierReturns.respond).toHaveBeenCalledWith(9, true, undefined));
+    // The list's flags are read again
+    await waitFor(() => expect(portal.getOrders).toHaveBeenCalledTimes(2));
   });
 
   it('splits orders into ongoing and past, and offers the bill only once delivered', async () => {
@@ -431,6 +500,48 @@ describe('Supplier portal', () => {
     await user.click(within(dialog).getByRole('button', { name: 'Back' }));
     await user.click(within(dialog).getByRole('button', { name: 'Accept order' }));
     await waitFor(() => expect(portal.respondToOrder).toHaveBeenCalledWith(6, { decision: 'ACCEPT' }));
+  });
+
+  it('shows what TinQa changed from the quotation and accepts only once the supplier agrees to it', async () => {
+    const user = userEvent.setup();
+    const changedByTinqa = [
+      { field: 'ADVANCE_PERCENT' as const, label: 'Advance payment', quoted: '30%', current: '20%' },
+      { field: 'FINAL_PERCENT' as const, label: 'Final payment (after testing)', quoted: '50%', current: '60%' },
+    ];
+    const waiting = order(6, 'SUPPLIER_LEVEL_PENDING', { advancePercent: 20, midtermPercent: 20, finalPercent: 60, changedByTinqa });
+    portal.getOrders.mockResolvedValue(ok([waiting]));
+    portal.getOrder.mockResolvedValue(ok({ ...waiting, history: [] }));
+    portal.respondToOrder.mockResolvedValue(ok(order(6, 'CONFIRMED')));
+    renderAt('/supplier/orders');
+
+    expect(await screen.findByText('Changed by TinQa')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Review ORD-6' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Order ORD-6' });
+
+    // Each change: what the supplier quoted beside what it is now
+    const changes = await within(dialog).findByRole('table', { name: 'Changes TinQa made to your quotation' });
+    expect(within(changes).getByRole('row', { name: 'Advance payment 30% 20%' })).toBeInTheDocument();
+    expect(within(changes).getByRole('row', { name: 'Final payment (after testing) 50% 60%' })).toBeInTheDocument();
+
+    // Accept stays off until the supplier ticks that they agree to the changes
+    const accept = within(dialog).getByRole('button', { name: 'Accept order' });
+    expect(accept).toBeDisabled();
+    await user.click(within(dialog).getByRole('checkbox', { name: /I have checked what TinQa changed/ }));
+    await user.click(accept);
+    await waitFor(() => expect(portal.respondToOrder).toHaveBeenCalledWith(6, { decision: 'ACCEPT', changesAccepted: true }));
+  });
+
+  it('asks for no agreement when nothing the supplier quoted was changed', async () => {
+    const user = userEvent.setup();
+    portal.getOrders.mockResolvedValue(ok([order(6, 'SUPPLIER_LEVEL_PENDING', { changedByTinqa: [] })]));
+    portal.getOrder.mockResolvedValue(ok(order(6, 'SUPPLIER_LEVEL_PENDING', { changedByTinqa: [], history: [] })));
+    renderAt('/supplier/orders');
+    await user.click(await screen.findByRole('button', { name: 'Review ORD-6' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Order ORD-6' });
+    expect(await within(dialog).findByRole('button', { name: 'Accept order' })).toBeEnabled();
+    expect(within(dialog).queryByRole('region', { name: 'Changed by TinQa' })).not.toBeInTheDocument();
+    expect(within(dialog).queryByRole('checkbox', { name: /I have checked what TinQa changed/ })).not.toBeInTheDocument();
+    expect(screen.queryByText('Changed by TinQa')).not.toBeInTheDocument();
   });
 
   it('lets the supplier mark a confirmed order as shipped after confirming once', async () => {

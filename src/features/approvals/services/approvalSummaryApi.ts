@@ -22,8 +22,14 @@ export const PROCUREMENT_QUEUES = {
   QUOTATION_CHANGES: ['SUPPLIER_QUOTATION_CHANGE_APPROVE'],
   BARCODES: ['BARCODE_APPROVE'],
   CLIENT_DEMOS: ['DEMO_APPROVE'],
-  // Payments to suppliers and refunds from them, waiting for someone other than the recorder
+  // Payment requests to suppliers, and refunds and reversals, waiting for the Super Admin
   SUPPLIER_PAYMENTS: ['SUPPLIER_PAYMENT_APPROVE', 'PROCUREMENT_ORDER_VIEW'],
+  // Approved payment requests to pay, and payments the supplier said they did not receive: the Finance Manager's
+  SUPPLIER_PAYMENTS_TO_MAKE: ['SUPPLIER_PAYMENT_RECORD', 'PROCUREMENT_ORDER_VIEW'],
+  // Returns of failed pieces raised by a Supplier Manager, waiting for the Super Admin (status PENDING_APPROVAL)
+  SUPPLIER_RETURNS: ['SUPPLIER_RETURN_APPROVE', 'PROCUREMENT_ORDER_VIEW'],
+  // Money suppliers say they paid back, for the Finance Manager to check (status REPAYMENT_SENT)
+  SUPPLIER_REPAYMENTS: ['SUPPLIER_PAYMENT_RECORD', 'PROCUREMENT_ORDER_VIEW'],
 } as const satisfies Record<string, readonly Permission[]>;
 
 export const ECOMMERCE_QUEUES = {

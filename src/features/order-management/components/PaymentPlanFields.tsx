@@ -1,7 +1,7 @@
 import React from 'react';
 import { CommonCheckbox, CommonInput, CommonSelect } from '../../../components/ui/FormInputs';
 import { formatCurrency } from '../../order-tracking/utils/orderTracking.utils';
-import { PAYMENT_METHOD_LABELS, PAYMENT_METHODS, finalPercentOf, type PaymentMethod, type PaymentPlanForm } from '../utils/paymentPlan';
+import { MIN_FINAL_PERCENT, PAYMENT_METHOD_LABELS, PAYMENT_METHODS, finalPercentOf, type PaymentMethod, type PaymentPlanForm } from '../utils/paymentPlan';
 
 interface Props {
   value: PaymentPlanForm;
@@ -15,7 +15,7 @@ interface Props {
 /**
  * How the supplier wants to be paid: the advance percentage, an optional midterm percentage (some suppliers want only an
  * advance and the final payment), the final part worked out as the rest of 100 % (paid only after the delivered units
- * are tested), and the payment method they expect.
+ * are tested, and never less than MIN_FINAL_PERCENT), and the payment method they expect.
  */
 export const PaymentPlanFields: React.FC<Props> = ({ value, onChange, total, errors = {}, disabled }) => {
   const set = (patch: Partial<PaymentPlanForm>) => onChange({ ...value, ...patch });
@@ -30,7 +30,7 @@ export const PaymentPlanFields: React.FC<Props> = ({ value, onChange, total, err
         label={<span className="text-xs">Midterm payment <span className="text-gray-500">(when shipped; untick for advance and final only)</span></span>}
         checked={value.midtermEnabled}
         disabled={disabled}
-        onChange={(midtermEnabled) => set({ midtermEnabled, midtermPercent: midtermEnabled ? value.midtermPercent || '30' : value.midtermPercent })}
+        onChange={(midtermEnabled) => set({ midtermEnabled, midtermPercent: midtermEnabled ? value.midtermPercent || '20' : value.midtermPercent })}
       />
       <div className={`grid gap-3 ${value.midtermEnabled ? 'grid-cols-3' : 'grid-cols-2'}`}>
         <div>
@@ -38,7 +38,7 @@ export const PaymentPlanFields: React.FC<Props> = ({ value, onChange, total, err
             label="Advance (%)"
             type="number"
             min="0"
-            max="100"
+            max={String(100 - MIN_FINAL_PERCENT)}
             step="0.01"
             required
             value={value.advancePercent}
@@ -53,7 +53,7 @@ export const PaymentPlanFields: React.FC<Props> = ({ value, onChange, total, err
             label="Midterm (%)"
             type="number"
             min="0"
-            max="100"
+            max={String(100 - MIN_FINAL_PERCENT)}
             step="0.01"
             required
             value={value.midtermPercent}
@@ -104,6 +104,7 @@ export const PaymentPlanFields: React.FC<Props> = ({ value, onChange, total, err
         error={errors.expectedPaymentMethod}
       />
       <p className="text-[11px] text-gray-500">
+        At least {MIN_FINAL_PERCENT}% is always paid at the end: advance and midterm together can be at most {100 - MIN_FINAL_PERCENT}%.
         The final part is paid only after the delivered units are tested, and only for the units that pass.
       </p>
     </fieldset>

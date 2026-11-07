@@ -4,7 +4,7 @@ import type { OrderStatus } from "../../../types/common.types";
 /**
  * A quotation's payment plan: how the supplier wants to be paid. The advance and the midterm percentages are typed in;
  * the final part is whatever is left of 100 % and is paid only after the delivered units are tested (the stock entry
- * is approved). Mirrors Procurement's PaymentPlan.
+ * is approved). At least half is always paid then (MIN_FINAL_PERCENT). Mirrors Procurement's PaymentPlan.
  */
 export type PaymentMethod = 'CASH' | 'ONLINE' | 'BANK_TRANSFER' | 'CHEQUE';
 
@@ -17,6 +17,17 @@ export const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
 
 export const PAYMENT_METHODS = Object.keys(PAYMENT_METHOD_LABELS) as PaymentMethod[];
 
+/** What a payment's reference is, per method. Every method but cash must give it (Procurement checks it too). */
+export const REFERENCE_LABELS: Record<PaymentMethod, string> = {
+  CASH: 'Receipt number (optional)',
+  ONLINE: 'Transaction ID',
+  BANK_TRANSFER: 'UTR number',
+  CHEQUE: 'Cheque number',
+};
+
+/** Online payments, bank transfers and cheques leave a trace at a bank: their reference is required. Cash has none. */
+export const referenceRequired = (method: PaymentMethod | ''): boolean => method !== '' && method !== 'CASH';
+
 export interface PaymentPlanForm {
   advancePercent: string;
   /** Some suppliers want only an advance and the final payment: no midterm part (sent as 0 %). */
@@ -25,8 +36,11 @@ export interface PaymentPlanForm {
   expectedPaymentMethod: PaymentMethod | '';
 }
 
-/** The plan a new quotation starts with: 30 % advance, 30 % midterm, 40 % after testing. */
-export const DEFAULT_PAYMENT_PLAN: PaymentPlanForm = { advancePercent: '30', midtermEnabled: true, midtermPercent: '30', expectedPaymentMethod: '' };
+/** The least share paid after delivery and testing (the final part); Procurement's PaymentPlan.MIN_FINAL_PERCENT. */
+export const MIN_FINAL_PERCENT = 50;
+
+/** The plan a new quotation starts with: 30 % advance, 20 % midterm, 50 % after testing. */
+export const DEFAULT_PAYMENT_PLAN: PaymentPlanForm = { advancePercent: '30', midtermEnabled: true, midtermPercent: '20', expectedPaymentMethod: '' };
 
 export interface PaymentPlanFields {
   advancePercent?: number | null;
@@ -61,8 +75,16 @@ export const finalPercentOf = (form: Pick<PaymentPlanForm, 'advancePercent' | 'm
   return left / 100;
 };
 
-/** Field errors keyed like the backend (advancePercent, midtermPercent, expectedPaymentMethod). */
-export const validatePlanForm = (form: PaymentPlanForm): Record<string, string> => {
+/** Whether the form's advance and midterm are the saved plan's (a plan saved before the 50 % rule is kept as it is). */
+const keepsSavedSplit = (form: PaymentPlanForm, saved: PaymentPlanFields | null | undefined): boolean =>
+  saved?.advancePercent != null && saved.midtermPercent != null &&
+  Number(form.advancePercent) === Number(saved.advancePercent) && Number(midtermText(form)) === Number(saved.midtermPercent);
+
+/**
+ * Field errors keyed like the backend (advancePercent, midtermPercent, expectedPaymentMethod). With the saved plan of
+ * an order being edited, an unchanged split is not checked again, as the server only checks a plan that changes.
+ */
+export const validatePlanForm = (form: PaymentPlanForm, saved?: PaymentPlanFields | null): Record<string, string> => {
   const errors: Record<string, string> = {};
   const advance = form.advancePercent.trim();
   if (advance === '') errors.advancePercent = 'Advance percentage is required (0 for none).';
@@ -74,8 +96,11 @@ export const validatePlanForm = (form: PaymentPlanForm): Record<string, string> 
     else if (Number(midterm) === 0) errors.midtermPercent = 'Untick the midterm payment instead of giving it 0%.';
   }
   const left = finalPercentOf(form);
-  if (!errors.advancePercent && !errors.midtermPercent && left !== null && left < 0) {
-    errors.midtermPercent = `Advance and midterm together cannot be more than 100% (they are ${100 - left}%).`;
+  if (!errors.advancePercent && !errors.midtermPercent && left !== null && left < MIN_FINAL_PERCENT && !keepsSavedSplit(form, saved)) {
+    // On the midterm when there is one, else on the advance (as the server names it)
+    const field = form.midtermEnabled ? 'midtermPercent' : 'advancePercent';
+    const upFront = Math.round((100 - left) * 100) / 100;
+    errors[field] = `At least ${MIN_FINAL_PERCENT}% is paid after delivery and testing, so advance and midterm together can be at most ${100 - MIN_FINAL_PERCENT}% (they are ${upFront}%).`;
   }
   if (!form.expectedPaymentMethod) errors.expectedPaymentMethod = 'Choose how the supplier expects to be paid.';
   return errors;
@@ -131,10 +156,42 @@ export const shownPlanErrors = (errors: Record<string, string>): Record<string, 
 
 /** Whether the form differs from the saved plan (an order without one always gets one when saved). */
 export const planChanged = (form: PaymentPlanForm, saved: PaymentPlanFields | null | undefined): boolean =>
-  Object.keys(validatePlanForm(form)).length > 0 || Object.keys(planChanges(form, saved)).length > 0;
+  Object.keys(validatePlanForm(form, saved)).length > 0 || Object.keys(planChanges(form, saved)).length > 0;
 
 /** Once approved, the supplier may have been paid (the advance is due from approval on): the stages showing payments. */
 export const PAYMENT_STAGES: ReadonlySet<OrderStatus> = new Set<OrderStatus>([
   'SUPPLIER_LEVEL_PENDING', 'CONFIRMED', 'CANCELLED', 'SHIPPED', 'DELIVERED', 'RETURN_REQUESTED', 'RETURN_APPROVED',
   'RETURN_REJECTED', 'RETURN_PICKED_UP', 'RETURN_RECEIVED', 'REFUND_INITIATED', 'REFUND_FAILED', 'REFUND_COMPLETED',
 ]);
+
+export interface PlanPart {
+  key: 'ADVANCE' | 'MIDTERM' | 'FINAL';
+  label: string;
+  percent: number;
+  amount: number;
+}
+
+/** A share of the total, to the paisa, rounded half up like the server's PaymentPlan.share. */
+const share = (total: number, percent: number): number => Math.round(Math.round(total * 100) * percent / 100) / 100;
+
+/**
+ * The plan's parts in rupees on the quoted total (GST included): advance, midterm (left out when 0 %) and the final
+ * part paid after testing (the rest), or [] without a plan. Before testing; after it the final part is worked out on
+ * what passed.
+ */
+export const planBreakup = (plan: PaymentPlanFields | null | undefined, grandTotal: number): PlanPart[] => {
+  if (plan?.advancePercent == null || plan.midtermPercent == null) return [];
+  const advance = Number(plan.advancePercent);
+  const midterm = Number(plan.midtermPercent);
+  const advanceAmount = share(grandTotal, advance);
+  const midtermAmount = share(grandTotal, midterm);
+  const parts: PlanPart[] = [{ key: 'ADVANCE', label: 'Advance (once the supplier accepts the order)', percent: advance, amount: advanceAmount }];
+  if (midterm > 0) parts.push({ key: 'MIDTERM', label: 'Midterm (once shipped)', percent: midterm, amount: midtermAmount });
+  parts.push({
+    key: 'FINAL',
+    label: 'Final (after the units are tested)',
+    percent: Math.round((100 - advance - midterm) * 100) / 100,
+    amount: Math.max(0, Math.round((grandTotal - advanceAmount - midtermAmount) * 100) / 100),
+  });
+  return parts;
+};

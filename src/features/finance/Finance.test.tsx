@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, onTestFinished } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Provider } from 'react-redux';
@@ -26,6 +26,7 @@ vi.mock('./api/financeApi', () => ({
     overview: vi.fn(),
     ledger: vi.fn(),
     exportLedger: vi.fn(),
+    supplierReceipts: vi.fn(),
     syncProcurement: vi.fn(),
     listVouchers: vi.fn(),
     createVoucher: vi.fn(),
@@ -269,6 +270,7 @@ describe('Vouchers', () => {
 
 describe('endpoint access', () => {
   it('knows the permission of every finance endpoint', () => {
+    expect(createEndpointMatcher(ECOMMERCE_ENDPOINTS)('get', '/admin/finance/supplier-receipts?page=0&size=20')).toBe('FINANCE_REPORT_VIEW');
     const match = createEndpointMatcher(ECOMMERCE_ENDPOINTS);
     expect(match('GET', '/admin/finance/overview?from=2026-01-01')).toBe('FINANCE_REPORT_VIEW');
     expect(match('GET', '/admin/finance/ledger/export')).toBe('FINANCE_REPORT_EXPORT');
@@ -359,6 +361,50 @@ describe('GST tab', () => {
   });
 });
 
+describe('Supplier money tab', () => {
+  const receipt = {
+    id: 1, procurementReceiptId: 12, kind: 'REFUND' as const, direction: 'IN' as const, reason: 'FAILED_PIECES_RETURN' as const,
+    claimCause: 'FAILED_TESTING', orderNumber: 'PO-2026-0012', supplierName: 'Acme', returnId: 3, milestone: null, amount: 200, chargeAmount: 50,
+    total: 250, method: 'BANK_TRANSFER', reference: 'UTR123', paidOn: '2026-11-07', note: '2 PCS failed testing: no power',
+    receiptFileName: 'bank.pdf', confirmedBy: 'fm.user', confirmedAt: '2026-11-07T10:00:00Z', ledgerEntryId: 88, syncedAt: '2026-11-07T10:01:00Z',
+  };
+
+  it('loads the supplier repayments only once its tab is open, a page at a time, and says what moved the balance', async () => {
+    signIn('owner', ['FINANCE_REPORT_VIEW']);
+    api.supplierReceipts.mockResolvedValue(page([receipt]));
+    const { user } = renderUi(<FinancePage />);
+    await screen.findByRole('region', { name: 'Company account' });
+    expect(api.supplierReceipts).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole('tab', { name: 'Supplier money' }));
+    await waitFor(() => expect(api.supplierReceipts).toHaveBeenCalledWith({ page: 0, size: 20 }));
+    const panel = within(screen.getByRole('region', { name: 'Supplier money' }));
+    expect(panel.getByRole('note')).toHaveTextContent('Only the return shipping charge moves the company balance');
+    const row = within(await panel.findByTestId('supplier-receipt-1'));
+    expect(row.getByText('PO-2026-0012')).toBeInTheDocument();
+    expect(row.getByText('Acme')).toBeInTheDocument();
+    expect(row.getByText('Failed pieces returned')).toBeInTheDocument();
+    expect(row.getByText('Units failed testing · return #3')).toBeInTheDocument();
+    expect(row.getByText('Bank to bank transfer')).toBeInTheDocument();
+    expect(row.getByText('UTR123')).toBeInTheDocument();
+    expect(row.getByText('+₹200.00')).toBeInTheDocument();
+    expect(row.getByText('+₹50.00')).toBeInTheDocument();
+    expect(row.getByText('bank.pdf')).toBeInTheDocument();
+    expect(row.getByText('fm.user')).toBeInTheDocument();
+    // The overview is not read again
+    expect(api.overview).toHaveBeenCalledTimes(1);
+  });
+
+  it('is not shown, and never loads, without finance reports', async () => {
+    signIn('store_manager', ['EXPENSE_VIEW', 'EXPENSE_SUBMIT']);
+    sessionStorage.setItem('finance.tab', 'supplier-money');
+    renderUi(<FinancePage />);
+    await screen.findByRole('region', { name: 'Expenses & vouchers' });
+    expect(screen.queryByRole('tab', { name: 'Supplier money' })).not.toBeInTheDocument();
+    expect(api.supplierReceipts).not.toHaveBeenCalled();
+  });
+});
+
 describe('GST', () => {
   it('splits GST into equal CGST and SGST inside the state and IGST across states', () => {
     expect(gstAtRate(100_000, 18, 'INTRA_STATE')).toEqual({ cgst: 9_000, sgst: 9_000, igst: 0 });
@@ -377,6 +423,12 @@ describe('GST', () => {
   });
 
   it('raises a GST bill with its breakdown, then attaches the receipt to the new voucher', async () => {
+    // The receipt's name carries today's local date: frozen at midday so no time zone puts it on another day
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date(2026, 10, 7, 12, 0, 0));
+    onTestFinished(() => {
+      vi.useRealTimers();
+    });
     signIn('maker', ['EXPENSE_VIEW', 'EXPENSE_SUBMIT']);
     const created = voucher({ id: 12, voucherNumber: 'EXP-2026-000012' });
     api.createVoucher.mockResolvedValue(ok(created, 'Voucher raised.'));
@@ -407,7 +459,7 @@ describe('GST', () => {
 
     const receipt = new File(['%PDF-1.4'], 'upi.pdf', { type: 'application/pdf' });
     await user.upload(within(dialog).getByLabelText('Attach receipt or proof'), receipt);
-    expect(await within(dialog).findByText('EXP-…_RECEIPT_INV-7781_' + new Date().toISOString().slice(0, 10) + '_01.pdf', { exact: false }))
+    expect(await within(dialog).findByText('EXP-…_RECEIPT_INV-7781_2026-11-07_01.pdf', { exact: false }))
       .toBeInTheDocument();
     expect(api.analyzeInvoice).not.toHaveBeenCalled();
     await user.click(within(dialog).getByRole('button', { name: 'Raise for approval' }));

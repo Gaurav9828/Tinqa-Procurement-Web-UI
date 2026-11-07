@@ -8,6 +8,8 @@ import type {
   LedgerEntry,
   LedgerListParams,
   Period,
+  SupplierReceipt,
+  SupplierReceiptListParams,
   Voucher,
   VoucherListParams,
 } from '../types/finance.types';
@@ -141,6 +143,13 @@ export const useLedger = ({ from, to, category, section, source, search, page, s
     [cache, from, to, category, section, source, search, page, size]
   );
   return useSearchableList(cache, load, enabled && can('FINANCE_REPORT_VIEW'), 'The ledger could not be loaded.');
+};
+
+/** Finance › Supplier money: one page of the supplier receipts, loaded only while `enabled` (its tab is open). */
+export const useSupplierReceipts = ({ page, size }: SupplierReceiptListParams, enabled = true) => {
+  const { can } = useAccess();
+  const load = useCallback(() => financeApi.supplierReceipts({ page, size }), [page, size]);
+  return useLoad<PageResponse<SupplierReceipt>>(load, enabled && can('FINANCE_REPORT_VIEW'), 'The supplier money history could not be loaded.');
 };
 
 export const useGstSummary = (period: Period) => {

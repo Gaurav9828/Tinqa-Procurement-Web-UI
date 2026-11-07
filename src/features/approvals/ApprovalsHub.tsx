@@ -29,9 +29,12 @@ import { ClientDemoApprovalsPanel } from '../client-demos/components/ClientDemoA
 import { useWaitingDemos } from '../client-demos/hooks/useClientDemoData';
 import { CareerApprovalsPanel } from '../careers/components/CareerApprovalsPanel';
 import { SupplierPaymentApprovalsPanel } from './components/SupplierPaymentApprovalsPanel';
+import { SupplierReturnApprovalsPanel } from './components/SupplierReturnApprovalsPanel';
+import { SupplierRepaymentChecksPanel } from './components/SupplierRepaymentChecksPanel';
 
 type HubTab =
-  | 'requests' | 'refunds' | 'expenses' | 'suppliers' | 'supplier-payments' | 'pre-orders' | 'company-profile' | 'barcodes' | 'client-demos' | 'careers';
+  | 'requests' | 'refunds' | 'expenses' | 'suppliers' | 'supplier-payments' | 'supplier-returns' | 'supplier-repayments' | 'pre-orders'
+  | 'company-profile' | 'barcodes' | 'client-demos' | 'careers';
 const TAB_STORAGE_KEY = 'approvals.tab';
 
 /** Remembered per browser tab, so Back from an order opened in the refunds queue returns to it. */
@@ -50,6 +53,8 @@ const TABS: { id: HubTab; label: string }[] = [
   { id: 'expenses', label: 'Expenses' },
   { id: 'suppliers', label: 'Suppliers' },
   { id: 'supplier-payments', label: 'Supplier payments' },
+  { id: 'supplier-returns', label: 'Supplier returns' },
+  { id: 'supplier-repayments', label: 'Supplier repayments' },
   { id: 'pre-orders', label: 'Pre-orders' },
   { id: 'company-profile', label: 'Company profile' },
   { id: 'barcodes', label: 'Barcodes' },
@@ -80,7 +85,14 @@ export const ApprovalsHub: React.FC = () => {
       case 'suppliers':
         return canAny('SUPPLIER_LOGIN_APPROVE', 'SUPPLIER_QUOTATION_CHANGE_APPROVE');
       case 'supplier-payments':
-        return canAll('SUPPLIER_PAYMENT_APPROVE', 'PROCUREMENT_ORDER_VIEW');
+        // The Super Admin approves payment requests; the Finance Manager makes the approved payments
+        return canAll('SUPPLIER_PAYMENT_APPROVE', 'PROCUREMENT_ORDER_VIEW') || canAll('SUPPLIER_PAYMENT_RECORD', 'PROCUREMENT_ORDER_VIEW');
+      case 'supplier-returns':
+        // Returns of failed pieces: the Super Admin approves them
+        return canAll('SUPPLIER_RETURN_APPROVE', 'PROCUREMENT_ORDER_VIEW');
+      case 'supplier-repayments':
+        // Money suppliers paid back: the Finance Manager checks it arrived
+        return canAll('SUPPLIER_PAYMENT_RECORD', 'PROCUREMENT_ORDER_VIEW');
       default:
         return canAny(...REQUEST_QUEUE_PERMISSIONS);
     }
@@ -128,7 +140,9 @@ export const ApprovalsHub: React.FC = () => {
     refunds: { count: pendingRefundCount, noun: 'refunds' },
     expenses: { count: summary.count('EXPENSES'), noun: 'expenses' },
     suppliers: { count: summary.count('SUPPLIER_LOGINS', 'QUOTATION_CHANGES'), noun: 'supplier requests' },
-    'supplier-payments': { count: summary.count('SUPPLIER_PAYMENTS'), noun: 'supplier payments' },
+    'supplier-payments': { count: summary.count('SUPPLIER_PAYMENTS', 'SUPPLIER_PAYMENTS_TO_MAKE'), noun: 'supplier payments' },
+    'supplier-returns': { count: summary.count('SUPPLIER_RETURNS'), noun: 'supplier returns' },
+    'supplier-repayments': { count: summary.count('SUPPLIER_REPAYMENTS'), noun: 'supplier repayments to check' },
     'pre-orders': { count: summary.count('PRE_ORDERS'), noun: 'pre-orders' },
     'company-profile': { count: summary.count('COMPANY_PROFILE'), noun: 'company profile changes' },
     barcodes: { count: summary.count('BARCODES'), noun: 'barcode requests' },
@@ -165,6 +179,10 @@ export const ApprovalsHub: React.FC = () => {
         return <SupplierApprovalsPanel onChanged={refreshSummary} />;
       case 'supplier-payments':
         return <SupplierPaymentApprovalsPanel enabled={tab === 'supplier-payments'} onChanged={refreshSummary} />;
+      case 'supplier-returns':
+        return <SupplierReturnApprovalsPanel enabled={tab === 'supplier-returns'} onChanged={refreshSummary} />;
+      case 'supplier-repayments':
+        return <SupplierRepaymentChecksPanel enabled={tab === 'supplier-repayments'} onChanged={refreshSummary} />;
       case 'refunds':
         return <RefundsQueue onChanged={refreshSummary} />;
       case 'expenses':
@@ -298,8 +316,8 @@ export const ApprovalsHub: React.FC = () => {
           </h1>
           <p className="text-gray-500 dark:text-neutral-400 text-sm mt-1">
             Every request waiting for your decision: documents, profile updates, new employees, stock, supplier quotations,
-            orders, returns, products, refunds, expenses, suppliers, pre-orders, the company profile, barcodes, client demos and careers
-            shortlists and selections.
+            orders, returns, products, refunds, expenses, suppliers, supplier payments, returns of failed pieces and repayments, pre-orders,
+            the company profile, barcodes, client demos and careers shortlists and selections.
           </p>
         </div>
         {tab === 'requests' && (

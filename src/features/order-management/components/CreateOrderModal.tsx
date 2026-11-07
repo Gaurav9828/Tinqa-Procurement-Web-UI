@@ -1,17 +1,21 @@
 import React, { useState, useEffect } from 'react';
-import { Info, X } from 'lucide-react';
+import { Info } from 'lucide-react';
+import { TabbedModal, modalTabPanelProps, statusOfTab, useModalTab } from '../../../components/ui/TabbedModal';
+import { SOLID_TONE } from '../../../components/ui/actionTones';
 import type { ItemResponse } from '../../item-management/types/item.types';
 import type { SupplierResponse } from '../../supplier-management/types/supplier.types';
 import type { CreateOrderRequest } from '../types/order.types';
 import { ORDER_LIMITS, todayLocalIsoDate } from '../validator/orderValidator';
 import { useAccess } from '../../../hooks/useAccess';
-import { CommonInput, CommonSelect } from '../../../components/ui/FormInputs'; // Adjust import path as needed
+import { CommonInput, CommonSelect } from '../../../components/ui/FormInputs';
 import { unitSelectOptions } from '../../../constants/unitsOfMeasure';
 import { QuotationTaxFields } from './QuotationTaxFields';
 import { QuotedPriceFields } from './QuotedPriceFields';
 import { isPriceChanged } from '../utils/quotedPrice';
 import { emptyTaxForm, taxPayload, validateTaxForm, type TaxForm } from '../utils/quotationTax';
 import { PaymentPlanFields } from './PaymentPlanFields';
+import { OrderTotal } from './OrderTotal';
+import { ORDER_FORM_ID, orderFormTabs, type OrderFormTab } from '../utils/orderTabs';
 import { DEFAULT_PAYMENT_PLAN, planPayload, quotedTotal, shownPlanErrors, validatePlanForm, type PaymentPlanForm } from '../utils/paymentPlan';
 
 interface CreateOrderModalProps {
@@ -32,6 +36,8 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
   onSubmit,
 }) => {
   const { can } = useAccess();
+  // Back on the first tab each time the form is opened
+  const [activeTab, setActiveTab] = useModalTab<OrderFormTab>('item', isOpen);
   // How the supplier wants to be paid: advance and midterm percentages, the rest after testing
   const [plan, setPlan] = useState<PaymentPlanForm>(DEFAULT_PAYMENT_PLAN);
   const [selectedItemId, setSelectedItemId] = useState<number | ''>('');
@@ -111,131 +117,140 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
     value: supplier.id,
   }));
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-      <div className="w-full max-w-lg max-h-[92vh] overflow-y-auto bg-white dark:bg-neutral-900 border border-black/10 dark:border-white/10 rounded-2xl shadow-xl">
-        {/* Header */}
-        <div className="flex items-center justify-between p-5 border-b border-black/10 dark:border-white/10">
-          <div>
-            <h2 className="text-lg font-bold text-black dark:text-white">Create Procurement Order</h2>
-            <p className="text-xs text-gray-500 dark:text-neutral-400">Initiate a new stock procurement request</p>
-          </div>
-          <button
-            onClick={onClose}
-            className="p-1.5 rounded-lg text-gray-400 hover:text-black dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/10 transition-colors cursor-pointer"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
+  const tabs = orderFormTabs('create');
+  const errorTabs = new Set<OrderFormTab>([
+    ...(taxValid ? [] : (['gst'] as const)),
+    ...(Object.keys(shownPlanErrors(planErrors)).length > 0 ? (['payment'] as const) : []),
+  ]);
+  const panel = (id: OrderFormTab) => modalTabPanelProps(ORDER_FORM_ID, id, activeTab);
 
-        {!can('PROCUREMENT_ORDER_APPROVE') && (
-          <div className="mx-5 mt-5 p-3.5 bg-amber-500/10 border border-amber-500/20 rounded-xl flex items-start gap-3 text-xs text-amber-700 dark:text-amber-400">
+  return (
+    <TabbedModal
+      idPrefix={ORDER_FORM_ID}
+      tabsLabel="Order sections"
+      heading="Create Procurement Order"
+      subheading="Initiate a new stock procurement request"
+      size="lg"
+      onClose={onClose}
+      onSubmit={handleSubmit}
+      closeDisabled={isSubmitting}
+      tabs={tabs}
+      activeTab={activeTab}
+      onSelectTab={setActiveTab}
+      statusOf={(id) => statusOfTab(id, errorTabs, { item: isFormComplete, payment: planValid })}
+      notes={
+        !can('PROCUREMENT_ORDER_APPROVE') && (
+          <div className="p-3.5 bg-amber-500/10 border border-amber-500/20 rounded-xl flex items-start gap-3 text-amber-700 dark:text-amber-400">
             <Info className="w-4 h-4 shrink-0 mt-0.5" />
             <span>
               <strong>Notice:</strong> Orders you create need final review and approval by an order approver.
             </span>
           </div>
-        )}
+        )
+      }
+      footer={<OrderTotal total={taxable} />}
+      actions={
+        <>
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-4 py-2 text-xs font-medium text-gray-600 dark:text-neutral-300 hover:bg-black/5 dark:hover:bg-white/10 rounded-xl transition-colors cursor-pointer"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={isSubmitting || !isFormComplete || !taxValid || !planValid}
+            className={`px-4 py-2 text-xs font-semibold rounded-xl transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${SOLID_TONE.primary}`}
+          >
+            {isSubmitting ? 'Submitting...' : 'Create Order'}
+          </button>
+        </>
+      }
+    >
+      <section {...panel('item')}>
+        <CommonSelect
+          label="Select Item"
+          required
+          placeholder="-- Choose Item --"
+          value={selectedItemId}
+          options={itemOptions}
+          onChange={(e) => {
+            setSelectedItemId(Number(e.target.value));
+            // A new item starts again from its own existing price.
+            setNewPrice('');
+            setPriceReason('');
+          }}
+        />
 
-        {/* Form Body */}
-        <form onSubmit={handleSubmit} className="p-5 space-y-4">
-          <CommonSelect
-            label="Select Item"
+        <CommonSelect
+          label="Select Supplier"
+          required
+          placeholder="-- Choose Supplier --"
+          value={selectedSupplierId}
+          options={supplierOptions}
+          onChange={(e) => setSelectedSupplierId(Number(e.target.value))}
+        />
+
+        <div className="grid grid-cols-2 gap-3">
+          <CommonInput
+            label="Quantity"
+            type="number"
+            min="1"
+            max={ORDER_LIMITS.MAX_QUANTITY}
+            step="1"
             required
-            placeholder="-- Choose Item --"
-            value={selectedItemId}
-            options={itemOptions}
-            onChange={(e) => {
-              setSelectedItemId(Number(e.target.value));
-              // A new item starts again from its own existing price.
-              setNewPrice('');
-              setPriceReason('');
-            }}
+            placeholder="e.g. 50"
+            value={quantity}
+            onChange={(e) => setQuantity(Number(e.target.value))}
           />
 
           <CommonSelect
-            label="Select Supplier"
+            label="Unit Type"
             required
-            placeholder="-- Choose Supplier --"
-            value={selectedSupplierId}
-            options={supplierOptions}
-            onChange={(e) => setSelectedSupplierId(Number(e.target.value))}
+            // Follows the selected item's unit; chosen from the fixed list only when the item has none.
+            disabled={isUnitDisabled}
+            placeholder="Select unit"
+            options={unitSelectOptions(unitOfMeasure)}
+            value={unitOfMeasure}
+            onChange={(e) => setUnitOfMeasure(e.target.value)}
+            data-testid="order-unit-type"
           />
+        </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <CommonInput
-              label="Quantity"
-              type="number"
-              min="1"
-              max={ORDER_LIMITS.MAX_QUANTITY}
-              step="1"
-              required
-              placeholder="e.g. 50"
-              value={quantity}
-              onChange={(e) => setQuantity(Number(e.target.value))}
-            />
+        <QuotedPriceFields
+          hasItem={!!selectedItem}
+          existingPrice={itemMrp}
+          newPrice={newPrice}
+          reason={priceReason}
+          priceChanged={priceChanged}
+          onNewPriceChange={setNewPrice}
+          onReasonChange={setPriceReason}
+        />
 
-            <CommonSelect
-              label="Unit Type"
-              required
-              // Follows the selected item's unit; chosen from the fixed list only when the item has none.
-              disabled={isUnitDisabled}
-              placeholder="Select unit"
-              options={unitSelectOptions(unitOfMeasure)}
-              value={unitOfMeasure}
-              onChange={(e) => setUnitOfMeasure(e.target.value)}
-              data-testid="order-unit-type"
-            />
-          </div>
-
-          <QuotedPriceFields
-            hasItem={!!selectedItem}
-            existingPrice={itemMrp}
-            newPrice={newPrice}
-            reason={priceReason}
-            priceChanged={priceChanged}
-            onNewPriceChange={setNewPrice}
-            onReasonChange={setPriceReason}
+        <div className="grid grid-cols-2 gap-3">
+          <CommonInput
+            label="Shipment Price (₹)"
+            type="number"
+            step="0.01"
+            max={ORDER_LIMITS.MAX_SHIPMENT_PRICE}
+            min="0"
+            required
+            placeholder="0.00"
+            value={shipmentPrice}
+            onChange={(e) => setShipmentPrice(Number(e.target.value))}
           />
+        </div>
+      </section>
 
-          <div className="grid grid-cols-2 gap-3">
-            <CommonInput
-              label="Shipment Price (₹)"
-              type="number"
-              step="0.01"
-              max={ORDER_LIMITS.MAX_SHIPMENT_PRICE}
-              min="0"
-              required
-              placeholder="0.00"
-              value={shipmentPrice}
-              onChange={(e) => setShipmentPrice(Number(e.target.value))}
-            />
-          </div>
+      <section {...panel('gst')}>
+        <QuotationTaxFields value={tax} onChange={setTax} taxable={taxable} errors={taxErrors} disabled={isSubmitting}
+          supplierState={selectedSupplier?.state} />
+      </section>
 
-          <QuotationTaxFields value={tax} onChange={setTax} taxable={taxable} errors={taxErrors} disabled={isSubmitting}
-            supplierState={selectedSupplier?.state} />
-
-          <PaymentPlanFields value={plan} onChange={setPlan} total={quotedTotal(taxable, tax)} errors={shownPlanErrors(planErrors)} disabled={isSubmitting} />
-
-          {/* Actions */}
-          <div className="flex items-center justify-end gap-3 pt-3 border-t border-black/10 dark:border-white/10">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 text-xs font-medium text-gray-600 dark:text-neutral-300 hover:bg-black/5 dark:hover:bg-white/10 rounded-xl transition-colors cursor-pointer"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={isSubmitting || !isFormComplete || !taxValid || !planValid}
-              className="px-4 py-2 text-xs font-medium text-white bg-[#0071e3] hover:bg-[#0071e3]/90 rounded-xl transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isSubmitting ? 'Submitting...' : 'Create Order'}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+      <section {...panel('payment')}>
+        <PaymentPlanFields value={plan} onChange={setPlan} total={quotedTotal(taxable, tax)} errors={shownPlanErrors(planErrors)} disabled={isSubmitting} />
+      </section>
+    </TabbedModal>
   );
 };

@@ -25,8 +25,48 @@ export type LedgerSource =
   | 'PROCUREMENT_SALARY'
   // A client demo's costs, booked when its completion (or a correction) is approved
   | 'PROCUREMENT_DEMO'
+  // Return shipping a supplier paid back with a confirmed repayment (category SUPPLIER_CHARGES_RECOVERED)
+  | 'PROCUREMENT_SUPPLIER_RECEIPT'
   | 'VOUCHER'
   | 'REVERSAL';
+
+/**
+ * Money a supplier paid back to TinQa, confirmed by a Finance Manager in Procurement and pulled into the company
+ * account's history (GET /admin/finance/supplier-receipts, newest confirmed first). Amounts are in rupees and never
+ * negative; `direction` gives the sign (OUT: a confirmed refund was reversed, paid back to the supplier). Only
+ * `chargeAmount` (return shipping) is posted to the ledger: the pieces were never booked as a cost.
+ * See docs/supplier-returns-and-repayments.md § 8.
+ */
+export interface SupplierReceipt {
+  id: number;
+  procurementReceiptId: number;
+  kind: 'REFUND' | 'REVERSAL';
+  direction: 'IN' | 'OUT';
+  reason: 'FAILED_PIECES_RETURN' | 'REFUND_CLAIM' | 'PAYMENT_REVERSAL' | 'REFUND_REVERSAL';
+  claimCause: string | null;
+  orderNumber: string;
+  supplierName: string;
+  returnId: number | null;
+  milestone: string | null;
+  amount: number;
+  chargeAmount: number;
+  total: number;
+  method: string;
+  reference: string | null;
+  paidOn: string;
+  note: string | null;
+  receiptFileName: string | null;
+  confirmedBy: string;
+  confirmedAt: string;
+  /** The ledger entry of the charge (null when there was none) */
+  ledgerEntryId: number | null;
+  syncedAt: string;
+}
+
+export interface SupplierReceiptListParams {
+  page: number;
+  size: number;
+}
 
 export interface FinanceCategory {
   code: string;

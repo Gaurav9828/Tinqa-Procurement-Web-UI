@@ -83,3 +83,28 @@ test('Product Management loads no stock entry drafts until its Stock entry tab i
   await page.waitForLoadState('networkidle');
   expect(drafts().map((c) => c.method + ' ' + c.path.split('?')[0])).toEqual(['GET /product-stock-drafts']);
 });
+
+// Opening a hub tab also refreshes the badges (a second summary call), so the lists themselves are checked in
+// SupplierReturnsInHub.test.tsx; here only that nothing loads before a tab is opened.
+test('the Approvals Hub loads no supplier returns or repayments until their tabs are opened', async ({ page, backend }) => {
+  await backend.signInAsSuperAdmin();
+  await page.goto('/approvals');
+  await expect(page.getByRole('tab', { name: /Supplier returns/ })).toBeVisible();
+  await expect(page.getByRole('tab', { name: /Supplier repayments/ })).toBeVisible();
+  await page.waitForLoadState('networkidle');
+  const lists = backend.network.api.filter((c) => c.path.startsWith('/v1/orders/returns') || c.path.startsWith('/v1/orders/payments/repayments-to-check'));
+  expect(lists).toEqual([]);
+});
+
+test('Accounts & Finance loads the supplier money history only when its tab is opened', async ({ page, backend }) => {
+  await backend.signInAsSuperAdmin();
+  await page.goto('/finance');
+  await expect(page.getByRole('tab', { name: 'Supplier money' })).toBeVisible();
+  await page.waitForLoadState('networkidle');
+  const receipts = () => backend.network.api.filter((c) => c.path.startsWith('/admin/finance/supplier-receipts'));
+  expect(receipts()).toEqual([]);
+
+  await page.getByRole('tab', { name: 'Supplier money' }).click();
+  await expect(page.getByRole('region', { name: 'Supplier money' })).toContainText('No supplier repayments confirmed yet.');
+  expect(receipts().map((c) => c.path)).toEqual(['/admin/finance/supplier-receipts?page=0&size=20']);
+});

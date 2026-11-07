@@ -92,9 +92,16 @@ const changedFields = (form: FormState, tax: TaxForm, plan: PaymentPlanForm, ord
   if (form.expectedDelivery && form.expectedDelivery !== (order.expectedDelivery ?? '')) change.expectedDelivery = form.expectedDelivery;
   if (form.note.trim() !== (order.note ?? '')) change.note = form.note.trim();
   if (taxFormChanged(tax, order.taxBreakup)) change.taxBreakup = taxPayload(tax);
-  if (Object.keys(validatePlanForm(plan)).length === 0) Object.assign(change, planChanges(plan, order));
+  if (Object.keys(validatePlanForm(plan, order)).length === 0) Object.assign(change, planChanges(plan, order));
   return change;
 };
+
+// A proposed change with a new unit price can only be sent with the supplier's reason (the server requires it too)
+const isChangeJustified = (change: QuotationChangeRequest | null, reason: string): boolean =>
+  change?.unitPrice === undefined || reason.trim() !== '';
+
+const changeReasonLabel = (required: boolean) =>
+  required ? 'Reason for the change (required for a new unit price)' : 'Reason for the change';
 
 export const QuotationFormModal: React.FC<QuotationFormModalProps> = ({
   order,
@@ -136,12 +143,15 @@ export const QuotationFormModal: React.FC<QuotationFormModalProps> = ({
   const total = isValid ? quantity * unitPrice + shipmentPrice : null;
   const taxErrors = validateTaxForm(tax, total === null ? null : Math.round(total * 100));
   const taxValid = Object.keys(taxErrors).length === 0;
-  const planErrors = validatePlanForm(plan);
+  const planErrors = validatePlanForm(plan, order);
   const planValid = Object.keys(planErrors).length === 0;
 
   const change = useMemo(() => (order ? changedFields(form, tax, plan, order) : null), [form, tax, plan, order]);
   const hasChange = !change || Object.keys(change).length > 0;
   const priceJustified = !priceChanged || !!priceReason.trim();
+  // A change to the unit price always needs a reason: approvers see the old and new price beside it
+  const changeNeedsReason = change?.unitPrice !== undefined;
+  const changeJustified = isChangeJustified(change, reason);
 
   // The current item stays listed even if it is no longer offered, so a change form never loses it.
   const itemOptions = useMemo(() => {
@@ -169,7 +179,7 @@ export const QuotationFormModal: React.FC<QuotationFormModalProps> = ({
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (!isValid || !taxValid || !planValid || !hasChange || !priceJustified || form.itemId === '') return;
+    if (!isValid || !taxValid || !planValid || !hasChange || !priceJustified || !changeJustified || form.itemId === '') return;
     const ok = order
       ? await onRequestChange(order.id, { ...change, reason: reason.trim() || undefined })
       : await onCreate({
@@ -227,6 +237,11 @@ export const QuotationFormModal: React.FC<QuotationFormModalProps> = ({
             </span>
           </div>
           {isChange && !hasChange && <p className="text-gray-500 dark:text-neutral-400">Change at least one value to send a change.</p>}
+          {!changeJustified && (
+            <p className="text-amber-700 dark:text-amber-400" data-testid="change-reason-needed">
+              Give the reason for the new unit price in the Delivery &amp; reason tab.
+            </p>
+          )}
         </>
       }
       actions={
@@ -240,7 +255,7 @@ export const QuotationFormModal: React.FC<QuotationFormModalProps> = ({
           </button>
           <button
             type="submit"
-            disabled={isSubmitting || !isValid || !taxValid || !planValid || !hasChange || !priceJustified}
+            disabled={isSubmitting || !isValid || !taxValid || !planValid || !hasChange || !priceJustified || !changeJustified}
             className={`px-4 py-2 text-xs font-semibold rounded-xl transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${SOLID_TONE.primary}`}
           >
             {isSubmitting ? 'Sending…' : isChange ? 'Send for approval' : 'Create quotation'}
@@ -295,18 +310,25 @@ export const QuotationFormModal: React.FC<QuotationFormModalProps> = ({
 
         <div className="grid grid-cols-2 gap-3">
           {isChange && (
-            <CommonInput
-              label="Unit price (₹)"
-              aria-label="Unit price (₹)"
-              type="number"
-              min="0"
-              step="0.01"
-              max={ORDER_LIMITS.MAX_UNIT_PRICE}
-              required
-              placeholder="0.00"
-              value={form.unitPrice}
-              onChange={(event) => set('unitPrice', event.target.value)}
-            />
+            <div>
+              <CommonInput
+                label="Unit price (₹)"
+                aria-label="Unit price (₹)"
+                type="number"
+                min="0"
+                step="0.01"
+                max={ORDER_LIMITS.MAX_UNIT_PRICE}
+                required
+                placeholder="0.00"
+                value={form.unitPrice}
+                onChange={(event) => set('unitPrice', event.target.value)}
+              />
+              {changeNeedsReason && (
+                <p className="mt-1 text-[11px] text-amber-700 dark:text-amber-400" data-testid="last-quoted-price">
+                  Last quoted {formatCurrency(order?.unitPrice)}. Give the reason in the Delivery &amp; reason tab.
+                </p>
+              )}
+            </div>
           )}
           <CommonInput
             label="Shipment price (₹)"
@@ -353,8 +375,9 @@ export const QuotationFormModal: React.FC<QuotationFormModalProps> = ({
 
         {isChange && (
           <CommonTextArea
-            label="Reason for the change"
+            label={changeReasonLabel(changeNeedsReason)}
             aria-label="Reason for the change"
+            required={changeNeedsReason}
             rows={2}
             maxLength={500}
             placeholder="Shown to the supplier manager who approves it"

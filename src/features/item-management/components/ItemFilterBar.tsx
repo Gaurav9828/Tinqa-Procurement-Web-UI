@@ -1,8 +1,6 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
-import { Search, Plus, Package } from 'lucide-react';
+import { Search, Plus } from 'lucide-react';
 import type { CategoryResponse } from '../types/item.types';
-import { useAccess } from '../../../hooks/useAccess';
 
 export interface ItemFilterBarProps {
   searchQuery: string;
@@ -31,7 +29,6 @@ export const ItemFilterBar: React.FC<ItemFilterBarProps> = ({
   onOpenCreateItemModal,
   onOpenCreateCategoryModal,
 }) => {
-  const { can } = useAccess();
   return (
   <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-2 bg-black/[0.02] dark:bg-white/[0.02] border border-black/10 dark:border-white/10 rounded-2xl">
     <div className="flex flex-1 items-center gap-2 w-full">
@@ -66,14 +63,6 @@ export const ItemFilterBar: React.FC<ItemFilterBarProps> = ({
       </select>
     </div>
     <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
-      {can('STOCK_VIEW') && (
-      <Link
-        to="/item/stocks"
-        className="px-3 py-2 bg-black/5 dark:bg-white/10 hover:bg-black/10 dark:hover:bg-white/20 text-black dark:text-white rounded-xl text-xs font-medium flex items-center gap-1.5 transition-colors whitespace-nowrap"
-      >
-        <Package className="w-3.5 h-3.5" /> Stock Management
-      </Link>
-      )}
       {onOpenCreateCategoryModal && (
       <button
         type="button"

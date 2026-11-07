@@ -8,6 +8,8 @@ import type {
   LedgerEntry,
   LedgerListParams,
   Period,
+  SupplierReceipt,
+  SupplierReceiptListParams,
   Voucher,
   VoucherDocument,
   VoucherDocumentKind,
@@ -37,6 +39,10 @@ export const financeApi = {
   /** GET /admin/finance/ledger — newest first. */
   ledger: async (query: LedgerListParams): Promise<ApiResponse<PageResponse<LedgerEntry>>> =>
     (await ecommerceAxiosClient.get<ApiResponse<PageResponse<LedgerEntry>>>(`${BASE}/ledger`, { params: params(query) })).data,
+
+  /** GET /admin/finance/supplier-receipts — money suppliers paid back, newest confirmed first (FINANCE_REPORT_VIEW). */
+  supplierReceipts: async (query: SupplierReceiptListParams): Promise<ApiResponse<PageResponse<SupplierReceipt>>> =>
+    (await ecommerceAxiosClient.get<ApiResponse<PageResponse<SupplierReceipt>>>(`${BASE}/supplier-receipts`, { params: params(query) })).data,
 
   /** GET /admin/finance/ledger/export — every entry of the period, oldest first (FINANCE_REPORT_EXPORT). */
   exportLedger: async (period: Period): Promise<ApiResponse<LedgerEntry[]>> =>

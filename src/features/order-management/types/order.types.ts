@@ -124,7 +124,9 @@ export interface OrderChangeRequest {
   /** Order total if approved (pending requests only). */
   proposedTotalPrice: number | null;
   currentTotalPrice: number | null;
-  /** The supplier's reason. */
+  /** The MRP of the item the quotation would have once approved, to compare the unit price with. */
+  itemPrice?: number | null;
+  /** The supplier's reason (required by the server when the unit price changes). */
   note: string | null;
   status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'WITHDRAWN';
   requestedByUsername: string | null;

@@ -76,8 +76,11 @@ describe('route guards', () => {
           <Route element={<RequireNavAccess navId="order-tracking" />}>
             <Route path="/order-tracking" element={<p>Tracking page</p>} />
           </Route>
-          <Route element={<RequireNavAccess navId="items" requires={['STOCK_VIEW']} />}>
-            <Route path="/item/stocks" element={<p>Stock page</p>} />
+          <Route element={<RequireNavAccess navId="items" />}>
+            <Route path="/item" element={<p>Item page</p>} />
+          </Route>
+          <Route element={<RequireNavAccess navId="stocks" />}>
+            <Route path="/stocks" element={<p>Stock page</p>} />
           </Route>
         </Routes>
       </MemoryRouter>
@@ -96,9 +99,21 @@ describe('route guards', () => {
     expect(screen.getByText('Suppliers page')).toBeInTheDocument();
   });
 
-  it('narrows a sub-route with its own permission', () => {
+  it('opens Item Management and Stock Management each by their own permission', () => {
     signIn(['ITEM_VIEW']);
-    renderAt('/item/stocks');
+    renderAt('/stocks');
+    expect(screen.getByText('Access restricted')).toBeInTheDocument();
+  });
+
+  it('opens Stock Management without Item Management', () => {
+    signIn(['STOCK_VIEW']);
+    renderAt('/stocks');
+    expect(screen.getByText('Stock page')).toBeInTheDocument();
+  });
+
+  it('keeps Item Management closed to a stock-only user', () => {
+    signIn(['STOCK_VIEW']);
+    renderAt('/item');
     expect(screen.getByText('Access restricted')).toBeInTheDocument();
   });
 

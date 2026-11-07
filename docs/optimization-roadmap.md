@@ -16,7 +16,7 @@ Status: **done**, **next**, or **planned**.
 
 **What changed**
 
-- Procurement BE, migration V15:
+- Procurement BE, migration V14__approval_queue_counts.sql:
   - new function `approval_queue_counts(text[])`;
   - composite indexes that match the queues' order: orders, employees, profile changes, product approvals, supplier
     logins, client demos and documents;
@@ -24,7 +24,7 @@ Status: **done**, **next**, or **planned**.
   - the missing `document` uploader index.
 - Procurement BE, endpoint `GET /v1/approvals/summary`. It counts 12 queues, each filtered by the caller's
   permissions.
-- Ecommerce BE, migration V30 and `GET /api/admin/approvals/summary`. It counts refunds, expenses, pre-orders and
+- Ecommerce BE, migration V12__approval_queue_counts.sql and `GET /api/admin/approvals/summary`. It counts refunds, expenses, pre-orders and
   company profile changes. A composite index on `orders(order_status, created_at, id)` replaces the plain status
   index.
 - Web UI: tab badges come from the two summary calls, and a tab loads its list only when it is opened. A tab click

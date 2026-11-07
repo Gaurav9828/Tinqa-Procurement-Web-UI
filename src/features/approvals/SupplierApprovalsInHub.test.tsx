@@ -121,6 +121,22 @@ describe('Approvals hub: suppliers', () => {
     await waitFor(() => expect(orders.decideChangeRequest).toHaveBeenCalledWith(40, 'APPROVED'));
   });
 
+  it('shows a raised unit price against the item’s price and the last quoted price, with the supplier’s reason', async () => {
+    const user = userEvent.setup();
+    orders.listChangeRequests.mockResolvedValue(
+      ok([{ ...CHANGE, itemPrice: 1400, changes: { unitPrice: 1600 }, previous: { unitPrice: 1500 }, note: 'Copper prices went up' }])
+    );
+    renderHub();
+    await user.click(await screen.findByRole('tab', { name: /Suppliers/ }));
+
+    const changes = await screen.findByRole('region', { name: 'Quotation changes from suppliers' });
+    const check = within(within(changes).getByRole('region', { name: 'Price check' }));
+    expect(check.getByTestId('price-check-quoted')).toHaveTextContent('₹1,600.00 per unit');
+    expect(check.getByTestId('price-check-item')).toHaveTextContent('₹1,400.00 per unit+₹200.00 (+14.29%)');
+    expect(check.getByTestId('price-check-previous')).toHaveTextContent('₹1,500.00 per unit+₹100.00 (+6.67%)');
+    expect(check.getByTestId('price-change-reason')).toHaveTextContent('Copper prices went up');
+  });
+
   it('needs a reason to reject, and never offers a decision on a login you created', async () => {
     const user = userEvent.setup();
     logins.decide.mockResolvedValue(ok(LOGIN({ status: 'REJECTED' })));
