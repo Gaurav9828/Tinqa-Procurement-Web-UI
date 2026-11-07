@@ -24,7 +24,7 @@ describe('payment plan', () => {
     expect(validatePlanForm({ advancePercent: '', midtermEnabled: true, midtermPercent: '101', expectedPaymentMethod: '' })).toEqual({
       advancePercent: 'Advance percentage is required (0 for none).',
       midtermPercent: 'Midterm must be a percentage from 0 to 100, with at most 2 decimals.',
-      expectedPaymentMethod: 'Choose how the dealer expects to be paid.',
+      expectedPaymentMethod: 'Choose how the supplier expects to be paid.',
     });
     expect(validatePlanForm({ advancePercent: '70', midtermEnabled: true, midtermPercent: '40', expectedPaymentMethod: 'CHEQUE' }).midtermPercent).toBe(
       'Advance and midterm together cannot be more than 100% (they are 110%).'

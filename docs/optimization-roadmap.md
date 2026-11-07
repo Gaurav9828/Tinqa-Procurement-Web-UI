@@ -18,7 +18,7 @@ Status: **done**, **next**, or **planned**.
 
 - Procurement BE, migration V15:
   - new function `approval_queue_counts(text[])`;
-  - composite indexes that match the queues' order: orders, employees, profile changes, product approvals, dealer
+  - composite indexes that match the queues' order: orders, employees, profile changes, product approvals, supplier
     logins, client demos and documents;
   - a partial index for the stock approval queue;
   - the missing `document` uploader index.
@@ -81,13 +81,13 @@ The plan:
 
 **Procurement**
 
-- `lower(dealers.email)`, used on every dealer-portal orders call
-- `pg_trgm` indexes for dealer, item and employee search
+- `lower(suppliers.email)`, used on every supplier-portal orders call
+- `pg_trgm` indexes for supplier, item and employee search
 
 ## Phase 5: Paginate and project unbounded lists (planned)
 
 - **Procurement:**
-  - the queue lists: product approvals, employees, profile changes, dealer logins, change requests, barcode requests
+  - the queue lists: product approvals, employees, profile changes, supplier logins, change requests, barcode requests
     and demos;
   - `GET /v1/orders`, `GET /v1/stocks`, `GET /v1/documents`;
   - each as a DTO projection without the JSON columns.
@@ -120,7 +120,7 @@ These reports load records and total them up in Java today. Each becomes a SQL f
 
 - **Ecommerce:** cache the company profile and the active catalogue. Use Caffeine, evicted on approval or product
   change, and serve them with `ETag` and `Cache-Control`.
-- **Procurement:** cache reference data (access catalog, categories, dealer cities, staff options) in Redis for
+- **Procurement:** cache reference data (access catalog, categories, supplier cities, staff options) in Redis for
   5–15 minutes, evicted on writes.
 
 ## Phase 9: Calls between services (planned)
@@ -141,7 +141,7 @@ These reports load records and total them up in Java today. Each becomes a SQL f
 
 - **Session bootstrap:** access, unread count and badges in one call. Keep the `permissions` array reference
   stable in `setAccess`, so access refreshes do not refetch pages.
-- **Lookups endpoint:** id and name only, replacing the `size=1000` dealer and item lists.
+- **Lookups endpoint:** id and name only, replacing the `size=1000` supplier and item lists.
 - **Products list:** the latest approval status included.
 - **Product component rows:** one batch call for their details, replacing 3 calls per row.
 - **Order tracking:** the order detail includes its refunds and the tracking statuses.

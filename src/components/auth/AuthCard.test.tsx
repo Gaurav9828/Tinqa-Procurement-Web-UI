@@ -14,7 +14,7 @@ const LIVE = {
   brandName: 'TinQa',
   loginImageUrl: 'https://api.tinqa.com/api/company/assets/login-image-abc.jpg',
   adminLoginHeadline: 'Run procurement in one place.',
-  adminLoginTagline: 'For staff and dealers.',
+  adminLoginTagline: 'For staff and suppliers.',
   adminLoginHighlights: ['Quotes and POs', 'Approvals'],
   storeLoginHeadline: 'Not for this portal',
   storeLoginHighlights: ['Storefront only'],
@@ -22,7 +22,7 @@ const LIVE = {
 
 const renderCard = () =>
   render(
-    <AuthCard subtitle="Staff & Dealer Sign-in">
+    <AuthCard subtitle="Staff & Supplier Sign-in">
       <form aria-label="Sign in" />
     </AuthCard>
   );
@@ -43,7 +43,7 @@ describe('Admin sign-in page', () => {
     const image = panel.querySelector('img[alt=""]');
     expect(image).toHaveAttribute('src', LIVE.loginImageUrl);
     expect(image).toHaveClass('object-cover', 'w-full', 'h-full');
-    expect(within(panel).getByText('For staff and dealers.')).toBeInTheDocument();
+    expect(within(panel).getByText('For staff and suppliers.')).toBeInTheDocument();
     expect(within(panel).getAllByRole('listitem').map((li) => li.textContent)).toEqual(['Quotes and POs', 'Approvals']);
     expect(panel).not.toHaveTextContent('Storefront only');
     // Remembered for the next visit

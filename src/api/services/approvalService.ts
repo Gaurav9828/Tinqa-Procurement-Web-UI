@@ -4,7 +4,7 @@ export interface ApprovalItem {
   id: string;
   type: 'PROFILE_UPDATE' | 'NEW_PROFILE' | 'ORDER' | 'AUCTION' | 'CLAIM' | 'REPAIR';
   requesterName: string;
-  requesterRole: 'DEALER' | 'INSPECTOR' | 'EMPLOYEE';
+  requesterRole: 'SUPPLIER' | 'INSPECTOR' | 'EMPLOYEE';
   status: 'PENDING_L1' | 'PENDING_L2' | 'APPROVED' | 'REJECTED';
   submittedAt: string;
   details: Record<string, unknown>;

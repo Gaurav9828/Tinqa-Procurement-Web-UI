@@ -9,7 +9,7 @@ import { normalizeBarcode } from '../utils/barcode';
 
 /**
  * Barcode Tracking: scan or type any barcode to see the piece or product unit it belongs to: its batch, purchase order
- * and dealer, the product it is fitted into or the parts inside it, and everything that happened to it.
+ * and supplier, the product it is fitted into or the parts inside it, and everything that happened to it.
  */
 export const BarcodeTrackingPage: React.FC = () => {
   const { can } = useAccess();

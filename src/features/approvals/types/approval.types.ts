@@ -45,7 +45,7 @@ export interface StocksApprovalRequest {
   stockIdentityNumber?: string;
   batchNumber: string;
   orderNumber: string;
-  dealerName: string;
+  supplierName: string;
   itemName: string;
   totalOrderQuantity: number;
   unitType: string;
@@ -66,7 +66,7 @@ export interface StocksApprovalRequest {
 export interface OrdersApprovalRequest {
   id: number;
   orderNumber: string;
-  dealerName: string;
+  supplierName: string;
   itemName: string;
   orderQuantity: number;
   unitType: string;
@@ -80,8 +80,8 @@ export interface OrdersApprovalRequest {
   unitPrice?: number;
   expectedDelivery?: string | null;
   additionalInfo?: Record<string, unknown> | null;
-  raisedByDealer?: boolean;
-  dealerChangePending?: boolean;
+  raisedBySupplier?: boolean;
+  supplierChangePending?: boolean;
 }
 
 

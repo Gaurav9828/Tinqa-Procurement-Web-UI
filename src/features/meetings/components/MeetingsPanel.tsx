@@ -22,7 +22,7 @@ export const MeetingsPanel: React.FC = () => {
     <section className="apple-card p-5 space-y-4" aria-label="Meetings">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <p className="text-sm text-gray-500 dark:text-neutral-400 max-w-3xl">
-          Online and face-to-face meetings with clients, businesses, dealers and the team. Invitees are emailed, may decline within 24 hours of
+          Online and face-to-face meetings with clients, businesses, suppliers and the team. Invitees are emailed, may decline within 24 hours of
           the invite, and give feedback once the organiser marks the meeting completed.
         </p>
         {can('MEETING_SCHEDULE') && (

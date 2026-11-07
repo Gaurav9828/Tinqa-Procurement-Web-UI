@@ -3,9 +3,9 @@ import { useEffect, useState } from 'react';
 import { ecommerceAxiosClient } from '../../../api/ecommerceAxiosClient';
 import type { ApiResponse, OrderStatus } from '../../../types/common.types';
 import { useAccess } from '../../../hooks/useAccess';
-import { dealerPortalApi } from '../../dealer-portal/api/dealerPortalApi';
+import { supplierPortalApi } from '../../supplier-portal/api/supplierPortalApi';
 import { orderApi } from '../../order-management/api/orderApi';
-import { dealerApi } from '../../dealer-management/api/dealerApi';
+import { supplierApi } from '../../supplier-management/api/supplierApi';
 import type { CompanyAddress } from '../../company-profile/types/companyProfile.types';
 
 /** The company on the letterhead: GET /company/profile on the storefront backend, public. */
@@ -71,40 +71,40 @@ const fetchCompany = async (): Promise<PrintCompany | null> => {
 };
 
 /**
- * Everything a printed quotation, purchase order or bill needs. A dealer loads it from their own portal endpoints;
- * staff from the order endpoints (and the dealer's details only when they may view dealers).
+ * Everything a printed quotation, purchase order or bill needs. A supplier loads it from their own portal endpoints;
+ * staff from the order endpoints (and the supplier's details only when they may view suppliers).
  */
 export const usePrintableOrder = (orderId: number) => {
   const { can } = useAccess();
-  const isDealer = can('DEALER_PORTAL_VIEW');
+  const isSupplier = can('SUPPLIER_PORTAL_VIEW');
   const isStaff = can('PROCUREMENT_ORDER_VIEW');
-  const canViewDealers = can('DEALER_VIEW');
+  const canViewSuppliers = can('SUPPLIER_VIEW');
   const [printable, setPrintable] = useState<Printable | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let current = true;
     const load = async (): Promise<Printable> => {
-      if (isDealer) {
+      if (isSupplier) {
         const [orderRes, profileRes, company] = await Promise.all([
-          dealerPortalApi.getOrder(orderId),
-          dealerPortalApi.getProfile(),
+          supplierPortalApi.getOrder(orderId),
+          supplierPortalApi.getProfile(),
           fetchCompany(),
         ]);
         if (!orderRes.success || !orderRes.data) throw new Error(orderRes.message || 'Order not found.');
         const order = orderRes.data;
-        const dealer = profileRes.data;
+        const supplier = profileRes.data;
         return {
           order,
           company,
           supplier: {
-            name: dealer?.name ?? '',
-            tradeName: dealer?.tradeName,
-            addressLines: joinAddress([dealer?.street, dealer?.landmark, [dealer?.city, dealer?.state, dealer?.pincode].filter(Boolean).join(', ')]),
-            gstin: dealer?.gstin,
-            pan: dealer?.panNumber,
-            phone: dealer?.phoneNumber,
-            email: dealer?.email,
+            name: supplier?.name ?? '',
+            tradeName: supplier?.tradeName,
+            addressLines: joinAddress([supplier?.street, supplier?.landmark, [supplier?.city, supplier?.state, supplier?.pincode].filter(Boolean).join(', ')]),
+            gstin: supplier?.gstin,
+            pan: supplier?.panNumber,
+            phone: supplier?.phoneNumber,
+            email: supplier?.email,
           },
         };
       }
@@ -112,24 +112,24 @@ export const usePrintableOrder = (orderId: number) => {
       const orderRes = await orderApi.getOrderById(orderId);
       if (!orderRes.success || !orderRes.data) throw new Error(orderRes.message || 'Order not found.');
       const order = orderRes.data;
-      const [dealerRes, company] = await Promise.all([
-        canViewDealers ? dealerApi.getDealerById(order.dealerId).catch(() => null) : Promise.resolve(null),
+      const [supplierRes, company] = await Promise.all([
+        canViewSuppliers ? supplierApi.getSupplierById(order.supplierId).catch(() => null) : Promise.resolve(null),
         fetchCompany(),
       ]);
-      const dealer = dealerRes?.data;
+      const supplier = supplierRes?.data;
       return {
-        order: { ...order, note: typeof order.additionalInfo?.dealerNote === 'string' ? order.additionalInfo.dealerNote : null },
+        order: { ...order, note: typeof order.additionalInfo?.supplierNote === 'string' ? order.additionalInfo.supplierNote : null },
         company,
         supplier: {
-          name: dealer?.name ?? order.dealerName,
-          tradeName: dealer?.tradeName,
-          addressLines: dealer
-            ? joinAddress([dealer.street, dealer.landmark, [dealer.city, dealer.state, dealer.pincode].filter(Boolean).join(', ')])
+          name: supplier?.name ?? order.supplierName,
+          tradeName: supplier?.tradeName,
+          addressLines: supplier
+            ? joinAddress([supplier.street, supplier.landmark, [supplier.city, supplier.state, supplier.pincode].filter(Boolean).join(', ')])
             : [],
-          gstin: dealer?.gstin,
-          pan: dealer?.panNumber,
-          phone: dealer?.phoneNumber,
-          email: dealer?.email,
+          gstin: supplier?.gstin,
+          pan: supplier?.panNumber,
+          phone: supplier?.phoneNumber,
+          email: supplier?.email,
         },
       };
     };
@@ -139,7 +139,7 @@ export const usePrintableOrder = (orderId: number) => {
     return () => {
       current = false;
     };
-  }, [orderId, isDealer, isStaff, canViewDealers]);
+  }, [orderId, isSupplier, isStaff, canViewSuppliers]);
 
   return { printable, error };
 };

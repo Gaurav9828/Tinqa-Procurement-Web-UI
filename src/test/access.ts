@@ -6,10 +6,10 @@ export const APPROVAL_LEVEL_PERMISSIONS: readonly Permission[] = [
   'EMPLOYEE_APPROVE',
   'EMPLOYEE_DELETE',
   'EMPLOYEE_PROFILE_CHANGE_APPROVE',
-  'DEALER_DELETE',
-  'DEALER_LOGIN_APPROVE',
+  'SUPPLIER_DELETE',
+  'SUPPLIER_LOGIN_APPROVE',
   'PROCUREMENT_ORDER_APPROVE',
-  'DEALER_PAYMENT_APPROVE',
+  'SUPPLIER_PAYMENT_APPROVE',
   'PRODUCT_APPROVAL_DECIDE',
   'STOCK_APPROVE',
   'BARCODE_APPROVE',
@@ -28,13 +28,13 @@ export const APPROVAL_LEVEL_PERMISSIONS: readonly Permission[] = [
   'PROMO_CODE_MANAGE',
 ];
 
-/** What a dealer login holds (Procurement's DEALER_PORTAL group), and nothing else. */
-export const DEALER_PORTAL: readonly Permission[] = [
-  'DEALER_PORTAL_VIEW',
-  'DEALER_QUOTATION_SUBMIT',
-  'DEALER_QUOTATION_CHANGE_REQUEST',
-  'DEALER_ORDER_RESPOND',
-  'DEALER_ORDER_SHIP',
+/** What a supplier login holds (Procurement's SUPPLIER_PORTAL group), and nothing else. */
+export const SUPPLIER_PORTAL: readonly Permission[] = [
+  'SUPPLIER_PORTAL_VIEW',
+  'SUPPLIER_QUOTATION_SUBMIT',
+  'SUPPLIER_QUOTATION_CHANGE_REQUEST',
+  'SUPPLIER_ORDER_RESPOND',
+  'SUPPLIER_ORDER_SHIP',
 ];
 
 /**
@@ -44,7 +44,7 @@ export const DEALER_PORTAL: readonly Permission[] = [
 export const superAdminPermissions = (...levels: AdminLevel[]): Permission[] =>
   PERMISSIONS.filter(
     (permission) =>
-      !DEALER_PORTAL.includes(permission) && (levels.includes('ADMIN_L2') || !APPROVAL_LEVEL_PERMISSIONS.includes(permission))
+      !SUPPLIER_PORTAL.includes(permission) && (levels.includes('ADMIN_L2') || !APPROVAL_LEVEL_PERMISSIONS.includes(permission))
   );
 
 /** Signs a test user in with a Super Admin's permissions at the given level. */
@@ -63,21 +63,21 @@ export const signInAsSuperAdmin = (level: AdminLevel = 'ADMIN_L1', username = 'a
     },
   });
 
-/** Signs a test user in as a dealer with a dealer login. */
-export const signInAsDealer = (username = 'dealer') =>
+/** Signs a test user in as a supplier with a supplier login. */
+export const signInAsSupplier = (username = 'supplier') =>
   useAuthStore.setState({
     token: 'test-token',
     isAuthenticated: true,
     user: {
       userId: 7,
       username,
-      email: `${username}@dealer.test`,
-      role: 'DEALER',
+      email: `${username}@supplier.test`,
+      role: 'SUPPLIER',
       authClient: 'WEB',
       isFirstLogin: false,
       designation: null,
-      designationLabel: 'Dealer',
-      permissionGroups: ['DEALER_PORTAL'],
-      permissions: [...DEALER_PORTAL],
+      designationLabel: 'Supplier',
+      permissionGroups: ['SUPPLIER_PORTAL'],
+      permissions: [...SUPPLIER_PORTAL],
     },
   });

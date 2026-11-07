@@ -15,7 +15,7 @@ const TONES = {
 const STYLES: Record<OrderStatus, string> = {
   QUOTATION: TONES.gray,
   PENDING: TONES.amber,
-  DEALER_LEVEL_PENDING: TONES.orange,
+  SUPPLIER_LEVEL_PENDING: TONES.orange,
   CONFIRMED: TONES.blue,
   SHIPPED: TONES.purple,
   DELIVERED: TONES.green,

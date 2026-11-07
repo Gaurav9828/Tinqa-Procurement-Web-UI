@@ -182,10 +182,10 @@ const Dashboard: React.FC<{
     setSyncing(true);
     try {
       const res = await financeApi.syncProcurement();
-      notify.success(res.message || 'Dealer purchases are up to date.');
+      notify.success(res.message || 'Supplier purchases are up to date.');
       refresh();
     } catch (err: unknown) {
-      notify.error(err, 'Dealer purchases and salaries could not be read from Procurement.');
+      notify.error(err, 'Supplier purchases and salaries could not be read from Procurement.');
       refresh();
     } finally {
       setSyncing(false);
@@ -256,12 +256,12 @@ const Dashboard: React.FC<{
           <div className="text-[11px] text-gray-500 dark:text-neutral-400 flex items-center gap-2">
             {sync?.lastError ? (
               <span className="flex items-center gap-1 text-rose-600 dark:text-rose-400" title={sync.lastError}>
-                <AlertTriangle className="w-3.5 h-3.5" /> Dealer purchase sync failing
+                <AlertTriangle className="w-3.5 h-3.5" /> Supplier purchase sync failing
               </span>
             ) : (
               <span className="flex items-center gap-1">
                 <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" aria-hidden />
-                Dealer purchases &amp; salaries synced {sync?.lastSuccessAt ? formatDateTime(sync.lastSuccessAt) : 'never'}
+                Supplier purchases &amp; salaries synced {sync?.lastSuccessAt ? formatDateTime(sync.lastSuccessAt) : 'never'}
               </span>
             )}
             <button type="button" onClick={syncNow} disabled={syncing}
@@ -330,7 +330,7 @@ const Dashboard: React.FC<{
         </MetricCard>
 
         <MetricCard {...metricProps} metric={METRICS.directCosts} value={rupees(pnl.directCosts)}
-          note="Raw materials & dealer purchases, consumables, labour, factory overheads, packaging"
+          note="Raw materials & supplier purchases, consumables, labour, factory overheads, packaging"
           table={categoryTable(directCats)} section={() => buildSections().directCosts()}>
           <ColumnChart title="Direct costs over time" labels={labels} exportId="directTrend"
             series={[{ key: 'direct', label: 'Direct costs', slot: 1, values: series('directCosts') }]} />

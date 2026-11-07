@@ -48,7 +48,7 @@ export const FinancePage: React.FC = () => {
       <div>
         <h1 className="text-3xl font-bold tracking-tight text-black dark:text-white">Accounts & Finance</h1>
         <p className="text-gray-500 dark:text-neutral-400 text-sm mt-1">
-          One company account, from ₹0: customer payments come in, refunds, dealer purchases and approved expenses go out — every rupee accounted for.
+          One company account, from ₹0: customer payments come in, refunds, supplier purchases and approved expenses go out — every rupee accounted for.
         </p>
       </div>
 

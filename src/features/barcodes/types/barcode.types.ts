@@ -46,7 +46,7 @@ export interface BarcodeUnit {
   lockedAt: string | null;
 }
 
-/** Where a piece came from: its batch, the purchase order it was received against and the dealer. */
+/** Where a piece came from: its batch, the purchase order it was received against and the supplier. */
 export interface BarcodeSource {
   stockId: number;
   stockIdentityNumber: string;
@@ -58,8 +58,8 @@ export interface BarcodeSource {
   orderNumber: string;
   orderDate: string;
   deliveredOn: string | null;
-  dealerId: number;
-  dealerName: string;
+  supplierId: number;
+  supplierName: string;
 }
 
 export interface BarcodeEvent {

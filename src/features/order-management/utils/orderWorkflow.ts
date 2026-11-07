@@ -2,12 +2,12 @@ import type { OrderStatus } from '../../../types/common.types';
 import type { Permission } from '../../../config/access';
 
 /**
- * Procurement (dealer) order lifecycle. Every move is forward-only: an order can never go
+ * Procurement (supplier) order lifecycle. Every move is forward-only: an order can never go
  * back to an earlier step. This is the console's copy of the rules so admins are only shown
  * valid next steps; the procurement backend enforces the same table (UI rules are guidance,
  * not security).
  *
- *   QUOTATION → PENDING (approval) → DEALER_LEVEL_PENDING → CONFIRMED → SHIPPED → DELIVERED
+ *   QUOTATION → PENDING (approval) → SUPPLIER_LEVEL_PENDING → CONFIRMED → SHIPPED → DELIVERED
  *   DELIVERED → RETURN_REQUESTED → RETURN_APPROVED → RETURN_PICKED_UP → RETURN_RECEIVED
  *             → REFUND_INITIATED → REFUND_COMPLETED   (REFUND_FAILED → REFUND_INITIATED retries)
  *   Cancelling is possible only before shipment.
@@ -42,18 +42,18 @@ export interface StatusInfo {
 }
 
 export const ORDER_STATUS_INFO: Record<OrderStatus, StatusInfo> = {
-  QUOTATION: { label: 'Quotation', description: 'Dealer quotation recorded; still editable.', action: 'Back to quotation', tone: 'forward' },
+  QUOTATION: { label: 'Quotation', description: 'Supplier quotation recorded; still editable.', action: 'Back to quotation', tone: 'forward' },
   PENDING: { label: 'Pending approval', description: 'Sent to an order approver.', action: 'Submit for approval', tone: 'forward' },
-  DEALER_LEVEL_PENDING: { label: 'Awaiting dealer', description: 'Approved; waiting for the dealer to accept or reject it (they can answer from their dealer login).', action: 'Approve', tone: 'forward' },
-  CONFIRMED: { label: 'Confirmed', description: 'The dealer accepted the order.', action: 'Dealer confirmed', tone: 'forward' },
-  SHIPPED: { label: 'Shipped', description: 'The dealer dispatched the goods.', action: 'Mark shipped', tone: 'forward' },
+  SUPPLIER_LEVEL_PENDING: { label: 'Awaiting supplier', description: 'Approved; waiting for the supplier to accept or reject it (they can answer from their supplier login).', action: 'Approve', tone: 'forward' },
+  CONFIRMED: { label: 'Confirmed', description: 'The supplier accepted the order.', action: 'Supplier confirmed', tone: 'forward' },
+  SHIPPED: { label: 'Shipped', description: 'The supplier dispatched the goods.', action: 'Mark shipped', tone: 'forward' },
   DELIVERED: { label: 'Delivered', description: 'Goods received at the warehouse.', action: 'Mark delivered', tone: 'forward' },
-  RETURN_REQUESTED: { label: 'Return requested', description: 'Some or all goods are being sent back to the dealer.', action: 'Request return', tone: 'exception' },
-  RETURN_APPROVED: { label: 'Return approved', description: 'The dealer agreed to take the goods back.', action: 'Approve return', tone: 'forward' },
+  RETURN_REQUESTED: { label: 'Return requested', description: 'Some or all goods are being sent back to the supplier.', action: 'Request return', tone: 'exception' },
+  RETURN_APPROVED: { label: 'Return approved', description: 'The supplier agreed to take the goods back.', action: 'Approve return', tone: 'forward' },
   RETURN_REJECTED: { label: 'Return rejected', description: 'The return was not accepted. The order stays delivered.', action: 'Reject return', tone: 'exception' },
-  RETURN_PICKED_UP: { label: 'Return picked up', description: 'The goods left the warehouse for the dealer.', action: 'Mark picked up', tone: 'forward' },
-  RETURN_RECEIVED: { label: 'Return received', description: 'The dealer received the returned goods.', action: 'Dealer received goods', tone: 'forward' },
-  REFUND_INITIATED: { label: 'Refund initiated', description: 'The dealer started refunding the amount.', action: 'Refund initiated', tone: 'forward' },
+  RETURN_PICKED_UP: { label: 'Return picked up', description: 'The goods left the warehouse for the supplier.', action: 'Mark picked up', tone: 'forward' },
+  RETURN_RECEIVED: { label: 'Return received', description: 'The supplier received the returned goods.', action: 'Supplier received goods', tone: 'forward' },
+  REFUND_INITIATED: { label: 'Refund initiated', description: 'The supplier started refunding the amount.', action: 'Refund initiated', tone: 'forward' },
   REFUND_FAILED: { label: 'Refund failed', description: 'The refund did not go through; it can be initiated again.', action: 'Refund failed', tone: 'exception' },
   REFUND_COMPLETED: { label: 'Refund completed', description: 'The refund was received. The order is closed.', action: 'Refund received', tone: 'forward' },
   CANCELLED: { label: 'Cancelled', description: 'The order is closed without delivery.', action: 'Cancel order', tone: 'exception' },
@@ -62,9 +62,9 @@ export const ORDER_STATUS_INFO: Record<OrderStatus, StatusInfo> = {
 /** Forward transitions. Anything not listed is not allowed. */
 export const ORDER_NEXT_STATUSES: Record<OrderStatus, readonly OrderStatus[]> = {
   QUOTATION: ['PENDING', 'CANCELLED'],
-  // Only the approval decision decides a pending order (Approvals Hub): approve → DEALER_LEVEL_PENDING, reject → CANCELLED.
+  // Only the approval decision decides a pending order (Approvals Hub): approve → SUPPLIER_LEVEL_PENDING, reject → CANCELLED.
   PENDING: [],
-  DEALER_LEVEL_PENDING: ['CONFIRMED', 'CANCELLED'],
+  SUPPLIER_LEVEL_PENDING: ['CONFIRMED', 'CANCELLED'],
   CONFIRMED: ['SHIPPED', 'CANCELLED'],
   // Once shipped it can't be cancelled; unwanted goods come back through a return.
   SHIPPED: ['DELIVERED'],
@@ -87,7 +87,7 @@ export const FINAL_ORDER_STATUSES: ReadonlySet<OrderStatus> = new Set(['CANCELLE
 export const REASON_REQUIRED_STATUSES: ReadonlySet<OrderStatus> = new Set(['CANCELLED', 'RETURN_REQUESTED', 'RETURN_REJECTED', 'REFUND_FAILED']);
 
 /** Approval-type decisions: moving out of these needs PROCUREMENT_ORDER_APPROVE as well (the backend's rule). */
-const APPROVER_ONLY_FROM: ReadonlySet<OrderStatus> = new Set(['PENDING', 'DEALER_LEVEL_PENDING', 'RETURN_REQUESTED']);
+const APPROVER_ONLY_FROM: ReadonlySet<OrderStatus> = new Set(['PENDING', 'SUPPLIER_LEVEL_PENDING', 'RETURN_REQUESTED']);
 
 /** Quantity, prices and dates can only change before the order is approved. */
 export const canEditOrder = (status: OrderStatus, access: OrderAccess): boolean =>
@@ -114,8 +114,8 @@ export const getOrderBlockReason = (status: string | null | undefined, access: O
   if (status === 'PENDING') return 'Waiting for an order approver to approve or reject it in the Approvals Hub.';
   if (!access.canProgress) return "You can view this order but your designation doesn't include progressing orders.";
   if (APPROVER_ONLY_FROM.has(status) && !access.canApprove) {
-    return status === 'DEALER_LEVEL_PENDING'
-      ? 'Waiting for the dealer to accept or reject it from their dealer login. An order approver can record their answer instead.'
+    return status === 'SUPPLIER_LEVEL_PENDING'
+      ? 'Waiting for the supplier to accept or reject it from their supplier login. An order approver can record their answer instead.'
       : 'An order approver decides whether to approve this return.';
   }
   return null;
@@ -125,7 +125,7 @@ export const getOrderBlockReason = (status: string | null | undefined, access: O
 export const MAIN_ORDER_TRACK: { status: OrderStatus; label: string }[] = [
   { status: 'QUOTATION', label: 'Quotation' },
   { status: 'PENDING', label: 'Approval' },
-  { status: 'DEALER_LEVEL_PENDING', label: 'Dealer' },
+  { status: 'SUPPLIER_LEVEL_PENDING', label: 'Supplier' },
   { status: 'CONFIRMED', label: 'Confirmed' },
   { status: 'SHIPPED', label: 'Shipped' },
   { status: 'DELIVERED', label: 'Delivered' },
@@ -135,7 +135,7 @@ export const RETURN_ORDER_TRACK: { status: OrderStatus; label: string; also?: Or
   { status: 'RETURN_REQUESTED', label: 'Requested' },
   { status: 'RETURN_APPROVED', label: 'Approved', also: ['RETURN_REJECTED'] },
   { status: 'RETURN_PICKED_UP', label: 'Picked up' },
-  { status: 'RETURN_RECEIVED', label: 'With dealer' },
+  { status: 'RETURN_RECEIVED', label: 'With supplier' },
   { status: 'REFUND_INITIATED', label: 'Refund', also: ['REFUND_FAILED', 'REFUND_COMPLETED'] },
 ];
 
@@ -166,8 +166,8 @@ export const validateMove = (
   return errors;
 };
 
-/** A dealer's change waits for approval: the quotation is frozen until it is decided (the backend refuses with 409). */
-export const DEALER_CHANGE_BLOCK_REASON = "A dealer's change to this quotation is waiting for approval in the Approvals hub.";
+/** A supplier's change waits for approval: the quotation is frozen until it is decided (the backend refuses with 409). */
+export const SUPPLIER_CHANGE_BLOCK_REASON = "A supplier's change to this quotation is waiting for approval in the Approvals hub.";
 
-export const isFrozenByDealerChange = (order: { orderStatus: string; dealerChangePending?: boolean }): boolean =>
-  !!order.dealerChangePending && order.orderStatus === 'QUOTATION';
+export const isFrozenBySupplierChange = (order: { orderStatus: string; supplierChangePending?: boolean }): boolean =>
+  !!order.supplierChangePending && order.orderStatus === 'QUOTATION';

@@ -39,9 +39,9 @@ export const orderApi = {
         return response.data;
     },
 
-    getOrdersByDealerId: async (dealerId: number): Promise<ApiResponse<OrderResponse[]>> => {
+    getOrdersBySupplierId: async (supplierId: number): Promise<ApiResponse<OrderResponse[]>> => {
         const response = await axiosClient.get<ApiResponse<OrderResponse[]>>(
-            `${BASE_URL}/dealer/${dealerId}`
+            `${BASE_URL}/supplier/${supplierId}`
         );
         return response.data;
     },
@@ -63,13 +63,13 @@ export const orderApi = {
         return response.data;
     },
 
-    /** The dealer's invoice that counts for the order, or null before one is uploaded. */
+    /** The supplier's invoice that counts for the order, or null before one is uploaded. */
     getInvoice: async (orderId: number): Promise<ApiResponse<OrderInvoice | null>> => {
         const response = await axiosClient.get<ApiResponse<OrderInvoice | null>>(`${BASE_URL}/${orderId}/invoice`);
         return response.data;
     },
 
-    /** Uploads the dealer's invoice PDF; the server reads it and checks it against the quotation. */
+    /** Uploads the supplier's invoice PDF; the server reads it and checks it against the quotation. */
     uploadInvoice: async (orderId: number, file: File): Promise<ApiResponse<OrderInvoice>> => {
         const formData = new FormData();
         formData.append('file', file);
@@ -83,7 +83,7 @@ export const orderApi = {
         return new Blob([response.data], { type: (response.headers['content-type'] as string) || 'application/pdf' });
     },
 
-    /** Dealers' quotation changes waiting for a decision (DEALER_QUOTATION_CHANGE_APPROVE). */
+    /** Suppliers' quotation changes waiting for a decision (SUPPLIER_QUOTATION_CHANGE_APPROVE). */
     listChangeRequests: async (status: OrderChangeRequest['status'] = 'PENDING'): Promise<ApiResponse<OrderChangeRequest[]>> => {
         const response = await axiosClient.get<ApiResponse<OrderChangeRequest[]>>(`${BASE_URL}/change-requests`, { params: { status } });
         return response.data;

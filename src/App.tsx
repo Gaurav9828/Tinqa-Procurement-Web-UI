@@ -21,8 +21,8 @@ const EmployeeManagementPage = lazy(() =>
 const ItemManagementPage = lazy(() =>
   import('./features/item-management/pages/ItemManagementPage').then((m) => ({ default: m.ItemManagementPage }))
 );
-const DealerManagementPage = lazy(() =>
-  import('./features/dealer-management/pages/DealerManagementPage').then((m) => ({ default: m.DealerManagementPage }))
+const SupplierManagementPage = lazy(() =>
+  import('./features/supplier-management/pages/SupplierManagementPage').then((m) => ({ default: m.SupplierManagementPage }))
 );
 const StockManagementPage = lazy(() =>
   import('./features/stock-management/pages/StockManagementPage').then((m) => ({ default: m.StockManagementPage }))
@@ -54,11 +54,11 @@ const ProductManagementPage = lazy(() =>
   import('./features/products-management/pages/ProductManagementPage').then((m) => ({ default: m.ProductManagementPage }))
 );
 
-const DealerQuotationsPage = lazy(() =>
-  import('./features/dealer-portal/pages/DealerQuotationsPage').then((m) => ({ default: m.DealerQuotationsPage }))
+const SupplierQuotationsPage = lazy(() =>
+  import('./features/supplier-portal/pages/SupplierQuotationsPage').then((m) => ({ default: m.SupplierQuotationsPage }))
 );
-const DealerOrdersPage = lazy(() =>
-  import('./features/dealer-portal/pages/DealerOrdersPage').then((m) => ({ default: m.DealerOrdersPage }))
+const SupplierOrdersPage = lazy(() =>
+  import('./features/supplier-portal/pages/SupplierOrdersPage').then((m) => ({ default: m.SupplierOrdersPage }))
 );
 const PrintOrderPage = lazy(() => import('./features/printing/pages/PrintOrderPage').then((m) => ({ default: m.PrintOrderPage })));
 
@@ -166,12 +166,12 @@ export const App: React.FC = () => {
                 <Route index element={<HomeRedirect />} />
                 <Route path="profile" element={<ProfilePage />} />
 
-                {/* Dealer logins */}
-                <Route element={<RequireNavAccess navId="dealer-quotations" />}>
-                  <Route path="dealer/quotations" element={<DealerQuotationsPage />} />
+                {/* Supplier logins */}
+                <Route element={<RequireNavAccess navId="supplier-quotations" />}>
+                  <Route path="supplier/quotations" element={<SupplierQuotationsPage />} />
                 </Route>
-                <Route element={<RequireNavAccess navId="dealer-orders" />}>
-                  <Route path="dealer/orders" element={<DealerOrdersPage />} />
+                <Route element={<RequireNavAccess navId="supplier-orders" />}>
+                  <Route path="supplier/orders" element={<SupplierOrdersPage />} />
                 </Route>
 
                 <Route element={<RequireNavAccess navId="analytics" />}>
@@ -225,8 +225,8 @@ export const App: React.FC = () => {
                 <Route element={<RequireNavAccess navId="products" />}>
                   <Route path="products" element={<ProductManagementPage />} />
                 </Route>
-                <Route element={<RequireNavAccess navId="dealers" />}>
-                  <Route path="dealers" element={<DealerManagementPage />} />
+                <Route element={<RequireNavAccess navId="suppliers" />}>
+                  <Route path="suppliers" element={<SupplierManagementPage />} />
                 </Route>
                 <Route element={<RequireNavAccess navId="auctions" />}>
                   <Route path="auctions" element={<Placeholder title="Auctions Module Container" />} />

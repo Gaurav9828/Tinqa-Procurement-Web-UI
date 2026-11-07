@@ -49,7 +49,7 @@ export const StockTable: React.FC<StockTableProps> = ({
                     <thead>
                         <tr className="bg-black/5 dark:bg-white/5 border-b border-black/10 dark:border-white/10 font-semibold text-gray-500 dark:text-neutral-400 uppercase tracking-wider">
                             <th className="p-4">Identity / Batch</th>
-                            <th className="p-4">Dealer & Item</th>
+                            <th className="p-4">Supplier & Item</th>
                             <th className="p-4">Available / Total</th>
                             <th className="p-4">Unit Price</th>
                             <th className="p-4">Status</th>
@@ -66,7 +66,7 @@ export const StockTable: React.FC<StockTableProps> = ({
 
                                 <td className="p-4">
                                     <div className="font-medium text-black dark:text-white">{stock.itemName || `Item #${stock.itemId}`}</div>
-                                    <div className="text-[11px] text-gray-400">{stock.dealerName || `Dealer #${stock.dealerId}`}</div>
+                                    <div className="text-[11px] text-gray-400">{stock.supplierName || `Supplier #${stock.supplierId}`}</div>
                                 </td>
 
                                 <td className="p-4 font-mono">

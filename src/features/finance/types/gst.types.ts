@@ -1,7 +1,7 @@
 /** The GST register and position (GET /admin/finance/gst/*). Amounts are paise, signed where noted. */
 
 export type GstDirection = 'OUTPUT' | 'INPUT';
-export type GstSource = 'ECOMMERCE_SALE' | 'ECOMMERCE_CREDIT_NOTE' | 'OTHER_SUPPLY' | 'DEALER_PURCHASE' | 'EXPENSE_BILL';
+export type GstSource = 'ECOMMERCE_SALE' | 'ECOMMERCE_CREDIT_NOTE' | 'OTHER_SUPPLY' | 'SUPPLIER_PURCHASE' | 'EXPENSE_BILL';
 export type GstDocumentType = 'TAX_INVOICE' | 'CREDIT_NOTE' | 'PURCHASE_INVOICE' | 'EXPENSE_BILL' | 'SUPPLY_BILL' | 'REVERSAL';
 export type GstMonthStatus = 'OPEN' | 'TO_FILE' | 'PAST_DUE_DATE';
 

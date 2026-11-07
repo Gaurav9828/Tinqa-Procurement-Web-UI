@@ -32,8 +32,8 @@ const signInWith = (permissions: string[]) =>
 
 // The guide must keep up with the app: these fail when a role, menu item or actor is added without updating it.
 describe('guide content', () => {
-  it('covers every designation and dealers', () => {
-    expect(GUIDE_ROLE_IDS).toEqual(expect.arrayContaining([...DESIGNATIONS, 'DEALER']));
+  it('covers every designation and suppliers', () => {
+    expect(GUIDE_ROLE_IDS).toEqual(expect.arrayContaining([...DESIGNATIONS, 'SUPPLIER']));
     expect(GUIDE_ROLE_IDS).toHaveLength(DESIGNATIONS.length + 1);
   });
 
@@ -70,7 +70,7 @@ describe('user guide access', () => {
   });
 
   it('stays hidden and closed without the permission', () => {
-    signInWith(['DEALER_VIEW', 'PROCUREMENT_ORDER_VIEW']);
+    signInWith(['SUPPLIER_VIEW', 'PROCUREMENT_ORDER_VIEW']);
     const { result } = renderHook(() => useAccess());
     expect(result.current.authorizedNavigation().map((item) => item.id)).not.toContain('user-guide');
 
@@ -89,17 +89,17 @@ describe('user guide access', () => {
 });
 
 describe('role PDF', () => {
-  it("holds only the Dealer Manager's role and flows", async () => {
-    const pdf = (await buildGuidePdf('DEALER_MANAGER')).output();
+  it("holds only the Supplier Manager's role and flows", async () => {
+    const pdf = (await buildGuidePdf('SUPPLIER_MANAGER')).output();
 
-    expect(pdf).toContain('Dealer Manager guide');
-    expect(pdf).toContain('Buying from a dealer');
-    expect(pdf).toContain('A dealer changes their quotation');
+    expect(pdf).toContain('Supplier Manager guide');
+    expect(pdf).toContain('Buying from a supplier');
+    expect(pdf).toContain('A supplier changes their quotation');
     for (const other of ['Customer order to the doorstep', 'Support ticket', 'Company profile change', 'Refund for a customer']) {
       expect(pdf).not.toContain(other);
     }
     expect(pdf).not.toContain('Delivers orders to the customer'); // another role's section
-    expect(guideFileName('DEALER_MANAGER')).toBe('TinQa-User-Guide-Dealer-Manager.pdf');
+    expect(guideFileName('SUPPLIER_MANAGER')).toBe('TinQa-User-Guide-Supplier-Manager.pdf');
   });
 
   it('holds every role in the full guide', async () => {
@@ -121,11 +121,11 @@ describe('UserGuidePage', () => {
     renderPage();
     expect(screen.getByRole('heading', { name: /Customer order to the doorstep/ })).toBeInTheDocument();
 
-    await user.click(within(screen.getByRole('group', { name: 'Role' })).getByRole('button', { name: 'Dealer Manager' }));
-    expect(screen.getByRole('heading', { name: /Buying from a dealer/ })).toBeInTheDocument();
+    await user.click(within(screen.getByRole('group', { name: 'Role' })).getByRole('button', { name: 'Supplier Manager' }));
+    expect(screen.getByRole('heading', { name: /Buying from a supplier/ })).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: /Customer order to the doorstep/ })).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: 'Download Dealer Manager guide (PDF)' }));
-    await waitFor(() => expect(downloadGuidePdf).toHaveBeenCalledWith('DEALER_MANAGER'));
+    await user.click(screen.getByRole('button', { name: 'Download Supplier Manager guide (PDF)' }));
+    await waitFor(() => expect(downloadGuidePdf).toHaveBeenCalledWith('SUPPLIER_MANAGER'));
   });
 });

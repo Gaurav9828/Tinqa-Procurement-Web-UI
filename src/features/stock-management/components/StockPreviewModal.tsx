@@ -93,17 +93,17 @@ export const StockPreviewModal: React.FC<StockPreviewModalProps> = ({
               </div>
             </div>
 
-            {/* Dealer Information */}
+            {/* Supplier Information */}
             <div className="p-4 rounded-xl border border-black/5 dark:border-white/5 space-y-3">
               <div className="flex items-center gap-2 text-gray-500 font-semibold">
                 <Building2 className="w-4 h-4 text-[#0071e3]" />
-                <span>Dealer Information</span>
+                <span>Supplier Information</span>
               </div>
               <div className="space-y-1">
                 <p className="text-sm font-bold text-black dark:text-white">
-                  {stock.dealerName || `Dealer #${stock.dealerId}`}
+                  {stock.supplierName || `Supplier #${stock.supplierId}`}
                 </p>
-                <p className="text-[11px] text-gray-400 font-mono">Dealer ID: {stock.dealerId}</p>
+                <p className="text-[11px] text-gray-400 font-mono">Supplier ID: {stock.supplierId}</p>
               </div>
             </div>
 

@@ -524,9 +524,9 @@ export const ApprovalPreviewModal: React.FC<PreviewModalProps> = ({
                 <div className="flex items-center gap-2 mt-3 text-xs text-gray-500">
                   <UserRound className="w-3.5 h-3.5" />
                   <span>
-                    Dealer:{' '}
+                    Supplier:{' '}
                     <span className="font-medium text-black dark:text-white">
-                      {request.dealerName || 'N/A'}
+                      {request.supplierName || 'N/A'}
                     </span>
                   </span>
                 </div>
@@ -637,11 +637,11 @@ export const ApprovalPreviewModal: React.FC<PreviewModalProps> = ({
 
                   <div>
                     <span className="text-[10px] text-gray-400 uppercase">
-                      Dealer
+                      Supplier
                     </span>
 
                     <p className="font-medium text-black dark:text-white">
-                      {request.dealerName || 'N/A'}
+                      {request.supplierName || 'N/A'}
                     </p>
                   </div>
 
@@ -659,10 +659,10 @@ export const ApprovalPreviewModal: React.FC<PreviewModalProps> = ({
 
               </div>
 
-              {typeof request.additionalInfo?.dealerNote === 'string' && (
+              {typeof request.additionalInfo?.supplierNote === 'string' && (
                 <p className="text-sm rounded-xl bg-gray-50 dark:bg-white/5 px-3 py-2">
-                  <span className="text-xs text-gray-400 block">Dealer's note</span>
-                  {request.additionalInfo.dealerNote}
+                  <span className="text-xs text-gray-400 block">Supplier's note</span>
+                  {request.additionalInfo.supplierNote}
                 </p>
               )}
 

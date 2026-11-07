@@ -15,20 +15,20 @@ export interface NavigationItem {
 }
 
 export const APP_NAVIGATION: NavigationItem[] = [
-  // Dealer logins: their own quotations, and their orders once a quotation is approved. Nothing else opens for them.
+  // Supplier logins: their own quotations, and their orders once a quotation is approved. Nothing else opens for them.
   {
-    id: 'dealer-quotations',
+    id: 'supplier-quotations',
     label: 'My Quotations',
-    path: '/dealer/quotations',
+    path: '/supplier/quotations',
     iconName: 'FileText',
-    requires: ['DEALER_PORTAL_VIEW'],
+    requires: ['SUPPLIER_PORTAL_VIEW'],
   },
   {
-    id: 'dealer-orders',
+    id: 'supplier-orders',
     label: 'My Orders',
-    path: '/dealer/orders',
+    path: '/supplier/orders',
     iconName: 'ShoppingBag',
-    requires: ['DEALER_PORTAL_VIEW'],
+    requires: ['SUPPLIER_PORTAL_VIEW'],
   },
   // {
   //   id: 'analytics',
@@ -123,7 +123,7 @@ export const APP_NAVIGATION: NavigationItem[] = [
     requires: ['ITEM_VIEW', 'STOCK_VIEW'],
   },
   {
-    // Trace any piece or product unit by its barcode: batch, purchase order, dealer, the product it is in, its parts
+    // Trace any piece or product unit by its barcode: batch, purchase order, supplier, the product it is in, its parts
     id: 'barcodes',
     label: 'Barcode Tracking',
     path: '/barcodes',
@@ -138,11 +138,11 @@ export const APP_NAVIGATION: NavigationItem[] = [
     requires: ['PRODUCT_VIEW'],
   },
   {
-    id: 'dealers',
-    label: 'Dealer Management',
-    path: '/dealers',
+    id: 'suppliers',
+    label: 'Supplier Management',
+    path: '/suppliers',
     iconName: 'Users',
-    requires: ['DEALER_VIEW'],
+    requires: ['SUPPLIER_VIEW'],
   },
   // {
   //   id: 'auctions',

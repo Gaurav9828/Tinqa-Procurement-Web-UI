@@ -9,7 +9,7 @@ import { StockTable } from './StockTable';
 import type { StockResponse } from '../types/stock.types';
 
 vi.mock('../../../hooks/useLookupOptions', () => ({
-  useDealerOptions: () => ({ options: [{ id: 3, name: 'Acme Traders' }, { id: 4, name: 'Other Dealer' }], isLoading: false }),
+  useSupplierOptions: () => ({ options: [{ id: 3, name: 'Acme Traders' }, { id: 4, name: 'Other Supplier' }], isLoading: false }),
   useItemOptions: () => ({ options: [{ id: 7, name: 'Motherboard' }, { id: 8, name: 'Cable' }], isLoading: false }),
 }));
 
@@ -18,8 +18,8 @@ const STOCK = {
   stockIdentityNumber: 'STK-1',
   batchNumber: 'BAT-1',
   orderNumber: 'ORD-1',
-  dealerId: 3,
-  dealerName: 'Acme Traders',
+  supplierId: 3,
+  supplierName: 'Acme Traders',
   itemId: 7,
   itemName: 'Motherboard',
   totalOrderQuantity: 10,
@@ -46,7 +46,7 @@ describe('Stock quantities are never adjusted after creation', () => {
     expect(screen.getByTitle('Edit Stock Details')).toBeInTheDocument();
   });
 
-  it('Edit Stock Batch shows units, test result, dealer and item disabled and sends the stored values back', async () => {
+  it('Edit Stock Batch shows units, test result, supplier and item disabled and sends the stored values back', async () => {
     const onRequestSubmit = vi.fn();
     const user = userEvent.setup();
     render(withStore(<StockEditModal isOpen stock={STOCK} isSubmitting={false} onClose={() => undefined} onRequestSubmit={onRequestSubmit} />));
@@ -56,7 +56,7 @@ describe('Stock quantities are never adjusted after creation', () => {
     expect(screen.getByTestId('edit-defected-units')).toBeDisabled();
     expect(screen.getByTestId('edit-defected-units')).toHaveValue(2);
     expect(screen.getByRole('checkbox', { name: 'Has Passed Quality Testing' })).toBeDisabled();
-    expect(screen.getByDisplayValue('Acme Traders')).toBeDisabled(); // dealer fixed to the order
+    expect(screen.getByDisplayValue('Acme Traders')).toBeDisabled(); // supplier fixed to the order
     expect(screen.getByDisplayValue('Motherboard')).toBeDisabled(); // item fixed to the order
     expect(screen.getByText(/can't be edited\. To add stock, create a new stock entry/)).toBeInTheDocument();
 
@@ -72,7 +72,7 @@ describe('Stock quantities are never adjusted after creation', () => {
 
     expect(onRequestSubmit).toHaveBeenCalledWith(
       1,
-      expect.objectContaining({ dealerId: 3, itemId: 7, unitsPassedTest: 8, defectedUnits: 2, hasTested: false, batchNumber: 'BAT-1', isActive: false })
+      expect.objectContaining({ supplierId: 3, itemId: 7, unitsPassedTest: 8, defectedUnits: 2, hasTested: false, batchNumber: 'BAT-1', isActive: false })
     );
   });
 });

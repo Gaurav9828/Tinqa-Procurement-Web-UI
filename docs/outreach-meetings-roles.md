@@ -28,7 +28,7 @@ permission groups. It is used exactly like a built-in designation: an employee h
 
 Rules (server-enforced):
 - `code` is generated from the label (`MARKETING_EXECUTIVE`), unique across built-in and custom roles, never changes.
-- The creator may grant only groups they hold themselves (their effective groups). `DEALER_PORTAL` and
+- The creator may grant only groups they hold themselves (their effective groups). `SUPPLIER_PORTAL` and
   `SYSTEM_ADMINISTRATION` can never be granted to a custom role. At least one group.
 - Editing a role's groups applies to its employees from their next sign-in / token refresh (same as today).
 - A role in use by any employee cannot be deleted; it can be deactivated (no new employees get it).
@@ -99,9 +99,9 @@ clientName, clientDescription, clientContact, outreachBusinessId|null, startsAt,
 placeName, address, googleMapsUrl (IN_PERSON), status: SCHEDULED|COMPLETED|CANCELLED, cancelReason,
 organizerId, organizerName, attendees: Attendee[], feedbackCount, attendeeCount, completedAt, createdAt,
 myAttendance: Attendee|null, canManage: boolean }`
-- `meetingType`: `CLIENT | BUSINESS_TO_BUSINESS | BUSINESS_TO_DEALER | CLIENT_TO_CLIENT | INTERNAL | OTHER`.
+- `meetingType`: `CLIENT | BUSINESS_TO_BUSINESS | BUSINESS_TO_SUPPLIER | CLIENT_TO_CLIENT | INTERNAL | OTHER`.
 - ONLINE needs `joinUrl` (https; the organiser pastes the Meet/Teams/Zoom link, TinQa does not create it).
-  IN_PERSON needs `placeName` + `address`; `googleMapsUrl` optional, validated like dealers' `@GoogleMapsUrl`.
+  IN_PERSON needs `placeName` + `address`; `googleMapsUrl` optional, validated like suppliers' `@GoogleMapsUrl`.
 - `startsAt` in the future when scheduled; `endsAt` after `startsAt`, on the same day (India time), within 12 h.
 - **No one is in two meetings at once** (added 2026-10-31): scheduling, changing the time, or inviting people is refused
   with 409 `MEETING_TIME_CLASH` when anyone concerned (the organiser included) is INVITED to another SCHEDULED meeting

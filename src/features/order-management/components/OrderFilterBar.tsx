@@ -2,19 +2,19 @@ import React from 'react';
 import { Search, Plus } from 'lucide-react';
 
 
-import type { DealerResponse } from '../../dealer-management/types/dealer.types';
+import type { SupplierResponse } from '../../supplier-management/types/supplier.types';
 import { ORDER_STATUS, type OrderStatus } from '../../../types/common.types';
 import { orderStatusLabel } from '../utils/orderWorkflow';
 
 interface OrderFilterBarProps {
   searchQuery: string;
   selectedStatus?: OrderStatus;
-  selectedDealerId?: number;
-  /** Hidden when absent (the user can't see dealers). */
-  dealers?: DealerResponse[];
+  selectedSupplierId?: number;
+  /** Hidden when absent (the user can't see suppliers). */
+  suppliers?: SupplierResponse[];
   onSearchChange: (val: string) => void;
   onStatusChange: (status?: OrderStatus) => void;
-  onDealerChange: (dealerId?: number) => void;
+  onSupplierChange: (supplierId?: number) => void;
   /** Hidden when absent (the user can't create orders). */
   onOpenCreateOrderModal?: () => void;
 }
@@ -22,11 +22,11 @@ interface OrderFilterBarProps {
 export const OrderFilterBar: React.FC<OrderFilterBarProps> = ({
   searchQuery,
   selectedStatus,
-  selectedDealerId,
-  dealers,
+  selectedSupplierId,
+  suppliers,
   onSearchChange,
   onStatusChange,
-  onDealerChange,
+  onSupplierChange,
   onOpenCreateOrderModal,
 }) => {
   return (
@@ -58,15 +58,15 @@ export const OrderFilterBar: React.FC<OrderFilterBarProps> = ({
           ))}
         </select>
 
-        {/* Dealer Dropdown */}
-        {dealers && (
+        {/* Supplier Dropdown */}
+        {suppliers && (
           <select
-            value={selectedDealerId || ''}
-            onChange={(e) => onDealerChange(e.target.value ? Number(e.target.value) : undefined)}
+            value={selectedSupplierId || ''}
+            onChange={(e) => onSupplierChange(e.target.value ? Number(e.target.value) : undefined)}
             className="px-3 py-2 bg-white dark:bg-neutral-900 border border-black/10 dark:border-white/10 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-[#0071e3] text-black dark:text-white cursor-pointer"
           >
-            <option value="">All Dealers</option>
-            {dealers.map((d) => (
+            <option value="">All Suppliers</option>
+            {suppliers.map((d) => (
               <option key={d.id} value={d.id}>
                 {d.name}
               </option>

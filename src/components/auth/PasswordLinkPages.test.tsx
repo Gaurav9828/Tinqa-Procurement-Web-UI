@@ -73,7 +73,7 @@ describe('Set password from an emailed link', () => {
     await user.click(screen.getByRole('button', { name: 'Save password' }));
 
     expect(api.setPasswordFromLink).toHaveBeenCalledWith({ token: 'abc123', newPassword: STRONG, confirmNewPassword: STRONG });
-    expect(await screen.findByText('Staff & Dealer Sign-in')).toBeInTheDocument();
+    expect(await screen.findByText('Staff & Supplier Sign-in')).toBeInTheDocument();
     expect(screen.getByText('Your password is saved. Sign in with your new password.')).toBeInTheDocument();
   });
 

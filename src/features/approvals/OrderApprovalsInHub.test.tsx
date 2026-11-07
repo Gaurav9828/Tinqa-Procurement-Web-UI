@@ -26,16 +26,16 @@ const orders = vi.mocked(orderApi);
 
 const ok = <T,>(data: T) => ({ success: true, message: 'OK', errorCode: null, timestamp: '', path: '', data });
 
-// Dealer Managers as the backend reports them: Level 1 progresses orders, Level 2 also approves them
-const DEALER_MANAGER_L1: Permission[] = [
-  'DEALER_VIEW', 'PROCUREMENT_ORDER_VIEW', 'PROCUREMENT_ORDER_CREATE', 'PROCUREMENT_ORDER_UPDATE', 'PROCUREMENT_ORDER_UPDATE_STATUS',
+// Supplier Managers as the backend reports them: Level 1 progresses orders, Level 2 also approves them
+const SUPPLIER_MANAGER_L1: Permission[] = [
+  'SUPPLIER_VIEW', 'PROCUREMENT_ORDER_VIEW', 'PROCUREMENT_ORDER_CREATE', 'PROCUREMENT_ORDER_UPDATE', 'PROCUREMENT_ORDER_UPDATE_STATUS',
 ];
-const DEALER_MANAGER_L2: Permission[] = [...DEALER_MANAGER_L1, 'PROCUREMENT_ORDER_APPROVE'];
+const SUPPLIER_MANAGER_L2: Permission[] = [...SUPPLIER_MANAGER_L1, 'PROCUREMENT_ORDER_APPROVE'];
 
 const ORDER = (id: number, orderStatus: OrderStatus, overrides: Partial<OrdersApprovalRequest> = {}): OrdersApprovalRequest => ({
   id,
   orderNumber: `ORD-${id}`,
-  dealerName: 'Shree Metals',
+  supplierName: 'Shree Metals',
   itemName: 'Copper Wire',
   orderQuantity: 10,
   unitType: 'KG',
@@ -50,13 +50,13 @@ const ORDER = (id: number, orderStatus: OrderStatus, overrides: Partial<OrdersAp
 
 const BY_STATUS: Partial<Record<OrderStatus, OrdersApprovalRequest[]>> = {
   QUOTATION: [
-    ORDER(21, 'QUOTATION', { raisedByDealer: true, additionalInfo: { dealerNote: 'Need it before Diwali' } }),
-    // A staff draft isn't sent to anyone, and a frozen quotation waits on its change in the Dealers tab
-    ORDER(22, 'QUOTATION', { raisedByDealer: false }),
-    ORDER(23, 'QUOTATION', { raisedByDealer: true, dealerChangePending: true }),
+    ORDER(21, 'QUOTATION', { raisedBySupplier: true, additionalInfo: { supplierNote: 'Need it before Diwali' } }),
+    // A staff draft isn't sent to anyone, and a frozen quotation waits on its change in the Suppliers tab
+    ORDER(22, 'QUOTATION', { raisedBySupplier: false }),
+    ORDER(23, 'QUOTATION', { raisedBySupplier: true, supplierChangePending: true }),
   ],
   PENDING: [ORDER(31, 'PENDING')],
-  RETURN_REQUESTED: [ORDER(41, 'RETURN_REQUESTED', { dealerName: 'Om Traders' })],
+  RETURN_REQUESTED: [ORDER(41, 'RETURN_REQUESTED', { supplierName: 'Om Traders' })],
 };
 
 const signIn = (permissions: Permission[]) =>
@@ -99,12 +99,12 @@ beforeEach(() => {
 });
 
 describe('Approvals hub: quotations, orders and returns', () => {
-  it('opens the hub for whoever reviews dealer quotations', () => {
+  it('opens the hub for whoever reviews supplier quotations', () => {
     expect(APPROVAL_PERMISSIONS).toContain('PROCUREMENT_ORDER_UPDATE_STATUS');
   });
 
-  it("lists dealers' quotations, orders to approve and returns side by side", async () => {
-    signIn(DEALER_MANAGER_L2);
+  it("lists suppliers' quotations, orders to approve and returns side by side", async () => {
+    signIn(SUPPLIER_MANAGER_L2);
     renderHub();
 
     expect(await screen.findByText('Quotation: ORD-21')).toBeInTheDocument();
@@ -112,21 +112,21 @@ describe('Approvals hub: quotations, orders and returns', () => {
     expect(screen.getByText('Return: ORD-41')).toBeInTheDocument();
     expect(screen.queryByText('Quotation: ORD-22')).not.toBeInTheDocument();
     expect(screen.queryByText('Quotation: ORD-23')).not.toBeInTheDocument();
-    expect(within(rowFor('Quotation: ORD-21')).getByText('Dealer Quotation')).toBeInTheDocument();
+    expect(within(rowFor('Quotation: ORD-21')).getByText('Supplier Quotation')).toBeInTheDocument();
     expect(within(rowFor('Return: ORD-41')).getByText('Return Request')).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: /Requests/ })).toHaveTextContent('3');
     // All three queues in one call
     expect(orderCalls()).toEqual(['/v1/orders?status=QUOTATION&status=PENDING&status=RETURN_REQUESTED']);
   });
 
-  it("submits a dealer's quotation for Level 2 approval from its preview", async () => {
+  it("submits a supplier's quotation for Level 2 approval from its preview", async () => {
     const user = userEvent.setup();
-    signIn(DEALER_MANAGER_L2);
+    signIn(SUPPLIER_MANAGER_L2);
     renderHub();
 
     await screen.findByText('Quotation: ORD-21');
     await user.click(within(rowFor('Quotation: ORD-21')).getByTitle('Preview Request Details'));
-    const preview = within(screen.getByText('Quotation from a Dealer').closest<HTMLElement>('.fixed')!);
+    const preview = within(screen.getByText('Quotation from a Supplier').closest<HTMLElement>('.fixed')!);
     expect(preview.getByText('Need it before Diwali')).toBeInTheDocument();
     await user.click(preview.getByRole('button', { name: 'Submit for approval' }));
 
@@ -138,7 +138,7 @@ describe('Approvals hub: quotations, orders and returns', () => {
 
   it('needs a reason to reject a return, and sends it with the decision', async () => {
     const user = userEvent.setup();
-    signIn(DEALER_MANAGER_L2);
+    signIn(SUPPLIER_MANAGER_L2);
     renderHub();
 
     await screen.findByText('Return: ORD-41');
@@ -153,9 +153,9 @@ describe('Approvals hub: quotations, orders and returns', () => {
     );
   });
 
-  it('cancels a dealer quotation with a reason', async () => {
+  it('cancels a supplier quotation with a reason', async () => {
     const user = userEvent.setup();
-    signIn(DEALER_MANAGER_L2);
+    signIn(SUPPLIER_MANAGER_L2);
     renderHub();
 
     await screen.findByText('Quotation: ORD-21');
@@ -166,8 +166,8 @@ describe('Approvals hub: quotations, orders and returns', () => {
     await waitFor(() => expect(orders.updateOrderStatus).toHaveBeenCalledWith(21, { status: 'CANCELLED', reason: 'Price too high' }));
   });
 
-  it('shows a Level 1 Dealer Manager only the quotations, and never loads what they cannot decide', async () => {
-    signIn(DEALER_MANAGER_L1);
+  it('shows a Level 1 Supplier Manager only the quotations, and never loads what they cannot decide', async () => {
+    signIn(SUPPLIER_MANAGER_L1);
     renderHub();
 
     expect(await screen.findByText('Quotation: ORD-21')).toBeInTheDocument();

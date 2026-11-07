@@ -59,7 +59,7 @@ const signIn = (username: string, permissions: Permission[]) =>
 
 const CATEGORIES: FinanceCategory[] = [
   { code: 'PRODUCT_SALES', label: 'Product sales', section: 'REVENUE', sectionLabel: 'Revenue', activity: 'OPERATING', direction: 'IN', cashImpact: true, system: true },
-  { code: 'RAW_MATERIALS', label: 'Raw materials & dealer purchases', section: 'DIRECT_COSTS', sectionLabel: 'Direct costs', activity: 'OPERATING', direction: 'OUT', cashImpact: true, system: false },
+  { code: 'RAW_MATERIALS', label: 'Raw materials & supplier purchases', section: 'DIRECT_COSTS', sectionLabel: 'Direct costs', activity: 'OPERATING', direction: 'OUT', cashImpact: true, system: false },
   { code: 'TRAVEL', label: 'Travel & conveyance', section: 'OPERATING_EXPENSES', sectionLabel: 'Operating expenses', activity: 'OPERATING', direction: 'OUT', cashImpact: true, system: false },
   { code: 'DEPRECIATION', label: 'Depreciation', section: 'DEPRECIATION_AMORTIZATION', sectionLabel: 'D&A', activity: 'NON_CASH', direction: 'OUT', cashImpact: false, system: false },
 ];
@@ -86,7 +86,7 @@ const OVERVIEW: FinanceOverview = {
   trend: [point('Sep 2026', { revenue: 1_000_000, closingBalance: -2_000_000 }), point('Oct 2026', { revenue: 3_800_000, closingBalance: -12_345_600 })],
   categories: [
     { category: 'PRODUCT_SALES', label: 'Product sales', section: 'REVENUE', activity: 'OPERATING', amount: 5_000_000, cash: 5_000_000 },
-    { category: 'RAW_MATERIALS', label: 'Raw materials & dealer purchases', section: 'DIRECT_COSTS', activity: 'OPERATING', amount: -2_000_000, cash: -2_000_000 },
+    { category: 'RAW_MATERIALS', label: 'Raw materials & supplier purchases', section: 'DIRECT_COSTS', activity: 'OPERATING', amount: -2_000_000, cash: -2_000_000 },
   ],
   pending: { vouchers: 3, expensePaise: 700_000 },
   procurementSync: { cursorAt: null, lastRunAt: null, lastSuccessAt: '2026-10-19T10:00:00Z', lastError: null, postedCount: 4 },
@@ -309,19 +309,19 @@ const GST_SUMMARY: GstSummary = {
   },
   bySource: [
     { source: 'ECOMMERCE_SALE', label: 'E-commerce sale', direction: 'OUTPUT', taxable: 110_000, tax: 19_800, documents: 1, lines: 2 },
-    { source: 'DEALER_PURCHASE', label: 'Dealer purchase', direction: 'INPUT', taxable: 100_000, tax: 18_000, documents: 1, lines: 1 },
+    { source: 'SUPPLIER_PURCHASE', label: 'Supplier purchase', direction: 'INPUT', taxable: 100_000, tax: 18_000, documents: 1, lines: 1 },
   ],
   byRate: [],
   hsnSummary: [{ hsnSac: '9405', rate: 18, quantity: 1, taxable: 100_000, igst: 0, cgst: 9_000, sgst: 9_000, cess: 0, tax: 18_000 }],
   notes: [],
 };
 const GST_ROW: GstRegisterEntry = {
-  id: 1, direction: 'INPUT', source: 'DEALER_PURCHASE', sourceLabel: 'Dealer purchase', documentType: 'PURCHASE_INVOICE',
+  id: 1, direction: 'INPUT', source: 'SUPPLIER_PURCHASE', sourceLabel: 'Supplier purchase', documentType: 'PURCHASE_INVOICE',
   documentNumber: 'SM/101', documentDate: '2026-10-20', taxPeriod: '2026-10', orderReference: 'PO-77', sourceId: '5', lineKey: 'PURCHASE',
-  description: 'Dealer purchase PO-77: Solar cell approved into stock', hsnSac: '8541', quantity: 8, counterpartyName: 'Local Trader',
+  description: 'Supplier purchase PO-77: Solar cell approved into stock', hsnSac: '8541', quantity: 8, counterpartyName: 'Local Trader',
   counterpartyGstin: null, placeOfSupply: 'Maharashtra', placeOfSupplyCode: '27', supplyType: 'INTRA_STATE', gstRate: 18,
   taxablePaise: 100_000, cgstPaise: 9_000, sgstPaise: 9_000, igstPaise: 0, cessPaise: 0, totalTaxPaise: 18_000, itcEligible: false,
-  itcNote: 'The dealer has no valid GSTIN on record', reversesEntryId: null, recordedAt: '2026-10-20T10:00:00', recordedBy: 'SYSTEM',
+  itcNote: 'The supplier has no valid GSTIN on record', reversesEntryId: null, recordedAt: '2026-10-20T10:00:00', recordedBy: 'SYSTEM',
 };
 
 describe('GST tab', () => {
@@ -343,7 +343,7 @@ describe('GST tab', () => {
 
     const register = screen.getByRole('region', { name: 'GST register' });
     expect(await within(register).findByText(/PO-77: Solar cell/)).toBeInTheDocument();
-    expect(within(register).getByText('The dealer has no valid GSTIN on record')).toBeInTheDocument();
+    expect(within(register).getByText('The supplier has no valid GSTIN on record')).toBeInTheDocument();
     // No exports without FINANCE_REPORT_EXPORT; nothing is asked for that the auditor can't see
     expect(screen.queryByRole('button', { name: /CSV/ })).not.toBeInTheDocument();
     expect(api.exportGstRegister).not.toHaveBeenCalled();

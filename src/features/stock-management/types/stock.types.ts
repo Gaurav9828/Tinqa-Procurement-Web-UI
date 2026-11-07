@@ -16,8 +16,8 @@ export interface StockResponse {
   stockIdentityNumber: string;
   batchNumber: string;
   orderNumber: string;
-  dealerId: number;
-  dealerName: string;
+  supplierId: number;
+  supplierName: string;
   itemId: number;
   itemName: string;
   totalOrderQuantity: number;
@@ -44,7 +44,7 @@ export interface StockResponse {
   changeAwaitingApproval?: boolean;
   /** Passed units added since approval, not usable until Admin L2 approves them. */
   heldUnits?: number;
-  /** Value of the approved passed units booked as bought from the dealer (before GST). */
+  /** Value of the approved passed units booked as bought from the supplier (before GST). */
   bookedPurchaseValue?: number;
   /** Available units received before barcodes were recorded; a Super Admin assigns them theirs. */
   unitsWithoutBarcode?: number;
@@ -70,7 +70,7 @@ export interface ItemAvailabilityResponse {
 
 export interface UpdateStockRequest {
   batchNumber: string;
-  dealerId: number;
+  supplierId: number;
   itemId: number;
   unitsPassedTest: number;
   defectedUnits: number;

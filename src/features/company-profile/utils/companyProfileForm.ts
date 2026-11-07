@@ -50,7 +50,7 @@ export interface LoginPageText {
   highlights: string[];
 }
 
-/** Which sign-in page: the admin web UI (staff & dealers) or the storefront (customers). */
+/** Which sign-in page: the admin web UI (staff & suppliers) or the storefront (customers). */
 export type LoginPortal = 'adminLogin' | 'storeLogin';
 
 export interface ShippingRuleRow {

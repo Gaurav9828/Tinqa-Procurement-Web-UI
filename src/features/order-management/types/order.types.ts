@@ -1,9 +1,9 @@
 import type { OrderStatus } from "../../../types/common.types";
-import type { QuotationTerms } from "../../dealer-portal/types/dealerPortal.types";
+import type { QuotationTerms } from "../../supplier-portal/types/supplierPortal.types";
 import type { PaymentMethod } from "../utils/paymentPlan";
 
 export interface CreateOrderRequest {
-  dealerId: number;
+  supplierId: number;
   itemId: number;
   orderQuantity: number;
   unitType: string;
@@ -26,13 +26,13 @@ export interface UpdateOrderStatusRequest {
   actualDelivery?: string;
   /** Required for cancel, return request/rejection and failed refunds; optional otherwise. */
   reason?: string;
-  /** DELIVERED only: a Level 2 approver accepting a dealer's invoice that didn't match the quotation. */
+  /** DELIVERED only: a Level 2 approver accepting a supplier's invoice that didn't match the quotation. */
   invoiceOverrideReason?: string;
 }
 
 export type InvoiceVerificationStatus = 'MATCHED' | 'MISMATCH' | 'UNVERIFIED';
 
-/** One figure compared between the quotation and the dealer's invoice. Amounts are rupee text; for gstin, GSTINs. */
+/** One figure compared between the quotation and the supplier's invoice. Amounts are rupee text; for gstin, GSTINs. */
 export interface InvoiceCheck {
   key: 'text' | 'grandTotal' | 'taxableValue' | 'cgst' | 'sgst' | 'igst' | 'cess' | 'gstin';
   label: string;
@@ -43,7 +43,7 @@ export interface InvoiceCheck {
   message: string | null;
 }
 
-/** GET/POST /v1/orders/{id}/invoice: the dealer's invoice that counts for the order (the latest upload). */
+/** GET/POST /v1/orders/{id}/invoice: the supplier's invoice that counts for the order (the latest upload). */
 export interface OrderInvoice {
   id: number;
   orderId: number;
@@ -65,8 +65,8 @@ export interface OrderInvoice {
 export interface OrderResponse {
   id: number;
   orderNumber: string;
-  dealerId: number;
-  dealerName: string;
+  supplierId: number;
+  supplierName: string;
   itemId: number;
   itemName: string;
   orderQuantity: number;
@@ -88,14 +88,14 @@ export interface OrderResponse {
   additionalInfo: Record<string, any> | null;
   createdAt: string;
   createdBy: number;
-  /** The dealer raised this quotation from their dealer login. */
-  raisedByDealer?: boolean;
-  /** A dealer's change waits for approval: the quotation can't be edited, submitted or cancelled until it is decided. */
-  dealerChangePending?: boolean;
+  /** The supplier raised this quotation from their supplier login. */
+  raisedBySupplier?: boolean;
+  /** A supplier's change waits for approval: the quotation can't be edited, submitted or cancelled until it is decided. */
+  supplierChangePending?: boolean;
 }
 
 export interface UpdateOrderRequest {
-  dealerId?: number;
+  supplierId?: number;
   itemId?: number;
   orderQuantity?: number;
   unitType?: string;
@@ -111,20 +111,20 @@ export interface UpdateOrderRequest {
   additionalInfo?: Record<string, any>;
 }
 
-/** A dealer's proposed change to a quotation (GET /v1/orders/change-requests). Only the proposed fields are set in `changes`. */
+/** A supplier's proposed change to a quotation (GET /v1/orders/change-requests). Only the proposed fields are set in `changes`. */
 export interface OrderChangeRequest {
   id: number;
   orderId: number;
   orderNumber: string | null;
   orderStatus: OrderStatus | null;
-  dealerId: number | null;
-  dealerName: string | null;
+  supplierId: number | null;
+  supplierName: string | null;
   changes: QuotationTerms;
   previous: QuotationTerms;
   /** Order total if approved (pending requests only). */
   proposedTotalPrice: number | null;
   currentTotalPrice: number | null;
-  /** The dealer's reason. */
+  /** The supplier's reason. */
   note: string | null;
   status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'WITHDRAWN';
   requestedByUsername: string | null;

@@ -3,18 +3,18 @@ import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { CreateOrderModal } from './CreateOrderModal';
 import type { ItemResponse } from '../../item-management/types/item.types';
-import type { DealerResponse } from '../../dealer-management/types/dealer.types';
+import type { SupplierResponse } from '../../supplier-management/types/supplier.types';
 
 const ITEMS = [{ id: 7, name: 'Motherboard', brand: 'ASUS', mrp: 1499, unitOfMeasure: 'PCS', isActive: true }] as unknown as ItemResponse[];
-const DEALERS = [{ id: 3, name: 'Acme Traders', isActive: true }] as unknown as DealerResponse[];
+const SUPPLIERS = [{ id: 3, name: 'Acme Traders', isActive: true }] as unknown as SupplierResponse[];
 
 const setup = async () => {
   const onSubmit = vi.fn();
   const user = userEvent.setup();
-  render(<CreateOrderModal isOpen isSubmitting={false} items={ITEMS} dealers={DEALERS} onClose={() => undefined} onSubmit={onSubmit} />);
-  const [itemSelect, dealerSelect] = screen.getAllByRole('combobox');
+  render(<CreateOrderModal isOpen isSubmitting={false} items={ITEMS} suppliers={SUPPLIERS} onClose={() => undefined} onSubmit={onSubmit} />);
+  const [itemSelect, supplierSelect] = screen.getAllByRole('combobox');
   await user.selectOptions(itemSelect, '7');
-  await user.selectOptions(dealerSelect, '3');
+  await user.selectOptions(supplierSelect, '3');
   await user.type(screen.getByLabelText(/Quantity/), '4');
   await user.selectOptions(screen.getByRole('combobox', { name: 'Expected payment method' }), 'BANK_TRANSFER');
   return { onSubmit, user };
@@ -30,7 +30,7 @@ describe('Create Procurement Order: price', () => {
     expect(screen.getByTestId('order-price-reason')).toBeDisabled();
 
     await user.click(screen.getByRole('button', { name: 'Create Order' }));
-    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ itemId: 7, dealerId: 3, unitPrice: 1499, additionalInfo: {} }));
+    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ itemId: 7, supplierId: 3, unitPrice: 1499, additionalInfo: {} }));
   });
 });
 

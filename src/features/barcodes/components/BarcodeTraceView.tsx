@@ -18,10 +18,10 @@ const Fact: React.FC<{ label: string; children: React.ReactNode }> = ({ label, c
   </div>
 );
 
-/** Batch, purchase order and dealer a piece came from. */
+/** Batch, purchase order and supplier a piece came from. */
 const SourceFacts: React.FC<{ source: BarcodeSource }> = ({ source }) => (
   <dl className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-    <Fact label="Dealer">{source.dealerName}</Fact>
+    <Fact label="Supplier">{source.supplierName}</Fact>
     <Fact label="Purchase order">{source.orderNumber}</Fact>
     <Fact label="Ordered on">{formatDate(source.orderDate)}</Fact>
     <Fact label="Delivered on">{formatDate(source.deliveredOn)}</Fact>

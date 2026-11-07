@@ -30,7 +30,7 @@ describe('employee level helpers', () => {
   it('accepts only the two admin levels, never labels', () => {
     expect(isEmployeeRole('ADMIN_L2')).toBe(true);
     expect(isEmployeeRole('Level 2 (approver)')).toBe(false);
-    expect(isEmployeeRole('DEALER')).toBe(false);
+    expect(isEmployeeRole('SUPPLIER')).toBe(false);
   });
 });
 

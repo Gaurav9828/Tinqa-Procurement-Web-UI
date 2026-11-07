@@ -3,7 +3,7 @@ import { X, Info, AlertTriangle } from 'lucide-react';
 import type { OrderResponse, UpdateOrderRequest } from '../types/order.types';
 import { ORDER_LIMITS } from '../validator/orderValidator';
 import type { ItemResponse } from '../../item-management/types/item.types';
-import type { DealerResponse } from '../../dealer-management/types/dealer.types';
+import type { SupplierResponse } from '../../supplier-management/types/supplier.types';
 import { useAccess } from '../../../hooks/useAccess';
 import { CommonInput, CommonSelect } from '../../../components/ui/FormInputs';
 import { unitSelectOptions } from '../../../constants/unitsOfMeasure';
@@ -17,7 +17,7 @@ interface EditOrderModalProps {
   isOpen: boolean;
   isSubmitting: boolean;
   items: ItemResponse[];
-  dealers: DealerResponse[];
+  suppliers: SupplierResponse[];
   onClose: () => void;
   onSubmit: (orderId: number, formData: UpdateOrderRequest) => void;
 }
@@ -40,13 +40,13 @@ export const EditOrderModal: React.FC<EditOrderModalProps> = ({
   isOpen,
   isSubmitting,
   items,
-  dealers,
+  suppliers,
   onClose,
   onSubmit,
 }) => {
   const { can } = useAccess();
   const [selectedItemId, setSelectedItemId] = useState<number | ''>('');
-  const [selectedDealerId, setSelectedDealerId] = useState<number | ''>('');
+  const [selectedSupplierId, setSelectedSupplierId] = useState<number | ''>('');
   const [quantity, setQuantity] = useState<number | ''>('');
   const [unitPrice, setUnitPrice] = useState<number | ''>('');
   const [unitOfMeasure, setUnitOfMeasure] = useState<string>('PCS');
@@ -60,7 +60,7 @@ export const EditOrderModal: React.FC<EditOrderModalProps> = ({
   useEffect(() => {
     if (order) {
       setSelectedItemId(order.itemId || '');
-      setSelectedDealerId(order.dealerId || '');
+      setSelectedSupplierId(order.supplierId || '');
       setQuantity(order.orderQuantity || '');
       setUnitPrice(order.unitPrice || '');
       setUnitOfMeasure(order.unitType || 'PCS');
@@ -91,7 +91,7 @@ export const EditOrderModal: React.FC<EditOrderModalProps> = ({
   // Check if any field differs from the original order values
   const hasChanges =
     selectedItemId !== (order.itemId || '') ||
-    selectedDealerId !== (order.dealerId || '') ||
+    selectedSupplierId !== (order.supplierId || '') ||
     quantity !== (order.orderQuantity || '') ||
     unitPrice !== (order.unitPrice || '') ||
     unitOfMeasure !== (order.unitType || 'PCS') ||
@@ -105,7 +105,7 @@ export const EditOrderModal: React.FC<EditOrderModalProps> = ({
   const priceVariance = calculatePriceVariance(itemMrp, currentPrice);
   const isFormComplete =
     selectedItemId !== '' &&
-    selectedDealerId !== '' &&
+    selectedSupplierId !== '' &&
     Number(quantity) >= 1 &&
     currentPrice > 0 &&
     !!unitOfMeasure.trim() &&
@@ -136,7 +136,7 @@ export const EditOrderModal: React.FC<EditOrderModalProps> = ({
     setIsConfirmOpen(false);
     onSubmit(order.id, {
       itemId: Number(selectedItemId),
-      dealerId: Number(selectedDealerId),
+      supplierId: Number(selectedSupplierId),
       orderQuantity: Number(quantity),
       unitPrice: Number(unitPrice),
       unitType: unitOfMeasure.trim(),
@@ -155,9 +155,9 @@ export const EditOrderModal: React.FC<EditOrderModalProps> = ({
     value: item.id,
   }));
 
-  const dealerOptions = dealers.map((dealer) => ({
-    label: `${dealer.name} ${dealer.tradeName ? `(${dealer.tradeName})` : ''}`,
-    value: dealer.id,
+  const supplierOptions = suppliers.map((supplier) => ({
+    label: `${supplier.name} ${supplier.tradeName ? `(${supplier.tradeName})` : ''}`,
+    value: supplier.id,
   }));
 
   return (
@@ -203,12 +203,12 @@ export const EditOrderModal: React.FC<EditOrderModalProps> = ({
             />
 
             <CommonSelect
-              label="Select Dealer"
+              label="Select Supplier"
               required
-              placeholder="-- Choose Dealer --"
-              value={selectedDealerId}
-              options={dealerOptions}
-              onChange={(e) => setSelectedDealerId(Number(e.target.value))}
+              placeholder="-- Choose Supplier --"
+              value={selectedSupplierId}
+              options={supplierOptions}
+              onChange={(e) => setSelectedSupplierId(Number(e.target.value))}
             />
 
             <div className="grid grid-cols-2 gap-3">
@@ -287,7 +287,7 @@ export const EditOrderModal: React.FC<EditOrderModalProps> = ({
             />
 
             <QuotationTaxFields value={tax} onChange={setTax} taxable={taxable} errors={taxErrors} disabled={isSubmitting}
-              dealerState={dealers.find((dealer) => dealer.id === Number(selectedDealerId))?.state} />
+              supplierState={suppliers.find((supplier) => supplier.id === Number(selectedSupplierId))?.state} />
 
             <PaymentPlanFields value={plan} onChange={setPlan} total={quotedTotal(taxable, tax)} errors={shownPlanErrors(planErrors)} disabled={isSubmitting} />
 

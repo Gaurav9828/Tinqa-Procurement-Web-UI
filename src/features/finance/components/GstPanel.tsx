@@ -27,7 +27,7 @@ export const GST_SOURCE_LABELS: Record<GstSource, string> = {
   ECOMMERCE_SALE: 'E-commerce sale (tax invoice)',
   ECOMMERCE_CREDIT_NOTE: 'E-commerce credit note (refund)',
   OTHER_SUPPLY: 'Other supply (income voucher)',
-  DEALER_PURCHASE: 'Dealer purchase (procurement)',
+  SUPPLIER_PURCHASE: 'Supplier purchase (procurement)',
   EXPENSE_BILL: 'Expense bill (voucher)',
 };
 
@@ -119,7 +119,7 @@ const Tile: React.FC<{ label: string; value: string; note?: React.ReactNode }> =
 );
 
 /**
- * GST: what was charged to customers (output tax), what was paid to dealers and on bills (input tax, and how much of
+ * GST: what was charged to customers (output tax), what was paid to suppliers and on bills (input tax, and how much of
  * it is claimable), the set-off month by month in the order the law requires, what is left to pay in cash, what was
  * paid to the government and what is outstanding till date. Every figure comes from the GST register below it.
  */
@@ -136,7 +136,7 @@ export const GstPanel: React.FC = () => {
             <h2 className="text-sm font-semibold text-black dark:text-white">GST position</h2>
             <p className="text-gray-500 dark:text-neutral-400 mt-0.5 max-w-2xl">
               Output tax is recorded when a tax invoice is issued at dispatch and reduced by credit notes for refunds. Input tax
-              is recorded when Admin L2 approves the stock of a dealer purchase, or an expense bill is approved. Each month's input
+              is recorded when Admin L2 approves the stock of a supplier purchase, or an expense bill is approved. Each month's input
               tax credit is set off against its output tax (IGST first, CGST never against SGST); the rest is payable in cash with GSTR-3B.
             </p>
             {summary && (

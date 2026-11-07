@@ -8,7 +8,7 @@ interface Props {
   totalPrice: number;
 }
 
-/** The quoted price with its GST, as the dealer's invoice is expected to show it. */
+/** The quoted price with its GST, as the supplier's invoice is expected to show it. */
 export const TaxBreakupSummary: React.FC<Props> = ({ taxBreakup, totalPrice }) => {
   const breakup = readTaxBreakup(taxBreakup);
   if (!breakup) {

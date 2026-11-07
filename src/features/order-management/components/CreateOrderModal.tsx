@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Info, X } from 'lucide-react';
 import type { ItemResponse } from '../../item-management/types/item.types';
-import type { DealerResponse } from '../../dealer-management/types/dealer.types';
+import type { SupplierResponse } from '../../supplier-management/types/supplier.types';
 import type { CreateOrderRequest } from '../types/order.types';
 import { ORDER_LIMITS, todayLocalIsoDate } from '../validator/orderValidator';
 import { useAccess } from '../../../hooks/useAccess';
@@ -18,7 +18,7 @@ interface CreateOrderModalProps {
   isOpen: boolean;
   isSubmitting: boolean;
   items: ItemResponse[];
-  dealers: DealerResponse[];
+  suppliers: SupplierResponse[];
   onClose: () => void;
   onSubmit: (formData: CreateOrderRequest) => void;
 }
@@ -27,15 +27,15 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
   isOpen,
   isSubmitting,
   items,
-  dealers,
+  suppliers,
   onClose,
   onSubmit,
 }) => {
   const { can } = useAccess();
-  // How the dealer wants to be paid: advance and midterm percentages, the rest after testing
+  // How the supplier wants to be paid: advance and midterm percentages, the rest after testing
   const [plan, setPlan] = useState<PaymentPlanForm>(DEFAULT_PAYMENT_PLAN);
   const [selectedItemId, setSelectedItemId] = useState<number | ''>('');
-  const [selectedDealerId, setSelectedDealerId] = useState<number | ''>('');
+  const [selectedSupplierId, setSelectedSupplierId] = useState<number | ''>('');
   const [quantity, setQuantity] = useState<number | ''>('');
   // Optional: left empty, the quotation uses the item's existing price (MRP).
   const [newPrice, setNewPrice] = useState('');
@@ -68,7 +68,7 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
   const priceChanged = isPriceChanged(itemMrp, newPrice);
   const isFormComplete =
     selectedItemId !== '' &&
-    selectedDealerId !== '' &&
+    selectedSupplierId !== '' &&
     Number(quantity) >= 1 &&
     currentPrice > 0 &&
     currentPrice <= ORDER_LIMITS.MAX_UNIT_PRICE &&
@@ -81,14 +81,14 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
   const taxValid = Object.keys(taxErrors).length === 0;
   const planErrors = validatePlanForm(plan);
   const planValid = Object.keys(planErrors).length === 0;
-  const selectedDealer = dealers.find((dealer) => dealer.id === Number(selectedDealerId));
+  const selectedSupplier = suppliers.find((supplier) => supplier.id === Number(selectedSupplierId));
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!isFormComplete || !taxValid || !planValid) return;
     onSubmit({
       itemId: Number(selectedItemId),
-      dealerId: Number(selectedDealerId),
+      supplierId: Number(selectedSupplierId),
       orderQuantity: Number(quantity),
       unitPrice: currentPrice,
       unitType: unitOfMeasure.trim(),
@@ -106,9 +106,9 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
     value: item.id,
   }));
 
-  const dealerOptions = dealers.map((dealer) => ({
-    label: `${dealer.name} ${dealer.tradeName ? `(${dealer.tradeName})` : ''}`,
-    value: dealer.id,
+  const supplierOptions = suppliers.map((supplier) => ({
+    label: `${supplier.name} ${supplier.tradeName ? `(${supplier.tradeName})` : ''}`,
+    value: supplier.id,
   }));
 
   return (
@@ -154,12 +154,12 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
           />
 
           <CommonSelect
-            label="Select Dealer"
+            label="Select Supplier"
             required
-            placeholder="-- Choose Dealer --"
-            value={selectedDealerId}
-            options={dealerOptions}
-            onChange={(e) => setSelectedDealerId(Number(e.target.value))}
+            placeholder="-- Choose Supplier --"
+            value={selectedSupplierId}
+            options={supplierOptions}
+            onChange={(e) => setSelectedSupplierId(Number(e.target.value))}
           />
 
           <div className="grid grid-cols-2 gap-3">
@@ -213,7 +213,7 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
           </div>
 
           <QuotationTaxFields value={tax} onChange={setTax} taxable={taxable} errors={taxErrors} disabled={isSubmitting}
-            dealerState={selectedDealer?.state} />
+            supplierState={selectedSupplier?.state} />
 
           <PaymentPlanFields value={plan} onChange={setPlan} total={quotedTotal(taxable, tax)} errors={shownPlanErrors(planErrors)} disabled={isSubmitting} />
 

@@ -707,13 +707,13 @@ describe('Sign-in pages', () => {
   it('edits each portal\'s text and points, uploads the shared image and previews both panels', async () => {
     versions.push(version(2, 'DRAFT'));
     const { user } = renderAt('/settings/company-profile/drafts/2');
-    const admin = await screen.findByRole('group', { name: 'Admin portal (staff & dealers) sign-in' });
+    const admin = await screen.findByRole('group', { name: 'Admin portal (staff & suppliers) sign-in' });
     const store = screen.getByRole('group', { name: 'Storefront (customers) sign-in' });
 
     const headline = within(admin).getByLabelText('Headline');
     await user.clear(headline);
     await user.type(headline, 'Run procurement in one place.');
-    await user.type(within(admin).getByLabelText(/^Tagline/), 'For staff and dealers.');
+    await user.type(within(admin).getByLabelText(/^Tagline/), 'For staff and suppliers.');
     await user.click(within(store).getByRole('button', { name: 'Remove point 1' }));
     expect(within(store).getByText('No points.')).toBeInTheDocument();
     await user.click(within(admin).getByRole('button', { name: 'Move point 2 up' }));
@@ -721,7 +721,7 @@ describe('Sign-in pages', () => {
     const previews = screen.getAllByTestId('auth-brand-panel');
     expect(previews).toHaveLength(2);
     expect(previews[0]).toHaveTextContent('Run procurement in one place.');
-    expect(previews[0]).toHaveTextContent('For staff and dealers.');
+    expect(previews[0]).toHaveTextContent('For staff and suppliers.');
     expect(previews[1]).toHaveTextContent('Miniature worlds, crafted for you.');
 
     fireEvent.change(screen.getByTestId('asset-input-LOGIN_IMAGE'), { target: { files: [new File(['jpg'], 'login.jpg', { type: 'image/jpeg' })] } });
@@ -738,7 +738,7 @@ describe('Sign-in pages', () => {
         expect.objectContaining({
           loginImageUrl: image,
           adminLoginHeadline: 'Run procurement in one place.',
-          adminLoginTagline: 'For staff and dealers.',
+          adminLoginTagline: 'For staff and suppliers.',
           adminLoginHighlights: ['Live order tracking', 'Quotes in one place'],
           storeLoginHighlights: [],
         })
@@ -749,7 +749,7 @@ describe('Sign-in pages', () => {
   it('blocks saving an empty point and a fifth point', async () => {
     versions.push(version(2, 'DRAFT'));
     const { user } = renderAt('/settings/company-profile/drafts/2');
-    const admin = await screen.findByRole('group', { name: 'Admin portal (staff & dealers) sign-in' });
+    const admin = await screen.findByRole('group', { name: 'Admin portal (staff & suppliers) sign-in' });
     await user.click(within(admin).getByRole('button', { name: 'Add point' }));
     await user.click(within(admin).getByRole('button', { name: 'Add point' }));
     expect(within(admin).getByRole('button', { name: 'Add point' })).toBeDisabled();

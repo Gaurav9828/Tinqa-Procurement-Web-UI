@@ -9,9 +9,9 @@ import { scanAllBarcodes } from '../../products-management/pages/barcodeTestUtil
 import type { OrderResponse } from '../../order-management/types/order.types';
 
 const ORDERS = [
-  { id: 1, orderNumber: 'ORD-1', dealerName: 'Acme', itemName: 'Motherboard', orderQuantity: 5, orderDate: '2026-10-01', unitType: 'PCS' },
-  { id: 2, orderNumber: 'ORD-2', dealerName: 'Acme', itemName: 'Cable', orderQuantity: 3, orderDate: '2026-10-01', unitType: 'PCS' },
-  { id: 3, orderNumber: 'ORD-3', dealerName: 'Acme', itemName: 'Fan', orderQuantity: 4, orderDate: '2026-10-01', unitType: 'PCS' },
+  { id: 1, orderNumber: 'ORD-1', supplierName: 'Acme', itemName: 'Motherboard', orderQuantity: 5, orderDate: '2026-10-01', unitType: 'PCS' },
+  { id: 2, orderNumber: 'ORD-2', supplierName: 'Acme', itemName: 'Cable', orderQuantity: 3, orderDate: '2026-10-01', unitType: 'PCS' },
+  { id: 3, orderNumber: 'ORD-3', supplierName: 'Acme', itemName: 'Fan', orderQuantity: 4, orderDate: '2026-10-01', unitType: 'PCS' },
 ] as unknown as OrderResponse[];
 
 vi.mock('../hooks/useReceivableOrders', () => ({ useReceivableOrders: () => ({ orders: ORDERS, isLoading: false }) }));

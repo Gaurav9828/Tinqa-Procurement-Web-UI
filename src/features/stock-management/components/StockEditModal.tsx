@@ -4,7 +4,7 @@ import { X, Save } from 'lucide-react';
 import { Validator, type ValidationRule } from '../../../utils/validator';
 import { hasFormChanges } from '../../../utils/formChanges';
 import type { StockResponse, UpdateStockRequest } from '../types/stock.types';
-import { useDealerOptions, useItemOptions } from '../../../hooks/useLookupOptions';
+import { useSupplierOptions, useItemOptions } from '../../../hooks/useLookupOptions';
 import { CommonInput, CommonSelect, CommonCheckbox } from '../../../components/ui/FormInputs';
 import { AttributeInputBuilder } from '../../../components/ui/AttributeInputBuilder';
 
@@ -18,7 +18,7 @@ interface StockEditModalProps {
 
 interface FormState {
     batchNumber: string;
-    dealerId: string;
+    supplierId: string;
     itemId: string;
     unitsPassedTest: string;
     defectedUnits: string;
@@ -36,12 +36,12 @@ export const StockEditModal: React.FC<StockEditModalProps> = ({
     onRequestSubmit,
 }) => {
     // Only load (cached, full) option lists once the modal is actually opened.
-    const { options: dealers } = useDealerOptions(isOpen);
+    const { options: suppliers } = useSupplierOptions(isOpen);
     const { options: items } = useItemOptions(isOpen);
 
     const [formData, setFormData] = useState<FormState>({
         batchNumber: '',
-        dealerId: '',
+        supplierId: '',
         itemId: '',
         unitsPassedTest: '0',
         defectedUnits: '0',
@@ -61,7 +61,7 @@ export const StockEditModal: React.FC<StockEditModalProps> = ({
         if (isOpen && stock) {
             const initial: FormState = {
                 batchNumber: stock.batchNumber || '',
-                dealerId: String(stock.dealerId || ''),
+                supplierId: String(stock.supplierId || ''),
                 itemId: String(stock.itemId || ''),
                 unitsPassedTest: String(stock.unitsPassedTest ?? 0),
                 defectedUnits: String(stock.defectedUnits ?? 0),
@@ -76,9 +76,9 @@ export const StockEditModal: React.FC<StockEditModalProps> = ({
         }
     }, [isOpen, stock]);
 
-    const dealerOptions = useMemo(
-        () => dealers?.map((d) => ({ label: d.name, value: d.id })) || [],
-        [dealers]
+    const supplierOptions = useMemo(
+        () => suppliers?.map((d) => ({ label: d.name, value: d.id })) || [],
+        [suppliers]
     );
 
     const itemOptions = useMemo(
@@ -88,7 +88,7 @@ export const StockEditModal: React.FC<StockEditModalProps> = ({
 
     const validationRules = useMemo<Record<keyof FormState, ValidationRule>>(() => ({
         batchNumber: { required: true, customMessage: 'Batch number is required.' },
-        dealerId: { required: true, customMessage: 'Dealer selection is required.' },
+        supplierId: { required: true, customMessage: 'Supplier selection is required.' },
         itemId: { required: true, customMessage: 'Item selection is required.' },
         dateOfArrival: { required: true, customMessage: 'Date of arrival is required.' },
         // Read-only (fixed when the entry was created from its order), so not validated here.
@@ -135,11 +135,11 @@ export const StockEditModal: React.FC<StockEditModalProps> = ({
             return;
         }
 
-        // Units, quality result, dealer and item belong to the order and the original entry: they are
+        // Units, quality result, supplier and item belong to the order and the original entry: they are
         // never edited here and are sent back exactly as stored (the update API still requires them).
         const payload: UpdateStockRequest = {
             batchNumber: formData.batchNumber.trim(),
-            dealerId: stock.dealerId,
+            supplierId: stock.supplierId,
             itemId: stock.itemId,
             unitsPassedTest: Number(stock.unitsPassedTest ?? 0),
             defectedUnits: Number(stock.defectedUnits ?? 0),
@@ -199,16 +199,16 @@ export const StockEditModal: React.FC<StockEditModalProps> = ({
                             error={touched.dateOfArrival ? validationErrors.dateOfArrival : undefined}
                         />
 
-                        {/* Dealer Selection */}
+                        {/* Supplier Selection */}
                         <div className="sm:col-span-2">
                             <CommonSelect
-                                label="Dealer"
+                                label="Supplier"
                                 required
-                                options={dealerOptions}
-                                placeholder="Select Dealer..."
-                                value={formData.dealerId}
+                                options={supplierOptions}
+                                placeholder="Select Supplier..."
+                                value={formData.supplierId}
                                 disabled
-                                title="Fixed to the order's dealer"
+                                title="Fixed to the order's supplier"
                                 onChange={() => undefined}
                             />
                         </div>
@@ -255,7 +255,7 @@ export const StockEditModal: React.FC<StockEditModalProps> = ({
                                 onChange={() => undefined}
                             />
                             <p className="text-[11px] text-gray-400 pl-6">
-                                Units, test result, dealer and item are fixed by the order and can't be edited. To add stock, create a new stock entry.
+                                Units, test result, supplier and item are fixed by the order and can't be edited. To add stock, create a new stock entry.
                             </p>
                             <CommonCheckbox
                                 label="Is Active"

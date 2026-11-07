@@ -6,7 +6,7 @@ import { useApiAction } from '../../hooks/useApiAction';
 import { AuthCard } from './AuthCard';
 
 /**
- * "Forgot password?": staff and dealers enter the username or email they sign in with and get a link to choose a new
+ * "Forgot password?": staff and suppliers enter the username or email they sign in with and get a link to choose a new
  * password (valid for 15 minutes, once). The answer never says whether an account matched.
  */
 export const ForgotPasswordPage: React.FC = () => {

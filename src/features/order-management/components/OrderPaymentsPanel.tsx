@@ -11,26 +11,26 @@ import {
   CLAIM_CAUSE_LABELS,
   MILESTONE_LABELS,
   PAYMENT_STATUS_LABELS,
-  type DealerPaymentEntry,
+  type SupplierPaymentEntry,
   type PaymentMilestone,
   type PaymentSummary,
   type RecordPaymentRequest,
   type RefundClaim,
-} from '../types/dealerPayment.types';
+} from '../types/supplierPayment.types';
 
 const field = 'w-full px-2.5 py-1.5 rounded-lg border border-black/10 dark:border-white/10 bg-transparent text-xs';
 const smallButton = 'px-2.5 py-1 rounded-lg text-[11px] font-medium cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed';
 
-const STATUS_TONE: Record<DealerPaymentEntry['status'], string> = {
+const STATUS_TONE: Record<SupplierPaymentEntry['status'], string> = {
   PENDING_APPROVAL: 'bg-amber-500/15 text-amber-700 dark:text-amber-400',
   APPROVED: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400',
   REJECTED: 'bg-rose-500/15 text-rose-700 dark:text-rose-400',
   WITHDRAWN: 'bg-black/5 dark:bg-white/10 text-gray-500',
 };
 
-const entryTitle = (entry: DealerPaymentEntry) => {
+const entryTitle = (entry: SupplierPaymentEntry) => {
   if (entry.kind === 'PAYMENT') return `${MILESTONE_LABELS[entry.milestone ?? 'ADVANCE']} payment`;
-  if (entry.kind === 'REFUND') return 'Refund from the dealer';
+  if (entry.kind === 'REFUND') return 'Refund from the supplier';
   return entry.milestone ? `Reversal of a ${MILESTONE_LABELS[entry.milestone].toLowerCase()} payment` : 'Reversal of a refund';
 };
 
@@ -44,7 +44,7 @@ interface FormState {
   note: string;
 }
 
-const formFor = (summary: PaymentSummary, entry?: DealerPaymentEntry): FormState =>
+const formFor = (summary: PaymentSummary, entry?: SupplierPaymentEntry): FormState =>
   entry
     ? {
         kind: entry.kind === 'REFUND' ? 'REFUND' : 'PAYMENT',
@@ -67,10 +67,10 @@ const formFor = (summary: PaymentSummary, entry?: DealerPaymentEntry): FormState
 
 const AMOUNT = /^\d{1,8}(\.\d{1,2})?$/;
 
-/** A payment to the dealer or a refund from them, as recorded (or corrected while it waits for confirmation). */
+/** A payment to the supplier or a refund from them, as recorded (or corrected while it waits for confirmation). */
 const PaymentForm: React.FC<{
   summary: PaymentSummary;
-  entry?: DealerPaymentEntry;
+  entry?: SupplierPaymentEntry;
   busy: boolean;
   onSave: (payload: RecordPaymentRequest) => Promise<boolean>;
   onCancel: () => void;
@@ -110,7 +110,7 @@ const PaymentForm: React.FC<{
             <label key={kind} className={`flex items-center gap-1.5 ${kind === 'REFUND' && !refundOpen ? 'opacity-40' : ''}`}>
               <input type="radio" name="payment-kind" checked={form.kind === kind} disabled={kind === 'REFUND' && !refundOpen}
                 onChange={() => set({ kind })} />
-              {kind === 'PAYMENT' ? 'Paid to the dealer' : 'Refund received from the dealer'}
+              {kind === 'PAYMENT' ? 'Paid to the supplier' : 'Refund received from the supplier'}
             </label>
           ))}
         </div>
@@ -245,7 +245,7 @@ const MilestoneTable: React.FC<{ summary: PaymentSummary }> = ({ summary }) => (
   </table>
 );
 
-/** The refund the dealer owes; a Level 2 may change its amount (at most what was overpaid) with a reason. */
+/** The refund the supplier owes; a Level 2 may change its amount (at most what was overpaid) with a reason. */
 const RefundClaimBox: React.FC<{
   claim: RefundClaim;
   canApprove: boolean;
@@ -256,7 +256,7 @@ const RefundClaimBox: React.FC<{
   const [agreed, setAgreed] = useState('');
   const [reason, setReason] = useState('');
   const open = claim.status === 'OPEN';
-  const failed = claim.failedUnits > 0 ? ` (${Number(claim.failedUnits)} failed; they go back to the dealer)` : '';
+  const failed = claim.failedUnits > 0 ? ` (${Number(claim.failedUnits)} failed; they go back to the supplier)` : '';
   const valid = !!reason.trim() && AMOUNT.test(agreed.trim()) && Number(agreed) <= claim.claimedAmount;
   const tone = open
     ? 'bg-rose-500/10 border-rose-500/20 text-rose-700 dark:text-rose-400'
@@ -265,7 +265,7 @@ const RefundClaimBox: React.FC<{
     <div role={open ? 'alert' : 'note'} data-testid="refund-claim" className={`p-3 rounded-xl border space-y-1 ${tone}`}>
       <p className="flex items-center gap-1.5 font-semibold">
         {open ? <AlertTriangle className="w-3.5 h-3.5" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
-        {open ? `Refund due from the dealer: ${formatCurrency(claim.refundDue)}` : 'Refund claim settled'}
+        {open ? `Refund due from the supplier: ${formatCurrency(claim.refundDue)}` : 'Refund claim settled'}
       </p>
       <p>
         {CLAIM_CAUSE_LABELS[claim.cause]}
@@ -311,7 +311,7 @@ const RefundClaimBox: React.FC<{
 
 type Payments = ReturnType<typeof useOrderPayments>;
 
-const entryFacts = (entry: DealerPaymentEntry) =>
+const entryFacts = (entry: SupplierPaymentEntry) =>
   [
     PAYMENT_METHOD_LABELS[entry.method],
     formatDate(entry.paidOn),
@@ -323,7 +323,7 @@ const entryFacts = (entry: DealerPaymentEntry) =>
     .join(' · ');
 
 /** What one person may do with one entry: confirm or reject someone else's, correct or withdraw their own, reverse a confirmed one. */
-const EntryActions: React.FC<{ entry: DealerPaymentEntry; mine: boolean; payments: Payments; canRecord: boolean; canApprove: boolean; onPrompt: (action: 'reject' | 'reverse') => void; onEdit: () => void }> = ({
+const EntryActions: React.FC<{ entry: SupplierPaymentEntry; mine: boolean; payments: Payments; canRecord: boolean; canApprove: boolean; onPrompt: (action: 'reject' | 'reverse') => void; onEdit: () => void }> = ({
   entry, mine, payments, canRecord, canApprove, onPrompt, onEdit,
 }) => {
   const busy = payments.isSubmitting;
@@ -364,7 +364,7 @@ const EntryActions: React.FC<{ entry: DealerPaymentEntry; mine: boolean; payment
 };
 
 const PaymentEntryItem: React.FC<{
-  entry: DealerPaymentEntry;
+  entry: SupplierPaymentEntry;
   summary: PaymentSummary;
   payments: Payments;
   mine: boolean;
@@ -412,15 +412,15 @@ interface Props {
   orderId: number;
   /** Load only while shown. */
   enabled: boolean;
-  /** The dealer's own view: confirmed entries only, nothing to record or decide. */
-  view?: 'staff' | 'dealer';
+  /** The supplier's own view: confirmed entries only, nothing to record or decide. */
+  view?: 'staff' | 'supplier';
   /** Figures and entries only, nothing to record or decide (e.g. inside another form). */
   readOnly?: boolean;
 }
 
 /**
- * An order's payments to its dealer against the quotation's payment plan: what each part is worth, what was paid and
- * confirmed, what is still owed and, when units failed testing or the order was cancelled, the refund the dealer owes.
+ * An order's payments to its supplier against the quotation's payment plan: what each part is worth, what was paid and
+ * confirmed, what is still owed and, when units failed testing or the order was cancelled, the refund the supplier owes.
  * Payment staff record entries; someone else confirms them.
  */
 export const OrderPaymentsPanel: React.FC<Props> = ({ orderId, enabled, view = 'staff', readOnly = false }) => {
@@ -444,10 +444,10 @@ export const OrderPaymentsPanel: React.FC<Props> = ({ orderId, enabled, view = '
   const canRecordNow = canRecord && (summary.openMilestones.length > 0 || claim?.status === 'OPEN');
 
   return (
-    <section aria-label="Payments to the dealer" className="p-3 border border-black/10 dark:border-white/10 rounded-xl space-y-3 text-xs">
+    <section aria-label="Payments to the supplier" className="p-3 border border-black/10 dark:border-white/10 rounded-xl space-y-3 text-xs">
       <div className="flex items-center justify-between gap-2">
         <h3 className="flex items-center gap-1.5 font-medium text-gray-500">
-          <Wallet className="w-3.5 h-3.5" /> Payments to the dealer
+          <Wallet className="w-3.5 h-3.5" /> Payments to the supplier
         </h3>
         {canRecordNow && !recording && (
           <button type="button" onClick={() => setRecording(true)} className={`${smallButton} ${SOLID_TONE.primary}`}>
@@ -463,7 +463,7 @@ export const OrderPaymentsPanel: React.FC<Props> = ({ orderId, enabled, view = '
       {claim && <RefundClaimBox claim={claim} canApprove={canApprove} busy={payments.isSubmitting} onAdjust={payments.adjustClaim} />}
       {recording && <PaymentForm summary={summary} busy={payments.isSubmitting} onSave={payments.record} onCancel={() => setRecording(false)} />}
       {entries.length === 0 ? (
-        <p className="text-gray-400 italic">{view === 'dealer' ? 'No payment recorded yet.' : 'Nothing recorded yet.'}</p>
+        <p className="text-gray-400 italic">{view === 'supplier' ? 'No payment recorded yet.' : 'Nothing recorded yet.'}</p>
       ) : (
         <ul className="space-y-2" aria-label="Payment entries">
           {entries.map((entry) => (

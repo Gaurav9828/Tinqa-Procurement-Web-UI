@@ -1,7 +1,7 @@
 // Erasable Syntax Compatible Enums (Object Maps + Union Types)
 
 export const DocumentUploaderType = {
-  DEALER: 'DEALER',
+  SUPPLIER: 'SUPPLIER',
   INSPECTOR: 'INSPECTOR',
   ADMIN_L1: 'ADMIN_L1',
   ADMIN_L2: 'ADMIN_L2',
@@ -11,7 +11,7 @@ export type DocumentUploaderType = typeof DocumentUploaderType[keyof typeof Docu
 
 export const DocumentOwnerType = {
   ADMIN: 'ADMIN',
-  DEALER: 'DEALER',
+  SUPPLIER: 'SUPPLIER',
   INSPECTOR: 'INSPECTOR',
   WORKSHOP: 'WORKSHOP',
   EMPLOYEE: 'EMPLOYEE',
@@ -21,7 +21,7 @@ export type DocumentOwnerType = typeof DocumentOwnerType[keyof typeof DocumentOw
 
 export const DocumentReferenceType = {
   PRODUCT: 'PRODUCT',
-  DEALER: 'DEALER',
+  SUPPLIER: 'SUPPLIER',
   WORKSHOP: 'WORKSHOP',
   INSPECTOR: 'INSPECTOR',
   EMPLOYEE: 'EMPLOYEE',
@@ -35,7 +35,7 @@ export type DocumentReferenceType = typeof DocumentReferenceType[keyof typeof Do
 export const DocumentCategory = {
   PRODUCT_PHOTO: 'PRODUCT_PHOTO',
   PRODUCT_DOCUMENT: 'PRODUCT_DOCUMENT',
-  DEALER_DOCUMENT: 'DEALER_DOCUMENT',
+  SUPPLIER_DOCUMENT: 'SUPPLIER_DOCUMENT',
   WORKSHOP_DOCUMENT: 'WORKSHOP_DOCUMENT',
   INSPECTOR_DOCUMENT: 'INSPECTOR_DOCUMENT',
   ADMIN_DOCUMENT: 'ADMIN_DOCUMENT',

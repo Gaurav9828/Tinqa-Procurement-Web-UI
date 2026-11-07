@@ -17,17 +17,17 @@ interface Props {
   /** Keyed like the backend: taxBreakup.gstRate, … */
   errors?: Record<string, string>;
   disabled?: boolean;
-  /** The dealer's state on record, to help choose CGST + SGST or IGST. */
-  dealerState?: string | null;
+  /** The supplier's state on record, to help choose CGST + SGST or IGST. */
+  supplierState?: string | null;
 }
 
 const SUPPLY_TYPES = Object.keys(SUPPLY_TYPE_LABELS) as SupplyType[];
 
 /**
  * The optional GST breakup of a quotation: supply type, rate, HSN/SAC and cess, with CGST/SGST or IGST worked out from
- * the rate (or typed to match the dealer's rounding). Shows the bill the dealer's invoice will be checked against.
+ * the rate (or typed to match the supplier's rounding). Shows the bill the supplier's invoice will be checked against.
  */
-export const QuotationTaxFields: React.FC<Props> = ({ value, onChange, taxable, errors = {}, disabled, dealerState }) => {
+export const QuotationTaxFields: React.FC<Props> = ({ value, onChange, taxable, errors = {}, disabled, supplierState }) => {
   const set = (patch: Partial<TaxForm>) => onChange({ ...value, ...patch });
   const taxablePaise = taxable === null ? null : Math.round(taxable * 100);
   const amounts = calculateTax(taxablePaise, value);
@@ -38,7 +38,7 @@ export const QuotationTaxFields: React.FC<Props> = ({ value, onChange, taxable, 
   return (
     <fieldset className="space-y-3 rounded-xl border border-black/10 dark:border-white/10 p-3" aria-label="GST breakup" disabled={disabled}>
       <CommonCheckbox
-        label={<span className="text-xs font-semibold">Add GST breakup <span className="font-normal text-gray-500">(optional — the dealer's invoice is checked against it)</span></span>}
+        label={<span className="text-xs font-semibold">Add GST breakup <span className="font-normal text-gray-500">(optional — the supplier's invoice is checked against it)</span></span>}
         checked={value.enabled}
         disabled={disabled}
         onChange={(enabled) => set({ enabled })}
@@ -69,7 +69,7 @@ export const QuotationTaxFields: React.FC<Props> = ({ value, onChange, taxable, 
             ))}
           </div>
           {errors['taxBreakup.supplyType'] && <p className="text-[11px] text-red-500 font-medium">{errors['taxBreakup.supplyType']}</p>}
-          {dealerState && <p className="text-[10px] text-gray-500 px-1">Dealer's state on record: {dealerState}</p>}
+          {supplierState && <p className="text-[10px] text-gray-500 px-1">Supplier's state on record: {supplierState}</p>}
 
           <div className="grid grid-cols-2 gap-3">
             <CommonSelect
@@ -139,7 +139,7 @@ export const QuotationTaxFields: React.FC<Props> = ({ value, onChange, taxable, 
               onChange={(event) => set({ cess: event.target.value })}
             />
           </div>
-          <p className="text-[10px] text-gray-500 px-1">Leave the tax amounts empty to work them out from the rate, or type the dealer's figure (within ₹1).</p>
+          <p className="text-[10px] text-gray-500 px-1">Leave the tax amounts empty to work them out from the rate, or type the supplier's figure (within ₹1).</p>
 
           <dl aria-label="Quotation bill" className="rounded-xl bg-black/[0.03] dark:bg-white/[0.04] px-3 py-2 text-[11px] grid grid-cols-[1fr_auto] gap-x-4 gap-y-0.5 tabular-nums">
             {amounts ? (

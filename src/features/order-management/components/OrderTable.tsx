@@ -3,12 +3,12 @@ import { Eye, ListChecks, Lock, Pencil, RefreshCw } from 'lucide-react';
 import { OrderStatusBadge } from './OrderStatusBadge';
 import type { OrderResponse } from '../types/order.types';
 import {
-    DEALER_CHANGE_BLOCK_REASON,
+    SUPPLIER_CHANGE_BLOCK_REASON,
     ORDER_STATUS_INFO,
     canEditOrder,
     getNextOrderStatuses,
     getOrderBlockReason,
-    isFrozenByDealerChange,
+    isFrozenBySupplierChange,
     orderAccessFrom,
 } from '../utils/orderWorkflow';
 import { useAccess } from '../../../hooks/useAccess';
@@ -48,7 +48,7 @@ export const OrderTable: React.FC<OrderTableProps> = ({ orders, isLoading, onPre
                 <thead>
                     <tr className="border-b border-black/10 dark:border-white/10 bg-black/[0.02] dark:bg-white/[0.02] text-gray-500">
                         <th className="p-3 font-semibold">Order Number</th>
-                        <th className="p-3 font-semibold">Dealer</th>
+                        <th className="p-3 font-semibold">Supplier</th>
                         <th className="p-3 font-semibold">Item</th>
                         <th className="p-3 font-semibold">Quantity</th>
                         <th className="p-3 font-semibold">Total Price</th>
@@ -59,20 +59,20 @@ export const OrderTable: React.FC<OrderTableProps> = ({ orders, isLoading, onPre
                 </thead>
                 <tbody className="divide-y divide-black/10 dark:divide-white/10">
                     {orders.map((order) => {
-                        const frozen = isFrozenByDealerChange(order);
+                        const frozen = isFrozenBySupplierChange(order);
                         const editable = !frozen && canEditOrder(order.orderStatus, access);
                         const next = frozen ? [] : getNextOrderStatuses(order.orderStatus, access);
                         const blockReason = frozen
-                            ? DEALER_CHANGE_BLOCK_REASON
+                            ? SUPPLIER_CHANGE_BLOCK_REASON
                             : next.length ? null : getOrderBlockReason(order.orderStatus, access);
 
                         return (
                             <tr key={order.id} data-testid={`order-row-${order.id}`} className="hover:bg-black/[0.01] dark:hover:bg-white/[0.01]">
                                 <td className="p-3 font-mono font-medium text-black dark:text-white">{order.orderNumber}</td>
                                 <td className="p-3 font-medium text-black dark:text-white">
-                                    {order.dealerName}
-                                    {order.raisedByDealer && (
-                                        <span className="block mt-0.5 text-[10px] font-semibold text-[#0071e3] dark:text-blue-400">Raised by dealer</span>
+                                    {order.supplierName}
+                                    {order.raisedBySupplier && (
+                                        <span className="block mt-0.5 text-[10px] font-semibold text-[#0071e3] dark:text-blue-400">Raised by supplier</span>
                                     )}
                                 </td>
                                 <td className="p-3 text-gray-600 dark:text-gray-300">{order.itemName}</td>
@@ -84,7 +84,7 @@ export const OrderTable: React.FC<OrderTableProps> = ({ orders, isLoading, onPre
                                     <OrderStatusBadge status={order.orderStatus} />
                                     {frozen && (
                                         <span className="block mt-1 text-[10px] font-semibold text-amber-600 dark:text-amber-400">
-                                            Dealer change awaiting approval
+                                            Supplier change awaiting approval
                                         </span>
                                     )}
                                     <p className="mt-1 text-[10px] text-gray-400 max-w-[180px] truncate" title={blockReason ?? undefined}>
@@ -116,7 +116,7 @@ export const OrderTable: React.FC<OrderTableProps> = ({ orders, isLoading, onPre
                                                 editable
                                                     ? 'Edit Order'
                                                     : frozen
-                                                    ? DEALER_CHANGE_BLOCK_REASON
+                                                    ? SUPPLIER_CHANGE_BLOCK_REASON
                                                     : 'Only quotations (and, for order approvers, orders pending approval) can be edited'
                                             }
                                             aria-label={`Edit ${order.orderNumber}`}

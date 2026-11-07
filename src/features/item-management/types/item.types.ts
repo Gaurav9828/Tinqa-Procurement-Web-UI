@@ -32,7 +32,7 @@ export interface ItemWarrantyRequest {
   /** Whole number > 0. */
   durationValue: number;
   durationUnit: WarrantyDurationUnit;
-  /** Who honours it (brand, manufacturer or dealer). Max 255. */
+  /** Who honours it (brand, manufacturer or supplier). Max 255. */
   provider?: string;
   coverage?: string;
   exclusions?: string;

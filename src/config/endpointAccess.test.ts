@@ -11,8 +11,8 @@ describe('endpoint access table', () => {
   });
 
   it('finds the permission by method and path, ignoring the query string', () => {
-    expect(procurement('get', '/v1/admin/dealers?page=0&size=1000')).toBe('DEALER_VIEW');
-    expect(procurement('post', '/v1/admin/dealers')).toBe('DEALER_CREATE');
+    expect(procurement('get', '/v1/admin/suppliers?page=0&size=1000')).toBe('SUPPLIER_VIEW');
+    expect(procurement('post', '/v1/admin/suppliers')).toBe('SUPPLIER_CREATE');
     expect(procurement('get', '/v1/admin/items?page=0')).toBe('ITEM_VIEW');
     expect(procurement('get', '/v1/stocks/items/12/availability')).toBe('STOCK_VIEW');
     expect(procurement('get', '/v1/documents?status=WAITING_FOR_APPROVAL')).toBe('DOCUMENT_VIEW');
@@ -22,7 +22,7 @@ describe('endpoint access table', () => {
   });
 
   it('prefers literal segments over placeholders', () => {
-    expect(procurement('get', '/v1/orders/change-requests?status=PENDING')).toBe('DEALER_QUOTATION_CHANGE_APPROVE');
+    expect(procurement('get', '/v1/orders/change-requests?status=PENDING')).toBe('SUPPLIER_QUOTATION_CHANGE_APPROVE');
     expect(procurement('get', '/v1/orders/12/change-requests')).toBe('PROCUREMENT_ORDER_VIEW');
     expect(procurement('get', '/v1/orders/12')).toBe('PROCUREMENT_ORDER_VIEW');
     expect(procurement('get', '/v1/admin/employees/pending-approvals')).toBe('EMPLOYEE_APPROVE');

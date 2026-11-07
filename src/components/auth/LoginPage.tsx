@@ -58,7 +58,7 @@ export const LoginPage: React.FC = () => {
 
   return (
     <AuthCard
-      subtitle="Staff & Dealer Sign-in"
+      subtitle="Staff & Supplier Sign-in"
       footer={
         <p className="text-center text-xs text-gray-400 dark:text-neutral-500 mt-4">
           Your role and access are applied automatically after sign-in.

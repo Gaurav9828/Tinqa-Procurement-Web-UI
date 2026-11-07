@@ -18,13 +18,13 @@ const PUBLIC = new Set(['/login', '/forgot-password', '/set-password', '/error']
 
 const accountFor = (path: string): AppRoute['account'] => {
   if (PUBLIC.has(path)) return 'none';
-  return path.startsWith('/dealer/') ? 'dealer' : 'super admin';
+  return path.startsWith('/supplier/') ? 'supplier' : 'super admin';
 };
 
 interface AppRoute {
   path: string;
   url: string;
-  account: 'none' | 'super admin' | 'dealer';
+  account: 'none' | 'super admin' | 'supplier';
 }
 
 const discoverRoutes = (): AppRoute[] =>
@@ -50,7 +50,7 @@ for (const route of routes) {
   const forWhom = route.account === 'none' ? '' : ' for a ' + route.account;
   test(`${route.path} loads cleanly${forWhom}`, async ({ page, backend }) => {
     if (route.account === 'super admin') await backend.signInAsSuperAdmin();
-    if (route.account === 'dealer') await backend.signInAsDealer();
+    if (route.account === 'supplier') await backend.signInAsSupplier();
     const response = await page.goto(route.url);
     expect(response?.status()).toBeLessThan(400);
     await page.waitForLoadState('networkidle');

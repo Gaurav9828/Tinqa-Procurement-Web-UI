@@ -13,7 +13,7 @@ export const MODE_LABELS: Record<MeetingMode, string> = { ONLINE: 'Online', IN_P
 export const MEETING_TYPE_LABELS: Record<MeetingType, string> = {
   CLIENT: 'Client',
   BUSINESS_TO_BUSINESS: 'B2B',
-  BUSINESS_TO_DEALER: 'Business-to-dealer',
+  BUSINESS_TO_SUPPLIER: 'Business-to-supplier',
   CLIENT_TO_CLIENT: 'Client-to-client',
   INTERNAL: 'Internal',
   OTHER: 'Other',

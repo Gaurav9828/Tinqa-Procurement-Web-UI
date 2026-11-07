@@ -5,15 +5,15 @@ import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import alertReducer from '../../../store/alertSlice';
 import { OrderPaymentsPanel } from './OrderPaymentsPanel';
-import { dealerPaymentApi } from '../api/dealerPaymentApi';
+import { supplierPaymentApi } from '../api/supplierPaymentApi';
 import { paymentEntry, paymentSummary, paymentsOf } from '../test/paymentFixtures';
 import { signInAsSuperAdmin } from '../../../test/access';
 import { todayLocalIsoDate } from '../validator/orderValidator';
 
-vi.mock('../api/dealerPaymentApi', () => ({
-  dealerPaymentApi: { forOrder: vi.fn(), record: vi.fn(), update: vi.fn(), withdraw: vi.fn(), reverse: vi.fn(), decide: vi.fn(), adjustClaim: vi.fn() },
+vi.mock('../api/supplierPaymentApi', () => ({
+  supplierPaymentApi: { forOrder: vi.fn(), record: vi.fn(), update: vi.fn(), withdraw: vi.fn(), reverse: vi.fn(), decide: vi.fn(), adjustClaim: vi.fn() },
 }));
-const api = vi.mocked(dealerPaymentApi);
+const api = vi.mocked(supplierPaymentApi);
 const ok = <T,>(data: T) => ({ success: true, message: 'OK', data }) as never;
 
 const renderPanel = (enabled = true) =>
@@ -28,7 +28,7 @@ beforeEach(() => {
   api.forOrder.mockResolvedValue(paymentsOf());
 });
 
-describe('Payments to the dealer', () => {
+describe('Payments to the supplier', () => {
   it('loads nothing while hidden', () => {
     signInAsSuperAdmin('ADMIN_L1');
     renderPanel(false);
@@ -41,7 +41,7 @@ describe('Payments to the dealer', () => {
     api.record.mockResolvedValue(ok(paymentEntry({ status: 'PENDING_APPROVAL' })));
     renderPanel();
 
-    const panel = within(await screen.findByRole('region', { name: 'Payments to the dealer' }));
+    const panel = within(await screen.findByRole('region', { name: 'Payments to the supplier' }));
     expect(panel.getByTestId('payment-plan')).toHaveTextContent('30% advance · 30% midterm · 40% after testing · Bank to bank transfer');
     expect(within(panel.getByTestId('milestone-FINAL')).getByText('₹472.00')).toBeInTheDocument();
     expect(panel.getByTestId('payment-outstanding')).toHaveTextContent('₹1,180.00');
@@ -94,7 +94,7 @@ describe('Payments to the dealer', () => {
     await waitFor(() => expect(api.decide).toHaveBeenCalledWith(31, 'APPROVED', undefined));
   });
 
-  it('shows the refund the dealer owes after testing, lets Level 2 change it with a reason, and reverses a confirmed payment', async () => {
+  it('shows the refund the supplier owes after testing, lets Level 2 change it with a reason, and reverses a confirmed payment', async () => {
     const user = userEvent.setup();
     signInAsSuperAdmin('ADMIN_L2');
     api.forOrder.mockResolvedValue(
@@ -113,7 +113,7 @@ describe('Payments to the dealer', () => {
     renderPanel();
 
     const claim = within(await screen.findByTestId('refund-claim'));
-    expect(claim.getByText('Refund due from the dealer: ₹200.00')).toBeInTheDocument();
+    expect(claim.getByText('Refund due from the supplier: ₹200.00')).toBeInTheDocument();
     expect(screen.getByTestId('payment-tested')).toHaveTextContent('Tested: 8 passed, 2 failed');
 
     await user.click(claim.getByRole('button', { name: 'Change refund amount' }));
@@ -141,7 +141,7 @@ describe('Payments to the dealer', () => {
     useAuthStore.setState((state) => ({ user: state.user && { ...state.user, permissions: ['PROCUREMENT_ORDER_VIEW'] } }));
     api.forOrder.mockResolvedValue(paymentsOf(paymentSummary(), [paymentEntry({ status: 'PENDING_APPROVAL', recordedBy: 50 })]));
     renderPanel();
-    const panel = within(await screen.findByRole('region', { name: 'Payments to the dealer' }));
+    const panel = within(await screen.findByRole('region', { name: 'Payments to the supplier' }));
     expect(panel.queryByRole('button')).not.toBeInTheDocument();
   });
 });

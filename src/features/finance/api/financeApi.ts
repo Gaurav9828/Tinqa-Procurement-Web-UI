@@ -42,7 +42,7 @@ export const financeApi = {
   exportLedger: async (period: Period): Promise<ApiResponse<LedgerEntry[]>> =>
     (await ecommerceAxiosClient.get<ApiResponse<LedgerEntry[]>>(`${BASE}/ledger/export`, { params: params(period) })).data,
 
-  /** POST /admin/finance/sync/procurement — reads new dealer purchases now (idempotent). */
+  /** POST /admin/finance/sync/procurement — reads new supplier purchases now (idempotent). */
   syncProcurement: async (): Promise<ApiResponse<{ posted: number; read: number }>> =>
     (await ecommerceAxiosClient.post<ApiResponse<{ posted: number; read: number }>>(`${BASE}/sync/procurement`)).data,
 

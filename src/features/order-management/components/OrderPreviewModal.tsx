@@ -4,7 +4,7 @@ import { OrderStatusBadge } from './OrderStatusBadge';
 import { OrderProgress } from './OrderProgress';
 import type { OrderResponse } from '../types/order.types';
 import { PrintMenu } from '../../printing/components/PrintMenu';
-import { DEALER_CHANGE_BLOCK_REASON, isFrozenByDealerChange } from '../utils/orderWorkflow';
+import { SUPPLIER_CHANGE_BLOCK_REASON, isFrozenBySupplierChange } from '../utils/orderWorkflow';
 import { TaxBreakupSummary } from './TaxBreakupSummary';
 import { InvoiceVerificationPanel } from './InvoiceVerificationPanel';
 import { useOrderInvoice } from '../hooks/useOrderInvoice';
@@ -17,7 +17,7 @@ interface OrderPreviewModalProps {
   onClose: () => void;
 }
 
-// From shipping on, an order may have the dealer's invoice
+// From shipping on, an order may have the supplier's invoice
 const INVOICE_STAGES: ReadonlySet<OrderStatus> = new Set<OrderStatus>([
   'SHIPPED', 'DELIVERED', 'RETURN_REQUESTED', 'RETURN_APPROVED', 'RETURN_REJECTED', 'RETURN_PICKED_UP',
   'RETURN_RECEIVED', 'REFUND_INITIATED', 'REFUND_FAILED', 'REFUND_COMPLETED',
@@ -46,19 +46,19 @@ export const OrderPreviewModal: React.FC<OrderPreviewModalProps> = ({ order, onC
             <OrderStatusBadge status={order.orderStatus} />
           </div>
           <OrderProgress status={order.orderStatus} />
-          {isFrozenByDealerChange(order) && (
+          {isFrozenBySupplierChange(order) && (
             <p className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-400">
-              {DEALER_CHANGE_BLOCK_REASON}
+              {SUPPLIER_CHANGE_BLOCK_REASON}
             </p>
           )}
 
           <div className="grid grid-cols-2 gap-3">
             <div className="p-3 border border-black/10 dark:border-white/10 rounded-xl space-y-1">
               <div className="flex items-center gap-1.5 text-gray-400 font-medium">
-                <User className="w-3.5 h-3.5" /> Dealer Details
+                <User className="w-3.5 h-3.5" /> Supplier Details
               </div>
-              <p className="font-semibold text-black dark:text-white">{order.dealerName}</p>
-              {order.raisedByDealer && <p className="text-[10px] font-semibold text-[#0071e3] dark:text-blue-400">Raised by the dealer</p>}
+              <p className="font-semibold text-black dark:text-white">{order.supplierName}</p>
+              {order.raisedBySupplier && <p className="text-[10px] font-semibold text-[#0071e3] dark:text-blue-400">Raised by the supplier</p>}
             </div>
 
             <div className="p-3 border border-black/10 dark:border-white/10 rounded-xl space-y-1">

@@ -13,7 +13,7 @@ interface Props {
 }
 
 /**
- * How the dealer wants to be paid: the advance percentage, an optional midterm percentage (some dealers want only an
+ * How the supplier wants to be paid: the advance percentage, an optional midterm percentage (some suppliers want only an
  * advance and the final payment), the final part worked out as the rest of 100 % (paid only after the delivered units
  * are tested), and the payment method they expect.
  */
@@ -97,7 +97,7 @@ export const PaymentPlanFields: React.FC<Props> = ({ value, onChange, total, err
       <CommonSelect
         label="Expected payment method"
         required
-        placeholder="-- How the dealer wants to be paid --"
+        placeholder="-- How the supplier wants to be paid --"
         value={value.expectedPaymentMethod}
         options={PAYMENT_METHODS.map((method) => ({ label: PAYMENT_METHOD_LABELS[method], value: method }))}
         onChange={(e) => set({ expectedPaymentMethod: e.target.value as PaymentMethod })}

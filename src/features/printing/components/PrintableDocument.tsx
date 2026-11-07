@@ -2,7 +2,7 @@ import React from 'react';
 import { describePlan } from '../../order-management/utils/paymentPlan';
 import type { Printable, PrintParty } from '../hooks/usePrintableOrder';
 import type { PrintDocument } from '../printDocuments';
-import { dealerStatusLabel } from '../../dealer-portal/utils/dealerOrderStage';
+import { supplierStatusLabel } from '../../supplier-portal/utils/supplierOrderStage';
 import { formatCurrency } from '../../order-tracking/utils/orderTracking.utils';
 import { formatDate } from '../../finance/utils/period';
 import { formatUnit } from '../../../constants/unitsOfMeasure';
@@ -56,7 +56,7 @@ const Party: React.FC<{ heading: string; party: PrintParty }> = ({ heading, part
 );
 
 /**
- * One printable page: the company letterhead, buyer (the company) and supplier (the dealer), the line and totals.
+ * One printable page: the company letterhead, buyer (the company) and supplier (the supplier), the line and totals.
  * Always light on white, whatever the app theme, because it is meant for paper.
  */
 export const PrintableDocument: React.FC<{ document: PrintDocument; printable: Printable }> = ({ document, printable }) => {
@@ -106,7 +106,7 @@ export const PrintableDocument: React.FC<{ document: PrintDocument; printable: P
             {NUMBER_LABEL[document]} <span className="font-mono font-semibold">{order.orderNumber}</span>
           </p>
           <p className="text-xs">Date: {formatDate(documentDate)}</p>
-          {document === 'quotation' && <p className="text-xs">Status: {dealerStatusLabel(order.orderStatus)}</p>}
+          {document === 'quotation' && <p className="text-xs">Status: {supplierStatusLabel(order.orderStatus)}</p>}
         </div>
       </header>
 

@@ -109,14 +109,14 @@ export const AdminLayout: React.FC = () => {
 
   useAccessSync();
   const { authorizedNavigation, designationLabel, level, can } = useAccess();
-  // Dealer logins see only their own portal: no admin level, no management modules
-  const isDealer = can('DEALER_PORTAL_VIEW');
+  // Supplier logins see only their own portal: no admin level, no management modules
+  const isSupplier = can('SUPPLIER_PORTAL_VIEW');
   // Only the modules the user's permissions open
   const authorizedItems = useMemo(() => authorizedNavigation(), [authorizedNavigation]);
   // Header items (My Meetings) sit in the top bar beside the bell; the rest fill the sidebar
   const visibleNavItems = useMemo(() => authorizedItems.filter((item) => item.placement !== 'header'), [authorizedItems]);
   const myMeetingsNav = authorizedItems.find((item) => item.id === 'my-meetings');
-  const levelLabel = level === 'ADMIN_L2' ? 'Level 2' : level === 'ADMIN_L1' ? 'Level 1' : isDealer ? null : level;
+  const levelLabel = level === 'ADMIN_L2' ? 'Level 2' : level === 'ADMIN_L1' ? 'Level 1' : isSupplier ? null : level;
 
   // "1" next to Company Profile while a change waits for approval.
   const hasCompanyProfileNav = visibleNavItems.some((item) => item.id === 'company-profile');
@@ -223,7 +223,7 @@ export const AdminLayout: React.FC = () => {
           {/* Capped to the window so the module list scrolls with the mouse wheel instead of running off-screen */}
           <div className="bg-white dark:bg-[#161617] rounded-2xl p-3 sticky top-20 max-h-[calc(100dvh-6rem)] flex flex-col border border-black/10 dark:border-white/10 shadow-sm transition-colors duration-200">
             <p className="shrink-0 px-3 py-2 text-[11px] font-bold tracking-wider text-gray-400 dark:text-neutral-500 uppercase select-none">
-              {isDealer ? 'Dealer Portal' : 'Management Modules'}
+              {isSupplier ? 'Supplier Portal' : 'Management Modules'}
             </p>
 
             <nav className="flex-1 min-h-0 overflow-y-auto overscroll-contain flex flex-col gap-1 pt-1 -mx-1 px-1">

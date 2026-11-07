@@ -9,7 +9,7 @@ export const INVOICE_ACCEPT = 'application/pdf,.pdf';
 export const INVOICE_MAX_BYTES = 25 * 1024 * 1024;
 
 /**
- * The dealer's invoice of a procurement order: loads it (PROCUREMENT_ORDER_VIEW) only while `enabled`, uploads a new
+ * The supplier's invoice of a procurement order: loads it (PROCUREMENT_ORDER_VIEW) only while `enabled`, uploads a new
  * one (PROCUREMENT_ORDER_UPDATE_STATUS) and downloads the stored PDF. Errors and results go to the global alert.
  */
 export const useOrderInvoice = (orderId: number | null, enabled: boolean) => {
@@ -35,7 +35,7 @@ export const useOrderInvoice = (orderId: number | null, enabled: boolean) => {
       .catch((err: unknown) => {
         if (!current) return;
         setLoaded({ orderId, invoice: null });
-        notify.error(err, "Couldn't load the dealer's invoice.");
+        notify.error(err, "Couldn't load the supplier's invoice.");
       });
     return () => {
       current = false;
@@ -48,7 +48,7 @@ export const useOrderInvoice = (orderId: number | null, enabled: boolean) => {
     async (file: File): Promise<OrderInvoice | null> => {
       if (orderId === null || !canUpload) return null;
       if (!/\.pdf$/i.test(file.name)) {
-        notify.error("Upload the dealer's invoice as a PDF.");
+        notify.error("Upload the supplier's invoice as a PDF.");
         return null;
       }
       if (file.size > INVOICE_MAX_BYTES) {

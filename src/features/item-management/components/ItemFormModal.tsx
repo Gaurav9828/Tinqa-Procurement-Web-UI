@@ -218,7 +218,7 @@ export const ItemFormModal: React.FC<Props> = ({
         <form onSubmit={handleSubmit} className="p-6 space-y-4 overflow-y-auto flex-1">
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {/* Categories: dealers assigned any of them can quote for the item */}
+            {/* Categories: suppliers assigned any of them can quote for the item */}
             <div className="sm:col-span-2">
               <span className="block text-xs font-semibold text-gray-600 dark:text-neutral-300 mb-1">
                 Categories *

@@ -1,5 +1,5 @@
 import type { ApiResponse } from '../../../types/common.types';
-import type { DealerPaymentEntry, OrderPayments, PaymentSummary } from '../types/dealerPayment.types';
+import type { SupplierPaymentEntry, OrderPayments, PaymentSummary } from '../types/supplierPayment.types';
 
 /** A 30 / 30 / 40 plan on an order worth 1180.00 (GST included), nothing paid yet; override what a test needs. */
 export const paymentSummary = (patch: Partial<PaymentSummary> = {}): PaymentSummary => ({
@@ -32,11 +32,11 @@ export const paymentSummary = (patch: Partial<PaymentSummary> = {}): PaymentSumm
   ...patch,
 });
 
-export const paymentEntry = (patch: Partial<DealerPaymentEntry> = {}): DealerPaymentEntry => ({
+export const paymentEntry = (patch: Partial<SupplierPaymentEntry> = {}): SupplierPaymentEntry => ({
   id: 11,
   orderId: 1,
   orderNumber: 'ORD-1',
-  dealerName: 'Acme Traders',
+  supplierName: 'Acme Traders',
   kind: 'PAYMENT',
   milestone: 'ADVANCE',
   amount: 354,
@@ -56,5 +56,5 @@ export const paymentEntry = (patch: Partial<DealerPaymentEntry> = {}): DealerPay
   ...patch,
 });
 
-export const paymentsOf = (summary: PaymentSummary = paymentSummary(), entries: DealerPaymentEntry[] = []): ApiResponse<OrderPayments> =>
+export const paymentsOf = (summary: PaymentSummary = paymentSummary(), entries: SupplierPaymentEntry[] = []): ApiResponse<OrderPayments> =>
   ({ success: true, message: '', data: { summary, entries } }) as ApiResponse<OrderPayments>;

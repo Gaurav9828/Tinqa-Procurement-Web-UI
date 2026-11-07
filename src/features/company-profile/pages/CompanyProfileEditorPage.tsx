@@ -342,7 +342,7 @@ export const CompanyProfileEditorPage: React.FC = () => {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {(
               [
-                ['adminLogin', 'Admin portal (staff & dealers)'],
+                ['adminLogin', 'Admin portal (staff & suppliers)'],
                 ['storeLogin', 'Storefront (customers)'],
               ] as const
             ).map(([portal, title]) => (

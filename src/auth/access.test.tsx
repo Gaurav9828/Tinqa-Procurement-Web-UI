@@ -42,8 +42,8 @@ describe('useAccess', () => {
 
     expect(result.current.can('ITEM_VIEW')).toBe(true);
     expect(result.current.can('ITEM_CREATE')).toBe(false);
-    expect(result.current.canAny('DEALER_VIEW', 'STOCK_VIEW')).toBe(true);
-    expect(result.current.canAll('ITEM_VIEW', 'DEALER_VIEW')).toBe(false);
+    expect(result.current.canAny('SUPPLIER_VIEW', 'STOCK_VIEW')).toBe(true);
+    expect(result.current.canAll('ITEM_VIEW', 'SUPPLIER_VIEW')).toBe(false);
     expect(result.current.inGroup('CATALOG_READ')).toBe(true);
     expect(result.current.designationLabel).toBe('Catalog Specialist');
     expect(result.current.accessLoaded).toBe(true);
@@ -70,8 +70,8 @@ describe('route guards', () => {
         <Routes>
           <Route path="/" element={<HomeRedirect />} />
           <Route path="/profile" element={<p>Profile page</p>} />
-          <Route element={<RequireNavAccess navId="dealers" />}>
-            <Route path="/dealers" element={<p>Dealers page</p>} />
+          <Route element={<RequireNavAccess navId="suppliers" />}>
+            <Route path="/suppliers" element={<p>Suppliers page</p>} />
           </Route>
           <Route element={<RequireNavAccess navId="order-tracking" />}>
             <Route path="/order-tracking" element={<p>Tracking page</p>} />
@@ -85,15 +85,15 @@ describe('route guards', () => {
 
   it('blocks a module the designation does not include and says why', () => {
     signIn(['CUSTOMER_ORDER_VIEW'], { designationLabel: 'Delivery Rider / Courier' });
-    renderAt('/dealers');
+    renderAt('/suppliers');
     expect(screen.getByText('Access restricted')).toBeInTheDocument();
     expect(screen.getByText(/Delivery Rider \/ Courier/)).toBeInTheDocument();
   });
 
   it('lets a permitted user in', () => {
-    signIn(['DEALER_VIEW']);
-    renderAt('/dealers');
-    expect(screen.getByText('Dealers page')).toBeInTheDocument();
+    signIn(['SUPPLIER_VIEW']);
+    renderAt('/suppliers');
+    expect(screen.getByText('Suppliers page')).toBeInTheDocument();
   });
 
   it('narrows a sub-route with its own permission', () => {
@@ -124,7 +124,7 @@ describe('HasAccess', () => {
         <HasAccess permission="REFUND_APPROVE" fallback={<span>no approve</span>}>
           <span>can approve</span>
         </HasAccess>
-        <HasAccess anyOf={['DEALER_VIEW', 'REFUND_VIEW']}><span>any of</span></HasAccess>
+        <HasAccess anyOf={['SUPPLIER_VIEW', 'REFUND_VIEW']}><span>any of</span></HasAccess>
       </>
     );
     expect(screen.getByText('can view')).toBeInTheDocument();

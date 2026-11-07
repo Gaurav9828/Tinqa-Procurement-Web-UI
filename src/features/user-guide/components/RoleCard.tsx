@@ -44,8 +44,8 @@ export const RoleCard: React.FC<{ guide: RoleGuide }> = ({ guide }) => (
         <div className="space-y-2">
           <h3 className="text-[11px] font-bold uppercase tracking-wider text-gray-400 dark:text-neutral-500">Approvals</h3>
           <p className="text-sm text-gray-600 dark:text-neutral-300">
-            {guide.id === 'DEALER'
-              ? 'Every change a dealer requests is checked by a Dealer Manager.'
+            {guide.id === 'SUPPLIER'
+              ? 'Every change a supplier requests is checked by a Supplier Manager.'
               : 'None. This role works at Level 1; what it prepares is approved by a manager.'}
           </p>
         </div>

@@ -2,7 +2,7 @@ import { calculateTax, type TaxForm } from "./quotationTax";
 import type { OrderStatus } from "../../../types/common.types";
 
 /**
- * A quotation's payment plan: how the dealer wants to be paid. The advance and the midterm percentages are typed in;
+ * A quotation's payment plan: how the supplier wants to be paid. The advance and the midterm percentages are typed in;
  * the final part is whatever is left of 100 % and is paid only after the delivered units are tested (the stock entry
  * is approved). Mirrors Procurement's PaymentPlan.
  */
@@ -19,7 +19,7 @@ export const PAYMENT_METHODS = Object.keys(PAYMENT_METHOD_LABELS) as PaymentMeth
 
 export interface PaymentPlanForm {
   advancePercent: string;
-  /** Some dealers want only an advance and the final payment: no midterm part (sent as 0 %). */
+  /** Some suppliers want only an advance and the final payment: no midterm part (sent as 0 %). */
   midtermEnabled: boolean;
   midtermPercent: string;
   expectedPaymentMethod: PaymentMethod | '';
@@ -77,7 +77,7 @@ export const validatePlanForm = (form: PaymentPlanForm): Record<string, string> 
   if (!errors.advancePercent && !errors.midtermPercent && left !== null && left < 0) {
     errors.midtermPercent = `Advance and midterm together cannot be more than 100% (they are ${100 - left}%).`;
   }
-  if (!form.expectedPaymentMethod) errors.expectedPaymentMethod = 'Choose how the dealer expects to be paid.';
+  if (!form.expectedPaymentMethod) errors.expectedPaymentMethod = 'Choose how the supplier expects to be paid.';
   return errors;
 };
 
@@ -88,7 +88,7 @@ export const planPayload = (form: PaymentPlanForm): Required<{ [K in keyof Payme
   expectedPaymentMethod: form.expectedPaymentMethod as PaymentMethod,
 });
 
-/** Only the plan fields that differ from the saved ones (an edit or a dealer's change sends just those). */
+/** Only the plan fields that differ from the saved ones (an edit or a supplier's change sends just those). */
 export interface PlanChange {
   advancePercent?: number;
   midtermPercent?: number;
@@ -133,8 +133,8 @@ export const shownPlanErrors = (errors: Record<string, string>): Record<string, 
 export const planChanged = (form: PaymentPlanForm, saved: PaymentPlanFields | null | undefined): boolean =>
   Object.keys(validatePlanForm(form)).length > 0 || Object.keys(planChanges(form, saved)).length > 0;
 
-/** Once approved, the dealer may have been paid (the advance is due from approval on): the stages showing payments. */
+/** Once approved, the supplier may have been paid (the advance is due from approval on): the stages showing payments. */
 export const PAYMENT_STAGES: ReadonlySet<OrderStatus> = new Set<OrderStatus>([
-  'DEALER_LEVEL_PENDING', 'CONFIRMED', 'CANCELLED', 'SHIPPED', 'DELIVERED', 'RETURN_REQUESTED', 'RETURN_APPROVED',
+  'SUPPLIER_LEVEL_PENDING', 'CONFIRMED', 'CANCELLED', 'SHIPPED', 'DELIVERED', 'RETURN_REQUESTED', 'RETURN_APPROVED',
   'RETURN_REJECTED', 'RETURN_PICKED_UP', 'RETURN_RECEIVED', 'REFUND_INITIATED', 'REFUND_FAILED', 'REFUND_COMPLETED',
 ]);

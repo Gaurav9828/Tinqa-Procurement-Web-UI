@@ -17,7 +17,7 @@ import type { ProductApprovalResponse } from '../products-management/types/produ
 import { RefundsQueue } from '../refunds/components/RefundsQueue';
 import { useAccess } from '../../hooks/useAccess';
 import { VouchersPanel } from '../finance/components/VouchersPanel';
-import { DealerApprovalsPanel } from './components/DealerApprovalsPanel';
+import { SupplierApprovalsPanel } from './components/SupplierApprovalsPanel';
 import { useApprovalSummary } from './hooks/useApprovalSummary';
 import { PreOrderApprovalsPanel } from './components/PreOrderApprovalsPanel';
 import { usePreOrderApprovals } from './hooks/usePreOrderApprovals';
@@ -28,10 +28,10 @@ import { useBarcodeRequests } from '../barcodes/hooks/useBarcodeRequests';
 import { ClientDemoApprovalsPanel } from '../client-demos/components/ClientDemoApprovalsPanel';
 import { useWaitingDemos } from '../client-demos/hooks/useClientDemoData';
 import { CareerApprovalsPanel } from '../careers/components/CareerApprovalsPanel';
-import { DealerPaymentApprovalsPanel } from './components/DealerPaymentApprovalsPanel';
+import { SupplierPaymentApprovalsPanel } from './components/SupplierPaymentApprovalsPanel';
 
 type HubTab =
-  | 'requests' | 'refunds' | 'expenses' | 'dealers' | 'dealer-payments' | 'pre-orders' | 'company-profile' | 'barcodes' | 'client-demos' | 'careers';
+  | 'requests' | 'refunds' | 'expenses' | 'suppliers' | 'supplier-payments' | 'pre-orders' | 'company-profile' | 'barcodes' | 'client-demos' | 'careers';
 const TAB_STORAGE_KEY = 'approvals.tab';
 
 /** Remembered per browser tab, so Back from an order opened in the refunds queue returns to it. */
@@ -48,8 +48,8 @@ const TABS: { id: HubTab; label: string }[] = [
   { id: 'requests', label: 'Requests' },
   { id: 'refunds', label: 'Refunds' },
   { id: 'expenses', label: 'Expenses' },
-  { id: 'dealers', label: 'Dealers' },
-  { id: 'dealer-payments', label: 'Dealer payments' },
+  { id: 'suppliers', label: 'Suppliers' },
+  { id: 'supplier-payments', label: 'Supplier payments' },
   { id: 'pre-orders', label: 'Pre-orders' },
   { id: 'company-profile', label: 'Company profile' },
   { id: 'barcodes', label: 'Barcodes' },
@@ -77,10 +77,10 @@ export const ApprovalsHub: React.FC = () => {
         return can('DEMO_APPROVE');
       case 'careers':
         return canAll('CAREER_DECISION_APPROVE', 'CAREER_APPLICATION_VIEW');
-      case 'dealers':
-        return canAny('DEALER_LOGIN_APPROVE', 'DEALER_QUOTATION_CHANGE_APPROVE');
-      case 'dealer-payments':
-        return canAll('DEALER_PAYMENT_APPROVE', 'PROCUREMENT_ORDER_VIEW');
+      case 'suppliers':
+        return canAny('SUPPLIER_LOGIN_APPROVE', 'SUPPLIER_QUOTATION_CHANGE_APPROVE');
+      case 'supplier-payments':
+        return canAll('SUPPLIER_PAYMENT_APPROVE', 'PROCUREMENT_ORDER_VIEW');
       default:
         return canAny(...REQUEST_QUEUE_PERMISSIONS);
     }
@@ -127,8 +127,8 @@ export const ApprovalsHub: React.FC = () => {
     },
     refunds: { count: pendingRefundCount, noun: 'refunds' },
     expenses: { count: summary.count('EXPENSES'), noun: 'expenses' },
-    dealers: { count: summary.count('DEALER_LOGINS', 'QUOTATION_CHANGES'), noun: 'dealer requests' },
-    'dealer-payments': { count: summary.count('DEALER_PAYMENTS'), noun: 'dealer payments' },
+    suppliers: { count: summary.count('SUPPLIER_LOGINS', 'QUOTATION_CHANGES'), noun: 'supplier requests' },
+    'supplier-payments': { count: summary.count('SUPPLIER_PAYMENTS'), noun: 'supplier payments' },
     'pre-orders': { count: summary.count('PRE_ORDERS'), noun: 'pre-orders' },
     'company-profile': { count: summary.count('COMPANY_PROFILE'), noun: 'company profile changes' },
     barcodes: { count: summary.count('BARCODES'), noun: 'barcode requests' },
@@ -161,10 +161,10 @@ export const ApprovalsHub: React.FC = () => {
         return <PreOrderApprovalsPanel orders={preOrders.orders} total={preOrders.total} isLoading={preOrders.isLoading} onRefresh={preOrders.refresh} />;
       case 'company-profile':
         return <CompanyProfileApprovalsPanel pending={companyProfile.pending} isLoading={companyProfile.isLoading} onRefresh={companyProfile.refresh} />;
-      case 'dealers':
-        return <DealerApprovalsPanel onChanged={refreshSummary} />;
-      case 'dealer-payments':
-        return <DealerPaymentApprovalsPanel enabled={tab === 'dealer-payments'} onChanged={refreshSummary} />;
+      case 'suppliers':
+        return <SupplierApprovalsPanel onChanged={refreshSummary} />;
+      case 'supplier-payments':
+        return <SupplierPaymentApprovalsPanel enabled={tab === 'supplier-payments'} onChanged={refreshSummary} />;
       case 'refunds':
         return <RefundsQueue onChanged={refreshSummary} />;
       case 'expenses':
@@ -297,8 +297,8 @@ export const ApprovalsHub: React.FC = () => {
             Approval Hub
           </h1>
           <p className="text-gray-500 dark:text-neutral-400 text-sm mt-1">
-            Every request waiting for your decision: documents, profile updates, new employees, stock, dealer quotations,
-            orders, returns, products, refunds, expenses, dealers, pre-orders, the company profile, barcodes, client demos and careers
+            Every request waiting for your decision: documents, profile updates, new employees, stock, supplier quotations,
+            orders, returns, products, refunds, expenses, suppliers, pre-orders, the company profile, barcodes, client demos and careers
             shortlists and selections.
           </p>
         </div>

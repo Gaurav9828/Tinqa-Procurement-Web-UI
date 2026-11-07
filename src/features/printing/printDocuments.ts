@@ -4,7 +4,7 @@ import type { OrderStatus } from '../../types/common.types';
 export type PrintDocument = 'quotation' | 'order' | 'bill';
 
 const ORDER_STATUSES = new Set<OrderStatus>([
-  'DEALER_LEVEL_PENDING', 'CONFIRMED', 'SHIPPED', 'DELIVERED', 'RETURN_REQUESTED', 'RETURN_APPROVED',
+  'SUPPLIER_LEVEL_PENDING', 'CONFIRMED', 'SHIPPED', 'DELIVERED', 'RETURN_REQUESTED', 'RETURN_APPROVED',
   'RETURN_PICKED_UP', 'RETURN_RECEIVED', 'REFUND_INITIATED', 'REFUND_FAILED', 'RETURN_REJECTED', 'REFUND_COMPLETED',
 ]);
 

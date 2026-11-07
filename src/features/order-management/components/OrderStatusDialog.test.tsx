@@ -8,7 +8,7 @@ import alertReducer from '../../../store/alertSlice';
 import { OrderStatusDialog } from './OrderStatusDialog';
 import { todayLocalIsoDate } from '../validator/orderValidator';
 import { orderApi } from '../api/orderApi';
-import { dealerPaymentApi } from '../api/dealerPaymentApi';
+import { supplierPaymentApi } from '../api/supplierPaymentApi';
 import { paymentEntry, paymentSummary, paymentsOf } from '../test/paymentFixtures';
 import { signInAsSuperAdmin } from '../../../test/access';
 import type { AdminLevel } from '../../../config/access';
@@ -16,9 +16,9 @@ import type { OrderInvoice, OrderResponse } from '../types/order.types';
 import type { OrderStatus } from '../../../types/common.types';
 
 vi.mock('../api/orderApi', () => ({ orderApi: { getInvoice: vi.fn(), uploadInvoice: vi.fn(), downloadInvoice: vi.fn() } }));
-vi.mock('../api/dealerPaymentApi', () => ({ dealerPaymentApi: { forOrder: vi.fn() } }));
+vi.mock('../api/supplierPaymentApi', () => ({ supplierPaymentApi: { forOrder: vi.fn() } }));
 const api = vi.mocked(orderApi);
-const payments = vi.mocked(dealerPaymentApi);
+const payments = vi.mocked(supplierPaymentApi);
 
 const invoice = (status: OrderInvoice['status']): OrderInvoice => ({
   id: 9,
@@ -50,7 +50,7 @@ const order = (orderStatus: OrderStatus): OrderResponse =>
   ({
     id: 1,
     orderNumber: 'ORD-1',
-    dealerName: 'Acme Traders',
+    supplierName: 'Acme Traders',
     itemName: 'Motherboard',
     orderQuantity: 10,
     unitType: 'PCS',
@@ -85,7 +85,7 @@ describe('Procurement status dialog', () => {
     expect(choices().map((r) => r.getAttribute('value'))).toEqual(['SHIPPED', 'CANCELLED']);
     const progress = screen.getByRole('list', { name: 'Order progress' });
     expect(within(progress).getByText('Confirmed').closest('li')).toHaveAttribute('aria-current', 'step');
-    expect(within(progress).getByText('Dealer').closest('li')).toHaveAttribute('data-done', 'true');
+    expect(within(progress).getByText('Supplier').closest('li')).toHaveAttribute('data-done', 'true');
   });
 
   it('marks delivered with an actual delivery date that cannot be in the future or before the order date', async () => {
@@ -110,7 +110,7 @@ describe('Procurement status dialog', () => {
     expect(onClose).toHaveBeenCalled();
   });
 
-  it("needs the dealer's invoice to deliver, and shows what it should total", async () => {
+  it("needs the supplier's invoice to deliver, and shows what it should total", async () => {
     api.uploadInvoice.mockResolvedValue({ success: true, message: 'Invoice uploaded and matches the quotation', data: invoice('MATCHED') } as never);
     const { user, onSubmit } = renderDialog('SHIPPED');
     await user.click(screen.getByRole('radio', { name: /Mark delivered/ }));
@@ -125,13 +125,13 @@ describe('Procurement status dialog', () => {
     expect(onSubmit).toHaveBeenCalledWith(expect.anything(), { status: 'DELIVERED', actualDelivery: todayLocalIsoDate() });
   });
 
-  it('shows at delivery what the dealer was paid and what waits for testing, with nothing to record there', async () => {
+  it('shows at delivery what the supplier was paid and what waits for testing, with nothing to record there', async () => {
     payments.forOrder.mockResolvedValue(
       paymentsOf(paymentSummary({ paid: 708, outstanding: 472, payableNow: 0 }), [paymentEntry(), paymentEntry({ id: 12, milestone: 'MIDTERM' })]),
     );
     const { user } = renderDialog('SHIPPED');
     await user.click(screen.getByRole('radio', { name: /Mark delivered/ }));
-    const panel = within(await screen.findByRole('region', { name: 'Payments to the dealer' }));
+    const panel = within(await screen.findByRole('region', { name: 'Payments to the supplier' }));
     expect(panel.getByTestId('payment-paid')).toHaveTextContent('₹708.00');
     expect(panel.getByTestId('payment-outstanding')).toHaveTextContent('₹472.00');
     expect(panel.getByText(/The final part is paid only after the delivered units are tested/)).toBeInTheDocument();
@@ -170,9 +170,9 @@ describe('Procurement status dialog', () => {
     expect(screen.getByRole('button', { name: 'Cancel order' })).toBeDisabled();
     expect(onSubmit).not.toHaveBeenCalled();
 
-    await user.type(screen.getByLabelText('Reason'), '  Dealer withdrew the quote ');
+    await user.type(screen.getByLabelText('Reason'), '  Supplier withdrew the quote ');
     await user.click(screen.getByRole('button', { name: 'Cancel order' }));
-    expect(onSubmit).toHaveBeenCalledWith(expect.anything(), { status: 'CANCELLED', reason: 'Dealer withdrew the quote' });
+    expect(onSubmit).toHaveBeenCalledWith(expect.anything(), { status: 'CANCELLED', reason: 'Supplier withdrew the quote' });
   });
 
   it('submits a quotation for approval', async () => {

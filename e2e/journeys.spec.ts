@@ -15,11 +15,11 @@ test('signing in sends one login request and opens the workspace', async ({ page
   expect(backend.network.api.filter((c) => c.path === '/v1/access/me').length).toBeLessThanOrEqual(1);
 });
 
-test('a dealer only reaches the dealer portal', async ({ page, backend }) => {
-  await backend.signInAsDealer();
+test('a supplier only reaches the supplier portal', async ({ page, backend }) => {
+  await backend.signInAsSupplier();
   await page.goto('/orders');
   await page.waitForLoadState('networkidle');
-  // No procurement order list is ever requested for a dealer
+  // No procurement order list is ever requested for a supplier
   expect(backend.network.api.filter((c) => c.path.startsWith('/v1/orders'))).toEqual([]);
 });
 

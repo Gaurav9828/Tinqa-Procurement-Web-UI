@@ -19,28 +19,28 @@ export const PERMISSIONS = [
   // Custom roles (e.g. Marketing Executive) built from the permission groups the admin holds (docs/outreach-meetings-roles.md)
   'ROLE_VIEW',
   'ROLE_MANAGE',
-  // Dealers
-  'DEALER_VIEW',
-  'DEALER_CREATE',
-  'DEALER_UPDATE',
-  'DEALER_TOGGLE_STATUS',
-  'DEALER_CATEGORY_MANAGE',
-  'DEALER_DELETE',
-  // Dealer logins: a Dealer Manager creates one, someone else (Level 2) approves it
-  'DEALER_LOGIN_MANAGE',
-  'DEALER_LOGIN_APPROVE',
+  // Suppliers
+  'SUPPLIER_VIEW',
+  'SUPPLIER_CREATE',
+  'SUPPLIER_UPDATE',
+  'SUPPLIER_TOGGLE_STATUS',
+  'SUPPLIER_CATEGORY_MANAGE',
+  'SUPPLIER_DELETE',
+  // Supplier logins: a Supplier Manager creates one, someone else (Level 2) approves it
+  'SUPPLIER_LOGIN_MANAGE',
+  'SUPPLIER_LOGIN_APPROVE',
   // Procurement orders
   'PROCUREMENT_ORDER_VIEW',
   'PROCUREMENT_ORDER_CREATE',
   'PROCUREMENT_ORDER_UPDATE',
   'PROCUREMENT_ORDER_UPDATE_STATUS',
   'PROCUREMENT_ORDER_APPROVE',
-  // Dealers' changes to their quotations apply only once a Dealer Manager (either level) approves them
-  'DEALER_QUOTATION_CHANGE_APPROVE',
-  // Payments to dealers against a quotation's payment plan, and refunds from them: recorded by one person, confirmed
+  // Suppliers' changes to their quotations apply only once a Supplier Manager (either level) approves them
+  'SUPPLIER_QUOTATION_CHANGE_APPROVE',
+  // Payments to suppliers against a quotation's payment plan, and refunds from them: recorded by one person, confirmed
   // by another (Level 2). Seen by everyone with PROCUREMENT_ORDER_VIEW
-  'DEALER_PAYMENT_RECORD',
-  'DEALER_PAYMENT_APPROVE',
+  'SUPPLIER_PAYMENT_RECORD',
+  'SUPPLIER_PAYMENT_APPROVE',
   // Catalog
   'ITEM_VIEW',
   'PRODUCT_VIEW',
@@ -169,12 +169,12 @@ export const PERMISSIONS = [
   // Meetings you are invited to: decline within 24 hours of the invite, give feedback once completed
   'MEETING_VIEW_OWN',
   'MEETING_RESPOND_OWN',
-  // Dealer portal: held only by dealer logins, always limited to the dealer's own records on the server
-  'DEALER_PORTAL_VIEW',
-  'DEALER_QUOTATION_SUBMIT',
-  'DEALER_QUOTATION_CHANGE_REQUEST',
-  'DEALER_ORDER_RESPOND',
-  'DEALER_ORDER_SHIP',
+  // Supplier portal: held only by supplier logins, always limited to the supplier's own records on the server
+  'SUPPLIER_PORTAL_VIEW',
+  'SUPPLIER_QUOTATION_SUBMIT',
+  'SUPPLIER_QUOTATION_CHANGE_REQUEST',
+  'SUPPLIER_ORDER_RESPOND',
+  'SUPPLIER_ORDER_SHIP',
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];
@@ -182,7 +182,7 @@ export type Permission = (typeof PERMISSIONS)[number];
 export const DESIGNATIONS = [
   'SUPER_ADMIN',
   'STORE_MANAGER',
-  'DEALER_MANAGER',
+  'SUPPLIER_MANAGER',
   'CATALOG_SPECIALIST',
   'FULFILLMENT_SPECIALIST',
   'DELIVERY_RIDER',
@@ -211,7 +211,7 @@ export const ADMIN_LEVEL_LABELS: Record<AdminLevel, string> = {
   ADMIN_L2: 'Level 2 (approver)',
 };
 
-/** Every approval action (and reviewing dealers' quotations). Holding any of them opens the Approvals Hub. */
+/** Every approval action (and reviewing suppliers' quotations). Holding any of them opens the Approvals Hub. */
 export const APPROVAL_PERMISSIONS: readonly Permission[] = [
   'EMPLOYEE_APPROVE',
   'EMPLOYEE_PROFILE_CHANGE_APPROVE',
@@ -220,14 +220,14 @@ export const APPROVAL_PERMISSIONS: readonly Permission[] = [
   'PRODUCT_APPROVAL_DECIDE',
   'BARCODE_APPROVE',
   'PROCUREMENT_ORDER_APPROVE',
-  // Submitting or cancelling the quotations dealers send in
+  // Submitting or cancelling the quotations suppliers send in
   'PROCUREMENT_ORDER_UPDATE_STATUS',
   'REFUND_APPROVE',
   'COMPANY_PROFILE_APPROVE',
   'EXPENSE_APPROVE',
-  'DEALER_LOGIN_APPROVE',
-  'DEALER_QUOTATION_CHANGE_APPROVE',
-  'DEALER_PAYMENT_APPROVE',
+  'SUPPLIER_LOGIN_APPROVE',
+  'SUPPLIER_QUOTATION_CHANGE_APPROVE',
+  'SUPPLIER_PAYMENT_APPROVE',
   'CUSTOMER_ORDER_PRE_ORDER_APPROVE',
   'DEMO_APPROVE',
   'CAREER_DECISION_APPROVE',

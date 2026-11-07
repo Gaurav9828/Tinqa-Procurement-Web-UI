@@ -61,7 +61,7 @@ export const useApprovals = ({ enabled = true }: { enabled?: boolean } = {}) => 
     setIsLoading(true);
 
     try {
-      // Orders waiting on staff (dealer quotations to submit, orders to approve, returns to decide): only the
+      // Orders waiting on staff (supplier quotations to submit, orders to approve, returns to decide): only the
       // queues this user decides, and only with PROCUREMENT_ORDER_VIEW to list them
       const orderTypes = ORDER_APPROVAL_TYPES.filter((type) => can(ORDER_QUEUES[type].decidePermission));
       const [documentsResult, profilesResult, stocksResult, orderResult, productResult, employeeResult] = await Promise.allSettled([

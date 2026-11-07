@@ -16,7 +16,7 @@ export type EmployeeStatus = (typeof EmployeeConstants)[keyof typeof EmployeeCon
 /**
  * Admin level. With the designation it decides access: the designation picks the business areas (permission
  * groups), and Level 1 holds them minus the approval-level groups while Level 2 holds them all.
- * DEALER and INSPECTOR also exist in the backend but are created elsewhere, never from this screen.
+ * SUPPLIER and INSPECTOR also exist in the backend but are created elsewhere, never from this screen.
  */
 export type EmployeeRole = 'ADMIN_L1' | 'ADMIN_L2';
 
@@ -35,7 +35,7 @@ export interface EmployeeResponse {
   designation: string;
   /** Human-readable designation, from the server. */
   designationLabel?: string | null;
-  /** Admin level (ADMIN_L1 / ADMIN_L2), or DEALER / INSPECTOR for mobile accounts. */
+  /** Admin level (ADMIN_L1 / ADMIN_L2), or SUPPLIER / INSPECTOR for mobile accounts. */
   role?: string | null;
   /** Follows the designation; set by the server. */
   department: string;

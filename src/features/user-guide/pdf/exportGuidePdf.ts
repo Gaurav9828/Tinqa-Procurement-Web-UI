@@ -39,7 +39,7 @@ const KIND_COLOR: Record<StepKind, Rgb> = {
   end: [13, 92, 99],
 };
 
-/** "Dealer Manager" → TinQa-User-Guide-Dealer-Manager.pdf */
+/** "Supplier Manager" → TinQa-User-Guide-Supplier-Manager.pdf */
 export const guideFileName = (role: GuideRoleId | null) =>
   `TinQa-User-Guide-${role ? ROLE_GUIDES[role].name.replace(/[^A-Za-z0-9]+/g, '-').replace(/^-|-$/g, '') : 'All-Roles'}.pdf`;
 
@@ -174,8 +174,8 @@ export const buildGuidePdf = async (role: GuideRoleId | null): Promise<JsPdf> =>
       bullets(guide.approves, KIND_COLOR.checker);
     } else {
       paragraph(
-        id === 'DEALER'
-          ? 'Every change you request is checked by a Dealer Manager at TinQa.'
+        id === 'SUPPLIER'
+          ? 'Every change you request is checked by a Supplier Manager at TinQa.'
           : 'None. This role works at Level 1; what it prepares is approved by a manager.',
         10
       );
@@ -214,7 +214,7 @@ export const buildGuidePdf = async (role: GuideRoleId | null): Promise<JsPdf> =>
     heading('How your work flows');
     paragraph('Highlighted steps marked YOU are yours. The other steps show who comes before and after you.', 9.5, 'normal', MUTED);
     flows.forEach((item, index) => flow(item, index + 1));
-    if (role !== 'DEALER') {
+    if (role !== 'SUPPLIER') {
       heading('For everyone');
       bullets(GENERAL_NOTES);
     }

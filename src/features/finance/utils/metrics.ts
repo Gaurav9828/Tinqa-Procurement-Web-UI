@@ -24,7 +24,7 @@ export const METRICS = {
   directCosts: {
     id: 'directCosts',
     title: 'Direct costs (COGS)',
-    definition: 'What it takes to make or buy what is sold: raw materials and dealer purchases, consumables such as wires, direct labour, factory overheads and packaging.',
+    definition: 'What it takes to make or buy what is sold: raw materials and supplier purchases, consumables such as wires, direct labour, factory overheads and packaging.',
     formula: 'Sum of direct-cost entries',
   },
   grossProfit: {
@@ -142,7 +142,7 @@ export const VOUCHER_STATUS_LABELS = {
 export const SOURCE_LABELS = {
   CUSTOMER_PAYMENT: 'Customer payment',
   CUSTOMER_REFUND: 'Customer refund',
-  PROCUREMENT_ORDER: 'Dealer purchase',
+  PROCUREMENT_ORDER: 'Supplier purchase',
   PROCUREMENT_SALARY: 'Salary',
   PROCUREMENT_DEMO: 'Client demo',
   VOUCHER: 'Voucher',

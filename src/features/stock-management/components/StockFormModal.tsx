@@ -120,7 +120,7 @@ export const StockFormModal: React.FC<StockFormModalProps> = ({
             (o) =>
                 o.orderNumber.toLowerCase().includes(query) ||
                 (o.itemName && o.itemName.toLowerCase().includes(query)) ||
-                (o.dealerName && o.dealerName.toLowerCase().includes(query))
+                (o.supplierName && o.supplierName.toLowerCase().includes(query))
         );
     }, [availableOrders, formData.orderNumber]);
 
@@ -318,7 +318,7 @@ export const StockFormModal: React.FC<StockFormModalProps> = ({
                                                                 {order.orderNumber}
                                                             </div>
                                                             <div className="text-[10px] text-gray-500 dark:text-neutral-400">
-                                                                {order.dealerName} • {order.itemName}
+                                                                {order.supplierName} • {order.itemName}
                                                             </div>
                                                         </div>
                                                         {formData.orderNumber === order.orderNumber && (
@@ -451,9 +451,9 @@ export const StockFormModal: React.FC<StockFormModalProps> = ({
 
                             {purchaseValue !== null && (
                                 <p className="sm:col-span-2 text-xs text-gray-600" data-testid="purchase-value">
-                                    Booked as a dealer purchase when saved: <span className="font-semibold">{formatCurrency(purchaseValue)}</span>
+                                    Booked as a supplier purchase when saved: <span className="font-semibold">{formatCurrency(purchaseValue)}</span>
                                     {passedUnits && passedUnits > 0 ? ' (passed units × unit price + shipment)' : ' (no unit passed)'}.
-                                    {defectedUnits ? ' Defected units go back to the dealer and are not paid for.' : ''}
+                                    {defectedUnits ? ' Defected units go back to the supplier and are not paid for.' : ''}
                                 </p>
                             )}
 

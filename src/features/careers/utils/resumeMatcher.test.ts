@@ -35,7 +35,7 @@ Education
 B.Tech, Electronics and Communication, RTU 2015 - 2019`;
 
 const SALES_RESUME = `Priya Sharma, Area Sales Manager
-Handled dealer network, key account management and channel sales across Rajasthan.
+Handled supplier network, key account management and channel sales across Rajasthan.
 Tools: Tally Prime, MS Excel, Zoho CRM. Eight years in FMCG distribution.
 MBA Marketing, 2014`;
 

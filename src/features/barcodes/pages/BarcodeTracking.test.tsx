@@ -54,8 +54,8 @@ const SOURCE = {
   orderNumber: 'ORD-77',
   orderDate: '2026-09-28',
   deliveredOn: '2026-10-04',
-  dealerId: 3,
-  dealerName: 'Acme Components',
+  supplierId: 3,
+  supplierName: 'Acme Components',
 };
 const BOARD = unit({ id: 2, code: 'BOARD0001', unitType: 'ITEM_UNIT', status: 'FITTED', itemId: 7, itemName: 'Touch board', itemSku: 'TB-1', stockId: 9, fittedIntoId: 1, fittedIntoCode: 'PANEL0001' });
 const PANEL_TRACE: BarcodeTrace = {

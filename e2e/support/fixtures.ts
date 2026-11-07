@@ -19,15 +19,15 @@ export interface Session {
   };
 }
 
-// What a dealer login holds (as in src/test/access.ts); a Super Admin holds every other permission
-const DEALER_PORTAL: readonly string[] = [
-  'DEALER_PORTAL_VIEW',
-  'DEALER_QUOTATION_SUBMIT',
-  'DEALER_QUOTATION_CHANGE_REQUEST',
-  'DEALER_ORDER_RESPOND',
-  'DEALER_ORDER_SHIP',
+// What a supplier login holds (as in src/test/access.ts); a Super Admin holds every other permission
+const SUPPLIER_PORTAL: readonly string[] = [
+  'SUPPLIER_PORTAL_VIEW',
+  'SUPPLIER_QUOTATION_SUBMIT',
+  'SUPPLIER_QUOTATION_CHANGE_REQUEST',
+  'SUPPLIER_ORDER_RESPOND',
+  'SUPPLIER_ORDER_SHIP',
 ];
-const superAdminPermissions = PERMISSIONS.filter((p) => !DEALER_PORTAL.includes(p));
+const superAdminPermissions = PERMISSIONS.filter((p) => !SUPPLIER_PORTAL.includes(p));
 
 export const SUPER_ADMIN_SESSION: Session = {
   user: {
@@ -44,18 +44,18 @@ export const SUPER_ADMIN_SESSION: Session = {
   },
 };
 
-export const DEALER_SESSION: Session = {
+export const SUPPLIER_SESSION: Session = {
   user: {
     userId: 2,
-    username: 'e2e.dealer',
-    email: 'e2e.dealer@tinqa.test',
-    role: 'DEALER',
+    username: 'e2e.supplier',
+    email: 'e2e.supplier@tinqa.test',
+    role: 'SUPPLIER',
     authClient: 'WEB',
     isFirstLogin: false,
     designation: null,
     designationLabel: null,
-    permissionGroups: ['DEALER_PORTAL'],
-    permissions: [...DEALER_PORTAL],
+    permissionGroups: ['SUPPLIER_PORTAL'],
+    permissions: [...SUPPLIER_PORTAL],
   },
 };
 
@@ -166,17 +166,17 @@ export const handlers = (session: Session): [string, RegExp, Handler][] => [
   ['GET', /^\/v1\/admin\/items$/, () => ok(page([]))],
   ['GET', /^\/v1\/admin\/items\/categories$/, () => ok([])],
   ['GET', /^\/v1\/stocks$/, () => ok([])],
-  ['GET', /^\/v1\/admin\/dealers$/, () => ok(page([]))],
-  ['GET', /^\/v1\/admin\/dealers\/categories$/, () => ok([])],
-  ['GET', /^\/v1\/admin\/dealers\/cities$/, () => ok([])],
-  ['GET', /^\/v1\/admin\/dealer-logins$/, () => ok([])],
+  ['GET', /^\/v1\/admin\/suppliers$/, () => ok(page([]))],
+  ['GET', /^\/v1\/admin\/suppliers\/categories$/, () => ok([])],
+  ['GET', /^\/v1\/admin\/suppliers\/cities$/, () => ok([])],
+  ['GET', /^\/v1\/admin\/supplier-logins$/, () => ok([])],
   ['GET', /^\/v1\/admin\/employees$/, () => ok(page([]))],
   ['GET', /^\/v1\/admin\/employees\/pending-approvals$/, () => ok([])],
   ['GET', /^\/v1\/orders$/, () => ok([])],
   ['GET', /^\/v1\/orders\/change-requests$/, () => ok([])],
   ['GET', /^\/v1\/orders\/status\/\w+$/, () => ok([])],
   ['GET', /^\/v1\/orders\/\d+$/, () => notFound('ORDER_NOT_FOUND')],
-  // Payments to dealers (DealerPaymentController): the Approvals Hub queue, and an order's payments
+  // Payments to suppliers (SupplierPaymentController): the Approvals Hub queue, and an order's payments
   ['GET', /^\/v1\/orders\/payments$/, () => ok([])],
   ['GET', /^\/v1\/orders\/\d+\/payments$/, () => notFound('ORDER_NOT_FOUND')],
   ['GET', /^\/v1\/documents$/, () => ok([])],
@@ -226,9 +226,9 @@ export const handlers = (session: Session): [string, RegExp, Handler][] => [
   ['GET', /^\/v1\/outreach\/contacts$/, () => ok(page([]))],
   ['GET', /^\/v1\/outreach\/contacts\/\d+\/proofs\/\d+$/, () => notFound('RESOURCE_NOT_FOUND')],
   ['GET', /^\/v1\/outreach\/follow-ups$/, () => ok(page([], 10))],
-  ['GET', /^\/v1\/dealer-portal\/quotations$/, () => ok([])],
-  ['GET', /^\/v1\/dealer-portal\/orders$/, () => ok([])],
-  ['GET', /^\/v1\/dealer-portal\/orders\/\d+\/payments$/, () => notFound('ORDER_NOT_FOUND')],
+  ['GET', /^\/v1\/supplier-portal\/quotations$/, () => ok([])],
+  ['GET', /^\/v1\/supplier-portal\/orders$/, () => ok([])],
+  ['GET', /^\/v1\/supplier-portal\/orders\/\d+\/payments$/, () => notFound('ORDER_NOT_FOUND')],
   // E-commerce
   ['GET', /^\/company\/profile$/, () => ok({ brandName: 'TinQa', adminLoginHeadline: 'Procurement, sales & delivery — one workspace.' })],
   ['GET', /^\/admin\/company\/profile$/, () => ok({ live: null, pendingChanges: [], myDrafts: [] })],

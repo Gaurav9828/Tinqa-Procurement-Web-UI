@@ -26,8 +26,8 @@ const shown = (check: InvoiceCheck, value: string | null) => {
 };
 
 /**
- * The dealer's invoice and what checking it against the quotation found: each figure (total, taxable value, CGST/SGST
- * or IGST, cess, the dealer's GSTIN) side by side, and who accepted it when it didn't match.
+ * The supplier's invoice and what checking it against the quotation found: each figure (total, taxable value, CGST/SGST
+ * or IGST, cess, the supplier's GSTIN) side by side, and who accepted it when it didn't match.
  */
 export const InvoiceVerificationPanel: React.FC<Props> = ({ invoice, loading, uploading = false, canUpload = false, onUpload, onDownload }) => {
   const fileInput = useRef<HTMLInputElement>(null);
@@ -39,9 +39,9 @@ export const InvoiceVerificationPanel: React.FC<Props> = ({ invoice, loading, up
   };
 
   return (
-    <section aria-label="Dealer invoice" className="p-3 rounded-xl border border-black/10 dark:border-white/10 space-y-2.5">
+    <section aria-label="Supplier invoice" className="p-3 rounded-xl border border-black/10 dark:border-white/10 space-y-2.5">
       <div className="flex items-center justify-between gap-2">
-        <p className="font-semibold text-black dark:text-white">Dealer's invoice</p>
+        <p className="font-semibold text-black dark:text-white">Supplier's invoice</p>
         {canUpload && onUpload && (
           <>
             <input ref={fileInput} type="file" accept={INVOICE_ACCEPT} className="hidden" aria-label="Invoice PDF" onChange={pick} />
@@ -62,7 +62,7 @@ export const InvoiceVerificationPanel: React.FC<Props> = ({ invoice, loading, up
         <p className="flex items-center gap-1.5 text-gray-500"><Loader2 className="w-3.5 h-3.5 animate-spin" /> Loading invoice…</p>
       ) : !invoice ? (
         <p className="text-gray-500">
-          No invoice uploaded yet. Upload the PDF the dealer sent: its total, GST and GSTIN are checked against the quotation before the order can be marked delivered.
+          No invoice uploaded yet. Upload the PDF the supplier sent: its total, GST and GSTIN are checked against the quotation before the order can be marked delivered.
         </p>
       ) : (
         <>

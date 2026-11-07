@@ -112,7 +112,7 @@ export const UserGuidePage: React.FC = () => {
         ))}
       </div>
 
-      {role !== 'DEALER' && (
+      {role !== 'SUPPLIER' && (
         <section className="apple-card p-5 space-y-2" aria-labelledby="good-to-know">
           <h2 id="good-to-know" className="text-lg font-semibold text-black dark:text-white">Good to know</h2>
           <ul className="list-disc pl-5 space-y-1 text-sm text-gray-700 dark:text-gray-200">

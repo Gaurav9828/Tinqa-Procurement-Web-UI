@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { ShoppingCart, RefreshCw } from 'lucide-react';
 import { useOrderList } from '../hooks/useOrderList';
 import { useOrderActions } from '../hooks/useOrderActions';
-import { useDealerOptions, useItemOptions } from '../../../hooks/useLookupOptions';
+import { useSupplierOptions, useItemOptions } from '../../../hooks/useLookupOptions';
 import { OrderFilterBar } from '../components/OrderFilterBar';
 import { OrderTable } from '../components/OrderTable';
 import { CreateOrderModal } from '../components/CreateOrderModal';
@@ -20,16 +20,16 @@ export const OrderManagementPage: React.FC = () => {
         isLoading,
         search,
         statusFilter,
-        dealerFilter,
+        supplierFilter,
         updateSearch,
         updateStatusFilter,
-        updateDealerFilter,
+        updateSupplierFilter,
         refetch,
     } = useOrderList();
 
     // Full (cached) lists for the filter bar and modal dropdowns — not a single 10-row page.
-    // Each list loads only with its view permission (a financial auditor sees orders, not dealers or items)
-    const { options: dealers, allowed: canSeeDealers } = useDealerOptions();
+    // Each list loads only with its view permission (a financial auditor sees orders, not suppliers or items)
+    const { options: suppliers, allowed: canSeeSuppliers } = useSupplierOptions();
     const { options: items } = useItemOptions();
 
     const {
@@ -72,7 +72,7 @@ export const OrderManagementPage: React.FC = () => {
                         <ShoppingCart className="w-5 h-5 text-[#0071e3]" /> Order Management
                     </h1>
                     <p className="text-xs text-gray-500 mt-0.5">
-                        Manage procurement orders, status tracking, and dealer assignments ({totalElements} total entries)
+                        Manage procurement orders, status tracking, and supplier assignments ({totalElements} total entries)
                     </p>
                 </div>
                 <button
@@ -87,11 +87,11 @@ export const OrderManagementPage: React.FC = () => {
             <OrderFilterBar
                 searchQuery={search}
                 selectedStatus={statusFilter}
-                selectedDealerId={dealerFilter}
-                dealers={canSeeDealers ? dealers : undefined}
+                selectedSupplierId={supplierFilter}
+                suppliers={canSeeSuppliers ? suppliers : undefined}
                 onSearchChange={updateSearch}
                 onStatusChange={updateStatusFilter}
-                onDealerChange={updateDealerFilter}
+                onSupplierChange={updateSupplierFilter}
                 onOpenCreateOrderModal={can('PROCUREMENT_ORDER_CREATE') ? () => setIsCreateModalOpen(true) : undefined}
             />
 
@@ -109,7 +109,7 @@ export const OrderManagementPage: React.FC = () => {
                 isOpen={isCreateModalOpen}
                 isSubmitting={isSubmitting}
                 items={items}
-                dealers={dealers}
+                suppliers={suppliers}
                 onClose={() => setIsCreateModalOpen(false)}
                 onSubmit={handleCreateOrderSubmit}
             />
@@ -119,7 +119,7 @@ export const OrderManagementPage: React.FC = () => {
                 isOpen={!!editingOrder}
                 isSubmitting={isSubmitting}
                 items={items}
-                dealers={dealers}
+                suppliers={suppliers}
                 onClose={() => setEditingOrder(null)}
                 onSubmit={handleEditOrderSubmit}
             />

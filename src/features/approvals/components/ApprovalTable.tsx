@@ -77,7 +77,7 @@ export const ApprovalTable = <T extends ApprovalItem>({
     if ('batchNumber' in item && 'orderNumber' in item && item?.approvalType == 'STOCKS') {
       return {
         title: `Batch: ${item.batchNumber}`,
-        subtitle: `Dealer: ${item.dealerName ? item.dealerName : undefined}`,
+        subtitle: `Supplier: ${item.supplierName ? item.supplierName : undefined}`,
       }
     }
     if (item?.approvalType == 'PRODUCTS' && 'productTitle' in item) {

@@ -152,16 +152,16 @@ export const getModalConfig = (
     // ORDER STATUS
     // ============================================================
 
-    case 'DEALER_LEVEL_PENDING':
+    case 'SUPPLIER_LEVEL_PENDING':
       return {
         icon: <Clock3 className="w-8 h-8 text-amber-500" />,
         iconBg: 'bg-amber-500/10',
-        title: customTitle || 'Dealer Approval Pending',
+        title: customTitle || 'Supplier Approval Pending',
         description:
           customDescription ||
           (requestId
-            ? `Order #${requestId} is pending dealer-level approval.`
-            : 'This order is pending dealer-level approval.'),
+            ? `Order #${requestId} is pending supplier-level approval.`
+            : 'This order is pending supplier-level approval.'),
         confirmBtnText: 'Continue',
         confirmBtnBg: 'bg-amber-500 hover:bg-amber-600',
       };

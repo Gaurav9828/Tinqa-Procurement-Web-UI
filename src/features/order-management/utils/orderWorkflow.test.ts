@@ -10,7 +10,7 @@ import {
   getOrderBlockReason,
   validateMove,
   NO_ORDER_ACCESS,
-  type OrderAccess, isFrozenByDealerChange } from './orderWorkflow';
+  type OrderAccess, isFrozenBySupplierChange } from './orderWorkflow';
 
 // A Level 1 maker and a Level 2 approver, as the permissions they hold
 const L1: OrderAccess = { canEdit: true, canProgress: true, canApprove: false };
@@ -37,10 +37,10 @@ describe('procurement order workflow', () => {
     }
   });
 
-  it('follows quotation → approval → dealer → confirmed → shipped → delivered', () => {
+  it('follows quotation → approval → supplier → confirmed → shipped → delivered', () => {
     expect(getNextOrderStatuses('QUOTATION', L1)).toEqual(['PENDING', 'CANCELLED']);
     expect(getNextOrderStatuses('PENDING', L2)).toEqual([]); // decided in the Approvals Hub only
-    expect(getNextOrderStatuses('DEALER_LEVEL_PENDING', L2)).toEqual(['CONFIRMED', 'CANCELLED']);
+    expect(getNextOrderStatuses('SUPPLIER_LEVEL_PENDING', L2)).toEqual(['CONFIRMED', 'CANCELLED']);
     expect(getNextOrderStatuses('CONFIRMED', L1)).toEqual(['SHIPPED', 'CANCELLED']);
     expect(getNextOrderStatuses('SHIPPED', L1)).toEqual(['DELIVERED']);
     expect(getNextOrderStatuses('DELIVERED', L1)).toEqual(['RETURN_REQUESTED']);
@@ -52,7 +52,7 @@ describe('procurement order workflow', () => {
     }
   });
 
-  it('runs the return through pickup, dealer receipt and refund, with retries only after a failed refund', () => {
+  it('runs the return through pickup, supplier receipt and refund, with retries only after a failed refund', () => {
     expect(getNextOrderStatuses('RETURN_REQUESTED', L2)).toEqual(['RETURN_APPROVED', 'RETURN_REJECTED']);
     expect(getNextOrderStatuses('RETURN_APPROVED', L1)).toEqual(['RETURN_PICKED_UP']);
     expect(getNextOrderStatuses('RETURN_PICKED_UP', L1)).toEqual(['RETURN_RECEIVED']);
@@ -69,10 +69,10 @@ describe('procurement order workflow', () => {
   });
 
   it('leaves approval decisions to Level 2', () => {
-    expect(getNextOrderStatuses('DEALER_LEVEL_PENDING', L1)).toEqual([]);
+    expect(getNextOrderStatuses('SUPPLIER_LEVEL_PENDING', L1)).toEqual([]);
     expect(getNextOrderStatuses('RETURN_REQUESTED', L1)).toEqual([]);
     expect(getOrderBlockReason('PENDING', L1)).toMatch(/Approvals Hub/);
-    expect(getOrderBlockReason('DEALER_LEVEL_PENDING', L1)).toMatch(/order approver/);
+    expect(getOrderBlockReason('SUPPLIER_LEVEL_PENDING', L1)).toMatch(/order approver/);
   });
 
   it('offers nothing for an unrecognised status', () => {
@@ -84,7 +84,7 @@ describe('procurement order workflow', () => {
     expect(canEditOrder('QUOTATION', L1)).toBe(true);
     expect(canEditOrder('PENDING', L1)).toBe(false);
     expect(canEditOrder('PENDING', L2)).toBe(true);
-    for (const status of ['DEALER_LEVEL_PENDING', 'CONFIRMED', 'SHIPPED', 'DELIVERED', 'CANCELLED'] as const) {
+    for (const status of ['SUPPLIER_LEVEL_PENDING', 'CONFIRMED', 'SHIPPED', 'DELIVERED', 'CANCELLED'] as const) {
       expect(canEditOrder(status, L2)).toBe(false);
     }
   });
@@ -119,11 +119,11 @@ describe('orders without the progress permission', () => {
   });
 });
 
-describe('dealer changes', () => {
-  it('freezes a quotation only while a dealer change waits for approval', () => {
-    expect(isFrozenByDealerChange({ orderStatus: 'QUOTATION', dealerChangePending: true })).toBe(true);
-    expect(isFrozenByDealerChange({ orderStatus: 'QUOTATION', dealerChangePending: false })).toBe(false);
-    expect(isFrozenByDealerChange({ orderStatus: 'QUOTATION' })).toBe(false);
-    expect(isFrozenByDealerChange({ orderStatus: 'PENDING', dealerChangePending: true })).toBe(false);
+describe('supplier changes', () => {
+  it('freezes a quotation only while a supplier change waits for approval', () => {
+    expect(isFrozenBySupplierChange({ orderStatus: 'QUOTATION', supplierChangePending: true })).toBe(true);
+    expect(isFrozenBySupplierChange({ orderStatus: 'QUOTATION', supplierChangePending: false })).toBe(false);
+    expect(isFrozenBySupplierChange({ orderStatus: 'QUOTATION' })).toBe(false);
+    expect(isFrozenBySupplierChange({ orderStatus: 'PENDING', supplierChangePending: true })).toBe(false);
   });
 });

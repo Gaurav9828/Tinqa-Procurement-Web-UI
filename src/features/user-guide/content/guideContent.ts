@@ -9,8 +9,8 @@ import type { BuiltInDesignation } from '../../../config/access';
  * guideContent.test.ts fails when a designation, menu item or actor is missing.
  */
 
-/** Everyone the guide can be written for: the ten designations, plus dealers signed in to their portal. */
-export type GuideRoleId = BuiltInDesignation | 'DEALER';
+/** Everyone the guide can be written for: the ten designations, plus suppliers signed in to their portal. */
+export type GuideRoleId = BuiltInDesignation | 'SUPPLIER';
 
 /** People and systems that take part in a flow without being a role of this app. */
 export type GuideExternalActor = 'CUSTOMER' | 'SYSTEM';
@@ -41,12 +41,12 @@ export type StepKind = 'maker' | 'checker' | 'external' | 'end';
 export interface FlowStep {
   /** Who can do this step. A role is "in" a flow when it appears here. */
   who: GuideActor[];
-  /** How the actor is shown on the step, e.g. "Dealer Manager · Level 2". */
+  /** How the actor is shown on the step, e.g. "Supplier Manager · Level 2". */
   label: string;
   kind: StepKind;
   /** What happens, in plain words. */
   text: string;
-  /** Where in the app, e.g. "Approvals Hub › Dealers". */
+  /** Where in the app, e.g. "Approvals Hub › Suppliers". */
   where?: string;
   /** What happens otherwise (reject, failure). */
   otherwise?: string;
@@ -66,16 +66,22 @@ export interface GuideChange {
 }
 
 /** Bump with every guide update; printed on the page and on every PDF. */
-export const GUIDE_VERSION = '2.48';
-export const GUIDE_UPDATED = '2026-11-06';
+export const GUIDE_VERSION = '2.49';
+export const GUIDE_UPDATED = '2026-11-07';
 
 export const GUIDE_CHANGELOG: GuideChange[] = [
   {
+    date: '2026-11-07',
+    changes: [
+      'Dealers are now called suppliers everywhere, because they are the companies TinQa buys from. Supplier Management replaces Dealer Management, the Supplier Portal (My Quotations, My Orders, My Profile) replaces the Dealer Portal, the Supplier Manager designation replaces Dealer Manager, and the Approvals Hub shows Supplier logins and Supplier payments. Quotations, purchase orders, bills, emails and permission names say supplier too. Nothing else changes: every supplier, login, quotation, order and payment is kept, and so is each role\'s access. Suppliers signed in before this change sign in again once.',
+    ],
+  },
+  {
     date: '2026-11-06',
     changes: [
-      'Quotations now carry a payment plan (Orders Management › Create / Edit, and a dealer\'s My Quotations): the advance and midterm percentages, 30% and 30% to start with and both editable, and the final part worked out by itself as the rest of 100% (30% + 30% leaves 40%), paid only after the delivered units are tested. The midterm part is optional: untick "Midterm payment" for a dealer who wants only an advance and the final payment (30% advance leaves 70% after testing), and no midterm payment is then asked for or accepted. The quotation also says how the dealer expects to be paid: cash, online payment, bank to bank transfer or cheque. Advance and midterm together can\'t be more than 100%. A dealer\'s change to the plan is a change request like any other, and approvers see the old and new plan. The quotation, purchase order and bill print the payment terms.',
-      'Orders Management › the order › Payments to the dealer (Dealer Manager, Finance Manager, Super Admin): record what was actually paid against each part of the plan, any amount (25% or 50% instead of the planned 30% is fine), with the method, date and reference. Someone else confirms it (Approvals Hub › Dealer payments, Level 2); only confirmed payments count. The advance can be paid once the order is approved and the midterm once the dealer has shipped; until the units are tested at most the advance and midterm parts can be paid. Your own entry can be corrected or withdrawn while it waits; a confirmed one is reversed (and the reversal confirmed). Everyone who sees orders sees the paid, refunded and still-to-pay figures; marking an order delivered shows them too.',
-      'Testing decides the final payment: once the stock entry is approved the order is worth only the units that passed (with shipment and GST), and the final part can be paid up to that. If more was paid (units failed testing, or the order was cancelled or returned after a payment), a refund claim against the dealer opens by itself, with the failed units, and the dealer and payments team are told. A Level 2 can change the amount to be refunded, with a reason; recording and confirming the dealer\'s refund settles it. Dealers see their payments and any refund they owe in My Orders.',
+      'Quotations now carry a payment plan (Orders Management › Create / Edit, and a supplier\'s My Quotations): the advance and midterm percentages, 30% and 30% to start with and both editable, and the final part worked out by itself as the rest of 100% (30% + 30% leaves 40%), paid only after the delivered units are tested. The midterm part is optional: untick "Midterm payment" for a supplier who wants only an advance and the final payment (30% advance leaves 70% after testing), and no midterm payment is then asked for or accepted. The quotation also says how the supplier expects to be paid: cash, online payment, bank to bank transfer or cheque. Advance and midterm together can\'t be more than 100%. A supplier\'s change to the plan is a change request like any other, and approvers see the old and new plan. The quotation, purchase order and bill print the payment terms.',
+      'Orders Management › the order › Payments to the supplier (Supplier Manager, Finance Manager, Super Admin): record what was actually paid against each part of the plan, any amount (25% or 50% instead of the planned 30% is fine), with the method, date and reference. Someone else confirms it (Approvals Hub › Supplier payments, Level 2); only confirmed payments count. The advance can be paid once the order is approved and the midterm once the supplier has shipped; until the units are tested at most the advance and midterm parts can be paid. Your own entry can be corrected or withdrawn while it waits; a confirmed one is reversed (and the reversal confirmed). Everyone who sees orders sees the paid, refunded and still-to-pay figures; marking an order delivered shows them too.',
+      'Testing decides the final payment: once the stock entry is approved the order is worth only the units that passed (with shipment and GST), and the final part can be paid up to that. If more was paid (units failed testing, or the order was cancelled or returned after a payment), a refund claim against the supplier opens by itself, with the failed units, and the supplier and payments team are told. A Level 2 can change the amount to be refunded, with a reason; recording and confirming the supplier\'s refund settles it. Suppliers see their payments and any refund they owe in My Orders.',
       'Products Management › View details (the eye) now opens the product in the same frame as Create and Edit: the same parts (Basics, Price & GST, Images & specs, Components & barcodes, Costs, Warranties, Accessory) in the same order, with Back / Next, and every field shown as it would be filled in but not editable. There is nothing to save; Close leaves it. The unit barcodes and the cost sheet load only when their part is opened.',
       'Product Management has a new Stock entry tab (Fulfillment Specialist, Super Admin) for adding units to a product. Add stock (+) on a product opens it there. Units to add is a list of only the units the components in stock can build: a product using one motherboard and two touch panels, with 5 motherboards and 10 touch panels in stock, offers 1 to 5. Only pieces with a barcode count, and the line under it names the component that limits the count. When not one unit can be built (no complete set in stock, or a product without components), Units to add shows 0 and can\'t be changed, "No component available" says why, and there are no rows to fill in. The grid then has one row per unit, a column for the unit\'s own barcode and one column per piece fitted into it (a USB cable used twice per unit gets USB Cable #1 and #2). So every row says exactly which pieces went into which unit. A scanner\'s Enter moves to the next cell, and a block copied from a spreadsheet (rows on lines, cells side by side) can be pasted into the first cell. The unit\'s barcode is new, so it is typed or scanned. Clicking a piece cell drops down that component\'s pieces in stock (pieces already entered in another cell are left out): pick one, type to narrow the list (arrow keys and Enter work too), or scan. A code entered twice is marked red. A draft saved with more units than the components in stock now allow can\'t be saved or added until Units to add is lowered.',
       'Stock entry › Save draft: keep a stock entry part-filled and continue later, on any computer. The Drafts list shows each product\'s draft, how many units are complete and who saved it last; Add stock on a product with a draft continues it. Each product has at most one draft, shared by the team. Saving checks every code: a unit barcode already in use, a piece that is not in stock or is a piece of another item, or a code already in another product\'s draft is refused, and its cell is marked. A draft takes nothing from item stock.',
@@ -107,7 +113,7 @@ export const GUIDE_CHANGELOG: GuideChange[] = [
   {
     date: '2026-11-03',
     changes: [
-      'My Demos is now only for the roles that go on client demos: Super Admin, Store Manager, Finance & Accounts Manager and Store Sales Agent (their new permission group "Client demos - attend demos"). Delivery riders, fleet coordinators, warehouse, support, catalog, dealer and audit staff no longer see it. Only staff in these roles are offered as attending staff when a demo is planned, and the server refuses anyone else. Someone already tagged on a demo stays on it. A custom role can include the group to send its holders on demos.',
+      'My Demos is now only for the roles that go on client demos: Super Admin, Store Manager, Finance & Accounts Manager and Store Sales Agent (their new permission group "Client demos - attend demos"). Delivery riders, fleet coordinators, warehouse, support, catalog, supplier and audit staff no longer see it. Only staff in these roles are offered as attending staff when a demo is planned, and the server refuses anyone else. Someone already tagged on a demo stays on it. A custom role can include the group to send its holders on demos.',
       'Products can now name the software they run and its version (optional), e.g. TinQa OS 2.1.0, like iOS on a phone. Create and Edit Product › Basics has a highlighted Software box: fill in both the name and the version, or leave both empty. A new version starts with the software of the one it is copied or adapted from. Changes are listed for the approver like any other change.',
       'On the website, the product view now lists the Highlights once, as a checklist under the description, followed by one Specifications list with the software and its version and the warranty. A specification that only repeats a highlight (e.g. "Lighting: Warm-white LED" next to the highlight "Warm-white LED sunrise cycle") is left out, so write each fact once.',
     ],
@@ -191,7 +197,7 @@ export const GUIDE_CHANGELOG: GuideChange[] = [
       'Client demos › Visit & staff: every product unit taken to a demo is now picked by its barcode, for accountability. Scan or type a unit\'s barcode (its product is added with it), or choose a product and tick its units in stock; the number of units is the number of barcodes. A unit another demo has on overlapping days can\'t be picked. Products listed before this keep their number of units until their units are picked.',
       'Client demos › the demo › Units taken: on the demo\'s days the attending staff (or the demo manager) scan the units as they leave and press Hand out: they are out of stock, and the storefront\'s stock goes down at once, so they can\'t be sold meanwhile (units already ordered online can\'t go). After the demo, scan them back and press Hand back: they are in stock again. A demo can\'t be sent for completion or cancelled while a unit is out; a unit that did not come back is written off by a Super Admin (Level 2) with the reason.',
       'Resubmitting a rejected product no longer asks for every barcode again: the unit and piece barcodes sent last time (when it was created, its stock changed or it was last resubmitted) are filled in. Check them, change only those that differ and scan any still missing, such as pieces of a component added after the rejection. They are kept in the browser they were entered in; on another computer they are scanned again.',
-      'Creating a quotation (Orders Management › Create Order, and New quotation in the dealer portal): after choosing the item, its existing price (MRP) is shown and can\'t be edited. To quote a different price, enter it as the new quoted price; the form shows the difference (e.g. ₹1,499 → ₹1,699 is +₹200) and then needs the reason for it, which the approver sees in the Approvals Hub. Leave the new price empty to quote the existing price; the reason box stays locked until a new price is entered.',
+      'Creating a quotation (Orders Management › Create Order, and New quotation in the supplier portal): after choosing the item, its existing price (MRP) is shown and can\'t be edited. To quote a different price, enter it as the new quoted price; the form shows the difference (e.g. ₹1,499 → ₹1,699 is +₹200) and then needs the reason for it, which the approver sees in the Approvals Hub. Leave the new price empty to quote the existing price; the reason box stays locked until a new price is entered.',
       'Client demos › Clients: every client now has its own phone (required) and email (optional), such as a hotel\'s front desk, besides its contact person\'s. The same contact person may help at several clients.',
       'Client demos › Clients: where the client is now sits with its name, phone and email (address, PIN code, city, state and Google Maps location), with the contact person below. The PIN code is required and fills in the city and state; they are typed in by hand only when the PIN code service can\'t be reached. Changing the PIN code replaces them.',
       'The same client can\'t be visited twice in a row on one day. Clients are matched by their own phone (however it is written: +91…, 0… or the 10 digits) or email. To see a hotel from 10:00 am to 12:00 pm and again from 1:00 pm to 3:00 pm, make it one visit from 10:00 am to 3:00 pm, or visit another client in between.',
@@ -229,17 +235,17 @@ export const GUIDE_CHANGELOG: GuideChange[] = [
       'Unsold products: a switched-off product with 1 unit in stock can now have its components changed. The same save rebuilds the unit (its old pieces go back to item stock; scan the rebuilt unit\'s barcode and its pieces). A rejected product already returned its pieces, so its components change freely and the unit is scanned again on resubmission. A product on sale must be switched off first; with more than 1 unit, reduce the stock to 1 first.',
       'Sold products keep their components: once a product is on any customer order, its components can\'t change any more (past orders, warranties and costs depend on them), whether it is on or off. The form says so and offers "Create Version 2": a draft copy of the product with its components, warranties, specifications and costs, whose components you can change and send for approval. The old version keeps selling until the new one is approved and turned on; then the old one is turned off automatically. Products Management shows each product\'s version (v1, v2…) and marks sold products.',
       'Item SKUs are now generated automatically when an item is created, as TQ-year month day-number of the item that day, e.g. TQ-20261028-0001 for the first item created on 28 Oct 2026. Every SKU is unique, and it can\'t be typed in or changed. Items created earlier keep the SKUs they have.',
-      'Approvals Hub › Requests now lists every quotation and order waiting on someone: quotations dealers send in (submit them for approval or cancel them, with a reason), orders to approve, and return requests to approve or reject. Each one opens with its details and the decisions it allows.',
+      'Approvals Hub › Requests now lists every quotation and order waiting on someone: quotations suppliers send in (submit them for approval or cancel them, with a reason), orders to approve, and return requests to approve or reject. Each one opens with its details and the decisions it allows.',
     ],
   },
   {
     date: '2026-10-27',
     changes: [
       'Barcodes: every piece the company owns now carries its own barcode, and so does every unit of every product. Barcodes are 8-32 letters, digits or hyphens (EAN, UPC and Code 128 labels all fit); scan them or type them, one by one or pasted together.',
-      'Receiving stock: scan one barcode for each unit that passed testing (defected units go back to the dealer and get none). A stock entry can\'t be saved until every passed unit has its barcode, and each barcode can be used only once.',
+      'Receiving stock: scan one barcode for each unit that passed testing (defected units go back to the supplier and get none). A stock entry can\'t be saved until every passed unit has its barcode, and each barcode can be used only once.',
       'Creating a product, adding product stock and resubmitting a rejected product: scan each new unit\'s barcode and, for every component, the barcode of each piece fitted into it ("Pick from stock" fills in pieces in stock, oldest first). Reducing product stock names the units taken out; their pieces go back to item stock.',
       'Barcodes are locked once what they belong to is approved: a stock entry by its Level 2 approver, a product when it is approved. After that only a Super Admin (Level 2) can change one. Everyone else uses "Correct barcode" on the barcode\'s page, and a Super Admin approves or rejects it in Approvals Hub › Barcodes. Stock received before barcodes existed gets its barcodes the same way ("Assign barcodes" on the stock entry).',
-      'Barcode Tracking (new menu): scan any barcode to see what it is. For a component piece: its item, batch, purchase order, dealer, delivery date, who received and approved it, and the product unit it is fitted into. For a product unit: every part inside it with where each came from. Every change to a barcode is listed in its history.',
+      'Barcode Tracking (new menu): scan any barcode to see what it is. For a component piece: its item, batch, purchase order, supplier, delivery date, who received and approved it, and the product unit it is fitted into. For a product unit: every part inside it with where each came from. Every change to a barcode is listed in its history.',
       'Stock and product details, and the approvals of stock entries and new products, list the barcodes involved.',
       'A product\'s components can\'t change while units are in stock, because each unit\'s pieces are recorded by barcode: reduce the stock to 0 first (the pieces go back to item stock), change the components, then add stock again. Unit costs can still be edited. Product stock is now always changed with Add / Reduce stock.',
     ],
@@ -307,7 +313,7 @@ export const GUIDE_CHANGELOG: GuideChange[] = [
     changes: [
       'Verified emails: before a customer or an employee is registered, their email is proved with a 5-digit code sent to it. The Store Sales Agent (customer\'s email) or the Super Admin (new employee\'s personal email, now required) presses Send code, types the code the person reads out and presses Verify; registering is possible only after that. A code works for 10 minutes; a new one can be asked for after a minute.',
       'No temporary passwords: a new employee is emailed a link to choose their password at their personal email once the account is approved (or at once when no approval is needed), and a customer registered at a store gets a "Set my password" link in their welcome email. Links work once, for 15 minutes.',
-      'Forgot password: staff and dealers use "Forgot password?" on the sign-in page with their username or email, customers on the storefront sign-in page with their email. A link to choose a new password is emailed (employees: to the personal email); it works once, for 15 minutes, and signs out every other session.',
+      'Forgot password: staff and suppliers use "Forgot password?" on the sign-in page with their username or email, customers on the storefront sign-in page with their email. A link to choose a new password is emailed (employees: to the personal email); it works once, for 15 minutes, and signs out every other session.',
       'Customers are emailed when their order is confirmed, shipped, out for delivery and delivered; the delivered email carries the GST tax invoice as a PDF.',
       'Store Sales shows the customer\'s email (verified or not), mobile, whether they have set their password yet and, on every sale, the delivery address.',
     ],
@@ -325,12 +331,12 @@ export const GUIDE_CHANGELOG: GuideChange[] = [
   {
     date: '2026-10-20',
     changes: [
-      'GST in one place: Accounts & Finance › GST shows the GST charged to customers (output tax), the GST paid to dealers and on bills (input tax, and how much is claimable as input tax credit), the set-off month by month, what is payable in cash with each GSTR-3B, what was paid to the government and what is outstanding till date. The GST register below it lists every invoice, credit note, dealer purchase and bill line with its order, document number, party, GSTIN and CGST/SGST/IGST/cess, and exports to CSV, PDF, Excel or Word.',
+      'GST in one place: Accounts & Finance › GST shows the GST charged to customers (output tax), the GST paid to suppliers and on bills (input tax, and how much is claimable as input tax credit), the set-off month by month, what is payable in cash with each GSTR-3B, what was paid to the government and what is outstanding till date. The GST register below it lists every invoice, credit note, supplier purchase and bill line with its order, document number, party, GSTIN and CGST/SGST/IGST/cess, and exports to CSV, PDF, Excel or Word.',
       'A refund on an invoiced customer order now issues a credit note (e.g. TQC/26-27/000001) that takes its share of the invoice\'s GST off output tax; the customer sees it on their order.',
-      'Finance waits for Admin Level 2: a dealer purchase is booked only when a Level 2 approves the stock entry (not when it is recorded), with the quotation\'s GST as input tax. A change to an approved stock entry (units added or counts corrected) also waits for Level 2: the money stays at the approved value and added units are held back from use until it is approved; rejecting puts the approved counts back.',
+      'Finance waits for Admin Level 2: a supplier purchase is booked only when a Level 2 approves the stock entry (not when it is recorded), with the quotation\'s GST as input tax. A change to an approved stock entry (units added or counts corrected) also waits for Level 2: the money stays at the approved value and added units are held back from use until it is approved; rejecting puts the approved counts back.',
       'GST in a customer payment is held for the government, not counted as sales; expense bills claim their GST as input tax credit unless marked as blocked credit. GST paid to the government is raised as a "GST paid to the government (challan)" voucher.',
-      'Dealers sign in to this web app: Dealer Managers create their logins, a different Level 2 approves them.',
-      "Dealers' quotation changes wait for a Dealer Manager of either level; the quotation is frozen meanwhile.",
+      'Suppliers sign in to this web app: Supplier Managers create their logins, a different Level 2 approves them.',
+      "Suppliers' quotation changes wait for a Supplier Manager of either level; the quotation is frozen meanwhile.",
       'Quotation, purchase order and bill can be printed from an order.',
       'Pre-orders are approved from the Approvals Hub (Pre-orders tab) once stock is there and the order is paid.',
       'Customer orders are confirmed only when fully paid; payment attempts show on the order.',
@@ -338,15 +344,15 @@ export const GUIDE_CHANGELOG: GuideChange[] = [
       'Item and product warranties; edits to an approved product wait for approval while the live one stays unchanged.',
       'Delivery riders record door-step outcomes only; Fleet Coordinators also send parcels back to the warehouse.',
       'User Guide in the sidebar for Super Admin and Store Manager, with per-role PDF downloads.',
-      'Item and Dealer lists: search and every filter (category, unit, city, status) cover the whole list, with pages; employee search matches full names.',
-      'Search boxes on server lists (items, dealers, employees, order tracking, ledger, vouchers) search 2 seconds after you stop typing, or at once on Enter.',
+      'Item and Supplier lists: search and every filter (category, unit, city, status) cover the whole list, with pages; employee search matches full names.',
+      'Search boxes on server lists (items, suppliers, employees, order tracking, ledger, vouchers) search 2 seconds after you stop typing, or at once on Enter.',
       'Product GST, as the law requires: every product has an HSN/SAC and one GST rate (0, 0.25, 1.5, 3, 5, 18 or 40%), and its price includes GST. Each order charges CGST + SGST (half the rate each) when delivered in our state and IGST to other states; delivery charges are taxed at the goods\' rate.',
       'Customer tax invoices are issued when the order ships, numbered consecutively per financial year (e.g. TQ/26-27/000001), and print the exact GST split with the place of supply.',
-      'Dealers mark their confirmed orders as shipped from My Orders; the procurement team is notified and records the delivery.',
+      'Suppliers mark their confirmed orders as shipped from My Orders; the procurement team is notified and records the delivery.',
       'Fulfillment & Warehouse sees every delivered purchase order that has no stock entry yet when adding stock, without needing access to procurement orders.',
-      'Dealer purchases reach the company account when stock is recorded, not on delivery: only units that passed testing are paid for (unit price × passed units + shipment). Correcting or adding passed units books the difference; a rejected stock entry books nothing.',
-      'Quotations can carry an optional GST breakup: CGST + SGST (dealer in our state) or IGST (another state) at one of the rates in force, with HSN/SAC and cess. Prices are before GST; the GST follows any later change to quantity, price or shipment, and dealers change it through the usual change request.',
-      "Marking a procurement order delivered needs the dealer's invoice PDF. It is read and checked against the quotation (total, taxable value, CGST/SGST/IGST, cess and the dealer's GSTIN). A matching invoice lets the order be delivered; one that doesn't match, or a scanned PDF that can't be read, needs a Level 2 order approver to accept it with a reason, which is kept in the order's history.",
+      'Supplier purchases reach the company account when stock is recorded, not on delivery: only units that passed testing are paid for (unit price × passed units + shipment). Correcting or adding passed units books the difference; a rejected stock entry books nothing.',
+      'Quotations can carry an optional GST breakup: CGST + SGST (supplier in our state) or IGST (another state) at one of the rates in force, with HSN/SAC and cess. Prices are before GST; the GST follows any later change to quantity, price or shipment, and suppliers change it through the usual change request.',
+      "Marking a procurement order delivered needs the supplier's invoice PDF. It is read and checked against the quotation (total, taxable value, CGST/SGST/IGST, cess and the supplier's GSTIN). A matching invoice lets the order be delivered; one that doesn't match, or a scanned PDF that can't be read, needs a Level 2 order approver to accept it with a reason, which is kept in the order's history.",
     ],
   },
   {
@@ -361,7 +367,7 @@ const ROLE_LIST: RoleGuide[] = [
     name: 'Super Admin',
     summary: 'Runs the whole portal: staff accounts, access, settings and every approval.',
     menu: ['finance', 'approvals', 'orders', 'store-sales', 'order-tracking', 'customers', 'promo-codes', 'support-tickets', 'reviews',
-      'employees', 'items', 'barcodes', 'products', 'dealers', 'payments', 'client-demos', 'client-outreach', 'careers', 'my-demos', 'my-meetings', 'my-payslips', 'company-profile',
+      'employees', 'items', 'barcodes', 'products', 'suppliers', 'payments', 'client-demos', 'client-outreach', 'careers', 'my-demos', 'my-meetings', 'my-payslips', 'company-profile',
       'user-guide'],
     hasApprovalLevel: true,
     does: [
@@ -384,7 +390,7 @@ const ROLE_LIST: RoleGuide[] = [
     ],
     approves: [
       'New employee accounts, employee deletions and profile changes',
-      'Products, stock entries, procurement orders and returns, dealer logins and dealer quotation changes',
+      'Products, stock entries, procurement orders and returns, supplier logins and supplier quotation changes',
       'Refunds, expenses, company profile changes and documents',
       'Salary transfers recorded by someone else (never your own salary)',
       'Barcode corrections, and barcodes for stock received before barcodes were recorded (Approvals Hub › Barcodes): only a Level 2 Super Admin changes a locked barcode',
@@ -425,44 +431,44 @@ const ROLE_LIST: RoleGuide[] = [
     approves: ['Products and their changes before they go live, seeing each one\'s cost, margin and profit after tax (approving a new product locks its unit barcodes)', 'Stock entries (approving locks the barcode of each passed unit)', 'Refunds', 'Company profile changes', 'Careers shortlists and selections (Approvals Hub › Careers), except those you asked for'],
     tips: [
       'Pre-orders can be accepted at Level 1 too: Approvals Hub › Pre-orders.',
-      'Dealers and procurement orders belong to the Dealer Manager; they are not in your menu.',
+      'Suppliers and procurement orders belong to the Supplier Manager; they are not in your menu.',
     ],
   },
   {
-    id: 'DEALER_MANAGER',
-    name: 'Dealer Manager',
-    summary: 'Buys from suppliers: dealers, their web logins, quotations and procurement orders.',
-    menu: ['finance', 'approvals', 'orders', 'items', 'barcodes', 'products', 'dealers', 'payments', 'my-meetings', 'my-payslips'],
+    id: 'SUPPLIER_MANAGER',
+    name: 'Supplier Manager',
+    summary: 'Buys from suppliers: suppliers, their web logins, quotations and procurement orders.',
+    menu: ['finance', 'approvals', 'orders', 'items', 'barcodes', 'products', 'suppliers', 'payments', 'my-meetings', 'my-payslips'],
     hasApprovalLevel: true,
     does: [
-      'Onboard, edit, activate or deactivate dealers and assign them item categories',
-      'Create a dealer\'s web login, switch it off or reset its password',
+      'Onboard, edit, activate or deactivate suppliers and assign them item categories',
+      'Create a supplier\'s web login, switch it off or reset its password',
       'Create quotation requests (RFQs) at the item\'s existing price, or at a new quoted price with the reason for it, edit quotations and submit them for approval',
-      'Review quotations dealers send in and submit them for approval or cancel them, from Approvals Hub › Requests (Level 1 too)',
+      'Review quotations suppliers send in and submit them for approval or cancel them, from Approvals Hub › Requests (Level 1 too)',
       'Move orders forward: shipped, delivered, returns and refunds',
       'Add the GST breakup to a quotation (optional): CGST + SGST or IGST, rate, HSN/SAC, cess',
-      'Give every quotation its payment plan: the advance and an optional midterm percentage (30% and 30% to start with; both editable, untick the midterm for advance and final only), the final part worked out as the rest of 100% and paid only after testing, and how the dealer expects to be paid (cash, online, bank transfer or cheque)',
-      'Record what was actually paid to the dealer against each part of the plan (any amount, e.g. 25% or 50% instead of the planned 30%), with the method, date and reference, and the refunds the dealer pays back; correct or withdraw your own entry until it is confirmed, and reverse a confirmed one (Orders Management › the order › Payments to the dealer)',
-      "Upload the dealer's invoice PDF when marking an order delivered; it is checked against the quotation",
+      'Give every quotation its payment plan: the advance and an optional midterm percentage (30% and 30% to start with; both editable, untick the midterm for advance and final only), the final part worked out as the rest of 100% and paid only after testing, and how the supplier expects to be paid (cash, online, bank transfer or cheque)',
+      'Record what was actually paid to the supplier against each part of the plan (any amount, e.g. 25% or 50% instead of the planned 30%), with the method, date and reference, and the refunds the supplier pays back; correct or withdraw your own entry until it is confirmed, and reverse a confirmed one (Orders Management › the order › Payments to the supplier)',
+      "Upload the supplier's invoice PDF when marking an order delivered; it is checked against the quotation",
       'Print the quotation, purchase order and bill of an order',
-      'Approve or reject dealers\' changes to their quotations (Level 1 too)',
+      'Approve or reject suppliers\' changes to their quotations (Level 1 too)',
       'View the catalog and stock, upload documents, raise expenses',
-      'Trace a piece by its barcode back to its purchase order, batch and dealer (Barcode Tracking)',
+      'Trace a piece by its barcode back to its purchase order, batch and supplier (Barcode Tracking)',
     ],
     approves: [
-      'Procurement orders (approve or reject) and the dealer\'s confirmation',
-      "Accepting a dealer's invoice that doesn't match the quotation, or couldn't be read, with a reason",
+      'Procurement orders (approve or reject) and the supplier\'s confirmation',
+      "Accepting a supplier's invoice that doesn't match the quotation, or couldn't be read, with a reason",
       'Return requests',
-      'Dealer logins created by someone else',
-      'Removing a dealer',
-      'Payments to dealers and refunds from them recorded by someone else (Approvals Hub › Dealer payments), and changing the amount of a refund claim with a reason',
+      'Supplier logins created by someone else',
+      'Removing a supplier',
+      'Payments to suppliers and refunds from them recorded by someone else (Approvals Hub › Supplier payments), and changing the amount of a refund claim with a reason',
     ],
     tips: [
-      'While a dealer\'s change request is open the quotation is frozen for everyone until it is decided. It shows in Approvals Hub › Dealers, and in Requests again once the change is decided.',
-      'To adjust a dealer\'s quotation before submitting it, edit it in Orders Management; the Approvals Hub submits it as it is.',
-      'Deactivating a dealer also switches off their login.',
-      "An invoice that doesn't match is shown figure by figure: ask the dealer for a corrected invoice before accepting one by override.",
-      'A payment counts only once someone else confirms it. Until the delivered units are tested only the advance and midterm parts can be paid; after testing the order is worth only the units that passed, and if more was paid a refund claim against the dealer opens by itself.',
+      'While a supplier\'s change request is open the quotation is frozen for everyone until it is decided. It shows in Approvals Hub › Suppliers, and in Requests again once the change is decided.',
+      'To adjust a supplier\'s quotation before submitting it, edit it in Orders Management; the Approvals Hub submits it as it is.',
+      'Deactivating a supplier also switches off their login.',
+      "An invoice that doesn't match is shown figure by figure: ask the supplier for a corrected invoice before accepting one by override.",
+      'A payment counts only once someone else confirms it. Until the delivered units are tested only the advance and midterm parts can be paid; after testing the order is worth only the units that passed, and if more was paid a refund claim against the supplier opens by itself.',
     ],
   },
   {
@@ -568,7 +574,7 @@ const ROLE_LIST: RoleGuide[] = [
       'Look up promo codes to tell a customer which one to use: who and which products each is for, its limits and dates, and the orders that used it (Promo Codes). A code for chosen customers shows only as TINQA***: email it to them with "Email code"; show a code for every customer on the storefront with "Show on storefront"',
       'Look up the customer\'s order, payment and products from the ticket',
       'Request a refund and re-check its status with the payment gateway',
-      'Trace a customer\'s device by its barcode: every part inside it, with its batch, purchase order and dealer (Barcode Tracking)',
+      'Trace a customer\'s device by its barcode: every part inside it, with its batch, purchase order and supplier (Barcode Tracking)',
     ],
     approves: [],
     tips: [
@@ -610,7 +616,7 @@ const ROLE_LIST: RoleGuide[] = [
       'Each month, record the salaries transferred from the bank (Payments & Chalans): one employee with a bonus or deduction, or everyone unpaid at once; resend a payslip email',
       'Track GST payable each month (Accounts & Finance › GST) and record GST paid to the government as a GST payment voucher',
       'View refunds, customer and procurement orders, documents',
-      'Pay dealers against each order\'s payment plan and collect their refunds: record the payment with its method, date and reference, correct or withdraw it until confirmed, reverse a confirmed one (Orders Management › the order › Payments to the dealer)',
+      'Pay suppliers against each order\'s payment plan and collect their refunds: record the payment with its method, date and reference, correct or withdraw it until confirmed, reverse a confirmed one (Orders Management › the order › Payments to the supplier)',
       'See every agent\'s store sales and how they were paid (Store Sales)',
       'See every promo code, the orders that used it and the discount it gave (Promo Codes, view only)',
       'Schedule client demos and meetings step by step: every client visited at its own time, the products to demo (each unit taken by its barcode), the attending staff and a day-by-day quotation (travel, night stay and meals, plus any justified extra); send it for approval, record each day\'s stay, food, travel and other bills with their invoices, and send the visit for completion (Client Demos & Meetings)',
@@ -620,7 +626,7 @@ const ROLE_LIST: RoleGuide[] = [
       'Expenses and vouchers: approve, reject or reverse (approving posts them to the ledger)',
       'Client demo quotations before the visit, and completions after it: approving a completion books its bills as Travel & conveyance (Approvals Hub › Client demos)',
       'Salary transfers recorded by someone else: confirming books them as salaries and emails each payslip',
-      'Payments to dealers and refunds from them recorded by someone else (Approvals Hub › Dealer payments), and the amount of a refund claim, with a reason',
+      'Payments to suppliers and refunds from them recorded by someone else (Approvals Hub › Supplier payments), and the amount of a refund claim, with a reason',
     ],
     tips: [
       'You cannot approve a voucher you raised yourself, confirm a salary you recorded, or confirm your own salary.',
@@ -652,10 +658,10 @@ const ROLE_LIST: RoleGuide[] = [
     ],
   },
   {
-    id: 'DEALER',
-    name: 'Dealer',
-    summary: 'A supplier signed in to their own dealer portal in this web app.',
-    menu: ['dealer-quotations', 'dealer-orders'],
+    id: 'SUPPLIER',
+    name: 'Supplier',
+    summary: 'A supplier signed in to their own supplier portal in this web app.',
+    menu: ['supplier-quotations', 'supplier-orders'],
     hasApprovalLevel: false,
     does: [
       'Create quotations for TinQa at the item\'s existing price, or at a new quoted price with the reason for it, optionally with the GST breakup (CGST + SGST or IGST, rate, HSN/SAC, cess)',
@@ -672,7 +678,7 @@ const ROLE_LIST: RoleGuide[] = [
       'You only ever see your own quotations and orders.',
       'Your invoice is checked against the quotation on delivery: bill the same total and GST, and show your GSTIN on it.',
       'The final payment is made only after the delivered units are tested, and only for the units that pass. Units that fail go back to you; if more was paid than the units that passed are worth, refund the difference.',
-      'Your business details are kept by your Dealer Manager; ask them to change anything.',
+      'Your business details are kept by your Supplier Manager; ask them to change anything.',
     ],
   },
 ];
@@ -687,7 +693,7 @@ export const GUIDE_ROLE_IDS: GuideRoleId[] = ROLE_LIST.map((role) => role.id);
 /** How actors that are not roles of this app are named. */
 export const EXTERNAL_ACTOR_NAMES: Record<GuideExternalActor, string> = { CUSTOMER: 'Customer', SYSTEM: 'TinQa' };
 
-const ANY_STAFF: GuideActor[] = ['SUPER_ADMIN', 'STORE_MANAGER', 'DEALER_MANAGER', 'CATALOG_SPECIALIST', 'FULFILLMENT_SPECIALIST',
+const ANY_STAFF: GuideActor[] = ['SUPER_ADMIN', 'STORE_MANAGER', 'SUPPLIER_MANAGER', 'CATALOG_SPECIALIST', 'FULFILLMENT_SPECIALIST',
   'DELIVERY_RIDER', 'FLEET_COORDINATOR', 'CUSTOMER_SUPPORT', 'FINANCIAL_AUDITOR', 'FINANCE_MANAGER', 'SALES_AGENT'];
 
 /** The roles that go on client demos (Procurement group CLIENT_DEMO_ATTENDANCE); only they can be tagged on one. */
@@ -697,11 +703,11 @@ export const GUIDE_FLOWS: GuideFlow[] = [
   {
     id: 'sign-in',
     title: 'Signing in for the first time',
-    summary: 'Employees choose their password through an emailed link; dealers start with the default password and change it.',
+    summary: 'Employees choose their password through an emailed link; suppliers start with the default password and change it.',
     steps: [
       { who: [...ANY_STAFF], label: 'New employee', kind: 'maker', text: 'Opens the "Set up your account" email at their personal email and chooses a password (the link works once, for 15 minutes).', where: 'Set my password (from the email)' },
-      { who: ['DEALER'], label: 'Dealer', kind: 'maker', text: 'Signs in with the username and the default password they were given, then chooses their own. Nothing else opens until they do.', where: 'Login page › Reset password' },
-      { who: [...ANY_STAFF, 'DEALER'], label: 'Everyone', kind: 'end', text: 'The sidebar lists only what your designation allows. My Profile is always there.' },
+      { who: ['SUPPLIER'], label: 'Supplier', kind: 'maker', text: 'Signs in with the username and the default password they were given, then chooses their own. Nothing else opens until they do.', where: 'Login page › Reset password' },
+      { who: [...ANY_STAFF, 'SUPPLIER'], label: 'Everyone', kind: 'end', text: 'The sidebar lists only what your designation allows. My Profile is always there.' },
     ],
   },
   {
@@ -709,9 +715,9 @@ export const GUIDE_FLOWS: GuideFlow[] = [
     title: 'Forgot password',
     summary: 'A link to choose a new password is emailed; it works once, for 15 minutes.',
     steps: [
-      { who: [...ANY_STAFF, 'DEALER'], label: 'Everyone', kind: 'maker', text: 'Chooses "Forgot password?" and enters their username or email.', where: 'Login page › Forgot password?' },
+      { who: [...ANY_STAFF, 'SUPPLIER'], label: 'Everyone', kind: 'maker', text: 'Chooses "Forgot password?" and enters their username or email.', where: 'Login page › Forgot password?' },
       { who: ['SYSTEM'], label: 'TinQa', kind: 'end', text: 'Emails a link (to the personal email for employees). The page never says whether an account matched.' },
-      { who: [...ANY_STAFF, 'DEALER'], label: 'Everyone', kind: 'maker', text: 'Opens the link and chooses a new password. Every other session is signed out; an expired link offers a new one.', where: 'Set password (from the email)' },
+      { who: [...ANY_STAFF, 'SUPPLIER'], label: 'Everyone', kind: 'maker', text: 'Opens the link and chooses a new password. Every other session is signed out; an expired link offers a new one.', where: 'Set password (from the email)' },
       { who: ['CUSTOMER'], label: 'Customer', kind: 'external', text: 'Does the same on the storefront: "Forgot password?" on the sign-in page, with their email.' },
     ],
   },
@@ -727,29 +733,29 @@ export const GUIDE_FLOWS: GuideFlow[] = [
     ],
   },
   {
-    id: 'dealer-onboarding',
-    title: 'Onboarding a dealer and their login',
-    summary: 'A dealer record first, then a web login that a different Level 2 approves.',
+    id: 'supplier-onboarding',
+    title: 'Onboarding a supplier and their login',
+    summary: 'A supplier record first, then a web login that a different Level 2 approves.',
     steps: [
-      { who: ['DEALER_MANAGER', 'SUPER_ADMIN'], label: 'Dealer Manager', kind: 'maker', text: 'Adds the dealer with its business details and the item categories it deals in; the dealer only sees and quotes for items in those categories.', where: 'Dealer Management' },
-      { who: ['DEALER_MANAGER', 'SUPER_ADMIN'], label: 'Dealer Manager', kind: 'maker', text: 'Creates the dealer\'s web login inside the dealer\'s details. It starts with the default password.', where: 'Dealer Management › dealer › Login' },
-      { who: ['DEALER_MANAGER', 'SUPER_ADMIN'], label: 'Another Dealer Manager · Level 2', kind: 'checker', text: 'Approves the login. The person who created it cannot.', where: 'Approvals Hub › Dealers', otherwise: 'Reject → the login cannot sign in' },
-      { who: ['DEALER'], label: 'Dealer', kind: 'end', text: 'Signs in, sets a new password and sees My Quotations and My Orders.' },
+      { who: ['SUPPLIER_MANAGER', 'SUPER_ADMIN'], label: 'Supplier Manager', kind: 'maker', text: 'Adds the supplier with its business details and the item categories it deals in; the supplier only sees and quotes for items in those categories.', where: 'Supplier Management' },
+      { who: ['SUPPLIER_MANAGER', 'SUPER_ADMIN'], label: 'Supplier Manager', kind: 'maker', text: 'Creates the supplier\'s web login inside the supplier\'s details. It starts with the default password.', where: 'Supplier Management › supplier › Login' },
+      { who: ['SUPPLIER_MANAGER', 'SUPER_ADMIN'], label: 'Another Supplier Manager · Level 2', kind: 'checker', text: 'Approves the login. The person who created it cannot.', where: 'Approvals Hub › Suppliers', otherwise: 'Reject → the login cannot sign in' },
+      { who: ['SUPPLIER'], label: 'Supplier', kind: 'end', text: 'Signs in, sets a new password and sees My Quotations and My Orders.' },
     ],
   },
   {
     id: 'procurement',
-    title: 'Buying from a dealer',
+    title: 'Buying from a supplier',
     summary: 'From quotation to goods at the warehouse. Every step moves forward only.',
     steps: [
-      { who: ['DEALER_MANAGER', 'SUPER_ADMIN', 'DEALER'], label: 'Dealer Manager or Dealer', kind: 'maker', text: 'Records a quotation: items, quantities, prices (before GST), dates, optionally the GST breakup, and the payment plan: advance % and midterm % (the final part, the rest, is paid after testing) and the payment method the dealer expects.', where: 'Orders Management · My Quotations' },
-      { who: ['DEALER_MANAGER', 'SUPER_ADMIN'], label: 'Dealer Manager', kind: 'maker', text: 'Submits the quotation for approval. It shows as "Under review" to the dealer. Quotations a dealer sent in wait in the Approvals Hub.', where: 'Approvals Hub › Requests · Orders Management', otherwise: 'Cancel → with a reason; the dealer is told' },
-      { who: ['DEALER_MANAGER', 'SUPER_ADMIN'], label: 'Dealer Manager · Level 2', kind: 'checker', text: 'Approves the order with its payment plan, which then waits for the dealer. From now on the advance can be paid.', where: 'Approvals Hub › Requests', otherwise: 'Reject → the order is cancelled' },
-      { who: ['DEALER_MANAGER', 'SUPER_ADMIN'], label: 'Dealer Manager · Level 2', kind: 'checker', text: 'Records that the dealer confirmed the order. The purchase order can now be printed.', where: 'Orders Management' },
-      { who: ['DEALER_MANAGER', 'SUPER_ADMIN', 'DEALER'], label: 'Dealer or Dealer Manager', kind: 'maker', text: 'Marks the confirmed order as shipped once the goods have left. The procurement team is notified.', where: 'My Orders · Orders Management', otherwise: 'Cancel is possible only before shipment, with a reason' },
-      { who: ['DEALER_MANAGER', 'SUPER_ADMIN'], label: 'Dealer Manager', kind: 'maker', text: "Uploads the dealer's invoice PDF. TinQa reads it and checks the total, the GST and the dealer's GSTIN against the quotation.", where: 'Orders Management › Update status › Mark delivered' },
-      { who: ['DEALER_MANAGER', 'SUPER_ADMIN'], label: 'Dealer Manager · Level 2', kind: 'checker', text: "Only when the invoice doesn't match or can't be read: accepts it with a reason, or asks the dealer for a corrected invoice.", where: 'Orders Management › Update status', otherwise: 'No override → upload a correct invoice; the order stays shipped' },
-      { who: ['DEALER_MANAGER', 'SUPER_ADMIN'], label: 'Dealer Manager', kind: 'maker', text: 'Marks it delivered with the actual delivery date. The bill can now be printed.', where: 'Orders Management' },
+      { who: ['SUPPLIER_MANAGER', 'SUPER_ADMIN', 'SUPPLIER'], label: 'Supplier Manager or Supplier', kind: 'maker', text: 'Records a quotation: items, quantities, prices (before GST), dates, optionally the GST breakup, and the payment plan: advance % and midterm % (the final part, the rest, is paid after testing) and the payment method the supplier expects.', where: 'Orders Management · My Quotations' },
+      { who: ['SUPPLIER_MANAGER', 'SUPER_ADMIN'], label: 'Supplier Manager', kind: 'maker', text: 'Submits the quotation for approval. It shows as "Under review" to the supplier. Quotations a supplier sent in wait in the Approvals Hub.', where: 'Approvals Hub › Requests · Orders Management', otherwise: 'Cancel → with a reason; the supplier is told' },
+      { who: ['SUPPLIER_MANAGER', 'SUPER_ADMIN'], label: 'Supplier Manager · Level 2', kind: 'checker', text: 'Approves the order with its payment plan, which then waits for the supplier. From now on the advance can be paid.', where: 'Approvals Hub › Requests', otherwise: 'Reject → the order is cancelled' },
+      { who: ['SUPPLIER_MANAGER', 'SUPER_ADMIN'], label: 'Supplier Manager · Level 2', kind: 'checker', text: 'Records that the supplier confirmed the order. The purchase order can now be printed.', where: 'Orders Management' },
+      { who: ['SUPPLIER_MANAGER', 'SUPER_ADMIN', 'SUPPLIER'], label: 'Supplier or Supplier Manager', kind: 'maker', text: 'Marks the confirmed order as shipped once the goods have left. The procurement team is notified.', where: 'My Orders · Orders Management', otherwise: 'Cancel is possible only before shipment, with a reason' },
+      { who: ['SUPPLIER_MANAGER', 'SUPER_ADMIN'], label: 'Supplier Manager', kind: 'maker', text: "Uploads the supplier's invoice PDF. TinQa reads it and checks the total, the GST and the supplier's GSTIN against the quotation.", where: 'Orders Management › Update status › Mark delivered' },
+      { who: ['SUPPLIER_MANAGER', 'SUPER_ADMIN'], label: 'Supplier Manager · Level 2', kind: 'checker', text: "Only when the invoice doesn't match or can't be read: accepts it with a reason, or asks the supplier for a corrected invoice.", where: 'Orders Management › Update status', otherwise: 'No override → upload a correct invoice; the order stays shipped' },
+      { who: ['SUPPLIER_MANAGER', 'SUPER_ADMIN'], label: 'Supplier Manager', kind: 'maker', text: 'Marks it delivered with the actual delivery date. The bill can now be printed.', where: 'Orders Management' },
       { who: ['FULFILLMENT_SPECIALIST', 'STORE_MANAGER', 'SUPER_ADMIN'], label: 'Fulfillment', kind: 'maker', text: 'Picks the delivered order, records the units that passed testing and scans one barcode per passed unit. Nothing is booked yet; defected units go back.', where: 'Item Management › Stocks › Add stock' },
       { who: ['STORE_MANAGER', 'SUPER_ADMIN'], label: 'Store Manager · Level 2', kind: 'checker', text: 'Approves the stock entry, which also locks its barcodes. Only now is the purchase booked to the company account, with its GST as input tax, and testing is done: the order is worth only the units that passed, and the final payment can be made.', where: 'Approvals Hub › Requests', otherwise: 'Reject → stock is not added, nothing is booked and its barcodes are freed' },
       { who: ['SYSTEM'], label: 'Inventory', kind: 'end', text: 'Stock is available to sell.' },
@@ -757,43 +763,43 @@ export const GUIDE_FLOWS: GuideFlow[] = [
     ],
   },
   {
-    id: 'dealer-change',
-    title: 'A dealer changes their quotation',
-    summary: 'Dealers never edit directly: every change is a request any Dealer Manager (Level 1 or 2) decides.',
+    id: 'supplier-change',
+    title: 'A supplier changes their quotation',
+    summary: 'Suppliers never edit directly: every change is a request any Supplier Manager (Level 1 or 2) decides.',
     steps: [
-      { who: ['DEALER'], label: 'Dealer', kind: 'external', text: 'Opens the quotation and requests a change. Only possible while it is still a quotation.', where: 'My Quotations' },
+      { who: ['SUPPLIER'], label: 'Supplier', kind: 'external', text: 'Opens the quotation and requests a change. Only possible while it is still a quotation.', where: 'My Quotations' },
       { who: ['SYSTEM'], label: 'TinQa', kind: 'end', text: 'The quotation is frozen for everyone (no edit, submit or cancel) until the request is decided.' },
-      { who: ['DEALER_MANAGER', 'SUPER_ADMIN'], label: 'Dealer Manager · Level 1 or 2', kind: 'checker', text: 'Compares old and new values and approves or rejects.', where: 'Approvals Hub › Dealers', otherwise: 'Reject → the quotation stays as it was' },
-      { who: ['DEALER'], label: 'Dealer', kind: 'end', text: 'Sees the updated quotation, which carries on through approval.' },
+      { who: ['SUPPLIER_MANAGER', 'SUPER_ADMIN'], label: 'Supplier Manager · Level 1 or 2', kind: 'checker', text: 'Compares old and new values and approves or rejects.', where: 'Approvals Hub › Suppliers', otherwise: 'Reject → the quotation stays as it was' },
+      { who: ['SUPPLIER'], label: 'Supplier', kind: 'end', text: 'Sees the updated quotation, which carries on through approval.' },
     ],
   },
   {
     id: 'procurement-return',
-    title: 'Returning goods to a dealer',
+    title: 'Returning goods to a supplier',
     summary: 'For a delivered order, some or all goods can go back for a refund.',
     steps: [
-      { who: ['DEALER_MANAGER', 'SUPER_ADMIN'], label: 'Dealer Manager', kind: 'maker', text: 'Requests a return with a reason.', where: 'Orders Management' },
-      { who: ['DEALER_MANAGER', 'SUPER_ADMIN'], label: 'Dealer Manager · Level 2', kind: 'checker', text: 'Approves the return once the dealer agrees.', where: 'Approvals Hub › Requests', otherwise: 'Reject → with a reason; the order stays delivered and closes' },
-      { who: ['DEALER_MANAGER', 'SUPER_ADMIN'], label: 'Dealer Manager', kind: 'maker', text: 'Marks it picked up, then received by the dealer.' },
-      { who: ['DEALER_MANAGER', 'SUPER_ADMIN'], label: 'Dealer Manager', kind: 'maker', text: 'Records the dealer\'s refund: initiated, then completed.', otherwise: 'Refund failed → initiate it again' },
-      { who: ['DEALER'], label: 'Dealer', kind: 'end', text: 'Follows the return in My Orders.' },
+      { who: ['SUPPLIER_MANAGER', 'SUPER_ADMIN'], label: 'Supplier Manager', kind: 'maker', text: 'Requests a return with a reason.', where: 'Orders Management' },
+      { who: ['SUPPLIER_MANAGER', 'SUPER_ADMIN'], label: 'Supplier Manager · Level 2', kind: 'checker', text: 'Approves the return once the supplier agrees.', where: 'Approvals Hub › Requests', otherwise: 'Reject → with a reason; the order stays delivered and closes' },
+      { who: ['SUPPLIER_MANAGER', 'SUPER_ADMIN'], label: 'Supplier Manager', kind: 'maker', text: 'Marks it picked up, then received by the supplier.' },
+      { who: ['SUPPLIER_MANAGER', 'SUPER_ADMIN'], label: 'Supplier Manager', kind: 'maker', text: 'Records the supplier\'s refund: initiated, then completed.', otherwise: 'Refund failed → initiate it again' },
+      { who: ['SUPPLIER'], label: 'Supplier', kind: 'end', text: 'Follows the return in My Orders.' },
     ],
   },
   {
-    id: 'dealer-payment',
-    title: 'Paying a dealer',
+    id: 'supplier-payment',
+    title: 'Paying a supplier',
     summary: 'Advance, midterm and final payment against the quotation\'s plan; the final part only after testing, for the units that passed.',
     steps: [
-      { who: ['DEALER_MANAGER', 'FINANCE_MANAGER', 'SUPER_ADMIN'], label: 'Dealer Manager or Finance Manager', kind: 'maker', text: 'Once the order is approved, records the advance actually paid (any amount up to the advance and midterm parts, e.g. 25% or 50%), with the method, date and reference (UTR, cheque number).', where: 'Orders Management › the order › Payments to the dealer', otherwise: 'A mistake → correct or withdraw it while it waits; reverse it once confirmed' },
-      { who: ['DEALER_MANAGER', 'FINANCE_MANAGER', 'SUPER_ADMIN'], label: 'Dealer Manager or Finance Manager · Level 2', kind: 'checker', text: 'Someone other than the recorder confirms it. Only confirmed payments count as paid.', where: 'Approvals Hub › Dealer payments', otherwise: 'Reject → with a reason; nothing is counted' },
-      { who: ['DEALER_MANAGER', 'FINANCE_MANAGER', 'SUPER_ADMIN'], label: 'Dealer Manager or Finance Manager', kind: 'maker', text: 'Once the dealer has shipped, records the midterm payment the same way. Until testing, at most the advance and midterm parts can be paid in all.' },
+      { who: ['SUPPLIER_MANAGER', 'FINANCE_MANAGER', 'SUPER_ADMIN'], label: 'Supplier Manager or Finance Manager', kind: 'maker', text: 'Once the order is approved, records the advance actually paid (any amount up to the advance and midterm parts, e.g. 25% or 50%), with the method, date and reference (UTR, cheque number).', where: 'Orders Management › the order › Payments to the supplier', otherwise: 'A mistake → correct or withdraw it while it waits; reverse it once confirmed' },
+      { who: ['SUPPLIER_MANAGER', 'FINANCE_MANAGER', 'SUPER_ADMIN'], label: 'Supplier Manager or Finance Manager · Level 2', kind: 'checker', text: 'Someone other than the recorder confirms it. Only confirmed payments count as paid.', where: 'Approvals Hub › Supplier payments', otherwise: 'Reject → with a reason; nothing is counted' },
+      { who: ['SUPPLIER_MANAGER', 'FINANCE_MANAGER', 'SUPER_ADMIN'], label: 'Supplier Manager or Finance Manager', kind: 'maker', text: 'Once the supplier has shipped, records the midterm payment the same way. Until testing, at most the advance and midterm parts can be paid in all.' },
       { who: ['SYSTEM'], label: 'TinQa', kind: 'end', text: 'When the order is marked delivered, the status dialog shows what was paid and what is still to pay.' },
       { who: ['STORE_MANAGER', 'SUPER_ADMIN'], label: 'Store Manager · Level 2', kind: 'checker', text: 'Approves the stock entry with the units that passed and failed testing. The order is now worth the passed units × unit price + shipment, with its GST.', where: 'Approvals Hub › Requests' },
-      { who: ['DEALER_MANAGER', 'FINANCE_MANAGER', 'SUPER_ADMIN'], label: 'Dealer Manager or Finance Manager', kind: 'maker', text: 'Records the final payment: whatever is still to pay for the units that passed. It is confirmed like the others.' },
-      { who: ['SYSTEM'], label: 'TinQa', kind: 'end', text: 'If more was paid than the order is now worth (units failed, or the order was cancelled or returned after a payment), a refund claim against the dealer opens by itself, naming the failed units; the dealer and the payments team are told.' },
-      { who: ['DEALER_MANAGER', 'FINANCE_MANAGER', 'SUPER_ADMIN'], label: 'Dealer Manager or Finance Manager · Level 2', kind: 'checker', text: 'May change the amount the dealer must refund (at most what was overpaid), with a reason, e.g. after agreeing a deduction.', where: 'Orders Management › the order › Refund due from the dealer' },
-      { who: ['DEALER_MANAGER', 'FINANCE_MANAGER', 'SUPER_ADMIN'], label: 'Dealer Manager or Finance Manager', kind: 'maker', text: 'Records the refund the dealer paid back; once confirmed by someone else the claim is settled.' },
-      { who: ['DEALER'], label: 'Dealer', kind: 'end', text: 'Sees each confirmed payment, what is still to come and any refund owed (My Orders › View).' },
+      { who: ['SUPPLIER_MANAGER', 'FINANCE_MANAGER', 'SUPER_ADMIN'], label: 'Supplier Manager or Finance Manager', kind: 'maker', text: 'Records the final payment: whatever is still to pay for the units that passed. It is confirmed like the others.' },
+      { who: ['SYSTEM'], label: 'TinQa', kind: 'end', text: 'If more was paid than the order is now worth (units failed, or the order was cancelled or returned after a payment), a refund claim against the supplier opens by itself, naming the failed units; the supplier and the payments team are told.' },
+      { who: ['SUPPLIER_MANAGER', 'FINANCE_MANAGER', 'SUPER_ADMIN'], label: 'Supplier Manager or Finance Manager · Level 2', kind: 'checker', text: 'May change the amount the supplier must refund (at most what was overpaid), with a reason, e.g. after agreeing a deduction.', where: 'Orders Management › the order › Refund due from the supplier' },
+      { who: ['SUPPLIER_MANAGER', 'FINANCE_MANAGER', 'SUPER_ADMIN'], label: 'Supplier Manager or Finance Manager', kind: 'maker', text: 'Records the refund the supplier paid back; once confirmed by someone else the claim is settled.' },
+      { who: ['SUPPLIER'], label: 'Supplier', kind: 'end', text: 'Sees each confirmed payment, what is still to come and any refund owed (My Orders › View).' },
     ],
   },
   {
@@ -814,10 +820,10 @@ export const GUIDE_FLOWS: GuideFlow[] = [
   {
     id: 'barcode-trace',
     title: 'Tracing a device by its barcode',
-    summary: 'Every piece and every product unit carries its own barcode, so a device can be traced back to each part\'s dealer.',
+    summary: 'Every piece and every product unit carries its own barcode, so a device can be traced back to each part\'s supplier.',
     steps: [
-      { who: ['CUSTOMER_SUPPORT', 'STORE_MANAGER', 'DEALER_MANAGER', 'CATALOG_SPECIALIST', 'FULFILLMENT_SPECIALIST', 'FINANCIAL_AUDITOR', 'SUPER_ADMIN'], label: 'Any role with Barcode Tracking', kind: 'maker', text: 'Scans or types the barcode on the device or on a part.', where: 'Barcode Tracking' },
-      { who: ['SYSTEM'], label: 'TinQa', kind: 'end', text: 'Shows the product unit and every part inside it, or the part and the unit it is fitted into: item, batch, purchase order, dealer, delivery date, who received and approved it, and its full history.' },
+      { who: ['CUSTOMER_SUPPORT', 'STORE_MANAGER', 'SUPPLIER_MANAGER', 'CATALOG_SPECIALIST', 'FULFILLMENT_SPECIALIST', 'FINANCIAL_AUDITOR', 'SUPER_ADMIN'], label: 'Any role with Barcode Tracking', kind: 'maker', text: 'Scans or types the barcode on the device or on a part.', where: 'Barcode Tracking' },
+      { who: ['SYSTEM'], label: 'TinQa', kind: 'end', text: 'Shows the product unit and every part inside it, or the part and the unit it is fitted into: item, batch, purchase order, supplier, delivery date, who received and approved it, and its full history.' },
     ],
   },
   {
@@ -850,7 +856,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
     title: 'Product cost and profit',
     summary: 'What a product costs to make and what it earns, from the product form to the books. Amounts exclude GST.',
     steps: [
-      { who: ['DEALER_MANAGER', 'STORE_MANAGER', 'SUPER_ADMIN'], label: 'Dealer Manager / Store Manager', kind: 'maker', text: 'Items are bought and their stock approved; each stock entry carries its purchase price and freight.', where: 'Procurement Orders, Stock' },
+      { who: ['SUPPLIER_MANAGER', 'STORE_MANAGER', 'SUPER_ADMIN'], label: 'Supplier Manager / Store Manager', kind: 'maker', text: 'Items are bought and their stock approved; each stock entry carries its purchase price and freight.', where: 'Procurement Orders, Stock' },
       { who: ['CATALOG_SPECIALIST', 'STORE_MANAGER', 'SUPER_ADMIN'], label: 'Catalog Specialist', kind: 'maker', text: 'In the product form, each component\'s unit cost is filled from what the next unit in stock cost and can be adjusted. Adds extra costs (manpower, software, packaging…) with how each was worked out, and reads the live profit, margin, income tax and profit after tax.', where: 'Products Management › Costing & profit' },
       { who: ['STORE_MANAGER', 'SUPER_ADMIN'], label: 'Store Manager · Level 2', kind: 'checker', text: 'Sees one unit\'s cost, margin and profit after tax with the approval request. Cost changes to a live product go for approval like any other edit.', where: 'Approvals Hub › Requests', otherwise: 'Reject → back with a reason' },
       { who: ['SYSTEM'], label: 'TinQa', kind: 'end', text: 'Every order line keeps the unit cost of the day it was ordered, so later cost changes never rewrite past profit. Shipping costs entered when the order ships are counted against that order.' },
@@ -959,7 +965,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
     title: 'Company expense or voucher',
     summary: 'Nothing is posted to the company account until a different Level 2 Finance Manager approves it.',
     steps: [
-      { who: ['STORE_MANAGER', 'DEALER_MANAGER', 'FULFILLMENT_SPECIALIST', 'FLEET_COORDINATOR', 'FINANCE_MANAGER', 'SUPER_ADMIN'], label: 'Any staff who raise expenses', kind: 'maker', text: 'Raises an expense and attaches the bill. The bill fills in the form; GST splits into CGST + SGST or IGST from the GSTINs.', where: 'Accounts & Finance › Expenses & vouchers' },
+      { who: ['STORE_MANAGER', 'SUPPLIER_MANAGER', 'FULFILLMENT_SPECIALIST', 'FLEET_COORDINATOR', 'FINANCE_MANAGER', 'SUPER_ADMIN'], label: 'Any staff who raise expenses', kind: 'maker', text: 'Raises an expense and attaches the bill. The bill fills in the form; GST splits into CGST + SGST or IGST from the GSTINs.', where: 'Accounts & Finance › Expenses & vouchers' },
       { who: ['FINANCE_MANAGER', 'SUPER_ADMIN'], label: 'Finance Manager · Level 2', kind: 'checker', text: 'Approves, rejects or later reverses it.', where: 'Approvals Hub › Expenses', otherwise: 'Reject → the maker can fix and resubmit while it awaits approval' },
       { who: ['SYSTEM'], label: 'Company ledger', kind: 'end', text: 'The entry is posted to the ledger. A GST bill\'s GST is claimed as input tax credit and recorded in the GST register, unless it was marked as blocked credit.' },
       { who: ['FINANCIAL_AUDITOR', 'FINANCE_MANAGER', 'SUPER_ADMIN'], label: 'Financial Auditor', kind: 'end', text: 'Reviews the overview and ledger and exports PDF, Excel or Word reports.', where: 'Accounts & Finance' },
@@ -1017,9 +1023,9 @@ export const GUIDE_FLOWS: GuideFlow[] = [
   {
     id: 'meeting-schedule',
     title: 'Scheduling a meeting',
-    summary: 'An online or face-to-face meeting with a client, business, dealer or the team is scheduled without approval; the invitees are emailed, and the organiser completes it afterwards so everyone gives feedback.',
+    summary: 'An online or face-to-face meeting with a client, business, supplier or the team is scheduled without approval; the invitees are emailed, and the organiser completes it afterwards so everyone gives feedback.',
     steps: [
-      { who: ['SUPER_ADMIN', 'STORE_MANAGER', 'FINANCE_MANAGER', 'FULFILLMENT_SPECIALIST', 'FINANCIAL_AUDITOR'], label: 'Organiser', kind: 'maker', text: 'Chooses Online (creates the meeting on Google Meet, Teams or Zoom first and pastes its https link) or Face-to-face (the place, its address and optionally its Google Maps link). Adds the meeting name, subject, description and type (Client, B2B, Business-to-dealer, Client-to-client, Internal or Other), the client or business with a short description and contact, the day and the start and end on the clock (the same day, at most 12 hours; time when the organiser or an invitee is already in another meeting is greyed out), and searches for the staff to invite. Anyone already in another meeting at that time is named in a warning, and the meeting can\'t be saved until the time or the invitees change. The meeting ID (MTG-year-number) is generated on save.', where: 'Client Demos & Meetings › Meetings › Schedule meeting' },
+      { who: ['SUPER_ADMIN', 'STORE_MANAGER', 'FINANCE_MANAGER', 'FULFILLMENT_SPECIALIST', 'FINANCIAL_AUDITOR'], label: 'Organiser', kind: 'maker', text: 'Chooses Online (creates the meeting on Google Meet, Teams or Zoom first and pastes its https link) or Face-to-face (the place, its address and optionally its Google Maps link). Adds the meeting name, subject, description and type (Client, B2B, Business-to-supplier, Client-to-client, Internal or Other), the client or business with a short description and contact, the day and the start and end on the clock (the same day, at most 12 hours; time when the organiser or an invitee is already in another meeting is greyed out), and searches for the staff to invite. Anyone already in another meeting at that time is named in a warning, and the meeting can\'t be saved until the time or the invitees change. The meeting ID (MTG-year-number) is generated on save.', where: 'Client Demos & Meetings › Meetings › Schedule meeting' },
       { who: ['SYSTEM'], label: 'TinQa', kind: 'end', text: 'Emails each invitee the invite with a calendar file and tells them in the app. 24 hours before the start, everyone still invited is reminded.' },
       { who: ['SUPER_ADMIN', 'STORE_MANAGER', 'FINANCE_MANAGER', 'FULFILLMENT_SPECIALIST', 'FINANCIAL_AUDITOR'], label: 'Organiser', kind: 'maker', text: 'While it is scheduled: edits it (a change of time, place or link emails the attendees again), invites more people, or invites someone in place of an attendee who declined.', where: 'the meeting › Edit / Invite more / Invite replacement', otherwise: 'Cancel meeting with a reason: every attendee is emailed and told' },
       { who: ['SUPER_ADMIN', 'STORE_MANAGER', 'FINANCE_MANAGER', 'FULFILLMENT_SPECIALIST', 'FINANCIAL_AUDITOR'], label: 'Organiser', kind: 'maker', text: 'Once the meeting has started, marks it completed: every attendee who did not decline, the organiser included, is asked for feedback. The organiser and anyone who sees every meeting read all the feedback on the meeting\'s page.', where: 'the meeting › Mark completed' },
@@ -1069,7 +1075,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
     summary: 'Every GST rupee is recorded once, in the GST register, when the document that makes it due or claimable is final.',
     steps: [
       { who: ['SYSTEM'], label: 'Customer order ships', kind: 'end', text: 'The tax invoice is issued and its CGST + SGST or IGST becomes output tax of that month. A refund afterwards issues a credit note that takes its share back.', where: 'Accounts & Finance › GST' },
-      { who: ['STORE_MANAGER', 'SUPER_ADMIN'], label: 'Store Manager · Level 2', kind: 'checker', text: 'Approves a dealer\'s stock entry: the purchase\'s GST (from the quotation) becomes input tax, claimable when the dealer has a GSTIN.', where: 'Approvals Hub › Requests' },
+      { who: ['STORE_MANAGER', 'SUPER_ADMIN'], label: 'Store Manager · Level 2', kind: 'checker', text: 'Approves a supplier\'s stock entry: the purchase\'s GST (from the quotation) becomes input tax, claimable when the supplier has a GSTIN.', where: 'Approvals Hub › Requests' },
       { who: ['FINANCE_MANAGER', 'SUPER_ADMIN'], label: 'Finance Manager · Level 2', kind: 'checker', text: 'Approves expense bills: their GST is input tax credit unless marked as blocked credit.', where: 'Approvals Hub › Expenses' },
       { who: ['FINANCIAL_AUDITOR', 'FINANCE_MANAGER', 'SUPER_ADMIN'], label: 'Finance', kind: 'end', text: 'Each month: input tax credit is set off against output tax (IGST first; CGST never pays SGST). What is left is paid in cash with GSTR-3B (due on the 20th; GSTR-1 on the 11th).', where: 'Accounts & Finance › GST' },
       { who: ['FINANCE_MANAGER', 'SUPER_ADMIN'], label: 'Finance Manager', kind: 'maker', text: 'Raises the GST payment as a "GST paid to the government (challan)" voucher; a different Level 2 approves it and the outstanding amount drops.', where: 'Accounts & Finance › Expenses & vouchers' },

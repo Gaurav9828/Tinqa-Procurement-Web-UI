@@ -14,13 +14,13 @@ import type { UnifiedApprovalItem } from "../features/approvals/types/approval.t
   ];
 
   /**
-   * Procurement (dealer) order lifecycle. Moves are forward-only; see
+   * Procurement (supplier) order lifecycle. Moves are forward-only; see
    * features/order-management/utils/orderWorkflow.ts for the allowed transitions.
    */
   export type OrderStatus =
     | 'QUOTATION'
     | 'PENDING'
-    | 'DEALER_LEVEL_PENDING'
+    | 'SUPPLIER_LEVEL_PENDING'
     | 'CONFIRMED'
     | 'SHIPPED'
     | 'DELIVERED'
@@ -38,7 +38,7 @@ import type { UnifiedApprovalItem } from "../features/approvals/types/approval.t
   export const ORDER_STATUS: OrderStatus[] = [
     'QUOTATION',
     'PENDING',
-    'DEALER_LEVEL_PENDING',
+    'SUPPLIER_LEVEL_PENDING',
     'CONFIRMED',
     'SHIPPED',
     'DELIVERED',

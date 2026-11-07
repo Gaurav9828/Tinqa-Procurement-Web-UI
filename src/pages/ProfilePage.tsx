@@ -4,7 +4,7 @@ import { useProfile } from '../hooks/useProfile';
 import { ProfileTab } from '../components/profile/ProfileTab';
 import { DocumentsTab } from '../components/profile/DocumentsTab';
 import { PasswordTab } from '../components/profile/PasswordTab';
-import { DealerProfilePage } from '../features/dealer-portal/pages/DealerProfilePage';
+import { SupplierProfilePage } from '../features/supplier-portal/pages/SupplierProfilePage';
 import { useAccess } from '../hooks/useAccess';
 
 const EmployeeProfilePage: React.FC = () => {
@@ -144,8 +144,8 @@ const EmployeeProfilePage: React.FC = () => {
   );
 };
 
-/** Dealers have no employee profile: they see their business details instead, and never call the employee endpoints. */
+/** Suppliers have no employee profile: they see their business details instead, and never call the employee endpoints. */
 export const ProfilePage: React.FC = () => {
   const { can } = useAccess();
-  return can('DEALER_PORTAL_VIEW') ? <DealerProfilePage /> : <EmployeeProfilePage />;
+  return can('SUPPLIER_PORTAL_VIEW') ? <SupplierProfilePage /> : <EmployeeProfilePage />;
 };

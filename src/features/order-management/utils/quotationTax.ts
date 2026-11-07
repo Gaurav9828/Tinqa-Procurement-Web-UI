@@ -5,8 +5,8 @@ import { GST_RATES, isAllowedGstRate } from '../../products-management/utils/pro
  * The optional GST breakup of a procurement quotation (Procurement BE QuotationTax; keep the two in step).
  *
  * Quoted prices are before GST, as on a B2B purchase. The taxable value is unit price × quantity + shipment (freight
- * billed with the goods is taxed at the goods' rate). One rate per item; a dealer in our state charges CGST + SGST at
- * half the rate each, a dealer in another state charges IGST, never both. Amounts may be typed to match the dealer's
+ * billed with the goods is taxed at the goods' rate). One rate per item; a supplier in our state charges CGST + SGST at
+ * half the rate each, a supplier in another state charges IGST, never both. Amounts may be typed to match the supplier's
  * rounding but must be within ₹1 of the rate; left empty they are worked out. The server stores the full breakup and
  * recalculates it at the same rate whenever quantity, price or shipment change.
  */
@@ -14,8 +14,8 @@ import { GST_RATES, isAllowedGstRate } from '../../products-management/utils/pro
 export type SupplyType = 'INTRA_STATE' | 'INTER_STATE';
 
 export const SUPPLY_TYPE_LABELS: Record<SupplyType, string> = {
-  INTRA_STATE: 'Dealer in our state — CGST + SGST',
-  INTER_STATE: 'Dealer in another state — IGST',
+  INTRA_STATE: 'Supplier in our state — CGST + SGST',
+  INTER_STATE: 'Supplier in another state — IGST',
 };
 
 /** As stored on the order (amounts in rupees). */

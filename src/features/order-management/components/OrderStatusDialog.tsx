@@ -19,8 +19,8 @@ import {
   REASON_REQUIRED_STATUSES,
   getNextOrderStatuses,
   getOrderBlockReason,
-  isFrozenByDealerChange,
-  DEALER_CHANGE_BLOCK_REASON,
+  isFrozenBySupplierChange,
+  SUPPLIER_CHANGE_BLOCK_REASON,
   validateMove,
   type OrderAccess,
 } from '../utils/orderWorkflow';
@@ -39,7 +39,7 @@ const INVOICE_OVERRIDE_MAX_LENGTH = 400;
 
 /**
  * Status changes for a procurement order: shows where the order is and offers only the steps that
- * may follow, with whatever each step needs (delivery date, reason, and for a delivery the dealer's
+ * may follow, with whatever each step needs (delivery date, reason, and for a delivery the supplier's
  * invoice checked against the quotation). There is no way to pick an arbitrary status or go back.
  */
 export const OrderStatusDialog: React.FC<Props> = ({ order, access, isSubmitting, onClose, onSubmit }) => {
@@ -61,13 +61,13 @@ export const OrderStatusDialog: React.FC<Props> = ({ order, access, isSubmitting
 
   if (!order) return null;
 
-  const frozen = isFrozenByDealerChange(order);
+  const frozen = isFrozenBySupplierChange(order);
   const options = frozen ? [] : getNextOrderStatuses(order.orderStatus, access);
-  const blockReason = frozen ? DEALER_CHANGE_BLOCK_REASON : options.length ? null : getOrderBlockReason(order.orderStatus, access);
+  const blockReason = frozen ? SUPPLIER_CHANGE_BLOCK_REASON : options.length ? null : getOrderBlockReason(order.orderStatus, access);
   const today = todayLocalIsoDate();
   const reasonRequired = !!next && REASON_REQUIRED_STATUSES.has(next);
   const needsOverride = !!invoice && !invoice.matched;
-  // A delivery needs the dealer's invoice: matching the quotation, or accepted by an approver with a reason
+  // A delivery needs the supplier's invoice: matching the quotation, or accepted by an approver with a reason
   const invoiceAccepted = !!invoice && (invoice.matched || (access.canApprove && !!overrideReason.trim()));
   const requiredFilled =
     !!next &&
@@ -110,7 +110,7 @@ export const OrderStatusDialog: React.FC<Props> = ({ order, access, isSubmitting
             <p className="text-gray-500 flex flex-wrap items-center gap-2">
               <span className="font-mono font-semibold text-black dark:text-white">{order.orderNumber}</span>
               <span>·</span>
-              <span className="truncate">{order.dealerName}</span>
+              <span className="truncate">{order.supplierName}</span>
               <OrderStatusBadge status={order.orderStatus} />
             </p>
           </div>
@@ -169,7 +169,7 @@ export const OrderStatusDialog: React.FC<Props> = ({ order, access, isSubmitting
                     <p className="font-semibold text-black dark:text-white">What the invoice should show</p>
                     <TaxBreakupSummary taxBreakup={order.taxBreakup} totalPrice={order.totalPrice} />
                   </div>
-                  {/* Delivered: where the dealer's payments stand (the final part waits for testing) */}
+                  {/* Delivered: where the supplier's payments stand (the final part waits for testing) */}
                   <OrderPaymentsPanel orderId={order.id} enabled readOnly />
                   <InvoiceVerificationPanel
                     invoice={invoice}
@@ -187,13 +187,13 @@ export const OrderStatusDialog: React.FC<Props> = ({ order, access, isSubmitting
                         required
                         rows={2}
                         maxLength={INVOICE_OVERRIDE_MAX_LENGTH}
-                        placeholder="e.g. Rounding on the dealer's bill; credit note promised for the difference"
+                        placeholder="e.g. Rounding on the supplier's bill; credit note promised for the difference"
                         value={overrideReason}
                         onChange={(e) => setOverrideReason(e.target.value)}
                       />
                     ) : (
                       <p role="note" className="flex items-start gap-1.5 p-2.5 rounded-xl bg-amber-500/10 text-amber-700 dark:text-amber-400">
-                        <Info className="w-3.5 h-3.5 mt-px shrink-0" /> Upload a correct invoice from the dealer, or ask a Level 2 order approver to accept this one with a reason.
+                        <Info className="w-3.5 h-3.5 mt-px shrink-0" /> Upload a correct invoice from the supplier, or ask a Level 2 order approver to accept this one with a reason.
                       </p>
                     ))}
                 </>

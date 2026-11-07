@@ -2,7 +2,7 @@
 
 export type MeetingMode = 'ONLINE' | 'IN_PERSON';
 export type MeetingStatus = 'SCHEDULED' | 'COMPLETED' | 'CANCELLED';
-export type MeetingType = 'CLIENT' | 'BUSINESS_TO_BUSINESS' | 'BUSINESS_TO_DEALER' | 'CLIENT_TO_CLIENT' | 'INTERNAL' | 'OTHER';
+export type MeetingType = 'CLIENT' | 'BUSINESS_TO_BUSINESS' | 'BUSINESS_TO_SUPPLIER' | 'CLIENT_TO_CLIENT' | 'INTERNAL' | 'OTHER';
 export type AttendeeStatus = 'INVITED' | 'DECLINED' | 'REPLACED';
 export type MeetingRating = 'EXCELLENT' | 'GOOD' | 'AVERAGE' | 'BAD' | 'WORSE';
 

@@ -15,7 +15,7 @@ const hasAtMostTwoDecimals = (value: number) => Math.abs(Math.round(value * 100)
 /** Returns an error message, or an empty string when the order payload is valid. */
 export const validateOrderPayload = (payload: CreateOrderRequest | UpdateOrderRequest): string => {
   if (!isPositiveId(payload.itemId)) return 'Please select an item.';
-  if (!isPositiveId(payload.dealerId)) return 'Please select a dealer.';
+  if (!isPositiveId(payload.supplierId)) return 'Please select a supplier.';
 
   const { orderQuantity, unitPrice, shipmentPrice } = payload;
 

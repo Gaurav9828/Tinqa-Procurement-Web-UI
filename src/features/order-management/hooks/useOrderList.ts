@@ -17,7 +17,7 @@ export const useOrderList = ({ enabled = true, initialStatus }: UseOrderListOpti
 
   const [search, setSearch] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<OrderStatus | undefined>(initialStatus);
-  const [dealerFilter, setDealerFilter] = useState<number | undefined>();
+  const [supplierFilter, setSupplierFilter] = useState<number | undefined>();
 
   const notify = useNotify();
 
@@ -27,8 +27,8 @@ export const useOrderList = ({ enabled = true, initialStatus }: UseOrderListOpti
     const isCurrent = beginRequest();
     setIsLoading(true);
     try {
-      const response = dealerFilter
-        ? await orderApi.getOrdersByDealerId(dealerFilter)
+      const response = supplierFilter
+        ? await orderApi.getOrdersBySupplierId(supplierFilter)
         : statusFilter
           ? await orderApi.getOrdersByStatus(statusFilter)
           : await orderApi.getAllOrders();
@@ -44,7 +44,7 @@ export const useOrderList = ({ enabled = true, initialStatus }: UseOrderListOpti
     } finally {
       if (isCurrent()) setIsLoading(false);
     }
-  }, [notify, beginRequest, dealerFilter, statusFilter]);
+  }, [notify, beginRequest, supplierFilter, statusFilter]);
 
   useEffect(() => {
     if (enabled) fetchOrders();
@@ -53,16 +53,16 @@ export const useOrderList = ({ enabled = true, initialStatus }: UseOrderListOpti
   const filteredOrders = useMemo(() => {
     const query = search.toLowerCase().trim();
     return orders.filter((order) => {
-      // The dealer endpoint ignores status, so apply it here when both filters are set.
-      if (dealerFilter && statusFilter && order.orderStatus !== statusFilter) return false;
+      // The supplier endpoint ignores status, so apply it here when both filters are set.
+      if (supplierFilter && statusFilter && order.orderStatus !== statusFilter) return false;
       if (!query) return true;
       return (
         order.orderNumber.toLowerCase().includes(query) ||
         (order.itemName?.toLowerCase().includes(query) ?? false) ||
-        (order.dealerName?.toLowerCase().includes(query) ?? false)
+        (order.supplierName?.toLowerCase().includes(query) ?? false)
       );
     });
-  }, [orders, search, dealerFilter, statusFilter]);
+  }, [orders, search, supplierFilter, statusFilter]);
 
   return {
     orders: filteredOrders,
@@ -70,10 +70,10 @@ export const useOrderList = ({ enabled = true, initialStatus }: UseOrderListOpti
     isLoading,
     search,
     statusFilter,
-    dealerFilter,
+    supplierFilter,
     updateSearch: setSearch,
     updateStatusFilter: setStatusFilter,
-    updateDealerFilter: setDealerFilter,
+    updateSupplierFilter: setSupplierFilter,
     refetch: fetchOrders,
   };
 };

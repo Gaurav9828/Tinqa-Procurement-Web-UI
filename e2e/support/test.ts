@@ -1,7 +1,7 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { test as base, expect, type Page, type Route } from '@playwright/test';
-import { DEALER_SESSION, e2eToken, handlers, SUPER_ADMIN_SESSION, type Session } from './fixtures';
+import { SUPPLIER_SESSION, e2eToken, handlers, SUPER_ADMIN_SESSION, type Session } from './fixtures';
 
 /**
  * The admin web app against mocked backends (Procurement and E-commerce). Every request the page makes is recorded:
@@ -80,7 +80,7 @@ async function seedSession(page: Page, session: Session): Promise<void> {
 }
 
 interface Fixtures {
-  backend: { network: Network; signInAsSuperAdmin: () => Promise<void>; signInAsDealer: () => Promise<void> };
+  backend: { network: Network; signInAsSuperAdmin: () => Promise<void>; signInAsSupplier: () => Promise<void> };
 }
 
 const REPORT_DIR = path.join(process.cwd(), 'reports', 'e2e', 'network');
@@ -108,8 +108,8 @@ export const test = base.extend<Fixtures>({
           session = SUPER_ADMIN_SESSION;
           return seedSession(page, session);
         },
-        signInAsDealer: () => {
-          session = DEALER_SESSION;
+        signInAsSupplier: () => {
+          session = SUPPLIER_SESSION;
           return seedSession(page, session);
         },
       });

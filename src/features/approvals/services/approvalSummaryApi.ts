@@ -18,12 +18,12 @@ export const PROCUREMENT_QUEUES = {
   RETURNS: ['PROCUREMENT_ORDER_APPROVE', 'PROCUREMENT_ORDER_VIEW'],
   PRODUCTS: ['PRODUCT_APPROVAL_DECIDE'],
   EMPLOYEES: ['EMPLOYEE_APPROVE'],
-  DEALER_LOGINS: ['DEALER_LOGIN_APPROVE'],
-  QUOTATION_CHANGES: ['DEALER_QUOTATION_CHANGE_APPROVE'],
+  SUPPLIER_LOGINS: ['SUPPLIER_LOGIN_APPROVE'],
+  QUOTATION_CHANGES: ['SUPPLIER_QUOTATION_CHANGE_APPROVE'],
   BARCODES: ['BARCODE_APPROVE'],
   CLIENT_DEMOS: ['DEMO_APPROVE'],
-  // Payments to dealers and refunds from them, waiting for someone other than the recorder
-  DEALER_PAYMENTS: ['DEALER_PAYMENT_APPROVE', 'PROCUREMENT_ORDER_VIEW'],
+  // Payments to suppliers and refunds from them, waiting for someone other than the recorder
+  SUPPLIER_PAYMENTS: ['SUPPLIER_PAYMENT_APPROVE', 'PROCUREMENT_ORDER_VIEW'],
 } as const satisfies Record<string, readonly Permission[]>;
 
 export const ECOMMERCE_QUEUES = {

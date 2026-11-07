@@ -3,16 +3,16 @@ import { useNotify } from './useNotify';
 import { useAccess } from './useAccess';
 import type { Permission } from '../config/access';
 import { itemApi } from '../features/item-management/api/itemApi';
-import { dealerApi } from '../features/dealer-management/api/dealerApi';
+import { supplierApi } from '../features/supplier-management/api/supplierApi';
 import { stockApi } from '../features/stock-management/api/stockApi';
 import type { StockResponse } from '../features/stock-management/types/stock.types';
 import type { ItemResponse } from '../features/item-management/types/item.types';
-import type { DealerResponse } from '../features/dealer-management/types/dealer.types';
+import type { SupplierResponse } from '../features/supplier-management/types/supplier.types';
 import { productApi } from '../features/products-management/api/productsApi';
 import type { ProductResponse } from '../features/products-management/types/product.types';
 
 /**
- * Shared, cached option lists for dropdowns (items, dealers, products on sale).
+ * Shared, cached option lists for dropdowns (items, suppliers, products on sale).
  *
  * The paginated list hooks only return one page (10 rows), which is why the
  * order/stock dropdowns used to be truncated. These fetch the full list once,
@@ -94,8 +94,8 @@ const itemLookup = createLookup<ItemResponse>('ITEM_VIEW', async () => {
   return res.data?.content ?? [];
 });
 
-const dealerLookup = createLookup<DealerResponse>('DEALER_VIEW', async () => {
-  const res = await dealerApi.getAllDealers({ page: 0, size: LOOKUP_PAGE_SIZE, sort: 'name,asc' });
+const supplierLookup = createLookup<SupplierResponse>('SUPPLIER_VIEW', async () => {
+  const res = await supplierApi.getAllSuppliers({ page: 0, size: LOOKUP_PAGE_SIZE, sort: 'name,asc' });
   return res.data?.content ?? [];
 });
 
@@ -112,6 +112,6 @@ export const useItemOptions = itemLookup.useOptions;
 export const useActiveProductOptions = activeProductLookup.useOptions;
 export const useStockOptions = stockLookup.useOptions;
 export const invalidateStockOptions = stockLookup.invalidate;
-export const useDealerOptions = dealerLookup.useOptions;
+export const useSupplierOptions = supplierLookup.useOptions;
 export const invalidateItemOptions = itemLookup.invalidate;
-export const invalidateDealerOptions = dealerLookup.invalidate;
+export const invalidateSupplierOptions = supplierLookup.invalidate;
