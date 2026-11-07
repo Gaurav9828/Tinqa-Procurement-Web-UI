@@ -18,6 +18,9 @@ import { ProductApprovalReviewModal } from '../components/ProductApprovalReviewM
 import { getApprovalPermissions, getApprovalState } from '../utils/productApproval';
 import { useAccess } from '../../../hooks/useAccess';
 import { useProductCategories } from '../hooks/useProductCategories';
+import { StockEntryPanel } from '../components/StockEntryPanel';
+import { useProductPageTab } from '../hooks/useProductPageTab';
+import { ProductPageTabs } from '../components/ProductPageTabs';
 
 export const ProductManagementPage: React.FC = () => {
     const {
@@ -36,9 +39,14 @@ export const ProductManagementPage: React.FC = () => {
         moveProduct,
     } = useProductList();
     const categories = useProductCategories(allProducts);
+    const { can } = useAccess();
 
-    // Admin L2 approval state of the listed products (Procurement backend).
-    const productIds = useMemo(() => products.map((p) => p.id), [products]);
+    const canAdjustStock = can('STOREFRONT_STOCK_UPDATE');
+    // Only the open tab is rendered, so a hidden tab fetches nothing
+    const { tab, openProductId, showTab, forgetOpenProduct } = useProductPageTab(canAdjustStock);
+
+    // Admin L2 approval state of the listed products (Procurement backend); the Stock entry tab offers every product.
+    const productIds = useMemo(() => (tab === 'stock-entry' ? allProducts : products).map((p) => p.id), [tab, allProducts, products]);
     const approvals = useProductApprovals(productIds);
     const { reload: reloadApprovals } = approvals;
     const refreshAll = useCallback(() => {
@@ -61,16 +69,15 @@ export const ProductManagementPage: React.FC = () => {
         decideApproval,
     } = useProductActions(refreshAll);
 
-    const { can } = useAccess();
     const canReview = can('PRODUCT_APPROVAL_DECIDE');
     const productActions = useMemo(
         () => ({
             canEdit: can('PRODUCT_UPDATE'),
-            canAdjustStock: can('STOREFRONT_STOCK_UPDATE'),
+            canAdjustStock,
             canSubmit: can('PRODUCT_APPROVAL_SUBMIT'),
             canPublish: can('PRODUCT_PUBLISH'),
         }),
-        [can]
+        [can, canAdjustStock]
     );
     const [reviewRequest, setReviewRequest] = useState<ProductApprovalResponse | null>(null);
 
@@ -93,12 +100,22 @@ export const ProductManagementPage: React.FC = () => {
         [approvals.byProductId, approvals.loaded]
     );
     const canActivate = (product: ProductResponse) => getApprovalPermissions(approvalFor(product).state).canActivate;
+    // Units are added in the Stock entry tab, one row per unit; reducing stays a pop-up
+    const onAdjustStock = (product: ProductResponse, mode: StockAdjustMode) => {
+        if (mode === 'add') showTab('stock-entry', product.id);
+        else setReducing(product);
+    };
+    const canAddStockTo = useCallback(
+        (product: ProductResponse) => getApprovalPermissions(approvalFor(product).state).canAddStock,
+        [approvalFor]
+    );
 
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
     const [editingProduct, setEditingProduct] = useState<ProductResponse | null>(null);
     const [previewProduct, setPreviewProduct] = useState<ProductResponse | null>(null);
     const [statusModalProduct, setStatusModalProduct] = useState<ProductResponse | null>(null);
-    const [stockTarget, setStockTarget] = useState<{ product: ProductResponse; mode: StockAdjustMode } | null>(null);
+    // Reducing stock is a pop-up; adding opens the product's stock entry
+    const [reducing, setReducing] = useState<ProductResponse | null>(null);
     const [resubmitting, setResubmitting] = useState<ProductResponse | null>(null);
     // A saved draft being finished, in its own copy of the create form
     const [openDraft, setOpenDraft] = useState<ProductResponse | null>(null);
@@ -173,6 +190,20 @@ export const ProductManagementPage: React.FC = () => {
                 </button>
             </div>
 
+            {canAdjustStock && <ProductPageTabs tab={tab} onChange={(next) => showTab(next)} />}
+
+            {tab === 'stock-entry' && (
+                <StockEntryPanel
+                    products={allProducts}
+                    canAddStockTo={canAddStockTo}
+                    openProductId={openProductId}
+                    onOpenedProduct={forgetOpenProduct}
+                    onStockAdded={refreshAll}
+                />
+            )}
+
+            {tab === 'products' && (
+            <>
             {/* Filter Bar */}
             <ProductFilterBar
                 search={search}
@@ -207,7 +238,7 @@ export const ProductManagementPage: React.FC = () => {
                     clearFieldErrors();
                     (product.draft ? setOpenDraft : setEditingProduct)(product);
                 }}
-                onAdjustStock={(product, mode) => setStockTarget({ product, mode })}
+                onAdjustStock={onAdjustStock}
                 approvalFor={approvalFor}
                 canReview={canReview}
                 actions={productActions}
@@ -233,6 +264,8 @@ export const ProductManagementPage: React.FC = () => {
                         Retry
                     </button>
                 </p>
+            )}
+            </>
             )}
 
             {resubmitting && (
@@ -307,14 +340,8 @@ export const ProductManagementPage: React.FC = () => {
                 onClose={() => setPreviewProduct(null)}
             />
 
-            {stockTarget && (
-                <StockAdjustModal
-                    key={`${stockTarget.product.id}-${stockTarget.mode}`}
-                    product={stockTarget.product}
-                    initialMode={stockTarget.mode}
-                    updateProduct={updateProduct}
-                    onClose={() => setStockTarget(null)}
-                />
+            {reducing && (
+                <StockAdjustModal key={reducing.id} product={reducing} updateProduct={updateProduct} onClose={() => setReducing(null)} />
             )}
 
             <ProductStatusModal

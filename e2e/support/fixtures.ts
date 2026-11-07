@@ -142,9 +142,9 @@ const financeOverview = (url: URL) => ({
 
 // A promo code as POST /admin/promo-codes answers it (docs/promo-codes.md › Staff)
 const PROMO_CODE = {
-  id: 1, code: 'TINQA7KQ3MZP', description: 'E2E offer', discountType: 'PERCENTAGE', discountPercentage: 20, amountOff: null, customerScope: 'ALL', customerCount: 0,
+  id: 1, code: 'TINQAhRtKwPzMbQeNcYvD', codeHidden: false, description: 'E2E offer', discountType: 'PERCENTAGE', discountPercentage: 20, amountOff: null, customerScope: 'ALL', customerCount: 0,
   productScope: 'ALL', productCount: 0, maxUnitsPerProduct: null, usageLimitPerCustomer: 1, totalUsageLimit: null,
-  startsOn: '2026-11-04', expiresOn: '2099-12-31', active: true, status: 'ACTIVE', timesUsed: 0, totalDiscountGiven: 0,
+  startsOn: '2026-11-04', expiresOn: '2099-12-31', active: true, shownOnStorefront: false, status: 'ACTIVE', timesUsed: 0, totalDiscountGiven: 0,
   createdBy: 'e2e.admin', createdAt: '2026-11-04T10:00:00', updatedBy: null, updatedAt: '2026-11-04T10:00:00',
   deletedBy: null, deletedAt: null, customers: [], products: [],
 };
@@ -176,6 +176,9 @@ export const handlers = (session: Session): [string, RegExp, Handler][] => [
   ['GET', /^\/v1\/orders\/change-requests$/, () => ok([])],
   ['GET', /^\/v1\/orders\/status\/\w+$/, () => ok([])],
   ['GET', /^\/v1\/orders\/\d+$/, () => notFound('ORDER_NOT_FOUND')],
+  // Payments to dealers (DealerPaymentController): the Approvals Hub queue, and an order's payments
+  ['GET', /^\/v1\/orders\/payments$/, () => ok([])],
+  ['GET', /^\/v1\/orders\/\d+\/payments$/, () => notFound('ORDER_NOT_FOUND')],
   ['GET', /^\/v1\/documents$/, () => ok([])],
   // Approvals hub badges: nothing waiting in any queue
   ['GET', /^\/v1\/approvals\/summary$/, () => ok({})],
@@ -225,6 +228,7 @@ export const handlers = (session: Session): [string, RegExp, Handler][] => [
   ['GET', /^\/v1\/outreach\/follow-ups$/, () => ok(page([], 10))],
   ['GET', /^\/v1\/dealer-portal\/quotations$/, () => ok([])],
   ['GET', /^\/v1\/dealer-portal\/orders$/, () => ok([])],
+  ['GET', /^\/v1\/dealer-portal\/orders\/\d+\/payments$/, () => notFound('ORDER_NOT_FOUND')],
   // E-commerce
   ['GET', /^\/company\/profile$/, () => ok({ brandName: 'TinQa', adminLoginHeadline: 'Procurement, sales & delivery — one workspace.' })],
   ['GET', /^\/admin\/company\/profile$/, () => ok({ live: null, pendingChanges: [], myDrafts: [] })],
@@ -246,7 +250,7 @@ export const handlers = (session: Session): [string, RegExp, Handler][] => [
   ['GET', /^\/admin\/customers\/\d+(\/(cart|orders|tickets))?$/, () => notFound('CUSTOMER_NOT_FOUND')],
   // Promo codes: none yet; the create form's code suggestion; an unknown code answers 404 as the backend does
   ['GET', /^\/admin\/promo-codes$/, () => ok(page([]))],
-  ['GET', /^\/admin\/promo-codes\/code-suggestion$/, () => ok({ code: 'TINQA7KQ3MZP' })],
+  ['GET', /^\/admin\/promo-codes\/code-suggestion$/, () => ok({ code: 'TINQAhRtKwPzMbQeNcYvD' })],
   ['GET', /^\/admin\/promo-codes\/\d+$/, () => notFound('PROMO_CODE_NOT_FOUND')],
   ['GET', /^\/admin\/promo-codes\/\d+\/redemptions$/, () => notFound('PROMO_CODE_NOT_FOUND')],
   ['POST', /^\/admin\/promo-codes$/, () => ok(PROMO_CODE)],
@@ -254,6 +258,8 @@ export const handlers = (session: Session): [string, RegExp, Handler][] => [
   ['PATCH', /^\/admin\/promo-codes\/\d+\/status$/, () => notFound('PROMO_CODE_NOT_FOUND')],
   ['DELETE', /^\/admin\/promo-codes\/\d+$/, () => notFound('PROMO_CODE_NOT_FOUND')],
   ['POST', /^\/admin\/promo-codes\/\d+\/restore$/, () => notFound('PROMO_CODE_NOT_FOUND')],
+  ['POST', /^\/admin\/promo-codes\/\d+\/share$/, () => notFound('PROMO_CODE_NOT_FOUND')],
+  ['PATCH', /^\/admin\/promo-codes\/\d+\/storefront$/, () => notFound('PROMO_CODE_NOT_FOUND')],
   ['GET', /^\/admin\/reviews$/, () => ok(page([]))],
   ['GET', /^\/admin\/store-sales\/products$/, () => ok([])],
   ['GET', /^\/admin\/product-categories$/, () => ok([])],
@@ -272,6 +278,9 @@ export const handlers = (session: Session): [string, RegExp, Handler][] => [
   ['GET', /^\/admin\/careers\/applications\/\d+\/resume$/, () => notFound('CAREER_APPLICATION_NOT_FOUND')],
   ['GET', /^\/products$/, () => ok([])],
   ['GET', /^\/products\/active$/, () => ok([])],
+  // Stock entry drafts (Product Management › Stock entry): none saved yet
+  ['GET', /^\/product-stock-drafts$/, () => ok([])],
+  ['GET', /^\/product-stock-drafts\/\d+$/, () => notFound('STOCK_DRAFT_NOT_FOUND')],
   // Description suggestions (only on "Suggest" in the product form): nothing found
   ['GET', /^\/products\/description-reference$/, () => ok(null)],
 ];

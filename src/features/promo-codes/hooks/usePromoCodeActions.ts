@@ -8,12 +8,15 @@ import { useNotify } from '../../../hooks/useNotify';
 import { getApiErrorCode, getApiFieldErrors } from '../../../utils/apiError';
 
 /**
- * The Super Admin's changes (PROMO_CODE_MANAGE): create, edit, switch off and on, delete and restore. Results go
+ * The Super Admin's changes (PROMO_CODE_MANAGE): create, edit, switch off and on, delete and restore; and sharing
+ * (PROMO_CODE_SHARE): email a chosen customers' code to them, show an everyone code on the storefront. Results go
  * through the global alert; field errors from the server come back for the form. Without the permission nothing here
  * is ever sent.
  */
 export const usePromoCodeActions = () => {
-  const canManage = useAccess().can('PROMO_CODE_MANAGE');
+  const { can } = useAccess();
+  const canManage = can('PROMO_CODE_MANAGE');
+  const canShare = can('PROMO_CODE_SHARE');
   const action = useApiAction();
   const [serverErrors, setServerErrors] = useState<Record<string, string>>({});
 
@@ -42,10 +45,14 @@ export const usePromoCodeActions = () => {
     [action, canManage, onError]
   );
 
-  /** One change answered with the detail as saved; resolves to it, or null when it failed. */
+  /** One change answered with the detail as saved; resolves to it, or null when it failed or isn't allowed. */
   const change = useCallback(
-    async (call: () => Promise<ApiResponse<PromoCodeDetail>>, messages: { success: string; failure: string }): Promise<PromoCodeDetail | null> => {
-      if (!canManage) return null;
+    async (
+      call: () => Promise<ApiResponse<PromoCodeDetail>>,
+      messages: { success: string; failure: string },
+      allowed: boolean = canManage
+    ): Promise<PromoCodeDetail | null> => {
+      if (!allowed) return null;
       const saved: { detail: PromoCodeDetail | null } = { detail: null };
       const ok = await action.run(async () => {
         const res = await call();
@@ -79,8 +86,37 @@ export const usePromoCodeActions = () => {
     [change]
   );
 
+  /** Emails the code to these of its customers (empty: all of them). */
+  const share = useCallback(
+    (id: number, customerIds: number[]) =>
+      change(
+        () => promoCodesApi.share(id, customerIds),
+        {
+          success: customerIds.length === 1 ? 'Promo code emailed to the customer.' : 'Promo code emailed to its customers.',
+          failure: 'The promo code could not be emailed.',
+        },
+        canShare
+      ),
+    [change, canShare]
+  );
+
+  /** Shows an everyone code on the storefront, or stops showing it. */
+  const setShownOnStorefront = useCallback(
+    (id: number, shown: boolean) =>
+      change(
+        () => promoCodesApi.setShownOnStorefront(id, shown),
+        {
+          success: shown ? 'Promo code shown on the storefront.' : 'Promo code removed from the storefront.',
+          failure: shown ? 'The promo code could not be shown on the storefront.' : 'The promo code could not be removed from the storefront.',
+        },
+        canShare
+      ),
+    [change, canShare]
+  );
+
   return {
     canManage,
+    canShare,
     isSubmitting: action.isSubmitting,
     serverErrors,
     clearServerErrors: useCallback(() => setServerErrors({}), []),
@@ -88,6 +124,8 @@ export const usePromoCodeActions = () => {
     setActive,
     remove,
     restore,
+    share,
+    setShownOnStorefront,
   };
 };
 

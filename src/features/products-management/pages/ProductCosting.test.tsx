@@ -257,6 +257,7 @@ describe('Product costing', () => {
     const { user } = renderPage();
     await screen.findByText('Smart Lock');
     await user.click(screen.getByTitle('View details'));
+    await openFormTab(user, 'Costs');
     const panel = await screen.findByTestId('product-profit');
     expect(await within(panel).findByText('2 technicians × 4 hours × ₹250/hour')).toBeInTheDocument();
     const perUnit = within(panel).getByRole('region', { name: "Per unit at today's price" });

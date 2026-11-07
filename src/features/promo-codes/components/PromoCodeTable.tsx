@@ -1,5 +1,5 @@
 import React from 'react';
-import { Power, RotateCcw, Trash2 } from 'lucide-react';
+import { EyeOff, Power, RotateCcw, Store, Trash2 } from 'lucide-react';
 import type { PromoCodeSummary } from '../types/promoCode.types';
 import { discountLabel, formatDay, scopeLabel } from '../utils/promoCodeForm';
 import { PromoStatusChip } from './PromoUi';
@@ -35,7 +35,10 @@ const RowActions: React.FC<{
     </span>
   );
 
-/** The list of codes. Each row opens its detail; a Super Admin also switches, deletes or restores it from here. */
+/**
+ * The list of codes. Each row opens its detail; a Super Admin also switches, deletes or restores it from here. A code
+ * for chosen customers shows as TINQA*** to everyone but the Super Admin.
+ */
 export const PromoCodeTable: React.FC<{
   codes: PromoCodeSummary[];
   isLoading: boolean;
@@ -70,6 +73,14 @@ export const PromoCodeTable: React.FC<{
               >
                 {code.code}
               </button>
+              {code.codeHidden && (
+                <EyeOff role="img" aria-label="Only the Super Admin sees this code" className="inline w-3 h-3 ml-1 text-gray-400" />
+              )}
+              {code.shownOnStorefront && (
+                <span className="ml-1.5 inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] bg-[#0071e3]/10 text-[#0071e3] dark:text-blue-300">
+                  <Store className="w-2.5 h-2.5" /> On storefront
+                </span>
+              )}
               {code.description && <p className="text-[11px] text-gray-500 truncate max-w-[220px]">{code.description}</p>}
             </td>
             <td className="p-3"><PromoStatusChip status={code.status} /></td>

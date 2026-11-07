@@ -1,5 +1,6 @@
 import type { OrderStatus } from "../../../types/common.types";
 import type { QuotationTerms } from "../../dealer-portal/types/dealerPortal.types";
+import type { PaymentMethod } from "../utils/paymentPlan";
 
 export interface CreateOrderRequest {
   dealerId: number;
@@ -9,6 +10,10 @@ export interface CreateOrderRequest {
   unitPrice: number;
   shipmentPrice: number;
   taxBreakup?: Record<string, any>;
+  /** Payment plan: the final part (paid after testing) is the rest of 100 %. */
+  advancePercent: number;
+  midtermPercent: number;
+  expectedPaymentMethod: PaymentMethod;
   expectedDelivery?: string;
   orderDate: string;
   additionalInfo?: Record<string, any>;
@@ -70,6 +75,12 @@ export interface OrderResponse {
   totalPrice: number;
   shipmentPrice: number;
   taxBreakup: Record<string, any> | null;
+  /** Payment plan; null on orders made before plans existed. */
+  advancePercent?: number | null;
+  midtermPercent?: number | null;
+  /** 100 less the advance and the midterm: paid after the delivered units are tested. */
+  finalPercent?: number | null;
+  expectedPaymentMethod?: PaymentMethod | null;
   orderStatus: OrderStatus;
   expectedDelivery: string | null;
   actualDelivery: string | null;
@@ -91,6 +102,9 @@ export interface UpdateOrderRequest {
   unitPrice?: number;
   shipmentPrice?: number;
   taxBreakup?: Record<string, any>;
+  advancePercent?: number;
+  midtermPercent?: number;
+  expectedPaymentMethod?: PaymentMethod;
   // null clears a previously set date.
   expectedDelivery?: string | null;
   orderDate?: string;

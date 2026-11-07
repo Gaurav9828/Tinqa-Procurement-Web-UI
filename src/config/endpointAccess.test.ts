@@ -34,6 +34,12 @@ describe('endpoint access table', () => {
     expect(ecommerce('patch', '/admin/promo-codes/12/status')).toBe('PROMO_CODE_MANAGE');
     expect(ecommerce('delete', '/admin/promo-codes/12')).toBe('PROMO_CODE_MANAGE');
     expect(ecommerce('post', '/admin/promo-codes/12/restore')).toBe('PROMO_CODE_MANAGE');
+    expect(ecommerce('get', '/product-stock-drafts')).toBe('STOREFRONT_STOCK_UPDATE');
+    expect(ecommerce('put', '/product-stock-drafts/7')).toBe('STOREFRONT_STOCK_UPDATE');
+    expect(ecommerce('delete', '/product-stock-drafts/7')).toBe('STOREFRONT_STOCK_UPDATE');
+    expect(ecommerce('post', '/product-stock-drafts/7/submit')).toBe('STOREFRONT_STOCK_UPDATE');
+    expect(ecommerce('post', '/admin/promo-codes/12/share')).toBe('PROMO_CODE_SHARE');
+    expect(ecommerce('patch', '/admin/promo-codes/12/storefront')).toBe('PROMO_CODE_SHARE');
   });
 
   it('leaves endpoints without a fixed permission to the backend', () => {

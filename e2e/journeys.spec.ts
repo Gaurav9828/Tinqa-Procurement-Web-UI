@@ -66,6 +66,20 @@ test('Promo Codes lists the codes with one call, and asks for a code suggestion 
 
   await page.getByRole('button', { name: 'New promo code' }).click();
   const dialog = page.getByRole('dialog', { name: 'New promo code' });
-  await expect(dialog.getByLabel('Code', { exact: true })).toHaveValue('TINQA7KQ3MZP');
+  await expect(dialog.getByLabel('Code', { exact: true })).toHaveValue('TINQAhRtKwPzMbQeNcYvD');
   expect(promo()).toEqual(['/admin/promo-codes', '/admin/promo-codes/code-suggestion']);
+});
+
+test('Product Management loads no stock entry drafts until its Stock entry tab is opened', async ({ page, backend }) => {
+  await backend.signInAsSuperAdmin();
+  await page.goto('/products');
+  await expect(page.getByRole('tab', { name: 'Stock entry' })).toBeVisible();
+  await page.waitForLoadState('networkidle');
+  const drafts = () => backend.network.api.filter((c) => c.path.startsWith('/product-stock-drafts'));
+  expect(drafts()).toEqual([]);
+
+  await page.getByRole('tab', { name: 'Stock entry' }).click();
+  await expect(page.getByText('No drafts. Save a stock entry as a draft to finish scanning it later.')).toBeVisible();
+  await page.waitForLoadState('networkidle');
+  expect(drafts().map((c) => c.method + ' ' + c.path.split('?')[0])).toEqual(['GET /product-stock-drafts']);
 });

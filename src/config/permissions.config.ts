@@ -85,7 +85,8 @@ export const APP_NAVIGATION: NavigationItem[] = [
   },
   {
     // Promo codes customers type at checkout: PROMO_CODE_VIEW sees the codes, their customers, products, limits and
-    // use history; PROMO_CODE_MANAGE (Super Admin, Level 2) creates, edits and switches them off or on
+    // use history (a code for chosen customers masked); PROMO_CODE_SHARE emails it to them or shows an everyone code on
+    // the storefront; PROMO_CODE_MANAGE (Super Admin, Level 2) creates, edits, switches them off or on and sees them all
     id: 'promo-codes',
     label: 'Promo Codes',
     path: '/promo-codes',

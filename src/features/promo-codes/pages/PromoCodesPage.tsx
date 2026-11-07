@@ -1,6 +1,6 @@
 import React, { useCallback, useState } from 'react';
 import { Plus, RefreshCw, Search, TicketPercent } from 'lucide-react';
-import type { PromoCodeDetail, PromoCodeRequest, PromoCodeSummary, PromoStatusFilter } from '../types/promoCode.types';
+import type { PromoCodeDetail, PromoCodeRequest, PromoCodeSummary, PromoCustomer, PromoStatusFilter } from '../types/promoCode.types';
 import { usePromoCodeDetail, usePromoCodes } from '../hooks/usePromoCodes';
 import { usePromoCodeActions } from '../hooks/usePromoCodeActions';
 import { PromoCodeTable } from '../components/PromoCodeTable';
@@ -12,11 +12,13 @@ import { Pager } from '../../../components/ui/Pager';
 import { SOLID_TONE } from '../../../components/ui/actionTones';
 
 type FormState = { kind: 'closed' } | { kind: 'create' } | { kind: 'edit'; detail: PromoCodeDetail };
-/** A change waiting for the Super Admin to confirm it. */
+/** A change waiting to be confirmed: the Super Admin's (switch, delete, restore) or a sharer's (email, storefront). */
 interface PendingChange {
-  kind: 'switch-off' | 'switch-on' | 'delete' | 'restore';
+  kind: 'switch-off' | 'switch-on' | 'delete' | 'restore' | 'share' | 'storefront-on' | 'storefront-off';
   id: number;
   code: string;
+  /** share: who gets the email. */
+  customers?: PromoCustomer[];
 }
 type PromoRef = Pick<PromoCodeSummary, 'id' | 'code' | 'active'>;
 
@@ -36,11 +38,35 @@ const CONFIRM: Record<PendingChange['kind'], { title: string; description: strin
     tone: 'danger',
   },
   restore: { title: 'Restore', description: 'It comes back as it was before it was deleted (switched on or off), and can be edited again.', label: 'Restore', tone: 'approve' },
+  share: {
+    title: 'Email',
+    description: 'Each customer gets an email with the code, its discount, products and dates. Only they can use it, signed in with that email address.',
+    label: 'Send email',
+    tone: 'approve',
+  },
+  'storefront-on': {
+    title: 'Show on the storefront',
+    description: 'Every visitor of the website sees this code and its offer, on every page and at checkout, while it can be used. You can remove it again at any time.',
+    label: 'Show it',
+    tone: 'approve',
+  },
+  'storefront-off': {
+    title: 'Remove from the storefront',
+    description: 'Visitors no longer see it. The code keeps working for anyone who already has it.',
+    label: 'Remove',
+    tone: 'warning',
+  },
 };
 
+/** "Email the code to Asha Rao?" / "Email the code to 3 customers?" */
+const shareTitle = (customers: PromoCustomer[]) =>
+  customers.length === 1 ? `Email the code to ${customers[0].name}?` : `Email the code to ${customers.length} customers?`;
+
 /**
- * Promo Codes: /promo-codes (PROMO_CODE_VIEW). Senior staff look codes up to tell customers which one to use; only the
- * Super Admin (PROMO_CODE_MANAGE) creates, edits, switches off or on, deletes and restores them (docs/promo-codes.md).
+ * Promo Codes: /promo-codes (PROMO_CODE_VIEW). Senior staff look codes up to tell customers which one to use (a code
+ * for chosen customers only as TINQA***); sharers (PROMO_CODE_SHARE) email such a code to its customers and show an
+ * everyone code on the storefront; only the Super Admin (PROMO_CODE_MANAGE) creates, edits, switches off or on,
+ * deletes and restores them and sees every code (docs/promo-codes.md).
  */
 export const PromoCodesPage: React.FC = () => {
   const list = usePromoCodes();
@@ -52,6 +78,9 @@ export const PromoCodesPage: React.FC = () => {
   const toggle = (code: PromoRef) => setPending({ kind: code.active ? 'switch-off' : 'switch-on', id: code.id, code: code.code });
   const askDelete = (code: PromoRef) => setPending({ kind: 'delete', id: code.id, code: code.code });
   const askRestore = (code: PromoRef) => setPending({ kind: 'restore', id: code.id, code: code.code });
+  const askShare = (code: PromoRef, customers: PromoCustomer[]) => setPending({ kind: 'share', id: code.id, code: code.code, customers });
+  const askStorefront = (code: PromoRef, shown: boolean) =>
+    setPending({ kind: shown ? 'storefront-on' : 'storefront-off', id: code.id, code: code.code });
 
   const closeForm = useCallback(() => {
     actions.clearServerErrors();
@@ -74,13 +103,21 @@ export const PromoCodesPage: React.FC = () => {
     let saved: PromoCodeDetail | null;
     if (kind === 'delete') saved = await actions.remove(id);
     else if (kind === 'restore') saved = await actions.restore(id);
+    else if (kind === 'share') {
+      // Everyone listed = all of its customers: sent as "all", so one added meanwhile gets it too
+      const everyone = detail.data?.id === id && pending.customers?.length === detail.data.customers.length;
+      saved = await actions.share(id, everyone ? [] : (pending.customers ?? []).map((c) => c.id));
+    } else if (kind === 'storefront-on' || kind === 'storefront-off') saved = await actions.setShownOnStorefront(id, kind === 'storefront-on');
     else saved = await actions.setActive(id, kind === 'switch-on');
     if (!saved) return;
-    list.refresh();
+    // Emailing changes nothing the list shows; only the detail's "last emailed"
+    if (kind !== 'share') list.refresh();
     if (openId === id) detail.replace(saved);
     setPending(null);
   };
   const confirm = pending ? CONFIRM[pending.kind] : null;
+  let confirmTitle = '';
+  if (pending && confirm) confirmTitle = pending.kind === 'share' ? shareTitle(pending.customers ?? []) : `${confirm.title} ${pending.code}?`;
 
   const renderList = () => {
     if (list.codes.length === 0) {
@@ -150,8 +187,8 @@ export const PromoCodesPage: React.FC = () => {
             maxLength={PROMO_SEARCH_MAX_LENGTH}
             onChange={(e) => list.setSearch(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && list.searchNow()}
-            placeholder="Code starts with… (e.g. TINQA7K)"
-            className="w-full pl-9 pr-3 py-2 text-xs rounded-xl border border-black/10 dark:border-white/10 bg-white dark:bg-[#1c1c1e] focus:outline-none focus:ring-2 focus:ring-[#0071e3] uppercase"
+            placeholder="Code starts with… (e.g. TINQAhR)"
+            className="w-full pl-9 pr-3 py-2 text-xs rounded-xl border border-black/10 dark:border-white/10 bg-white dark:bg-[#1c1c1e] focus:outline-none focus:ring-2 focus:ring-[#0071e3]"
           />
         </label>
         <label className="flex items-center gap-2 text-xs text-gray-500">
@@ -176,6 +213,9 @@ export const PromoCodesPage: React.FC = () => {
           detail={detail.data}
           isLoading={detail.isLoading}
           canManage={actions.canManage}
+          canShare={actions.canShare}
+          onShare={askShare}
+          onStorefront={askStorefront}
           onEdit={(d) => setForm({ kind: 'edit', detail: d })}
           onToggle={toggle}
           onDelete={askDelete}
@@ -197,7 +237,7 @@ export const PromoCodesPage: React.FC = () => {
       <ConfirmationModal
         isOpen={pending !== null}
         actionType="CONFIRM"
-        title={pending && confirm ? `${confirm.title} ${pending.code}?` : ''}
+        title={confirmTitle}
         description={confirm?.description ?? ''}
         tone={confirm?.tone ?? 'approve'}
         confirmLabel={confirm?.label}

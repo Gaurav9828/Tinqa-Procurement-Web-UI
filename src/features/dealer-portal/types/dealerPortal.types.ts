@@ -1,4 +1,5 @@
 import type { OrderStatus } from '../../../types/common.types';
+import type { PaymentMethod } from '../../order-management/utils/paymentPlan';
 
 /** GET /v1/dealer-portal/me: the dealer the signed-in dealer login belongs to. */
 export interface DealerProfile {
@@ -41,6 +42,9 @@ export interface QuotationTerms {
   /** The GST breakup as stored (see order-management/utils/quotationTax); {} when removed. */
   taxBreakup?: Record<string, unknown> | null;
   expectedDelivery?: string | null;
+  advancePercent?: number | null;
+  midtermPercent?: number | null;
+  expectedPaymentMethod?: PaymentMethod | null;
   note?: string | null;
 }
 
@@ -78,6 +82,11 @@ export interface DealerOrder {
   shipmentPrice: number;
   totalPrice: number;
   taxBreakup: Record<string, unknown> | null;
+  /** Payment plan; null on orders made before plans existed. */
+  advancePercent?: number | null;
+  midtermPercent?: number | null;
+  finalPercent?: number | null;
+  expectedPaymentMethod?: PaymentMethod | null;
   orderStatus: OrderStatus;
   orderDate: string;
   expectedDelivery: string | null;
@@ -107,6 +116,10 @@ export interface CreateQuotationRequest {
   /** Optional GST breakup: supplyType, gstRate, hsnSac, cgst/sgst or igst, cess. */
   taxBreakup?: Record<string, unknown>;
   expectedDelivery?: string;
+  /** How you want to be paid: the final part (the rest of 100 %) is paid after the delivered units are tested. */
+  advancePercent: number;
+  midtermPercent: number;
+  expectedPaymentMethod: PaymentMethod;
   note?: string;
   /** Required when unitPrice differs from the item's MRP. */
   priceChangeReason?: string;
@@ -130,6 +143,9 @@ export interface QuotationChangeRequest {
   /** A new GST breakup; {} removes it. */
   taxBreakup?: Record<string, unknown>;
   expectedDelivery?: string;
+  advancePercent?: number;
+  midtermPercent?: number;
+  expectedPaymentMethod?: PaymentMethod;
   note?: string;
   reason?: string;
 }

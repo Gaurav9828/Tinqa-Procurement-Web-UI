@@ -9,6 +9,8 @@ import { CommonInput, CommonSelect } from '../../../components/ui/FormInputs';
 import { unitSelectOptions } from '../../../constants/unitsOfMeasure';
 import { QuotationTaxFields } from './QuotationTaxFields';
 import { emptyTaxForm, taxFormChanged, taxFormFrom, taxPayload, validateTaxForm, type TaxForm } from '../utils/quotationTax';
+import { PaymentPlanFields } from './PaymentPlanFields';
+import { DEFAULT_PAYMENT_PLAN, planChanged, planChanges, planFormFrom, quotedTotal, shownPlanErrors, validatePlanForm, type PaymentPlanForm } from '../utils/paymentPlan';
 
 interface EditOrderModalProps {
   order: OrderResponse | null;
@@ -53,6 +55,7 @@ export const EditOrderModal: React.FC<EditOrderModalProps> = ({
   const [isUnitDisabled, setIsUnitDisabled] = useState<boolean>(false);
   const [isConfirmOpen, setIsConfirmOpen] = useState<boolean>(false);
   const [tax, setTax] = useState<TaxForm>(emptyTaxForm);
+  const [plan, setPlan] = useState<PaymentPlanForm>(DEFAULT_PAYMENT_PLAN);
 
   useEffect(() => {
     if (order) {
@@ -64,6 +67,7 @@ export const EditOrderModal: React.FC<EditOrderModalProps> = ({
       setShipmentPrice(order.shipmentPrice || 0);
       setExpectedDelivery(order.expectedDelivery || '');
       setTax(taxFormFrom(order.taxBreakup));
+      setPlan(planFormFrom(order));
     }
   }, [order]);
 
@@ -93,7 +97,8 @@ export const EditOrderModal: React.FC<EditOrderModalProps> = ({
     unitOfMeasure !== (order.unitType || 'PCS') ||
     shipmentPrice !== (order.shipmentPrice || 0) ||
     expectedDelivery !== (order.expectedDelivery || '') ||
-    taxFormChanged(tax, order.taxBreakup);
+    taxFormChanged(tax, order.taxBreakup) ||
+    planChanged(plan, order);
 
   const itemMrp = selectedItem?.mrp || 0;
   const currentPrice = Number(unitPrice) || 0;
@@ -109,6 +114,10 @@ export const EditOrderModal: React.FC<EditOrderModalProps> = ({
   const taxable = isFormComplete ? Number(quantity) * currentPrice + Number(shipmentPrice) : null;
   const taxErrors = validateTaxForm(tax, taxable === null ? null : Math.round(taxable * 100));
   const taxValid = Object.keys(taxErrors).length === 0;
+  const planErrors = validatePlanForm(plan);
+  const planValid = Object.keys(planErrors).length === 0;
+  // Only the parts of the plan that changed are sent (an order made before plans existed gets its first one)
+  const changedPlan = planValid ? planChanges(plan, order) : {};
   const minDeliveryDate = order.orderDate
     ? (() => {
         const d = new Date(order.orderDate);
@@ -119,7 +128,7 @@ export const EditOrderModal: React.FC<EditOrderModalProps> = ({
 
   const handleFormSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!isFormComplete || !taxValid) return;
+    if (!isFormComplete || !taxValid || !planValid) return;
     setIsConfirmOpen(true);
   };
 
@@ -136,6 +145,7 @@ export const EditOrderModal: React.FC<EditOrderModalProps> = ({
       expectedDelivery: expectedDelivery || null,
       // Sent only when changed; otherwise the server keeps the GST and follows a new total at the same rate
       ...(taxFormChanged(tax, order.taxBreakup) ? { taxBreakup: taxPayload(tax) } : {}),
+      ...changedPlan,
       additionalInfo: order.additionalInfo || {},
     });
   };
@@ -279,6 +289,8 @@ export const EditOrderModal: React.FC<EditOrderModalProps> = ({
             <QuotationTaxFields value={tax} onChange={setTax} taxable={taxable} errors={taxErrors} disabled={isSubmitting}
               dealerState={dealers.find((dealer) => dealer.id === Number(selectedDealerId))?.state} />
 
+            <PaymentPlanFields value={plan} onChange={setPlan} total={quotedTotal(taxable, tax)} errors={shownPlanErrors(planErrors)} disabled={isSubmitting} />
+
             {/* Actions */}
             <div className="flex items-center justify-end gap-3 pt-3 border-t border-black/10 dark:border-white/10">
               <button
@@ -290,7 +302,7 @@ export const EditOrderModal: React.FC<EditOrderModalProps> = ({
               </button>
               <button
                 type="submit"
-                disabled={isSubmitting || !hasChanges || !isFormComplete || !taxValid}
+                disabled={isSubmitting || !hasChanges || !isFormComplete || !taxValid || !planValid}
                 className="px-4 py-2 text-xs font-medium text-white bg-[#0071e3] hover:bg-[#0071e3]/90 rounded-xl transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isSubmitting ? 'Updating...' : 'Save Changes'}

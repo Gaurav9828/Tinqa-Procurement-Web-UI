@@ -5,6 +5,9 @@ import { formatCurrency } from '../../order-tracking/utils/orderTracking.utils';
 import { formatDate } from '../../finance/utils/period';
 import { formatUnit } from '../../../constants/unitsOfMeasure';
 import { describeTax, readTaxBreakup } from '../../order-management/utils/quotationTax';
+import { PAYMENT_METHOD_LABELS } from '../../order-management/utils/paymentPlan';
+
+const percent = (value: number | null | undefined) => (value != null ? `${Number(value)}%` : 'No plan');
 
 type Field = keyof QuotationTerms;
 
@@ -23,6 +26,13 @@ const ROWS: { field: Field; label: string; format: (terms: QuotationTerms) => st
     },
   },
   { field: 'expectedDelivery', label: 'Expected delivery', format: (t) => formatDate(t.expectedDelivery) },
+  { field: 'advancePercent', label: 'Advance payment', format: (t) => percent(t.advancePercent) },
+  { field: 'midtermPercent', label: 'Midterm payment', format: (t) => percent(t.midtermPercent) },
+  {
+    field: 'expectedPaymentMethod',
+    label: 'Payment method',
+    format: (t) => (t.expectedPaymentMethod ? PAYMENT_METHOD_LABELS[t.expectedPaymentMethod] : '—'),
+  },
   { field: 'note', label: 'Remarks', format: (t) => t.note?.trim() || '—' },
 ];
 

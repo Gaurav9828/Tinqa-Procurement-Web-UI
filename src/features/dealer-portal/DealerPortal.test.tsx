@@ -9,6 +9,8 @@ import profileReducer from '../../store/profileSlice';
 import { GlobalAlertContainer } from '../../components/ui/GlobalAlertContainer';
 import { axiosClient } from '../../api/axiosClient';
 import { dealerPortalApi } from './api/dealerPortalApi';
+import { dealerPaymentApi } from '../order-management/api/dealerPaymentApi';
+import { paymentEntry, paymentSummary, paymentsOf } from '../order-management/test/paymentFixtures';
 import { DealerQuotationsPage } from './pages/DealerQuotationsPage';
 import { DealerOrdersPage } from './pages/DealerOrdersPage';
 import { ProfilePage } from '../../pages/ProfilePage';
@@ -36,6 +38,18 @@ vi.mock('./api/dealerPortalApi', () => ({
   },
 }));
 const portal = vi.mocked(dealerPortalApi);
+vi.mock('../order-management/api/dealerPaymentApi', () => ({ dealerPaymentApi: { forDealer: vi.fn() } }));
+const dealerPayments = vi.mocked(dealerPaymentApi);
+
+/** Opens one part (tab) of the quotation form. */
+const openTab = (user: ReturnType<typeof userEvent.setup>, dialog: HTMLElement, name: RegExp) =>
+  user.click(within(dialog).getByRole('tab', { name }));
+
+/** How the dealer wants to be paid: the plan starts at 30 / 30 / 40, the method has to be chosen. */
+const choosePaymentMethod = async (user: ReturnType<typeof userEvent.setup>, dialog: HTMLElement, method = 'BANK_TRANSFER') => {
+  await openTab(user, dialog, /Payment plan/);
+  await user.selectOptions(within(dialog).getByRole('combobox', { name: 'Expected payment method' }), method);
+};
 
 const ok = <T,>(data: T) => ({ success: true, message: 'OK', errorCode: null, timestamp: '', path: '', data });
 
@@ -51,6 +65,10 @@ const order = (id: number, orderStatus: OrderStatus, extra: Partial<DealerOrder>
   shipmentPrice: 50,
   totalPrice: 1050,
   taxBreakup: {},
+  advancePercent: 30,
+  midtermPercent: 30,
+  finalPercent: 40,
+  expectedPaymentMethod: 'CHEQUE',
   orderStatus,
   orderDate: '2026-10-10',
   // Far in the future: the change form refuses a delivery date before today, so a near date expires the test.
@@ -108,6 +126,7 @@ beforeEach(() => {
   );
   portal.getItems.mockResolvedValue(ok([{ id: 5, name: 'Copper wire', brand: null, sku: 'CW-1', unitOfMeasure: 'PCS', mrp: 90 }]));
   portal.getProfile.mockResolvedValue(ok(PROFILE));
+  dealerPayments.forDealer.mockResolvedValue(paymentsOf());
 });
 
 describe('Dealer portal', () => {
@@ -131,7 +150,7 @@ describe('Dealer portal', () => {
     await user.click(screen.getByRole('button', { name: /New quotation/ }));
     const dialog = await screen.findByRole('dialog', { name: 'New quotation' });
     await waitFor(() => expect(within(dialog).getByRole('option', { name: /Copper wire/ })).toBeInTheDocument());
-    await user.selectOptions(within(dialog).getByLabelText(/Item/), '5');
+    await user.selectOptions(within(dialog).getByRole('combobox', { name: /^Item/ }), '5');
     await user.type(within(dialog).getByLabelText(/Quantity/), '20');
     // The item's existing price is shown read-only; the reason opens only for a different price
     expect(within(dialog).getByLabelText(/Existing price/)).toHaveValue(90);
@@ -145,6 +164,9 @@ describe('Dealer portal', () => {
     const create = within(dialog).getByRole('button', { name: 'Create quotation' });
     expect(create).toBeDisabled();
     await user.type(within(dialog).getByLabelText(/Reason for the new price/), 'Copper went up');
+    // The payment plan: 30 % advance and 30 % midterm to start with, the rest after testing; the method is chosen
+    expect(create).toBeDisabled();
+    await choosePaymentMethod(user, dialog, 'CHEQUE');
     await user.click(create);
 
     await waitFor(() =>
@@ -154,6 +176,9 @@ describe('Dealer portal', () => {
         unitType: 'PCS',
         unitPrice: 95,
         shipmentPrice: 100,
+        advancePercent: 30,
+        midtermPercent: 30,
+        expectedPaymentMethod: 'CHEQUE',
         expectedDelivery: undefined,
         note: undefined,
         priceChangeReason: 'Copper went up',
@@ -161,6 +186,38 @@ describe('Dealer portal', () => {
     );
     // The dealer is never part of the request: the server takes it from the signed-in account
     expect(portal.createQuotation.mock.calls[0][0]).not.toHaveProperty('dealerId');
+  });
+
+  it('splits the quotation form into parts, marking what is still needed or wrong, and keeps typed values across parts', async () => {
+    const user = userEvent.setup();
+    renderAt('/dealer/quotations');
+    await user.click(await screen.findByRole('button', { name: /New quotation/ }));
+    const dialog = await screen.findByRole('dialog', { name: 'New quotation' });
+    const tabs = within(within(dialog).getByRole('tablist', { name: 'Quotation sections' })).getAllByRole('tab');
+    expect(tabs.map((tab) => tab.textContent)).toEqual([
+      expect.stringContaining('Item & price'),
+      expect.stringContaining('GST'),
+      expect.stringContaining('Payment plan'),
+      expect.stringContaining('Delivery & remarks'),
+    ]);
+    expect(within(dialog).getByText('Step 1 of 4')).toBeInTheDocument();
+    expect(within(tabs[0]).getByRole('img', { name: 'still needed to submit' })).toBeInTheDocument();
+
+    await waitFor(() => expect(within(dialog).getByRole('option', { name: /Copper wire/ })).toBeInTheDocument());
+    await user.selectOptions(within(dialog).getByRole('combobox', { name: /^Item/ }), '5');
+    await user.type(within(dialog).getByLabelText(/Quantity/), '10');
+    expect(within(tabs[0]).getByRole('img', { name: 'done' })).toBeInTheDocument();
+
+    // An unfinished GST breakup marks its part as wrong
+    await user.click(within(dialog).getByRole('button', { name: /Next/ }));
+    expect(within(dialog).getByText('Step 2 of 4')).toBeInTheDocument();
+    await user.click(within(dialog).getByLabelText(/Add GST breakup/));
+    expect(within(tabs[1]).getByRole('img', { name: 'has errors' })).toBeInTheDocument();
+
+    // Going back shows what was typed, and the total stays below every part
+    await user.click(tabs[0]);
+    expect(within(dialog).getByLabelText(/Quantity/)).toHaveValue(10);
+    expect(within(dialog).getByTestId('quotation-total')).toHaveTextContent('₹900.00');
   });
 
   it('quotes the item’s existing price when no new price is given, without a reason', async () => {
@@ -171,9 +228,10 @@ describe('Dealer portal', () => {
     await user.click(await screen.findByRole('button', { name: /New quotation/ }));
     const dialog = await screen.findByRole('dialog', { name: 'New quotation' });
     await waitFor(() => expect(within(dialog).getByRole('option', { name: /Copper wire/ })).toBeInTheDocument());
-    await user.selectOptions(within(dialog).getByLabelText(/Item/), '5');
+    await user.selectOptions(within(dialog).getByRole('combobox', { name: /^Item/ }), '5');
     await user.type(within(dialog).getByLabelText(/Quantity/), '10');
     expect(within(dialog).getByTestId('quotation-total')).toHaveTextContent('₹900.00');
+    await choosePaymentMethod(user, dialog);
     await user.click(within(dialog).getByRole('button', { name: 'Create quotation' }));
 
     await waitFor(() => expect(portal.createQuotation).toHaveBeenCalledWith(expect.objectContaining({ unitPrice: 90 })));
@@ -194,6 +252,8 @@ describe('Dealer portal', () => {
 
     await user.clear(within(dialog).getByLabelText(/Unit price/));
     await user.type(within(dialog).getByLabelText(/Unit price/), '90');
+    // The reason sits with the delivery terms, in the last part
+    await openTab(user, dialog, /Delivery & reason/);
     await user.type(within(dialog).getByLabelText(/Reason for the change/), 'Bulk');
     await user.click(send);
 
@@ -213,13 +273,14 @@ describe('Dealer portal', () => {
     await user.click(await screen.findByRole('button', { name: /New quotation/ }));
     const dialog = await screen.findByRole('dialog', { name: 'New quotation' });
     await waitFor(() => expect(within(dialog).getByRole('option', { name: /Copper wire/ })).toBeInTheDocument());
-    await user.selectOptions(within(dialog).getByLabelText(/Item/), '5');
+    await user.selectOptions(within(dialog).getByRole('combobox', { name: /^Item/ }), '5');
     await user.type(within(dialog).getByLabelText(/Quantity/), '20');
     await user.type(within(dialog).getByLabelText(/New quoted price/), '95');
     await user.type(within(dialog).getByLabelText(/Reason for the new price/), 'Copper went up');
     await user.clear(within(dialog).getByLabelText(/Shipment price/));
     await user.type(within(dialog).getByLabelText(/Shipment price/), '100');
 
+    await openTab(user, dialog, /GST/);
     await user.click(within(dialog).getByLabelText(/Add GST breakup/));
     const create = within(dialog).getByRole('button', { name: 'Create quotation' });
     // Once added, the breakup has to be complete
@@ -235,6 +296,7 @@ describe('Dealer portal', () => {
     expect(within(dialog).getByText(/At 18% this is ₹180.00/)).toBeInTheDocument();
     expect(create).toBeDisabled();
     await user.clear(within(dialog).getByLabelText('CGST'));
+    await choosePaymentMethod(user, dialog);
     await user.click(create);
 
     await waitFor(() =>
@@ -245,6 +307,7 @@ describe('Dealer portal', () => {
 
     await user.click(await screen.findByRole('button', { name: 'Request a change to ORD-1' }));
     const change = await screen.findByRole('dialog', { name: 'Change quotation ORD-1' });
+    await openTab(user, change, /GST/);
     await user.click(within(change).getByLabelText(/Add GST breakup/));
     await user.click(within(change).getByLabelText(/Dealer in another state/));
     await user.selectOptions(within(change).getByLabelText('GST rate'), '5');
@@ -253,6 +316,52 @@ describe('Dealer portal', () => {
     await waitFor(() =>
       expect(portal.requestChange).toHaveBeenCalledWith(1, { taxBreakup: { supplyType: 'INTER_STATE', gstRate: 5 }, reason: undefined })
     );
+  });
+
+  it('proposes a new payment plan as a change, with the final part worked out', async () => {
+    const user = userEvent.setup();
+    portal.requestChange.mockResolvedValue(
+      ok({ id: 42, changes: { advancePercent: 50 }, previous: { advancePercent: 30 }, proposedTotalPrice: 1050, reason: null, status: 'PENDING', requestedAt: '', decidedAt: null, decisionReason: null })
+    );
+    renderAt('/dealer/quotations');
+    await user.click(await screen.findByRole('button', { name: 'Request a change to ORD-1' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Change quotation ORD-1' });
+    await openTab(user, dialog, /Payment plan/);
+    const advance = within(dialog).getByRole('spinbutton', { name: /Advance/ });
+    await user.clear(advance);
+    await user.type(advance, '50');
+    expect(within(dialog).getByTestId('plan-final-percent')).toHaveValue('20%');
+    await user.selectOptions(within(dialog).getByRole('combobox', { name: 'Expected payment method' }), 'ONLINE');
+    await user.click(within(dialog).getByRole('button', { name: 'Send for approval' }));
+    await waitFor(() =>
+      expect(portal.requestChange).toHaveBeenCalledWith(1, { advancePercent: 50, expectedPaymentMethod: 'ONLINE', reason: undefined })
+    );
+  });
+
+  it('shows the dealer what they were paid and any refund they owe', async () => {
+    const user = userEvent.setup();
+    dealerPayments.forDealer.mockResolvedValue(
+      paymentsOf(
+        paymentSummary({
+          orderStatus: 'DELIVERED', tested: true, unitsPassed: 8, unitsFailed: 2, payable: 850, paid: 1050, outstanding: 0, payableNow: 0,
+          openMilestones: ['ADVANCE', 'MIDTERM', 'FINAL'],
+          claim: { id: 1, cause: 'FAILED_TESTING', failedUnits: 2, claimedAmount: 200, agreedAmount: 200, adjustReason: null, adjustedAt: null,
+            refunded: 0, refundDue: 200, status: 'OPEN', openedAt: '2026-10-20T10:00:00Z', settledAt: null },
+        }),
+        [paymentEntry({ recordedBy: null, recordedByUsername: null, decidedByUsername: null, amount: 1050 })]
+      )
+    );
+    portal.getOrders.mockResolvedValue(ok([order(3, 'SHIPPED')]));
+    portal.getOrder.mockResolvedValue(ok(order(3, 'DELIVERED', { history: [] })));
+    renderAt('/dealer/orders');
+    await user.click(await screen.findByRole('button', { name: 'View ORD-3' }));
+    const panel = within(await screen.findByRole('region', { name: 'Payments to the dealer' }));
+    expect(panel.getByTestId('payment-paid')).toHaveTextContent('₹1,050.00');
+    expect(panel.getByRole('alert')).toHaveTextContent('Refund due from the dealer: ₹200.00');
+    expect(panel.getByRole('alert')).toHaveTextContent('2 failed; they go back to the dealer');
+    // The dealer only reads: nothing to record, confirm or change
+    expect(panel.queryByRole('button')).not.toBeInTheDocument();
+    expect(dealerPayments.forDealer).toHaveBeenCalledWith(3);
   });
 
   it('splits orders into ongoing and past, and offers the bill only once delivered', async () => {
@@ -280,6 +389,7 @@ describe('Dealer portal', () => {
     expect(screen.getByText('Shree Metals')).toBeInTheDocument();
     expect(screen.getAllByText('TinQa Pvt Ltd').length).toBeGreaterThan(0);
     expect(screen.getByTestId('print-total')).toHaveTextContent('₹1,050.00');
+    expect(screen.getByTestId('print-payment-plan')).toHaveTextContent('Payment terms: 30% advance · 30% midterm · 40% after testing · Cheque.');
     await waitFor(() => expect(print).toHaveBeenCalled());
     expect(axiosClient.get).not.toHaveBeenCalled();
     unmount();

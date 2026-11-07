@@ -69,11 +69,21 @@ export const PROCUREMENT_ENDPOINTS: readonly EndpointRule[] = [
   rule('GET', '/v1/orders/change-requests', 'DEALER_QUOTATION_CHANGE_APPROVE'),
   rule('GET', '/v1/orders/{id}/change-requests', 'PROCUREMENT_ORDER_VIEW'),
   rule('PATCH', '/v1/orders/change-requests/{id}/decision', 'DEALER_QUOTATION_CHANGE_APPROVE'),
+  // Payments to dealers and refunds from them (DealerPaymentController)
+  rule('GET', '/v1/orders/{id}/payments', 'PROCUREMENT_ORDER_VIEW'),
+  rule('POST', '/v1/orders/{id}/payments', 'DEALER_PAYMENT_RECORD'),
+  rule('GET', '/v1/orders/payments', 'DEALER_PAYMENT_APPROVE'),
+  rule('PUT', '/v1/orders/payments/{id}', 'DEALER_PAYMENT_RECORD'),
+  rule('PATCH', '/v1/orders/payments/{id}/withdraw', 'DEALER_PAYMENT_RECORD'),
+  rule('POST', '/v1/orders/payments/{id}/reversal', 'DEALER_PAYMENT_RECORD'),
+  rule('PATCH', '/v1/orders/payments/{id}/decision', 'DEALER_PAYMENT_APPROVE'),
+  rule('PATCH', '/v1/orders/{id}/refund-claim', 'DEALER_PAYMENT_APPROVE'),
   // Dealer portal (dealer logins only)
   rule('GET', '/v1/dealer-portal/me', 'DEALER_PORTAL_VIEW'),
   rule('GET', '/v1/dealer-portal/items', 'DEALER_QUOTATION_SUBMIT'),
   rule('GET', '/v1/dealer-portal/orders', 'DEALER_PORTAL_VIEW'),
   rule('GET', '/v1/dealer-portal/orders/{id}', 'DEALER_PORTAL_VIEW'),
+  rule('GET', '/v1/dealer-portal/orders/{id}/payments', 'DEALER_PORTAL_VIEW'),
   rule('POST', '/v1/dealer-portal/orders/{id}/response', 'DEALER_ORDER_RESPOND'),
   rule('POST', '/v1/dealer-portal/orders/{id}/ship', 'DEALER_ORDER_SHIP'),
   rule('POST', '/v1/dealer-portal/quotations', 'DEALER_QUOTATION_SUBMIT'),
@@ -224,6 +234,13 @@ export const ECOMMERCE_ENDPOINTS: readonly EndpointRule[] = [
   rule('POST', '/products/{id}/new-version', 'PRODUCT_CREATE'),
   rule('GET', '/products/description-reference', 'PRODUCT_VIEW'),
   rule('PATCH', '/products/{id}/stock', 'STOREFRONT_STOCK_UPDATE'),
+  // Stock entry drafts: units scanned row by row (unit + its pieces), saved part-filled, submitted as one stock change
+  rule('GET', '/product-stock-drafts', 'STOREFRONT_STOCK_UPDATE'),
+  rule('GET', '/product-stock-drafts/{id}', 'STOREFRONT_STOCK_UPDATE'),
+  rule('POST', '/product-stock-drafts', 'STOREFRONT_STOCK_UPDATE'),
+  rule('PUT', '/product-stock-drafts/{id}', 'STOREFRONT_STOCK_UPDATE'),
+  rule('DELETE', '/product-stock-drafts/{id}', 'STOREFRONT_STOCK_UPDATE'),
+  rule('POST', '/product-stock-drafts/{id}/submit', 'STOREFRONT_STOCK_UPDATE'),
   // Product categories (new ones are created with POST/PUT /products via categoryName)
   rule('GET', '/admin/product-categories', 'PRODUCT_VIEW'),
   // Product costing: cost sheets, product / order profit (costs themselves are sent with POST/PUT /products)
@@ -288,6 +305,8 @@ export const ECOMMERCE_ENDPOINTS: readonly EndpointRule[] = [
   rule('PATCH', '/admin/promo-codes/{id}/status', 'PROMO_CODE_MANAGE'),
   rule('DELETE', '/admin/promo-codes/{id}', 'PROMO_CODE_MANAGE'),
   rule('POST', '/admin/promo-codes/{id}/restore', 'PROMO_CODE_MANAGE'),
+  rule('POST', '/admin/promo-codes/{id}/share', 'PROMO_CODE_SHARE'),
+  rule('PATCH', '/admin/promo-codes/{id}/storefront', 'PROMO_CODE_SHARE'),
   // Company profile
   rule('GET', '/admin/company/profile', 'COMPANY_PROFILE_VIEW'),
   rule('GET', '/admin/company/profile/versions', 'COMPANY_PROFILE_VIEW'),

@@ -37,6 +37,10 @@ export const PERMISSIONS = [
   'PROCUREMENT_ORDER_APPROVE',
   // Dealers' changes to their quotations apply only once a Dealer Manager (either level) approves them
   'DEALER_QUOTATION_CHANGE_APPROVE',
+  // Payments to dealers against a quotation's payment plan, and refunds from them: recorded by one person, confirmed
+  // by another (Level 2). Seen by everyone with PROCUREMENT_ORDER_VIEW
+  'DEALER_PAYMENT_RECORD',
+  'DEALER_PAYMENT_APPROVE',
   // Catalog
   'ITEM_VIEW',
   'PRODUCT_VIEW',
@@ -95,9 +99,12 @@ export const PERMISSIONS = [
   'CUSTOMER_UPDATE',
   // Promo codes (docs/promo-codes.md): group PROMO_CODE_READ "Promo codes - view" (Super Admin, Store Manager, Store
   // Sales Agent, Customer Support, Finance Manager, Financial Auditor) sees the codes to tell customers which one to
-  // use; PROMO_CODE_MANAGE (SYSTEM_ADMINISTRATION, Super Admin Level 2 only, never in a custom role) creates, edits
-  // and switches them off
+  // use (a code for chosen customers only as TINQA***). PROMO_CODE_SHARE (group PROMO_CODE_MANAGEMENT: Super Admin,
+  // Store Manager, Sales Agent, Customer Support) emails such a code to its customers and shows an everyone code on
+  // the storefront; PROMO_CODE_MANAGE (SYSTEM_ADMINISTRATION, Super Admin Level 2 only, never in a custom role)
+  // creates, edits, switches them off and sees every code in full
   'PROMO_CODE_VIEW',
+  'PROMO_CODE_SHARE',
   'PROMO_CODE_MANAGE',
   // Company profile
   'COMPANY_PROFILE_VIEW',
@@ -220,6 +227,7 @@ export const APPROVAL_PERMISSIONS: readonly Permission[] = [
   'EXPENSE_APPROVE',
   'DEALER_LOGIN_APPROVE',
   'DEALER_QUOTATION_CHANGE_APPROVE',
+  'DEALER_PAYMENT_APPROVE',
   'CUSTOMER_ORDER_PRE_ORDER_APPROVE',
   'DEMO_APPROVE',
   'CAREER_DECISION_APPROVE',

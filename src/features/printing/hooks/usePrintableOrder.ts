@@ -1,3 +1,4 @@
+import type { PaymentMethod } from '../../order-management/utils/paymentPlan';
 import { useEffect, useState } from 'react';
 import { ecommerceAxiosClient } from '../../../api/ecommerceAxiosClient';
 import type { ApiResponse, OrderStatus } from '../../../types/common.types';
@@ -46,6 +47,10 @@ export interface PrintOrder {
   expectedDelivery: string | null;
   actualDelivery: string | null;
   note?: string | null;
+  /** Payment plan (absent on orders made before plans existed) */
+  advancePercent?: number | null;
+  midtermPercent?: number | null;
+  expectedPaymentMethod?: PaymentMethod | null;
 }
 
 export interface Printable {

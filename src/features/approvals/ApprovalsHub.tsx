@@ -28,8 +28,10 @@ import { useBarcodeRequests } from '../barcodes/hooks/useBarcodeRequests';
 import { ClientDemoApprovalsPanel } from '../client-demos/components/ClientDemoApprovalsPanel';
 import { useWaitingDemos } from '../client-demos/hooks/useClientDemoData';
 import { CareerApprovalsPanel } from '../careers/components/CareerApprovalsPanel';
+import { DealerPaymentApprovalsPanel } from './components/DealerPaymentApprovalsPanel';
 
-type HubTab = 'requests' | 'refunds' | 'expenses' | 'dealers' | 'pre-orders' | 'company-profile' | 'barcodes' | 'client-demos' | 'careers';
+type HubTab =
+  | 'requests' | 'refunds' | 'expenses' | 'dealers' | 'dealer-payments' | 'pre-orders' | 'company-profile' | 'barcodes' | 'client-demos' | 'careers';
 const TAB_STORAGE_KEY = 'approvals.tab';
 
 /** Remembered per browser tab, so Back from an order opened in the refunds queue returns to it. */
@@ -47,6 +49,7 @@ const TABS: { id: HubTab; label: string }[] = [
   { id: 'refunds', label: 'Refunds' },
   { id: 'expenses', label: 'Expenses' },
   { id: 'dealers', label: 'Dealers' },
+  { id: 'dealer-payments', label: 'Dealer payments' },
   { id: 'pre-orders', label: 'Pre-orders' },
   { id: 'company-profile', label: 'Company profile' },
   { id: 'barcodes', label: 'Barcodes' },
@@ -76,6 +79,8 @@ export const ApprovalsHub: React.FC = () => {
         return canAll('CAREER_DECISION_APPROVE', 'CAREER_APPLICATION_VIEW');
       case 'dealers':
         return canAny('DEALER_LOGIN_APPROVE', 'DEALER_QUOTATION_CHANGE_APPROVE');
+      case 'dealer-payments':
+        return canAll('DEALER_PAYMENT_APPROVE', 'PROCUREMENT_ORDER_VIEW');
       default:
         return canAny(...REQUEST_QUEUE_PERMISSIONS);
     }
@@ -123,6 +128,7 @@ export const ApprovalsHub: React.FC = () => {
     refunds: { count: pendingRefundCount, noun: 'refunds' },
     expenses: { count: summary.count('EXPENSES'), noun: 'expenses' },
     dealers: { count: summary.count('DEALER_LOGINS', 'QUOTATION_CHANGES'), noun: 'dealer requests' },
+    'dealer-payments': { count: summary.count('DEALER_PAYMENTS'), noun: 'dealer payments' },
     'pre-orders': { count: summary.count('PRE_ORDERS'), noun: 'pre-orders' },
     'company-profile': { count: summary.count('COMPANY_PROFILE'), noun: 'company profile changes' },
     barcodes: { count: summary.count('BARCODES'), noun: 'barcode requests' },
@@ -157,6 +163,8 @@ export const ApprovalsHub: React.FC = () => {
         return <CompanyProfileApprovalsPanel pending={companyProfile.pending} isLoading={companyProfile.isLoading} onRefresh={companyProfile.refresh} />;
       case 'dealers':
         return <DealerApprovalsPanel onChanged={refreshSummary} />;
+      case 'dealer-payments':
+        return <DealerPaymentApprovalsPanel enabled={tab === 'dealer-payments'} onChanged={refreshSummary} />;
       case 'refunds':
         return <RefundsQueue onChanged={refreshSummary} />;
       case 'expenses':

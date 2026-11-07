@@ -20,6 +20,7 @@ import { lastDayOf, todayInIndia, toRequest, emptyForm, validateForm, formOf } f
 vi.mock('./api/promoCodesApi', () => ({
   promoCodesApi: {
     list: vi.fn(), get: vi.fn(), redemptions: vi.fn(), suggestCode: vi.fn(), create: vi.fn(), update: vi.fn(), setActive: vi.fn(), remove: vi.fn(), restore: vi.fn(),
+    share: vi.fn(), setShownOnStorefront: vi.fn(),
   },
 }));
 vi.mock('../customer-management/api/customersApi', () => ({ customersApi: { list: vi.fn() } }));
@@ -33,17 +34,21 @@ const page = <T,>(content: T[]) =>
   ok({ content, number: 0, size: 20, totalElements: content.length, totalPages: content.length ? 1 : 0, first: true, last: true, empty: !content.length });
 
 const SUMMARY: PromoCodeSummary = {
-  id: 1, code: 'TINQA7KQ3MZP', description: 'Diwali offer', discountType: 'PERCENTAGE', discountPercentage: 20, amountOff: null, customerScope: 'SELECTED', customerCount: 1,
+  id: 1, code: 'TINQAhRtKwPzMbQeNcYvD', codeHidden: false, description: 'Diwali offer', discountType: 'PERCENTAGE', discountPercentage: 20, amountOff: null, customerScope: 'SELECTED', customerCount: 1,
   productScope: 'SELECTED', productCount: 1, maxUnitsPerProduct: null, usageLimitPerCustomer: 1, totalUsageLimit: null,
-  startsOn: '2026-11-04', expiresOn: '2027-05-03', active: true, status: 'ACTIVE', timesUsed: 3, totalDiscountGiven: 450,
+  startsOn: '2026-11-04', expiresOn: '2027-05-03', active: true, shownOnStorefront: false, status: 'ACTIVE', timesUsed: 3, totalDiscountGiven: 450,
   createdBy: 'superadmin', createdAt: '2026-11-04T10:00:00', updatedBy: null, updatedAt: '2026-11-04T10:00:00',
   deletedBy: null, deletedAt: null,
 };
 const DETAIL: PromoCodeDetail = {
   ...SUMMARY,
-  customers: [{ id: 7, name: 'Asha Rao', email: 'asha@example.com' }],
+  customers: [{ id: 7, name: 'Asha Rao', email: 'asha@example.com', timesShared: 0, lastSharedAt: null }],
   products: [{ id: 12, title: 'RudraX', maxUnits: 1 }],
 };
+// What staff without PROMO_CODE_MANAGE get for a code of chosen customers
+const MASKED = { code: 'TINQA***************', codeHidden: true };
+const RAVI = { id: 9, name: 'Ravi Kumar', email: 'ravi@example.com', timesShared: 1, lastSharedAt: '2026-11-04T09:30:00' };
+const EVERYONE: PromoCodeDetail = { ...DETAIL, customerScope: 'ALL', customerCount: 0, customers: [] };
 const DELETED: PromoCodeSummary = { ...SUMMARY, status: 'DELETED', deletedBy: 'superadmin', deletedAt: '2026-11-05T10:00:00' };
 const REDEMPTION: PromoRedemption = {
   id: 4, orderNumber: 'ORD-1A2B3C4D', customerId: 7, customerName: 'Asha Rao', customerEmail: 'asha@example.com', unitsDiscounted: 1,
@@ -75,7 +80,7 @@ beforeEach(() => {
   api.list.mockResolvedValue(page([SUMMARY]));
   api.get.mockResolvedValue(ok(DETAIL));
   api.redemptions.mockResolvedValue(page([REDEMPTION]));
-  api.suggestCode.mockReset().mockResolvedValueOnce(ok({ code: 'TINQA7KQ3MZP' })).mockResolvedValue(ok({ code: 'TINQAH4WX8RT' }));
+  api.suggestCode.mockReset().mockResolvedValueOnce(ok({ code: 'TINQAhRtKwPzMbQeNcYvD' })).mockResolvedValue(ok({ code: 'TINQAwXyZaBcDeFgHjKmN' }));
   api.setActive.mockResolvedValue(ok({ ...DETAIL, active: false, status: 'DISABLED' }, 'Promo code switched off'));
   customers.list.mockResolvedValue(page([CUSTOMER]));
   products.getActiveProducts.mockResolvedValue([PRODUCT, LAMP]);
@@ -88,7 +93,7 @@ afterEach(() => {
 const openCreate = async (user: ReturnType<typeof userEvent.setup>) => {
   await user.click(await screen.findByRole('button', { name: 'New promo code' }));
   const dialog = screen.getByRole('dialog', { name: 'New promo code' });
-  await waitFor(() => expect(within(dialog).getByLabelText('Code')).toHaveValue('TINQA7KQ3MZP'));
+  await waitFor(() => expect(within(dialog).getByLabelText('Code')).toHaveValue('TINQAhRtKwPzMbQeNcYvD'));
   return dialog;
 };
 
@@ -99,15 +104,15 @@ describe('Promo Codes for viewers', () => {
     renderPage();
 
     const table = await screen.findByRole('table', { name: 'Promo codes' });
-    expect(within(table).getByRole('button', { name: 'TINQA7KQ3MZP' })).toBeInTheDocument();
+    expect(within(table).getByRole('button', { name: 'TINQAhRtKwPzMbQeNcYvD' })).toBeInTheDocument();
     expect(within(table).getByText('Active')).toBeInTheDocument();
     expect(within(table).getByText('₹450.00')).toBeInTheDocument();
     expect(api.list).toHaveBeenCalledWith({ search: '', status: '', page: 0, size: 20 });
     expect(screen.queryByRole('button', { name: 'New promo code' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Switch (off|on)/ })).not.toBeInTheDocument();
 
-    await user.click(within(table).getByRole('button', { name: 'TINQA7KQ3MZP' }));
-    const dialog = await screen.findByRole('dialog', { name: 'Promo code TINQA7KQ3MZP' });
+    await user.click(within(table).getByRole('button', { name: 'TINQAhRtKwPzMbQeNcYvD' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Promo code TINQAhRtKwPzMbQeNcYvD' });
     expect(within(dialog).getByText('Asha Rao')).toBeInTheDocument();
     expect(within(dialog).getByText('RudraX')).toBeInTheDocument();
     expect(within(dialog).getByText('on 1 unit')).toBeInTheDocument();
@@ -129,8 +134,8 @@ describe('Promo Codes for viewers', () => {
     const user = userEvent.setup();
     renderPage();
 
-    await user.click(await screen.findByRole('button', { name: 'TINQA7KQ3MZP' }));
-    const dialog = await screen.findByRole('dialog', { name: 'Promo code TINQA7KQ3MZP' });
+    await user.click(await screen.findByRole('button', { name: 'TINQAhRtKwPzMbQeNcYvD' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Promo code TINQAhRtKwPzMbQeNcYvD' });
     expect(api.get).toHaveBeenCalledWith(1);
     expect(api.redemptions).not.toHaveBeenCalled();
 
@@ -193,7 +198,7 @@ describe('Promo Codes for the Super Admin', () => {
     await user.click(within(dialog).getByRole('button', { name: 'Create promo code' }));
     await waitFor(() =>
       expect(api.create).toHaveBeenCalledWith({
-        code: 'TINQA7KQ3MZP', description: 'Diwali offer', discountType: 'PERCENTAGE', discountPercentage: 20, amountOff: null,
+        code: 'TINQAhRtKwPzMbQeNcYvD', description: 'Diwali offer', discountType: 'PERCENTAGE', discountPercentage: 20, amountOff: null,
         customerScope: 'SELECTED', customerIds: [7], productScope: 'SELECTED',
         products: [{ productId: 12, maxUnits: 1 }, { productId: 14, maxUnits: null }],
         maxUnitsPerProduct: null, usageLimitPerCustomer: null, totalUsageLimit: null,
@@ -207,24 +212,24 @@ describe('Promo Codes for the Super Admin', () => {
     expect(api.suggestCode).toHaveBeenCalledTimes(1);
   });
 
-  it('rejects an invalid code and a 100 % discount without sending, and uppercases what is typed', async () => {
+  it('rejects an invalid code and a 100 % discount without sending, and keeps only letters with TINQA in capitals', async () => {
     signIn(superAdminPermissions('ADMIN_L2'));
     const user = userEvent.setup();
     renderPage();
 
     const dialog = await openCreate(user);
     await user.click(within(dialog).getByRole('button', { name: 'Suggest another' }));
-    await waitFor(() => expect(within(dialog).getByLabelText('Code')).toHaveValue('TINQAH4WX8RT'));
+    await waitFor(() => expect(within(dialog).getByLabelText('Code')).toHaveValue('TINQAwXyZaBcDeFgHjKmN'));
     expect(api.suggestCode).toHaveBeenCalledTimes(2);
 
     const code = within(dialog).getByLabelText('Code');
     await user.clear(code);
-    await user.type(code, 'tinqa1');
-    expect(code).toHaveValue('TINQA1');
+    await user.type(code, 'tinqa1Ab-c');
+    expect(code).toHaveValue('TINQAAbc');
     await user.type(within(dialog).getByLabelText('Discount %'), '100');
     await user.click(within(dialog).getByRole('button', { name: 'Create promo code' }));
 
-    expect(within(dialog).getByText(/Use TINQA followed by 3 to 15 capital letters or digits/)).toBeInTheDocument();
+    expect(within(dialog).getByText(/Use TINQA followed by 15 to 25 capital or small letters/)).toBeInTheDocument();
     expect(within(dialog).getByText(/Enter a percentage above 0 and below 100/)).toBeInTheDocument();
     expect(api.create).not.toHaveBeenCalled();
   });
@@ -287,11 +292,11 @@ describe('Promo Codes for the Super Admin', () => {
     const user = userEvent.setup();
     renderPage();
 
-    await user.click(await screen.findByRole('button', { name: 'TINQA7KQ3MZP' }));
-    const detail = await screen.findByRole('dialog', { name: 'Promo code TINQA7KQ3MZP' });
+    await user.click(await screen.findByRole('button', { name: 'TINQAhRtKwPzMbQeNcYvD' }));
+    const detail = await screen.findByRole('dialog', { name: 'Promo code TINQAhRtKwPzMbQeNcYvD' });
     await user.click(await within(detail).findByRole('button', { name: 'Edit' }));
 
-    const dialog = screen.getByRole('dialog', { name: 'Edit TINQA7KQ3MZP' });
+    const dialog = screen.getByRole('dialog', { name: 'Edit TINQAhRtKwPzMbQeNcYvD' });
     expect(within(dialog).getByLabelText('Code')).toHaveAttribute('readonly');
     expect(within(dialog).queryByRole('button', { name: 'Suggest another' })).not.toBeInTheDocument();
     expect(within(within(dialog).getByRole('group', { name: 'Valid for' })).getByRole('radio', { name: '6 months' })).toBeChecked();
@@ -308,13 +313,13 @@ describe('Promo Codes for the Super Admin', () => {
 
     await waitFor(() =>
       expect(api.update).toHaveBeenCalledWith(1, {
-        code: 'TINQA7KQ3MZP', description: 'Diwali offer', discountType: 'PERCENTAGE', discountPercentage: 25, amountOff: null,
+        code: 'TINQAhRtKwPzMbQeNcYvD', description: 'Diwali offer', discountType: 'PERCENTAGE', discountPercentage: 25, amountOff: null,
         customerScope: 'SELECTED', customerIds: [7], productScope: 'SELECTED', products: [{ productId: 12, maxUnits: 2 }],
         maxUnitsPerProduct: null, usageLimitPerCustomer: 1, totalUsageLimit: null,
         startsOn: '2026-11-04', expiresOn: '2027-05-03', active: true,
       })
     );
-    const reopened = await screen.findByRole('dialog', { name: 'Promo code TINQA7KQ3MZP' });
+    const reopened = await screen.findByRole('dialog', { name: 'Promo code TINQAhRtKwPzMbQeNcYvD' });
     expect(within(reopened).getByText('25% off the list price')).toBeInTheDocument();
     await waitFor(() => expect(api.list).toHaveBeenCalledTimes(2));
     // The saved detail came back with the answer: it is not asked for again
@@ -327,8 +332,8 @@ describe('Promo Codes for the Super Admin', () => {
     const user = userEvent.setup();
     renderPage();
 
-    await user.click(await screen.findByRole('button', { name: 'Switch off TINQA7KQ3MZP' }));
-    expect(screen.getByText('Switch off TINQA7KQ3MZP?')).toBeInTheDocument();
+    await user.click(await screen.findByRole('button', { name: 'Switch off TINQAhRtKwPzMbQeNcYvD' }));
+    expect(screen.getByText('Switch off TINQAhRtKwPzMbQeNcYvD?')).toBeInTheDocument();
     expect(api.setActive).not.toHaveBeenCalled();
     await user.click(screen.getByRole('button', { name: 'Switch off' }));
 
@@ -343,8 +348,8 @@ describe('Promo Codes for the Super Admin', () => {
     const user = userEvent.setup();
     renderPage();
 
-    await user.click(await screen.findByRole('button', { name: 'Delete TINQA7KQ3MZP' }));
-    expect(screen.getByText('Delete TINQA7KQ3MZP?')).toBeInTheDocument();
+    await user.click(await screen.findByRole('button', { name: 'Delete TINQAhRtKwPzMbQeNcYvD' }));
+    expect(screen.getByText('Delete TINQAhRtKwPzMbQeNcYvD?')).toBeInTheDocument();
     expect(screen.getByText(/Choose "Deleted" in the status filter/)).toBeInTheDocument();
     expect(api.remove).not.toHaveBeenCalled();
     await user.click(screen.getByRole('button', { name: 'Delete' }));
@@ -357,7 +362,7 @@ describe('Promo Codes for the Super Admin', () => {
     const table = await screen.findByRole('table', { name: 'Promo codes' });
     await waitFor(() => expect(within(table).getByText('Deleted')).toBeInTheDocument());
     expect(within(table).queryByRole('button', { name: /Switch|Delete/ })).not.toBeInTheDocument();
-    await user.click(within(table).getByRole('button', { name: 'Restore TINQA7KQ3MZP' }));
+    await user.click(within(table).getByRole('button', { name: 'Restore TINQAhRtKwPzMbQeNcYvD' }));
     await user.click(screen.getByRole('button', { name: 'Restore' }));
     await waitFor(() => expect(api.restore).toHaveBeenCalledWith(1));
   });
@@ -369,8 +374,8 @@ describe('Promo Codes for the Super Admin', () => {
     const user = userEvent.setup();
     renderPage();
 
-    await user.click(await screen.findByRole('button', { name: 'TINQA7KQ3MZP' }));
-    const dialog = await screen.findByRole('dialog', { name: 'Promo code TINQA7KQ3MZP' });
+    await user.click(await screen.findByRole('button', { name: 'TINQAhRtKwPzMbQeNcYvD' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Promo code TINQAhRtKwPzMbQeNcYvD' });
     expect(await within(dialog).findByText(/deleted by superadmin/)).toBeInTheDocument();
     expect(within(dialog).getByRole('button', { name: 'Restore' })).toBeInTheDocument();
     expect(within(dialog).queryByRole('button', { name: /Edit|Delete|Switch/ })).not.toBeInTheDocument();
@@ -382,6 +387,107 @@ describe('Promo Codes for the Super Admin', () => {
     await screen.findByRole('table', { name: 'Promo codes' });
     expect(screen.queryByRole('button', { name: 'New promo code' })).not.toBeInTheDocument();
     expect(api.suggestCode).not.toHaveBeenCalled();
+  });
+});
+
+describe('Promo Codes: who sees a code and who shares it', () => {
+  it('shows a chosen customers\' code masked to viewers, with nothing to copy, email or show', async () => {
+    signIn(['PROMO_CODE_VIEW']);
+    api.list.mockResolvedValue(page([{ ...SUMMARY, ...MASKED }]));
+    api.get.mockResolvedValue(ok({ ...DETAIL, ...MASKED }));
+    const user = userEvent.setup();
+    renderPage();
+
+    const table = await screen.findByRole('table', { name: 'Promo codes' });
+    expect(within(table).getByRole('img', { name: 'Only the Super Admin sees this code' })).toBeInTheDocument();
+    await user.click(within(table).getByRole('button', { name: 'TINQA***************' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Promo code TINQA***************' });
+    expect(within(dialog).getByText(/only the Super Admin sees it in full/)).toBeInTheDocument();
+    expect(within(dialog).getByText(/Ask someone who shares promo codes/)).toBeInTheDocument();
+    expect(within(dialog).queryByRole('button', { name: 'Copy the code' })).not.toBeInTheDocument();
+    expect(within(dialog).queryByRole('button', { name: /Email/ })).not.toBeInTheDocument();
+    expect(api.share).not.toHaveBeenCalled();
+  });
+
+  it('lets a sharer email the code to one customer or to all of them, without refreshing the list', async () => {
+    signIn(['PROMO_CODE_VIEW', 'PROMO_CODE_SHARE']);
+    const twoCustomers = { ...DETAIL, ...MASKED, customerCount: 2, customers: [DETAIL.customers[0], RAVI] };
+    api.list.mockResolvedValue(page([{ ...SUMMARY, ...MASKED }]));
+    api.get.mockResolvedValue(ok(twoCustomers));
+    api.share.mockResolvedValue(
+      ok({ ...twoCustomers, customers: [{ ...DETAIL.customers[0], timesShared: 1, lastSharedAt: '2026-11-04T11:00:00' }, RAVI] }, 'Promo code emailed')
+    );
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(await screen.findByRole('button', { name: 'TINQA***************' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Promo code TINQA***************' });
+    expect(within(dialog).getByText('Not emailed yet')).toBeInTheDocument();
+    expect(within(dialog).getByText(/Emailed once, last on/)).toBeInTheDocument();
+    expect(within(dialog).queryByRole('button', { name: 'Copy the code' })).not.toBeInTheDocument();
+
+    await user.click(within(dialog).getByRole('button', { name: 'Email the code to Asha Rao' }));
+    expect(await screen.findByText('Email the code to Asha Rao?')).toBeInTheDocument();
+    expect(api.share).not.toHaveBeenCalled();
+    await user.click(screen.getByRole('button', { name: 'Send email' }));
+    await waitFor(() => expect(api.share).toHaveBeenCalledWith(1, [7]));
+    expect(await screen.findByText('Promo code emailed')).toBeInTheDocument();
+    // The detail shows the new "last emailed"
+    expect(await within(dialog).findAllByText(/Emailed once, last on/)).toHaveLength(2);
+
+    await user.click(within(dialog).getByRole('button', { name: 'Email all 2' }));
+    expect(await screen.findByText('Email the code to 2 customers?')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Send email' }));
+    // Everyone listed is sent as "all of its customers"
+    await waitFor(() => expect(api.share).toHaveBeenLastCalledWith(1, []));
+    expect(api.list).toHaveBeenCalledTimes(1);
+  });
+
+  it('lets a sharer show an everyone code on the storefront, and never email it', async () => {
+    signIn(['PROMO_CODE_VIEW', 'PROMO_CODE_SHARE']);
+    api.list.mockResolvedValue(page([{ ...SUMMARY, customerScope: 'ALL', customerCount: 0 }]));
+    api.get.mockResolvedValue(ok(EVERYONE));
+    api.setShownOnStorefront.mockResolvedValue(ok({ ...EVERYONE, shownOnStorefront: true }));
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(await screen.findByRole('button', { name: 'TINQAhRtKwPzMbQeNcYvD' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Promo code TINQAhRtKwPzMbQeNcYvD' });
+    expect(within(dialog).getByText(/Not shown on the storefront/)).toBeInTheDocument();
+    expect(within(dialog).queryByRole('button', { name: /Email/ })).not.toBeInTheDocument();
+
+    await user.click(within(dialog).getByRole('button', { name: 'Show on storefront' }));
+    expect(await screen.findByText('Show on the storefront TINQAhRtKwPzMbQeNcYvD?')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Show it' }));
+    await waitFor(() => expect(api.setShownOnStorefront).toHaveBeenCalledWith(1, true));
+    expect(await within(dialog).findByText(/Shown on the storefront: every visitor/)).toBeInTheDocument();
+    expect(within(dialog).getByRole('button', { name: 'Remove from storefront' })).toBeInTheDocument();
+    await waitFor(() => expect(api.list).toHaveBeenCalledTimes(2));
+  });
+
+  it('offers no sharing for a code that can no longer be used', async () => {
+    signIn(['PROMO_CODE_VIEW', 'PROMO_CODE_SHARE']);
+    api.get.mockResolvedValue(ok({ ...DETAIL, ...MASKED, active: false, status: 'DISABLED' }));
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(await screen.findByRole('button', { name: 'TINQAhRtKwPzMbQeNcYvD' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Promo code TINQA***************' });
+    expect(within(dialog).getByText('Asha Rao')).toBeInTheDocument();
+    expect(within(dialog).queryByRole('button', { name: /Email/ })).not.toBeInTheDocument();
+  });
+
+  it('lets the Super Admin copy the whole code', async () => {
+    signIn(superAdminPermissions('ADMIN_L2'));
+    const user = userEvent.setup();
+    // user-event puts its own clipboard in place on setup
+    const writeText = vi.spyOn(navigator.clipboard, 'writeText');
+    renderPage();
+
+    await user.click(await screen.findByRole('button', { name: 'TINQAhRtKwPzMbQeNcYvD' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Promo code TINQAhRtKwPzMbQeNcYvD' });
+    await user.click(within(dialog).getByRole('button', { name: 'Copy the code' }));
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith('TINQAhRtKwPzMbQeNcYvD'));
   });
 });
 
@@ -419,9 +525,14 @@ describe('promo code form rules', () => {
   });
 
   it('validates like the server', () => {
-    const base = { ...emptyForm('2026-11-04'), code: 'TINQAABC', discountPercentage: '99.99' };
+    const base = { ...emptyForm('2026-11-04'), code: 'TINQAhRtKwPzMbQeNcYvD', discountPercentage: '99.99' };
     const rules = { creating: true, checkCode: true, today: '2026-11-04' };
     expect(validateForm(base, rules)).toEqual({});
+    // At least 20 characters: TINQA and 15 to 25 letters, no digits
+    for (const code of ['TINQAABC', 'TINQAhRtKwPzMbQeNcY', 'TINQAhRtKwPzMbQeNcY2', `TINQA${'a'.repeat(26)}`]) {
+      expect(validateForm({ ...base, code }, rules)).toHaveProperty('code');
+    }
+    expect(validateForm({ ...base, code: `TINQA${'a'.repeat(25)}` }, rules)).toEqual({});
     expect(Object.keys(validateForm({ ...base, code: 'PROMOABC', discountPercentage: '0', customerScope: 'SELECTED', productScope: 'SELECTED', maxUnitsPerProduct: '0' }, rules)).sort())
       .toEqual(['code', 'customerIds', 'discountPercentage', 'products']);
     expect(validateForm({ ...base, maxUnitsPerProduct: '0' }, rules)).toHaveProperty('maxUnitsPerProduct');

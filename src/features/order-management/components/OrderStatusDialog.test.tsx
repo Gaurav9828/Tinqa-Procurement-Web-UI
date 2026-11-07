@@ -8,13 +8,17 @@ import alertReducer from '../../../store/alertSlice';
 import { OrderStatusDialog } from './OrderStatusDialog';
 import { todayLocalIsoDate } from '../validator/orderValidator';
 import { orderApi } from '../api/orderApi';
+import { dealerPaymentApi } from '../api/dealerPaymentApi';
+import { paymentEntry, paymentSummary, paymentsOf } from '../test/paymentFixtures';
 import { signInAsSuperAdmin } from '../../../test/access';
 import type { AdminLevel } from '../../../config/access';
 import type { OrderInvoice, OrderResponse } from '../types/order.types';
 import type { OrderStatus } from '../../../types/common.types';
 
 vi.mock('../api/orderApi', () => ({ orderApi: { getInvoice: vi.fn(), uploadInvoice: vi.fn(), downloadInvoice: vi.fn() } }));
+vi.mock('../api/dealerPaymentApi', () => ({ dealerPaymentApi: { forOrder: vi.fn() } }));
 const api = vi.mocked(orderApi);
+const payments = vi.mocked(dealerPaymentApi);
 
 const invoice = (status: OrderInvoice['status']): OrderInvoice => ({
   id: 9,
@@ -39,6 +43,7 @@ const invoice = (status: OrderInvoice['status']): OrderInvoice => ({
 beforeEach(() => {
   vi.clearAllMocks();
   api.getInvoice.mockResolvedValue({ success: true, message: '', data: null } as never);
+  payments.forOrder.mockResolvedValue(paymentsOf());
 });
 
 const order = (orderStatus: OrderStatus): OrderResponse =>
@@ -118,6 +123,20 @@ describe('Procurement status dialog', () => {
     expect(await screen.findByText('Matches the quotation')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Mark delivered' }));
     expect(onSubmit).toHaveBeenCalledWith(expect.anything(), { status: 'DELIVERED', actualDelivery: todayLocalIsoDate() });
+  });
+
+  it('shows at delivery what the dealer was paid and what waits for testing, with nothing to record there', async () => {
+    payments.forOrder.mockResolvedValue(
+      paymentsOf(paymentSummary({ paid: 708, outstanding: 472, payableNow: 0 }), [paymentEntry(), paymentEntry({ id: 12, milestone: 'MIDTERM' })]),
+    );
+    const { user } = renderDialog('SHIPPED');
+    await user.click(screen.getByRole('radio', { name: /Mark delivered/ }));
+    const panel = within(await screen.findByRole('region', { name: 'Payments to the dealer' }));
+    expect(panel.getByTestId('payment-paid')).toHaveTextContent('₹708.00');
+    expect(panel.getByTestId('payment-outstanding')).toHaveTextContent('₹472.00');
+    expect(panel.getByText(/The final part is paid only after the delivered units are tested/)).toBeInTheDocument();
+    expect(panel.queryByRole('button')).not.toBeInTheDocument();
+    expect(payments.forOrder).toHaveBeenCalledWith(1);
   });
 
   it('lets only a Level 2 approver accept a mismatched invoice, with a reason', async () => {

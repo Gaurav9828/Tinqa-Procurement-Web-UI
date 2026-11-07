@@ -22,6 +22,8 @@ export const PROCUREMENT_QUEUES = {
   QUOTATION_CHANGES: ['DEALER_QUOTATION_CHANGE_APPROVE'],
   BARCODES: ['BARCODE_APPROVE'],
   CLIENT_DEMOS: ['DEMO_APPROVE'],
+  // Payments to dealers and refunds from them, waiting for someone other than the recorder
+  DEALER_PAYMENTS: ['DEALER_PAYMENT_APPROVE', 'PROCUREMENT_ORDER_VIEW'],
 } as const satisfies Record<string, readonly Permission[]>;
 
 export const ECOMMERCE_QUEUES = {

@@ -14,7 +14,10 @@ export type PromoStatusFilter = '' | 'ACTIVE' | 'SCHEDULED' | 'EXPIRED' | 'DISAB
 /** PromoCodeSummaryDTO: one row of GET /admin/promo-codes. */
 export interface PromoCodeSummary {
   id: number;
+  /** The whole code, or "TINQA***************" (codeHidden) for a code of chosen customers unless the caller has
+   *  PROMO_CODE_MANAGE (docs/promo-codes.md › Who sees a code). */
   code: string;
+  codeHidden: boolean;
   description: string | null;
   discountType: PromoDiscountType;
   /** Set for PERCENTAGE, else null. */
@@ -36,6 +39,8 @@ export interface PromoCodeSummary {
   startsOn: string;
   expiresOn: string;
   active: boolean;
+  /** Customer scope ALL only: shown to every storefront visitor while it can be used. */
+  shownOnStorefront: boolean;
   status: PromoStatus;
   /** Orders that were not cancelled. */
   timesUsed: number;
@@ -50,10 +55,18 @@ export interface PromoCodeSummary {
   deletedAt: string | null;
 }
 
-export interface PromoCustomer {
+/** A customer as the form picks them. */
+export interface PromoCustomerRef {
   id: number;
   name: string;
   email: string;
+}
+
+/** A chosen customer in the detail. */
+export interface PromoCustomer extends PromoCustomerRef {
+  /** How often and when last staff emailed them the code (0 / null: never). */
+  timesShared: number;
+  lastSharedAt: string | null;
 }
 
 export interface PromoProduct {

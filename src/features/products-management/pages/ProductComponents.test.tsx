@@ -141,6 +141,7 @@ const installBackends = () => {
   ecom.get.mockImplementation(async (url: string) => {
     if (url === '/admin/product-categories') return ok([DIORAMAS]);
     if (url === '/products') return ok(structuredClone(db));
+    if (url === '/product-stock-drafts') return ok([]);
     throw httpError(405, { success: false, message: 'Method not allowed' });
   });
   ecom.post.mockImplementation(async (_url: string, raw: unknown) => {
@@ -616,7 +617,8 @@ describe('Edit form layout', () => {
     );
     db[0].stockQuantity = 0; // components can only change with no unit in stock
     const { user } = renderPage();
-    const parts = () => screen.getAllByRole('tab').map((tab) => tab.textContent);
+    // The form's own parts (the page above has its Products / Stock entry tabs too)
+    const parts = () => within(screen.getByRole('tablist', { name: 'Product form sections' })).getAllByRole('tab').map((tab) => tab.textContent);
     await screen.findByText('Laptop X');
     await user.click(screen.getByRole('button', { name: /Create Product/ }));
     const createParts = parts();
@@ -661,10 +663,32 @@ describe('Components of a product with units in stock', () => {
 });
 
 describe('Product preview', () => {
+  it('shows the same parts as the create/edit form, every field read-only, with nothing to save', async () => {
+    const { user } = renderPage();
+    await screen.findByText('Laptop X');
+    await user.click(screen.getAllByTitle('View details')[0]);
+
+    const tabs = screen.getAllByRole('tab').map((tab) => tab.textContent);
+    expect(tabs).toEqual(expect.arrayContaining([expect.stringContaining('Basics'), expect.stringContaining('Price & GST'), expect.stringContaining('Warranties')]));
+    expect(screen.getByRole('textbox', { name: 'Title' })).toHaveTextContent('Laptop X');
+    expect(screen.getByRole('textbox', { name: 'Title' })).toHaveAttribute('aria-readonly', 'true');
+    // No real input, select or save button anywhere in the view: only Back / Next and Close
+    const view = screen.getByRole('textbox', { name: 'Title' }).closest('form')!;
+    expect(view.querySelectorAll('input, select, textarea')).toHaveLength(0);
+    expect(within(view).queryByRole('button', { name: /Review|Create|Save|Update/ })).not.toBeInTheDocument();
+    expect(within(view).getByRole('button', { name: 'Close' })).toBeInTheDocument();
+    // A hidden tab loads nothing: the unit barcodes are fetched only once their tab is opened
+    const barcodeCalls = () => procurement.get.mock.calls.filter(([url]) => String(url).includes('/barcodes/products/')).length;
+    expect(barcodeCalls()).toBe(0);
+    await openFormTab(user, 'Components & barcodes');
+    await waitFor(() => expect(barcodeCalls()).toBe(1));
+  });
+
   it('lists components with their warranties', async () => {
     const { user } = renderPage();
     await screen.findByText('Laptop X');
     await user.click(screen.getAllByTitle('View details')[0]);
+    await openFormTab(user, 'Components & barcodes');
     const preview = within(await screen.findByRole('list', { name: 'Components preview' }));
     expect(preview.getByText('Motherboard')).toBeInTheDocument();
     expect(preview.getByText('2 Years Manufacturer Warranty')).toBeInTheDocument();
@@ -673,44 +697,31 @@ describe('Product preview', () => {
 });
 
 describe('Add stock for a product built from components', () => {
-  const openAddStock = async (user: User) => {
+  it('opens a stock entry with a column per piece, and offers only the units the components in stock allow', async () => {
+    // 4 motherboards approved in stock (1 per unit); 10 cables (2 per unit); every piece carries a barcode
+    const base = procurement.get.getMockImplementation()!;
+    procurement.get.mockImplementation((async (url: string, config?: { params?: { itemId?: number } }) => {
+      const itemId = config?.params?.itemId;
+      if (url === '/v1/barcodes' && itemId) {
+        return ok(Array.from({ length: available[itemId] ?? 0 }, (_, i) => ({ id: i + 1, code: `P${itemId}${String(i).padStart(6, '0')}`, unitType: 'ITEM_UNIT', status: 'IN_STOCK' })));
+      }
+      return base(url, config);
+    }) as never);
+    const { user } = renderPage();
     await screen.findByText('Laptop X');
     await user.click(screen.getByRole('button', { name: 'Add stock for Laptop X' }));
-    return screen.getByRole('dialog', { name: 'Adjust stock for Laptop X' });
-  };
+    const entry = await screen.findByRole('region', { name: 'Stock entry for Laptop X' });
 
-  it('caps additions by the most limiting component and re-checks item stock before saving', async () => {
-    const { user } = renderPage();
-    const dialog = await openAddStock(user);
-    const capacity = await within(dialog).findByTestId('component-capacity');
-    await within(capacity).findByText('Motherboard × 1 — 4 in stock');
-    expect(capacity).toHaveTextContent('USB Cable × 2 — 10 in stock');
-    expect(capacity).toHaveTextContent('Limited by Motherboard (4 available, 1 per product).');
-    expect(within(dialog).getByText('Up to 4 can be added with the current item stock.')).toBeInTheDocument();
-
-    // A calculated field: only 1…4 can be chosen.
-    const quantity = within(dialog).getByLabelText('Quantity to add');
-    expect(quantity.tagName).toBe('SELECT');
-    expect(within(quantity).getAllByRole('option').slice(1).map((o) => o.getAttribute('value'))).toEqual(['1', '2', '3', '4']);
-    expect(within(dialog).getByRole('button', { name: 'Add stock' })).toBeDisabled();
-
-    await user.selectOptions(quantity, '3');
-    // Each new unit: its barcode, 1 motherboard and 2 cables
-    expect(within(dialog).getByRole('button', { name: 'Add stock' })).toBeDisabled();
-    await scanUnitBarcodes(user, 'stock-add');
-    available[7] = 2; // stock used elsewhere while the dialog was open
-    await user.click(within(dialog).getByRole('button', { name: 'Add stock' }));
-    expect(await within(dialog).findByText('You can add at most 2 (limited by item stock).')).toBeInTheDocument();
-    expect(ecom.put).not.toHaveBeenCalled();
-
-    await user.selectOptions(within(dialog).getByLabelText('Quantity to add'), '2');
-    await user.click(within(dialog).getByRole('button', { name: 'Add stock' }));
-    await waitFor(() => expect(ecom.put).toHaveBeenCalledTimes(1));
-    expect(lastBody('put')).toMatchObject({ stockQuantity: 5 });
-    expect(lastBody('put')).not.toHaveProperty('components'); // components untouched
-    // The first two units scanned are the ones added, each with its pieces
-    const units = lastBody('put').newUnits as { barcode: string; parts: { itemId: number; barcodes: string[] }[] }[];
-    expect(units).toHaveLength(2);
-    expect(units[0].parts.map((part) => [part.itemId, part.barcodes.length])).toEqual([[7, 1], [8, 2]]);
+    // One column for the unit, one for its motherboard and one for each of its two cables
+    expect(within(entry).getAllByRole('columnheader').map((header) => header.textContent)).toEqual([
+      'Unit', 'Unit barcode', 'Motherboard', 'USB Cable #1', 'USB Cable #2', 'Complete',
+    ]);
+    expect(await within(entry).findByTestId('stock-entry-capacity')).toHaveTextContent(
+      'Up to 4 units can be built from the components in stock (Motherboard: 4 in stock with a barcode, 1 per unit).'
+    );
+    const quantity = within(entry).getByLabelText('Units to add');
+    expect(within(quantity).getAllByRole('option').map((option) => option.textContent)).toEqual(['1', '2', '3', '4']);
+    await user.selectOptions(quantity, '4');
+    expect(within(entry).getAllByRole('row')).toHaveLength(5); // header + 4 units
   });
 });

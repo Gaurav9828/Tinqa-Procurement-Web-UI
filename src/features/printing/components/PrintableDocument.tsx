@@ -1,4 +1,5 @@
 import React from 'react';
+import { describePlan } from '../../order-management/utils/paymentPlan';
 import type { Printable, PrintParty } from '../hooks/usePrintableOrder';
 import type { PrintDocument } from '../printDocuments';
 import { dealerStatusLabel } from '../../dealer-portal/utils/dealerOrderStage';
@@ -167,6 +168,11 @@ export const PrintableDocument: React.FC<{ document: PrintDocument; printable: P
           {order.expectedDelivery && <p>Expected delivery: {formatDate(order.expectedDelivery)}</p>}
           {order.actualDelivery && <p>Delivered on: {formatDate(order.actualDelivery)}</p>}
           {order.note && <p className="mt-1">Remarks: {order.note}</p>}
+          {describePlan(order) && (
+            <p className="mt-1" data-testid="print-payment-plan">
+              Payment terms: {describePlan(order)}. The final part is paid after the delivered units are tested, for the units that pass.
+            </p>
+          )}
         </div>
         {document === 'bill' && (company?.invoiceTerms ?? []).length > 0 && (
           <div>

@@ -10,6 +10,7 @@ import { OrderProgress } from './OrderProgress';
 import { todayLocalIsoDate } from '../validator/orderValidator';
 import { useOrderInvoice } from '../hooks/useOrderInvoice';
 import { InvoiceVerificationPanel } from './InvoiceVerificationPanel';
+import { OrderPaymentsPanel } from './OrderPaymentsPanel';
 import { TaxBreakupSummary } from './TaxBreakupSummary';
 import {
   FINAL_ORDER_STATUSES,
@@ -168,6 +169,8 @@ export const OrderStatusDialog: React.FC<Props> = ({ order, access, isSubmitting
                     <p className="font-semibold text-black dark:text-white">What the invoice should show</p>
                     <TaxBreakupSummary taxBreakup={order.taxBreakup} totalPrice={order.totalPrice} />
                   </div>
+                  {/* Delivered: where the dealer's payments stand (the final part waits for testing) */}
+                  <OrderPaymentsPanel orderId={order.id} enabled readOnly />
                   <InvoiceVerificationPanel
                     invoice={invoice}
                     loading={invoiceState.loading}

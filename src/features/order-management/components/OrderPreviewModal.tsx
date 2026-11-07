@@ -9,6 +9,8 @@ import { TaxBreakupSummary } from './TaxBreakupSummary';
 import { InvoiceVerificationPanel } from './InvoiceVerificationPanel';
 import { useOrderInvoice } from '../hooks/useOrderInvoice';
 import type { OrderStatus } from '../../../types/common.types';
+import { OrderPaymentsPanel } from './OrderPaymentsPanel';
+import { PAYMENT_STAGES, describePlan } from '../utils/paymentPlan';
 
 interface OrderPreviewModalProps {
   order: OrderResponse | null;
@@ -94,7 +96,12 @@ export const OrderPreviewModal: React.FC<OrderPreviewModalProps> = ({ order, onC
             <div className="pt-1 border-t border-black/10 dark:border-white/10">
               <TaxBreakupSummary taxBreakup={order.taxBreakup} totalPrice={order.totalPrice} />
             </div>
+            <p className="pt-1 border-t border-black/10 dark:border-white/10 text-gray-500" data-testid="order-payment-plan">
+              Payment plan: {describePlan(order) ?? 'none (paid after testing)'}
+            </p>
           </div>
+
+          <OrderPaymentsPanel orderId={order.id} enabled={PAYMENT_STAGES.has(order.orderStatus)} />
 
           {INVOICE_STAGES.has(order.orderStatus) && (
             <InvoiceVerificationPanel

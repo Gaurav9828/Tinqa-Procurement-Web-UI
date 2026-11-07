@@ -1,3 +1,5 @@
+import { statusOfTab, tabOfField as tabOfModalField, type TabStatus } from '../../../components/ui/TabbedModal';
+
 /** The parts of the create (or draft) product form, one tab each, in the order a product is usually filled in. */
 export type CreateProductTab = 'basics' | 'pricing' | 'media' | 'components' | 'costing' | 'warranties' | 'accessory';
 
@@ -36,22 +38,14 @@ export const firstTabWithError = (errors: Record<string, string>): CreateProduct
   return CREATE_PRODUCT_TABS.find((tab) => tabs.has(tab.id))?.id ?? null;
 };
 
-/** A tab's marker: an error to fix, something still needed to create or submit, all needed filled in, or nothing needed. */
-export type TabStatus = 'error' | 'todo' | 'done' | 'optional';
+export type { TabStatus };
 
 /** `complete`: whether each tab with required fields has them all (tabs with none are absent). */
 export const tabStatus = (
   id: CreateProductTab,
   errorTabs: ReadonlySet<CreateProductTab>,
   complete: Partial<Record<CreateProductTab, boolean>>
-): TabStatus => {
-  if (errorTabs.has(id)) return 'error';
-  if (complete[id] === undefined) return 'optional';
-  return complete[id] ? 'done' : 'todo';
-};
+): TabStatus => statusOfTab(id, errorTabs, complete);
 
 /** The tab holding a form field (e.g. the one the browser's own check stopped on), or null outside every tab. */
-export const tabOfField = (field: EventTarget | null): CreateProductTab | null => {
-  const panel = field instanceof Element ? field.closest<HTMLElement>('[data-tab-panel]') : null;
-  return (panel?.dataset.tabPanel as CreateProductTab | undefined) ?? null;
-};
+export const tabOfField = (field: EventTarget | null): CreateProductTab | null => tabOfModalField<CreateProductTab>(field);

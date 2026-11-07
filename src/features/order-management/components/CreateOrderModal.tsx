@@ -11,6 +11,8 @@ import { QuotationTaxFields } from './QuotationTaxFields';
 import { QuotedPriceFields } from './QuotedPriceFields';
 import { isPriceChanged } from '../utils/quotedPrice';
 import { emptyTaxForm, taxPayload, validateTaxForm, type TaxForm } from '../utils/quotationTax';
+import { PaymentPlanFields } from './PaymentPlanFields';
+import { DEFAULT_PAYMENT_PLAN, planPayload, quotedTotal, shownPlanErrors, validatePlanForm, type PaymentPlanForm } from '../utils/paymentPlan';
 
 interface CreateOrderModalProps {
   isOpen: boolean;
@@ -30,6 +32,8 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
   onSubmit,
 }) => {
   const { can } = useAccess();
+  // How the dealer wants to be paid: advance and midterm percentages, the rest after testing
+  const [plan, setPlan] = useState<PaymentPlanForm>(DEFAULT_PAYMENT_PLAN);
   const [selectedItemId, setSelectedItemId] = useState<number | ''>('');
   const [selectedDealerId, setSelectedDealerId] = useState<number | ''>('');
   const [quantity, setQuantity] = useState<number | ''>('');
@@ -75,11 +79,13 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
   const taxable = isFormComplete ? Number(quantity) * currentPrice + Number(shipmentPrice) : null;
   const taxErrors = validateTaxForm(tax, taxable === null ? null : Math.round(taxable * 100));
   const taxValid = Object.keys(taxErrors).length === 0;
+  const planErrors = validatePlanForm(plan);
+  const planValid = Object.keys(planErrors).length === 0;
   const selectedDealer = dealers.find((dealer) => dealer.id === Number(selectedDealerId));
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!isFormComplete || !taxValid) return;
+    if (!isFormComplete || !taxValid || !planValid) return;
     onSubmit({
       itemId: Number(selectedItemId),
       dealerId: Number(selectedDealerId),
@@ -89,6 +95,7 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
       shipmentPrice: Number(shipmentPrice),
       orderDate: todayLocalIsoDate(),
       taxBreakup: taxPayload(tax),
+      ...planPayload(plan),
       // Approvers see the existing price and why it was changed.
       additionalInfo: priceChanged ? { mrp: itemMrp, priceChangeReason: priceReason.trim() } : {},
     });
@@ -208,6 +215,8 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
           <QuotationTaxFields value={tax} onChange={setTax} taxable={taxable} errors={taxErrors} disabled={isSubmitting}
             dealerState={selectedDealer?.state} />
 
+          <PaymentPlanFields value={plan} onChange={setPlan} total={quotedTotal(taxable, tax)} errors={shownPlanErrors(planErrors)} disabled={isSubmitting} />
+
           {/* Actions */}
           <div className="flex items-center justify-end gap-3 pt-3 border-t border-black/10 dark:border-white/10">
             <button
@@ -219,7 +228,7 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
             </button>
             <button
               type="submit"
-              disabled={isSubmitting || !isFormComplete || !taxValid}
+              disabled={isSubmitting || !isFormComplete || !taxValid || !planValid}
               className="px-4 py-2 text-xs font-medium text-white bg-[#0071e3] hover:bg-[#0071e3]/90 rounded-xl transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isSubmitting ? 'Submitting...' : 'Create Order'}

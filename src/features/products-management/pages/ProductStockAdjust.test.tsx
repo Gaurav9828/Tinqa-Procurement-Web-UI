@@ -14,7 +14,6 @@ import { mockDirectEditApprovals } from './directEditApprovals.testUtil';
 import type { ProductResponseDto, SpecificationDTO } from '../types/product.types';
 import { signInAsSuperAdmin } from '../../../test/access';
 import { DIORAMAS } from './categoryTestUtil';
-import { scanUnitBarcodes } from './barcodeTestUtil';
 
 /**
  * Only the HTTP client is mocked, with a tiny fake of the real Ecommerce BE ProductController:
@@ -95,6 +94,7 @@ const installFakeBackend = () => {
     if (url === '/admin/product-categories') return okBody([DIORAMAS]);
     if (url === '/products') return okBody(db.map(toReadDto), 'Products retrieved successfully');
     if (url === '/products/active') return okBody(db.filter((p) => p.enabled).map(toReadDto));
+    if (url === '/product-stock-drafts') return okBody([]);
     throw methodNotAllowed('GET', url);
   });
   http.put.mockImplementation(async (url: string, body: unknown) => {
@@ -132,9 +132,10 @@ const renderPage = () => {
   return { user };
 };
 
-const openDialog = async (user: ReturnType<typeof userEvent.setup>, action: 'Add' | 'Reduce', title = 'SummitX') => {
+// Units are added in the Stock entry tab; the pop-up only takes units out
+const openDialog = async (user: ReturnType<typeof userEvent.setup>, action: 'Reduce', title = 'SummitX') => {
   await user.click(await screen.findByRole('button', { name: `${action} stock for ${title}` }));
-  const dialog = screen.getByRole('dialog', { name: `Adjust stock for ${title}` });
+  const dialog = screen.getByRole('dialog', { name: `Reduce stock for ${title}` });
   await within(dialog).findByTestId('current-stock');
   return dialog;
 };
@@ -151,7 +152,7 @@ describe('Product API contract (no product-detail route)', () => {
   it('loads the product list from GET /products and never requests GET /products/{id}', async () => {
     const { user } = renderPage();
     expect(await screen.findByText('SummitX')).toBeInTheDocument();
-    await openDialog(user, 'Add');
+    await openDialog(user, 'Reduce');
     expect(requestedGetUrls().every((url) => url === '/products' || url === '/admin/product-categories')).toBe(true);
     expect(http.delete).not.toHaveBeenCalled();
   });
@@ -173,19 +174,28 @@ describe('Product stock add/reduce', () => {
     expect(screen.getByRole('button', { name: 'Reduce stock for Sold-out Plug' })).toBeDisabled();
   });
 
-  it('adds stock from the latest data and preserves specifications and user guide through the update', async () => {
+  it('adds stock in the Stock entry tab, not in a pop-up: Add stock opens the product\'s stock entry', async () => {
+    const { user } = renderPage();
+    await user.click(await screen.findByRole('button', { name: 'Add stock for SummitX' }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Stock entry' })).toHaveAttribute('aria-selected', 'true');
+    // SummitX has no components, so no unit can be built: 0, locked, and no rows to fill in
+    const entry = await screen.findByRole('region', { name: 'Stock entry for SummitX' });
+    expect(within(entry).getByLabelText('Units to add')).toBeDisabled();
+    expect(within(entry).getByRole('alert')).toHaveTextContent('No component available');
+    expect(within(entry).queryByRole('table')).not.toBeInTheDocument();
+  });
+
+  it('keeps specifications and user guide through a stock reduction', async () => {
     const { user } = renderPage();
     await screen.findByText('SummitX');
     db[0].stockQuantity = 15; // another admin changed it after the list loaded
-    const dialog = await openDialog(user, 'Add');
+    const dialog = await openDialog(user, 'Reduce');
 
     expect(within(dialog).getByTestId('current-stock')).toHaveTextContent('15');
-    await user.type(within(dialog).getByLabelText('Quantity to add'), '5');
-    await user.type(within(dialog).getByLabelText(/Reason/), 'Supplier delivery');
-    // Each added unit carries its own barcode
-    expect(within(dialog).getByRole('button', { name: 'Add stock' })).toBeDisabled();
-    await scanUnitBarcodes(user, 'stock-add');
-    await user.click(within(dialog).getByRole('button', { name: 'Add stock' }));
+    await user.type(within(dialog).getByLabelText('Quantity to remove'), '5');
+    await user.type(within(dialog).getByLabelText(/Reason/), 'Damaged in transit');
+    await user.click(within(dialog).getByRole('button', { name: 'Reduce stock' }));
 
     await waitFor(() => expect(http.put).toHaveBeenCalledTimes(1));
     const [url, body] = http.put.mock.calls[0];
@@ -198,15 +208,14 @@ describe('Product stock add/reduce', () => {
       hsnSac: '9405',
       gstRate: 18,
       enabled: true,
-      stockQuantity: 20,
-      lastUpdateDescription: 'Stock added: +5 (15 → 20) — Supplier delivery',
+      stockQuantity: 10,
+      lastUpdateDescription: 'Stock reduced: −5 (15 → 10) — Damaged in transit',
       specifications: [
         { specKey: 'Power', specValue: '9W' },
         { specKey: 'Guide - Setup', specValue: 'Plug it in' },
         { specKey: 'Guide - Setup', specValue: 'Pair with the app' },
       ],
     });
-    expect((body as { newUnits: unknown[] }).newUnits).toHaveLength(5);
     // Round trip: nothing was wiped on the server.
     expect(db[0].specRows).toEqual(LAMP.specRows);
     expect(await screen.findByText('Product updated successfully!')).toBeInTheDocument();
@@ -253,9 +262,9 @@ describe('Product stock add/reduce', () => {
 
   it.each(['0', '1.5'])('rejects quantity %s', async (value) => {
     const { user } = renderPage();
-    const dialog = await openDialog(user, 'Add');
-    await user.type(within(dialog).getByLabelText('Quantity to add'), value);
-    expect(within(dialog).getByRole('button', { name: 'Add stock' })).toBeDisabled();
+    const dialog = await openDialog(user, 'Reduce');
+    await user.type(within(dialog).getByLabelText('Quantity to remove'), value);
+    expect(within(dialog).getByRole('button', { name: 'Reduce stock' })).toBeDisabled();
   });
 
   it('re-checks against the latest stock at save time', async () => {
@@ -272,23 +281,22 @@ describe('Product stock add/reduce', () => {
     const { user } = renderPage();
     await screen.findByText('SummitX');
     db = db.filter((p) => p.id !== 1); // deleted after the list loaded
-    await user.click(screen.getByRole('button', { name: 'Add stock for SummitX' }));
-    const dialog = screen.getByRole('dialog', { name: 'Adjust stock for SummitX' });
+    await user.click(screen.getByRole('button', { name: 'Reduce stock for SummitX' }));
+    const dialog = screen.getByRole('dialog', { name: 'Reduce stock for SummitX' });
     expect(await within(dialog).findByText(/Couldn't load the latest stock/)).toBeInTheDocument();
     expect(await screen.findByText('This product no longer exists.')).toBeInTheDocument();
-    await user.type(within(dialog).getByLabelText('Quantity to add'), '2');
-    expect(within(dialog).getByRole('button', { name: 'Add stock' })).toBeDisabled();
+    await user.type(within(dialog).getByLabelText('Quantity to remove'), '2');
+    expect(within(dialog).getByRole('button', { name: 'Reduce stock' })).toBeDisabled();
   });
 
   it('keeps the pop-up open with the input when the update fails', async () => {
     http.put.mockRejectedValue(httpError(500, { message: 'Something went wrong. Please try again later.' }));
     const { user } = renderPage();
-    const dialog = await openDialog(user, 'Add');
-    await user.type(within(dialog).getByLabelText('Quantity to add'), '2');
-    await scanUnitBarcodes(user, 'stock-add');
-    await user.click(within(dialog).getByRole('button', { name: 'Add stock' }));
+    const dialog = await openDialog(user, 'Reduce');
+    await user.type(within(dialog).getByLabelText('Quantity to remove'), '2');
+    await user.click(within(dialog).getByRole('button', { name: 'Reduce stock' }));
     expect(await screen.findByText('Something went wrong. Please try again later.')).toBeInTheDocument();
-    expect(within(dialog).getByLabelText('Quantity to add')).toHaveValue(2);
+    expect(within(dialog).getByLabelText('Quantity to remove')).toHaveValue(2);
   });
 });
 

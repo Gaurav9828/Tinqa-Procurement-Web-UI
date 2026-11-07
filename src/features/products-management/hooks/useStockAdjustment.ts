@@ -1,18 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { productApi } from '../api/productsApi';
 import type { ProductResponse, UpdateProductRequest } from '../types/product.types';
-import { buildStockUpdatePayload, calculateNewStock, describeStockChange, type StockAdjustMode } from '../utils/stockAdjustment';
+import { buildStockUpdatePayload, calculateNewStock, describeStockChange } from '../utils/stockAdjustment';
 import { useNotify } from '../../../hooks/useNotify';
-import { loadComponentCapacity, type ComponentCapacity } from '../utils/componentStock';
-import { getApiErrorMessage } from '../../../utils/apiError';
-import type { NewProductUnit } from '../../barcodes/types/barcode.types';
 import { updateRememberedUnits } from '../../barcodes/utils/rememberedUnits';
-
-/** The units the change builds (with their pieces) or takes out, by barcode. */
-export interface StockAdjustBarcodes {
-  newUnits?: NewProductUnit[];
-  removedUnits?: string[];
-}
 
 export interface StockAdjustResult {
   ok: boolean;
@@ -21,7 +12,7 @@ export interface StockAdjustResult {
 }
 
 /**
- * Add/reduce stock for one product using the existing product update.
+ * Reduce stock for one product using the existing product update (units are added in the Stock entry tab).
  *
  * Loads the latest product when the dialog opens (so the admin sees current stock) and again
  * right before saving, so the +/− is applied to fresh data and no other field is overwritten
@@ -36,9 +27,6 @@ export const useStockAdjustment = (
   const [isLoading, setIsLoading] = useState(true);
   const [loadFailed, setLoadFailed] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  // For products built from components: how many units the item stock allows adding.
-  const [capacity, setCapacity] = useState<ComponentCapacity | null>(null);
-  const [capacityError, setCapacityError] = useState<string | null>(null);
   const inFlight = useRef(false);
   const notify = useNotify();
 
@@ -61,18 +49,10 @@ export const useStockAdjustment = (
   useEffect(() => {
     let active = true;
     fetchLatest(productId)
-      .then(async (latest) => {
+      .then((latest) => {
         if (!active) return;
         setProduct(latest);
         setLoadFailed(!latest);
-        if (latest?.components.length) {
-          try {
-            const loaded = await loadComponentCapacity(latest.components);
-            if (active) setCapacity(loaded);
-          } catch (err: unknown) {
-            if (active) setCapacityError(getApiErrorMessage(err, "Couldn't check item stock for this product's components."));
-          }
-        }
       })
       .finally(() => {
         if (active) setIsLoading(false);
@@ -82,8 +62,8 @@ export const useStockAdjustment = (
     };
   }, [productId, fetchLatest]);
 
-  const adjust = useCallback(
-    async (mode: StockAdjustMode, quantity: string, note: string, barcodes: StockAdjustBarcodes = {}): Promise<StockAdjustResult> => {
+  const reduce = useCallback(
+    async (quantity: string, note: string, removedUnits: string[]): Promise<StockAdjustResult> => {
       if (inFlight.current) return { ok: false };
       inFlight.current = true;
       setIsSaving(true);
@@ -92,27 +72,12 @@ export const useStockAdjustment = (
         if (!latest) return { ok: false };
         setProduct(latest);
 
-        // Additions use component item stock: re-check it now, not when the dialog opened.
-        let maxAdd: number | null = null;
-        if (mode === 'add' && latest.components.length > 0) {
-          try {
-            const fresh = await loadComponentCapacity(latest.components);
-            setCapacity(fresh);
-            maxAdd = fresh.maxAddable;
-          } catch (err: unknown) {
-            return { ok: false, quantityError: getApiErrorMessage(err, "Couldn't check item stock. Try again.") };
-          }
-        }
-
-        const result = calculateNewStock(latest.stockQuantity, mode, quantity, maxAdd);
+        const result = calculateNewStock(latest.stockQuantity, 'reduce', quantity);
         if (!result.ok) return { ok: false, quantityError: result.error };
 
-        const description = describeStockChange(mode, latest.stockQuantity, result.newStock, note);
-        const ok = await updateProduct(productId, {
-          ...buildStockUpdatePayload(latest, result.newStock, description),
-          ...(mode === 'add' ? { newUnits: barcodes.newUnits ?? [] } : { removedUnits: barcodes.removedUnits ?? [] }),
-        });
-        if (ok) updateRememberedUnits(productId, barcodes.newUnits, barcodes.removedUnits);
+        const description = describeStockChange('reduce', latest.stockQuantity, result.newStock, note);
+        const ok = await updateProduct(productId, { ...buildStockUpdatePayload(latest, result.newStock, description), removedUnits });
+        if (ok) updateRememberedUnits(productId, undefined, removedUnits);
         return { ok };
       } finally {
         inFlight.current = false;
@@ -122,5 +87,5 @@ export const useStockAdjustment = (
     [productId, fetchLatest, updateProduct]
   );
 
-  return { product, isLoading, loadFailed, isSaving, adjust, capacity, capacityError };
+  return { product, isLoading, loadFailed, isSaving, reduce };
 };

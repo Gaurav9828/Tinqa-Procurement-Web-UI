@@ -66,13 +66,29 @@ export interface GuideChange {
 }
 
 /** Bump with every guide update; printed on the page and on every PDF. */
-export const GUIDE_VERSION = '2.44';
-export const GUIDE_UPDATED = '2026-11-04';
+export const GUIDE_VERSION = '2.48';
+export const GUIDE_UPDATED = '2026-11-06';
 
 export const GUIDE_CHANGELOG: GuideChange[] = [
   {
+    date: '2026-11-06',
+    changes: [
+      'Quotations now carry a payment plan (Orders Management › Create / Edit, and a dealer\'s My Quotations): the advance and midterm percentages, 30% and 30% to start with and both editable, and the final part worked out by itself as the rest of 100% (30% + 30% leaves 40%), paid only after the delivered units are tested. The midterm part is optional: untick "Midterm payment" for a dealer who wants only an advance and the final payment (30% advance leaves 70% after testing), and no midterm payment is then asked for or accepted. The quotation also says how the dealer expects to be paid: cash, online payment, bank to bank transfer or cheque. Advance and midterm together can\'t be more than 100%. A dealer\'s change to the plan is a change request like any other, and approvers see the old and new plan. The quotation, purchase order and bill print the payment terms.',
+      'Orders Management › the order › Payments to the dealer (Dealer Manager, Finance Manager, Super Admin): record what was actually paid against each part of the plan, any amount (25% or 50% instead of the planned 30% is fine), with the method, date and reference. Someone else confirms it (Approvals Hub › Dealer payments, Level 2); only confirmed payments count. The advance can be paid once the order is approved and the midterm once the dealer has shipped; until the units are tested at most the advance and midterm parts can be paid. Your own entry can be corrected or withdrawn while it waits; a confirmed one is reversed (and the reversal confirmed). Everyone who sees orders sees the paid, refunded and still-to-pay figures; marking an order delivered shows them too.',
+      'Testing decides the final payment: once the stock entry is approved the order is worth only the units that passed (with shipment and GST), and the final part can be paid up to that. If more was paid (units failed testing, or the order was cancelled or returned after a payment), a refund claim against the dealer opens by itself, with the failed units, and the dealer and payments team are told. A Level 2 can change the amount to be refunded, with a reason; recording and confirming the dealer\'s refund settles it. Dealers see their payments and any refund they owe in My Orders.',
+      'Products Management › View details (the eye) now opens the product in the same frame as Create and Edit: the same parts (Basics, Price & GST, Images & specs, Components & barcodes, Costs, Warranties, Accessory) in the same order, with Back / Next, and every field shown as it would be filled in but not editable. There is nothing to save; Close leaves it. The unit barcodes and the cost sheet load only when their part is opened.',
+      'Product Management has a new Stock entry tab (Fulfillment Specialist, Super Admin) for adding units to a product. Add stock (+) on a product opens it there. Units to add is a list of only the units the components in stock can build: a product using one motherboard and two touch panels, with 5 motherboards and 10 touch panels in stock, offers 1 to 5. Only pieces with a barcode count, and the line under it names the component that limits the count. When not one unit can be built (no complete set in stock, or a product without components), Units to add shows 0 and can\'t be changed, "No component available" says why, and there are no rows to fill in. The grid then has one row per unit, a column for the unit\'s own barcode and one column per piece fitted into it (a USB cable used twice per unit gets USB Cable #1 and #2). So every row says exactly which pieces went into which unit. A scanner\'s Enter moves to the next cell, and a block copied from a spreadsheet (rows on lines, cells side by side) can be pasted into the first cell. The unit\'s barcode is new, so it is typed or scanned. Clicking a piece cell drops down that component\'s pieces in stock (pieces already entered in another cell are left out): pick one, type to narrow the list (arrow keys and Enter work too), or scan. A code entered twice is marked red. A draft saved with more units than the components in stock now allow can\'t be saved or added until Units to add is lowered.',
+      'Stock entry › Save draft: keep a stock entry part-filled and continue later, on any computer. The Drafts list shows each product\'s draft, how many units are complete and who saved it last; Add stock on a product with a draft continues it. Each product has at most one draft, shared by the team. Saving checks every code: a unit barcode already in use, a piece that is not in stock or is a piece of another item, or a code already in another product\'s draft is refused, and its cell is marked. A draft takes nothing from item stock.',
+      'Stock entry › "Add N units to stock" becomes available once every unit is complete. The stock is added only then, with each unit and its own pieces; if it is refused (e.g. a piece was used meanwhile), the draft stays and the cells are marked. Reduce stock (−) stays a pop-up and only takes units out.',
+    ],
+  },
+  {
     date: '2026-11-04',
     changes: [
+      'Promo Codes: a code for chosen customers is now shown in full only to the Super Admin. Everyone else sees TINQA*************** (with a crossed-out eye), can\'t copy it, and finds it by search only by TINQA. Orders that used it show it the same way. A code for every customer is shown in full to everyone who sees promo codes; the Super Admin can copy any code (the copy button next to it).',
+      'Promo Codes › the code › Customers (Super Admin, Store Manager, Store Sales Agent, Customer Support): "Email code" next to a customer, or "Email all", sends them an email with the code, what it is for (the description), the discount, the products and the dates, after confirming. Each customer shows when they were last emailed it. Only a code that is active or scheduled can be sent, and only to its own customers; send it again whenever needed. A code for every customer is never emailed.',
+      'Promo Codes › the code › "Show on storefront" (the same staff, codes for every customer only): every visitor of the website then sees the code and its offer (e.g. "Diwali offer: 20% off every product with code TINQA… until 3 May 2027") at the top of every page and at checkout, where "Use" applies it in one click. "Remove from storefront" takes it off again. A switched-off, expired or used-up code disappears from the website by itself; a code changed to chosen customers is taken off.',
+      'Promo Codes › New promo code: codes are now at least 20 characters: TINQA followed by 15 to 25 random capital and small letters (no digits), e.g. TINQAhRtKwPzMbQeNcYvD. The suggested code has this shape; a typed one must too. Capital and small letters matter: the customer types the code exactly as it was given (only TINQA may be typed in small letters). Codes made before keep working as they are.',
       'Promo Codes › New promo code and Edit: the discount can now be a percentage or an amount in rupees (above ₹0, at most ₹1,000), never both. Choose "Percentage (%)" or "Amount (₹)" under "Discount as"; the other box is then disabled and cleared. An amount is taken off the list price of each unit the promo works on and, like a percentage, replaces the product\'s own discount (₹1,000 at 5 % off with a ₹200 promo costs ₹800). A unit is never made free. The list shows 20% or ₹200; at checkout the customer sees "20% off" or "₹200 off each".',
       'Promo Codes (Super Admin, Level 2): a code can now be deleted, from the list or the code, after confirming. A deleted code disappears from the list and nobody can use it; orders already placed keep their discount and its use history stays. Choose "Deleted" in the Status filter to find it and press Restore: it comes back as it was (switched on or off) and can be edited again. Its code stays taken, so a new code can\'t reuse it.',
       'Promo Codes › New promo code and Edit: with chosen products, each product now has its own units right after it: "All units" or a number (RudraX on 1: three RudraX in the cart get the promo on one; the other two keep their normal price). With all products, one "Units per product" number still applies to every product. Codes made before keep their units on each chosen product.',
@@ -363,7 +379,8 @@ const ROLE_LIST: RoleGuide[] = [
       'Reopen a completed client demo for correction, with a reason (Level 2): only a Super Admin changes a completed demo, and the correction is approved again',
       'Write off a product unit that did not come back from a client demo, with the reason (Level 2): it leaves stock for good',
       'Post job openings and screen applicants, schedule interviews and record their outcomes (Careers)',
-      'Create promo codes for every customer or chosen ones, on every product or chosen ones (each with its own units: all or a number), with the discount (a percentage, or an amount of at most ₹1,000 off each unit), uses and dates; edit everything but the code, switch them off or back on, delete and restore them (Promo Codes, Level 2)',
+      'Create promo codes for every customer or chosen ones, on every product or chosen ones (each with its own units: all or a number), with the discount (a percentage, or an amount of at most ₹1,000 off each unit), uses and dates; edit everything but the code, switch them off or back on, delete and restore them (Promo Codes, Level 2). You are the only one who sees the codes of chosen customers in full',
+      'Email a code to its chosen customers, or show a code for every customer on the storefront (Promo Codes › the code)',
     ],
     approves: [
       'New employee accounts, employee deletions and profile changes',
@@ -398,7 +415,7 @@ const ROLE_LIST: RoleGuide[] = [
       'Book store sales for walk-in customers, like a Store Sales Agent, and follow every agent\'s sales',
       'Request refunds, reply to support tickets, publish or hide reviews',
       'Look up customers with their orders, carts and tickets, and ask the Super Admin to correct their details',
-      'Look up promo codes to tell a customer which one to use: who and which products each is for, its limits and dates, and the orders that used it (Promo Codes, view only)',
+      'Look up promo codes to tell a customer which one to use: who and which products each is for, its limits and dates, and the orders that used it (Promo Codes). A code for chosen customers shows only as TINQA***: email it to them with "Email code"; show a code for every customer on the storefront with "Show on storefront"',
       'Trace any piece or product unit by its barcode (Barcode Tracking) and ask a Super Admin to correct a barcode',
       'Draft company profile changes, upload documents, raise expenses',
       'Post job openings, screen applicants, schedule interviews and record their outcomes (Careers)',
@@ -424,6 +441,8 @@ const ROLE_LIST: RoleGuide[] = [
       'Review quotations dealers send in and submit them for approval or cancel them, from Approvals Hub › Requests (Level 1 too)',
       'Move orders forward: shipped, delivered, returns and refunds',
       'Add the GST breakup to a quotation (optional): CGST + SGST or IGST, rate, HSN/SAC, cess',
+      'Give every quotation its payment plan: the advance and an optional midterm percentage (30% and 30% to start with; both editable, untick the midterm for advance and final only), the final part worked out as the rest of 100% and paid only after testing, and how the dealer expects to be paid (cash, online, bank transfer or cheque)',
+      'Record what was actually paid to the dealer against each part of the plan (any amount, e.g. 25% or 50% instead of the planned 30%), with the method, date and reference, and the refunds the dealer pays back; correct or withdraw your own entry until it is confirmed, and reverse a confirmed one (Orders Management › the order › Payments to the dealer)',
       "Upload the dealer's invoice PDF when marking an order delivered; it is checked against the quotation",
       'Print the quotation, purchase order and bill of an order',
       'Approve or reject dealers\' changes to their quotations (Level 1 too)',
@@ -436,12 +455,14 @@ const ROLE_LIST: RoleGuide[] = [
       'Return requests',
       'Dealer logins created by someone else',
       'Removing a dealer',
+      'Payments to dealers and refunds from them recorded by someone else (Approvals Hub › Dealer payments), and changing the amount of a refund claim with a reason',
     ],
     tips: [
       'While a dealer\'s change request is open the quotation is frozen for everyone until it is decided. It shows in Approvals Hub › Dealers, and in Requests again once the change is decided.',
       'To adjust a dealer\'s quotation before submitting it, edit it in Orders Management; the Approvals Hub submits it as it is.',
       'Deactivating a dealer also switches off their login.',
       "An invoice that doesn't match is shown figure by figure: ask the dealer for a corrected invoice before accepting one by override.",
+      'A payment counts only once someone else confirms it. Until the delivered units are tested only the advance and midterm parts can be paid; after testing the order is worth only the units that passed, and if more was paid a refund claim against the dealer opens by itself.',
     ],
   },
   {
@@ -544,7 +565,7 @@ const ROLE_LIST: RoleGuide[] = [
       'View, reply to and change the status of support tickets; suggested replies help you answer quickly',
       'Open a customer (Customer Management) to see everything they bought and when, what is still in their cart and their tickets, then email or call them',
       'Ask for a correction to a customer\'s details (Request change); the Super Admin makes it',
-      'Look up promo codes to tell a customer which one to use: who and which products each is for, its limits and dates, and the orders that used it (Promo Codes, view only)',
+      'Look up promo codes to tell a customer which one to use: who and which products each is for, its limits and dates, and the orders that used it (Promo Codes). A code for chosen customers shows only as TINQA***: email it to them with "Email code"; show a code for every customer on the storefront with "Show on storefront"',
       'Look up the customer\'s order, payment and products from the ticket',
       'Request a refund and re-check its status with the payment gateway',
       'Trace a customer\'s device by its barcode: every part inside it, with its batch, purchase order and dealer (Barcode Tracking)',
@@ -589,6 +610,7 @@ const ROLE_LIST: RoleGuide[] = [
       'Each month, record the salaries transferred from the bank (Payments & Chalans): one employee with a bonus or deduction, or everyone unpaid at once; resend a payslip email',
       'Track GST payable each month (Accounts & Finance › GST) and record GST paid to the government as a GST payment voucher',
       'View refunds, customer and procurement orders, documents',
+      'Pay dealers against each order\'s payment plan and collect their refunds: record the payment with its method, date and reference, correct or withdraw it until confirmed, reverse a confirmed one (Orders Management › the order › Payments to the dealer)',
       'See every agent\'s store sales and how they were paid (Store Sales)',
       'See every promo code, the orders that used it and the discount it gave (Promo Codes, view only)',
       'Schedule client demos and meetings step by step: every client visited at its own time, the products to demo (each unit taken by its barcode), the attending staff and a day-by-day quotation (travel, night stay and meals, plus any justified extra); send it for approval, record each day\'s stay, food, travel and other bills with their invoices, and send the visit for completion (Client Demos & Meetings)',
@@ -598,6 +620,7 @@ const ROLE_LIST: RoleGuide[] = [
       'Expenses and vouchers: approve, reject or reverse (approving posts them to the ledger)',
       'Client demo quotations before the visit, and completions after it: approving a completion books its bills as Travel & conveyance (Approvals Hub › Client demos)',
       'Salary transfers recorded by someone else: confirming books them as salaries and emails each payslip',
+      'Payments to dealers and refunds from them recorded by someone else (Approvals Hub › Dealer payments), and the amount of a refund claim, with a reason',
     ],
     tips: [
       'You cannot approve a voucher you raised yourself, confirm a salary you recorded, or confirm your own salary.',
@@ -615,7 +638,7 @@ const ROLE_LIST: RoleGuide[] = [
       'Find a walk-in customer by mobile number or email, or register them with their delivery address',
       'Add products (search by name, or scan a unit\'s barcode into the search box), get the total from the server and book the order: cash you received, or online by the customer',
       'Follow your own sales and whether the customer\'s email went out (Store Sales › My sales)',
-      'Look up promo codes to tell a customer which one to use: who and which products each is for, its limits and dates, and the orders that used it (Promo Codes, view only)',
+      'Look up promo codes to tell a customer which one to use: who and which products each is for, its limits and dates, and the orders that used it (Promo Codes). A code for chosen customers shows only as TINQA***: email it to them with "Email code"; show a code for every customer on the storefront with "Show on storefront"',
       'Go on the client demos you are tagged on: hand the product units out and back, and record your own stay, food and travel bills (My Demos)',
     ],
     approves: [],
@@ -636,7 +659,9 @@ const ROLE_LIST: RoleGuide[] = [
     hasApprovalLevel: false,
     does: [
       'Create quotations for TinQa at the item\'s existing price, or at a new quoted price with the reason for it, optionally with the GST breakup (CGST + SGST or IGST, rate, HSN/SAC, cess)',
-      'Request changes to a quotation while it is still a quotation',
+      'Say how you want to be paid on each quotation: the advance and, if you want one, a midterm percentage (the final part, the rest of 100%, is paid after TinQa tests the delivered units) and the payment method you expect',
+      'Request changes to a quotation while it is still a quotation, including its payment plan',
+      'See what TinQa has paid you for each order, what is still to come, and any refund you owe when units fail testing (My Orders › View)',
       'Follow your orders: open quotations, ongoing orders and past orders',
       'Mark a confirmed order as shipped once the goods have left (My Orders › View)',
       'Print the quotation, purchase order and bill',
@@ -646,6 +671,7 @@ const ROLE_LIST: RoleGuide[] = [
     tips: [
       'You only ever see your own quotations and orders.',
       'Your invoice is checked against the quotation on delivery: bill the same total and GST, and show your GSTIN on it.',
+      'The final payment is made only after the delivered units are tested, and only for the units that pass. Units that fail go back to you; if more was paid than the units that passed are worth, refund the difference.',
       'Your business details are kept by your Dealer Manager; ask them to change anything.',
     ],
   },
@@ -716,16 +742,16 @@ export const GUIDE_FLOWS: GuideFlow[] = [
     title: 'Buying from a dealer',
     summary: 'From quotation to goods at the warehouse. Every step moves forward only.',
     steps: [
-      { who: ['DEALER_MANAGER', 'SUPER_ADMIN', 'DEALER'], label: 'Dealer Manager or Dealer', kind: 'maker', text: 'Records a quotation: items, quantities, prices (before GST), dates and, optionally, the GST breakup.', where: 'Orders Management · My Quotations' },
+      { who: ['DEALER_MANAGER', 'SUPER_ADMIN', 'DEALER'], label: 'Dealer Manager or Dealer', kind: 'maker', text: 'Records a quotation: items, quantities, prices (before GST), dates, optionally the GST breakup, and the payment plan: advance % and midterm % (the final part, the rest, is paid after testing) and the payment method the dealer expects.', where: 'Orders Management · My Quotations' },
       { who: ['DEALER_MANAGER', 'SUPER_ADMIN'], label: 'Dealer Manager', kind: 'maker', text: 'Submits the quotation for approval. It shows as "Under review" to the dealer. Quotations a dealer sent in wait in the Approvals Hub.', where: 'Approvals Hub › Requests · Orders Management', otherwise: 'Cancel → with a reason; the dealer is told' },
-      { who: ['DEALER_MANAGER', 'SUPER_ADMIN'], label: 'Dealer Manager · Level 2', kind: 'checker', text: 'Approves the order, which then waits for the dealer.', where: 'Approvals Hub › Requests', otherwise: 'Reject → the order is cancelled' },
+      { who: ['DEALER_MANAGER', 'SUPER_ADMIN'], label: 'Dealer Manager · Level 2', kind: 'checker', text: 'Approves the order with its payment plan, which then waits for the dealer. From now on the advance can be paid.', where: 'Approvals Hub › Requests', otherwise: 'Reject → the order is cancelled' },
       { who: ['DEALER_MANAGER', 'SUPER_ADMIN'], label: 'Dealer Manager · Level 2', kind: 'checker', text: 'Records that the dealer confirmed the order. The purchase order can now be printed.', where: 'Orders Management' },
       { who: ['DEALER_MANAGER', 'SUPER_ADMIN', 'DEALER'], label: 'Dealer or Dealer Manager', kind: 'maker', text: 'Marks the confirmed order as shipped once the goods have left. The procurement team is notified.', where: 'My Orders · Orders Management', otherwise: 'Cancel is possible only before shipment, with a reason' },
       { who: ['DEALER_MANAGER', 'SUPER_ADMIN'], label: 'Dealer Manager', kind: 'maker', text: "Uploads the dealer's invoice PDF. TinQa reads it and checks the total, the GST and the dealer's GSTIN against the quotation.", where: 'Orders Management › Update status › Mark delivered' },
       { who: ['DEALER_MANAGER', 'SUPER_ADMIN'], label: 'Dealer Manager · Level 2', kind: 'checker', text: "Only when the invoice doesn't match or can't be read: accepts it with a reason, or asks the dealer for a corrected invoice.", where: 'Orders Management › Update status', otherwise: 'No override → upload a correct invoice; the order stays shipped' },
       { who: ['DEALER_MANAGER', 'SUPER_ADMIN'], label: 'Dealer Manager', kind: 'maker', text: 'Marks it delivered with the actual delivery date. The bill can now be printed.', where: 'Orders Management' },
       { who: ['FULFILLMENT_SPECIALIST', 'STORE_MANAGER', 'SUPER_ADMIN'], label: 'Fulfillment', kind: 'maker', text: 'Picks the delivered order, records the units that passed testing and scans one barcode per passed unit. Nothing is booked yet; defected units go back.', where: 'Item Management › Stocks › Add stock' },
-      { who: ['STORE_MANAGER', 'SUPER_ADMIN'], label: 'Store Manager · Level 2', kind: 'checker', text: 'Approves the stock entry, which also locks its barcodes. Only now is the purchase booked to the company account, with its GST as input tax.', where: 'Approvals Hub › Requests', otherwise: 'Reject → stock is not added, nothing is booked and its barcodes are freed' },
+      { who: ['STORE_MANAGER', 'SUPER_ADMIN'], label: 'Store Manager · Level 2', kind: 'checker', text: 'Approves the stock entry, which also locks its barcodes. Only now is the purchase booked to the company account, with its GST as input tax, and testing is done: the order is worth only the units that passed, and the final payment can be made.', where: 'Approvals Hub › Requests', otherwise: 'Reject → stock is not added, nothing is booked and its barcodes are freed' },
       { who: ['SYSTEM'], label: 'Inventory', kind: 'end', text: 'Stock is available to sell.' },
       { who: ['SYSTEM'], label: 'Company ledger & GST register', kind: 'end', text: 'The purchase (approved passed units × unit price + shipment) and its GST are posted. A later change to the entry waits for Level 2 again; only an approved change posts the difference.', where: 'Accounts & Finance' },
     ],
@@ -754,6 +780,23 @@ export const GUIDE_FLOWS: GuideFlow[] = [
     ],
   },
   {
+    id: 'dealer-payment',
+    title: 'Paying a dealer',
+    summary: 'Advance, midterm and final payment against the quotation\'s plan; the final part only after testing, for the units that passed.',
+    steps: [
+      { who: ['DEALER_MANAGER', 'FINANCE_MANAGER', 'SUPER_ADMIN'], label: 'Dealer Manager or Finance Manager', kind: 'maker', text: 'Once the order is approved, records the advance actually paid (any amount up to the advance and midterm parts, e.g. 25% or 50%), with the method, date and reference (UTR, cheque number).', where: 'Orders Management › the order › Payments to the dealer', otherwise: 'A mistake → correct or withdraw it while it waits; reverse it once confirmed' },
+      { who: ['DEALER_MANAGER', 'FINANCE_MANAGER', 'SUPER_ADMIN'], label: 'Dealer Manager or Finance Manager · Level 2', kind: 'checker', text: 'Someone other than the recorder confirms it. Only confirmed payments count as paid.', where: 'Approvals Hub › Dealer payments', otherwise: 'Reject → with a reason; nothing is counted' },
+      { who: ['DEALER_MANAGER', 'FINANCE_MANAGER', 'SUPER_ADMIN'], label: 'Dealer Manager or Finance Manager', kind: 'maker', text: 'Once the dealer has shipped, records the midterm payment the same way. Until testing, at most the advance and midterm parts can be paid in all.' },
+      { who: ['SYSTEM'], label: 'TinQa', kind: 'end', text: 'When the order is marked delivered, the status dialog shows what was paid and what is still to pay.' },
+      { who: ['STORE_MANAGER', 'SUPER_ADMIN'], label: 'Store Manager · Level 2', kind: 'checker', text: 'Approves the stock entry with the units that passed and failed testing. The order is now worth the passed units × unit price + shipment, with its GST.', where: 'Approvals Hub › Requests' },
+      { who: ['DEALER_MANAGER', 'FINANCE_MANAGER', 'SUPER_ADMIN'], label: 'Dealer Manager or Finance Manager', kind: 'maker', text: 'Records the final payment: whatever is still to pay for the units that passed. It is confirmed like the others.' },
+      { who: ['SYSTEM'], label: 'TinQa', kind: 'end', text: 'If more was paid than the order is now worth (units failed, or the order was cancelled or returned after a payment), a refund claim against the dealer opens by itself, naming the failed units; the dealer and the payments team are told.' },
+      { who: ['DEALER_MANAGER', 'FINANCE_MANAGER', 'SUPER_ADMIN'], label: 'Dealer Manager or Finance Manager · Level 2', kind: 'checker', text: 'May change the amount the dealer must refund (at most what was overpaid), with a reason, e.g. after agreeing a deduction.', where: 'Orders Management › the order › Refund due from the dealer' },
+      { who: ['DEALER_MANAGER', 'FINANCE_MANAGER', 'SUPER_ADMIN'], label: 'Dealer Manager or Finance Manager', kind: 'maker', text: 'Records the refund the dealer paid back; once confirmed by someone else the claim is settled.' },
+      { who: ['DEALER'], label: 'Dealer', kind: 'end', text: 'Sees each confirmed payment, what is still to come and any refund owed (My Orders › View).' },
+    ],
+  },
+  {
     id: 'product',
     title: 'A new product on the storefront',
     summary: 'Products go live only after a Level 2 Store Manager approves them.',
@@ -764,6 +807,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
       { who: ['CATALOG_SPECIALIST', 'STORE_MANAGER', 'SUPER_ADMIN'], label: 'Catalog Specialist', kind: 'maker', text: 'Enters what one unit costs: each component\'s unit cost (filled from its purchase price) and extra costs such as manpower or software with their reasons, and checks the profit before and after tax shown in the form.', where: 'Products Management › Costing & profit' },
       { who: ['STORE_MANAGER', 'SUPER_ADMIN'], label: 'Store Manager · Level 2', kind: 'checker', text: 'Reviews the snapshot, including the GST split of the price, one unit\'s cost, margin and profit after tax, and the unit and piece barcodes, and approves, which activates the product and locks its barcodes.', where: 'Approvals Hub › Requests', otherwise: 'Reject → back with a reason; its pieces return to stock. Fix and resubmit; the barcodes entered last time are filled in' },
       { who: ['CATALOG_SPECIALIST', 'STORE_MANAGER', 'SUPER_ADMIN'], label: 'Catalog Specialist', kind: 'maker', text: 'Publishes it to the storefront. Later edits go for approval again; the live product stays unchanged until approved. Turning on a new version turns off the version it was adapted or copied from.', where: 'Products Management' },
+      { who: ['FULFILLMENT_SPECIALIST', 'SUPER_ADMIN'], label: 'Fulfillment', kind: 'maker', text: 'Adds units to stock: one row per unit with its own barcode and the barcode of every piece fitted into it, saved as a draft while scanning and added once every unit is complete.', where: 'Products Management › Stock entry' },
       { who: ['CUSTOMER'], label: 'Customer', kind: 'end', text: 'Can buy it.' },
     ],
   },
@@ -1009,11 +1053,12 @@ export const GUIDE_FLOWS: GuideFlow[] = [
   {
     id: 'promo-codes',
     title: 'Promo codes',
-    summary: 'The Super Admin creates a code; senior staff look it up and tell the customer, who types it at checkout. The website never shows or suggests a code.',
+    summary: 'The Super Admin creates a code. A code for chosen customers is shown in full only to the Super Admin; staff email it to those customers. A code for everyone can be put on the storefront. The customer types or picks the code at checkout.',
     steps: [
-      { who: ['SUPER_ADMIN'], label: 'Super Admin · Level 2', kind: 'maker', text: 'Creates the code: keeps the suggested one (TINQA + 8 characters), presses Suggest another or types their own (TINQA + 3 to 15 capital letters or digits). Sets the discount as a percentage or as an amount off each unit (at most ₹1,000), one of the two (either replaces the product\'s own discount, never adds to it), all or chosen customers, all or chosen products (each chosen product with its units: all units or a number; for all products one units-per-product number, empty = every unit), uses per customer, total uses and the dates (6 months, 1 year, 2 years or custom). The code can\'t be changed afterwards.', where: 'Promo Codes › New promo code' },
-      { who: ['SUPER_ADMIN', 'STORE_MANAGER', 'SALES_AGENT', 'CUSTOMER_SUPPORT', 'FINANCE_MANAGER', 'FINANCIAL_AUDITOR'], label: 'Senior staff', kind: 'maker', text: 'Look the code up (search by its start, filter by status) and open it to check who and which products it is for, its limits and dates, then tell the customer which code to use. Nobody but the Super Admin changes a code.', where: 'Promo Codes › the code' },
-      { who: ['CUSTOMER'], label: 'Customer', kind: 'external', text: 'Sees the promo code box at checkout only while a code is open to them, types the code and sees the discount in the order summary. One code per order.' },
+      { who: ['SUPER_ADMIN'], label: 'Super Admin · Level 2', kind: 'maker', text: 'Creates the code: keeps the suggested one (TINQA + 15 random capital and small letters), presses Suggest another or types their own (TINQA + 15 to 25 letters, at least 20 characters; capital and small letters matter). Sets the discount as a percentage or as an amount off each unit (at most ₹1,000), one of the two (either replaces the product\'s own discount, never adds to it), all or chosen customers, all or chosen products (each chosen product with its units: all units or a number; for all products one units-per-product number, empty = every unit), uses per customer, total uses and the dates (6 months, 1 year, 2 years or custom). The code can\'t be changed afterwards.', where: 'Promo Codes › New promo code' },
+      { who: ['SUPER_ADMIN', 'STORE_MANAGER', 'SALES_AGENT', 'CUSTOMER_SUPPORT', 'FINANCE_MANAGER', 'FINANCIAL_AUDITOR'], label: 'Senior staff', kind: 'maker', text: 'Look the code up (search by its start, filter by status) and open it to check who and which products it is for, its limits and dates. A code for everyone they can tell the customer; a code for chosen customers they see only as TINQA***. Nobody but the Super Admin changes a code.', where: 'Promo Codes › the code' },
+      { who: ['SUPER_ADMIN', 'STORE_MANAGER', 'SALES_AGENT', 'CUSTOMER_SUPPORT'], label: 'Sharers', kind: 'maker', text: 'A code for chosen customers: "Email code" (one customer) or "Email all" sends each an email with the code, its offer and dates. A code for everyone: "Show on storefront" puts it and its offer on every page of the website and at checkout, until removed or no longer usable.', where: 'Promo Codes › the code › Customers · Storefront' },
+      { who: ['CUSTOMER'], label: 'Customer', kind: 'external', text: 'Gets their code by email, or sees a storefront offer on the website. Sees the promo code box at checkout only while a code is open to them, types the code exactly as given (or presses Use on an offer) and sees the discount in the order summary. One code per order.' },
       { who: ['SYSTEM'], label: 'TinQa', kind: 'end', text: 'Keeps each use with its order and the discount it gave (Promo Codes › the code › Use history). A cancelled order gives its use back; a delivered or returned one keeps it.' },
       { who: ['SUPER_ADMIN'], label: 'Super Admin · Level 2', kind: 'maker', text: 'Edits everything but the code itself (customers, products and their units, limits, dates; the new settings apply to later orders), switches it off after confirming and back on, or deletes it: hidden and unusable, kept with its orders, found under the Deleted filter and restored from there.', where: 'Promo Codes › the code › Edit · Switch off · Delete · Restore' },
     ],

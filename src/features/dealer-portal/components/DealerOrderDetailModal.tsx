@@ -6,6 +6,8 @@ import { DealerStatusBadge } from './DealerStatusBadge';
 import { ChangeDiff } from './ChangeDiff';
 import { PrintMenu } from '../../printing/components/PrintMenu';
 import { TaxBreakupSummary } from '../../order-management/components/TaxBreakupSummary';
+import { OrderPaymentsPanel } from '../../order-management/components/OrderPaymentsPanel';
+import { PAYMENT_STAGES, describePlan } from '../../order-management/utils/paymentPlan';
 import { dealerStatusLabel } from '../utils/dealerOrderStage';
 import { formatCurrency, formatDateTime } from '../../order-tracking/utils/orderTracking.utils';
 import { formatDate } from '../../finance/utils/period';
@@ -281,6 +283,10 @@ export const DealerOrderDetailModal: React.FC<DealerOrderDetailModalProps> = ({
                 <Fact label="Expected delivery">{formatDate(order.expectedDelivery)}</Fact>
                 {order.actualDelivery && <Fact label="Delivered on">{formatDate(order.actualDelivery)}</Fact>}
               </dl>
+              <p className="text-sm rounded-xl bg-gray-50 dark:bg-white/5 px-3 py-2" data-testid="dealer-payment-plan">
+                <span className="text-xs text-gray-400 block">Payment plan</span>
+                {describePlan(order) ?? 'None: paid after the delivered units are tested'}
+              </p>
               <div className="rounded-xl bg-gray-50 dark:bg-white/5 px-3 py-2">
                 <TaxBreakupSummary taxBreakup={order.taxBreakup} totalPrice={order.totalPrice} />
                 <p className="text-[10px] text-gray-400 mt-1">Your invoice for this order is checked against these figures when it is delivered.</p>
@@ -291,6 +297,8 @@ export const DealerOrderDetailModal: React.FC<DealerOrderDetailModalProps> = ({
                   {order.note}
                 </p>
               )}
+
+              <OrderPaymentsPanel orderId={order.id} enabled={PAYMENT_STAGES.has(order.orderStatus)} view="dealer" />
 
               {order.awaitingYourResponse && can('DEALER_ORDER_RESPOND') && (
                 <ResponsePanel key={order.id} order={order} isSubmitting={isSubmitting} onRespond={onRespond} />

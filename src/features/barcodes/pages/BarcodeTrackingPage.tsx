@@ -102,7 +102,12 @@ export const BarcodeTrackingPage: React.FC = () => {
           onDone={(appliedCode) => {
             // Corrected at once: the barcode is shown (and linked) under its new code
             void refresh(appliedCode);
-            if (appliedCode) setParams({ code: appliedCode });
+            if (appliedCode) {
+              // The field follows at once, not only when the router renders the new address (it may defer that)
+              setDraft(appliedCode);
+              setAddressCode(appliedCode);
+              setParams({ code: appliedCode });
+            }
           }}
         />
       )}

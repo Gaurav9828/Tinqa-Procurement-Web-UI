@@ -1,10 +1,10 @@
-import type { PromoCodeDetail, PromoCodeRequest, PromoCustomer, PromoDiscountType, PromoScope, PromoStatus } from '../types/promoCode.types';
+import type { PromoCodeDetail, PromoCodeRequest, PromoCustomerRef, PromoDiscountType, PromoScope, PromoStatus } from '../types/promoCode.types';
 
-/** docs/promo-codes.md › Rules › Code: TINQA followed by 3 to 15 capital letters or digits. */
-export const PROMO_CODE_PATTERN = /^TINQA[A-Z0-9]{3,15}$/;
-export const PROMO_CODE_MAX_LENGTH = 20;
+/** docs/promo-codes.md › Rules › Code: TINQA followed by 15 to 25 capital or small letters (20 to 30 characters). */
+export const PROMO_CODE_PATTERN = /^TINQA[A-Za-z]{15,25}$/;
+export const PROMO_CODE_MAX_LENGTH = 30;
 export const PROMO_DESCRIPTION_MAX_LENGTH = 255;
-export const PROMO_SEARCH_MAX_LENGTH = 20;
+export const PROMO_SEARCH_MAX_LENGTH = 30;
 /** At most this many customers and products per code (server rule). */
 export const PROMO_SCOPE_MAX = 500;
 export const PROMO_PAGE_SIZE = 20;
@@ -63,7 +63,7 @@ export interface PromoForm {
   /** Typed only for AMOUNT. */
   amountOff: string;
   customerScope: PromoScope;
-  customers: PromoCustomer[];
+  customers: PromoCustomerRef[];
   productScope: PromoScope;
   products: PromoFormProduct[];
   /** Product scope ALL only. Empty = every unit. */
@@ -106,8 +106,12 @@ export const lastDayOf = (start: string, months: number): string => {
 export const expiryOf = (form: Pick<PromoForm, 'validity' | 'startsOn' | 'expiresOn'>): string =>
   form.validity === 'CUSTOM' || !form.startsOn ? form.expiresOn : lastDayOf(form.startsOn, VALIDITY_MONTHS[form.validity]);
 
-/** Codes are stored and compared in capitals; only letters and digits can be typed. */
-export const normaliseCode = (value: string) => value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, PROMO_CODE_MAX_LENGTH);
+/** Only letters can be typed. The TINQA prefix goes to capitals; the letters after it keep their case (codes are
+ *  compared exactly, docs/promo-codes.md › Rules › Code). */
+export const normaliseCode = (value: string) => {
+  const letters = value.replace(/[^A-Za-z]/g, '').slice(0, PROMO_CODE_MAX_LENGTH);
+  return letters.toUpperCase().startsWith('TINQA') ? `TINQA${letters.slice(5)}` : letters;
+};
 
 export const emptyForm = (today: string): PromoForm => ({
   code: '',
@@ -243,7 +247,7 @@ const dateErrors = (form: PromoForm, creating: boolean, today: string): PromoFor
  */
 export const validateForm = (form: PromoForm, { creating, checkCode, today }: { creating: boolean; checkCode: boolean; today: string }): PromoFormErrors => {
   const all: PromoFormErrors = {
-    code: checkCode && !PROMO_CODE_PATTERN.test(form.code) ? 'Use TINQA followed by 3 to 15 capital letters or digits, e.g. TINQADIWALI26.' : undefined,
+    code: checkCode && !PROMO_CODE_PATTERN.test(form.code) ? 'Use TINQA followed by 15 to 25 capital or small letters, e.g. TINQAhRtKwPzMbQeNcYvD.' : undefined,
     ...discountErrors(form),
     ...productUnitsErrors(form),
     ...scopeErrors(form),
@@ -313,3 +317,6 @@ export const scopeLabel = (scope: PromoScope, count: number, noun: string) => {
   if (scope === 'ALL') return `All ${noun}s`;
   return count === 1 ? `1 ${noun}` : `${count} ${noun}s`;
 };
+
+/** A code can be handed out (emailed, shown on the storefront) only while it can still be used: active or scheduled. */
+export const canBeShared = (code: Pick<PromoCodeDetail, 'status'>) => code.status === 'ACTIVE' || code.status === 'SCHEDULED';

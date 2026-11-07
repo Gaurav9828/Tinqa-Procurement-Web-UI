@@ -1,6 +1,6 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { Plus, Search, X } from 'lucide-react';
-import type { PromoCustomer } from '../types/promoCode.types';
+import type { PromoCustomerRef } from '../types/promoCode.types';
 import { productUnitsError, type PromoFormProduct, type UnitsChoice } from '../utils/promoCodeForm';
 import { RemovableChip } from './PromoUi';
 import { customersApi } from '../../customer-management/api/customersApi';
@@ -20,7 +20,7 @@ const addButton = `inline-flex items-center gap-1 px-2 py-1 rounded-lg border te
  * Chosen customers as removable chips, and a server search to add more: GET /admin/customers?search= (CUSTOMER_VIEW),
  * settled through useSearchTerm and answered from the search cache. Nothing is asked until something is typed.
  */
-export const CustomerPicker: React.FC<{ chosen: PromoCustomer[]; onChange: (customers: PromoCustomer[]) => void; error?: string }> = ({
+export const CustomerPicker: React.FC<{ chosen: PromoCustomerRef[]; onChange: (customers: PromoCustomerRef[]) => void; error?: string }> = ({
   chosen,
   onChange,
   error,

@@ -8,8 +8,9 @@ import type {
   PromoRedemption,
 } from '../types/promoCode.types';
 
-// Promo codes live in the Ecommerce backend (docs/promo-codes.md › Staff). Viewing needs PROMO_CODE_VIEW; the
-// suggestion and every change need PROMO_CODE_MANAGE (Super Admin). See config/endpointAccess.ts.
+// Promo codes live in the Ecommerce backend (docs/promo-codes.md › Staff). Viewing needs PROMO_CODE_VIEW; sharing
+// (email, storefront) PROMO_CODE_SHARE; the suggestion and every change PROMO_CODE_MANAGE (Super Admin). See
+// config/endpointAccess.ts.
 const BASE_URL = '/admin/promo-codes';
 
 export const promoCodesApi = {
@@ -63,6 +64,22 @@ export const promoCodesApi = {
   /** DELETE /api/admin/promo-codes/{id} (PROMO_CODE_MANAGE): soft delete, hidden and unusable until restored. Answers the detail. */
   remove: async (id: number): Promise<ApiResponse<PromoCodeDetail>> => {
     const response = await ecommerceAxiosClient.delete<ApiResponse<PromoCodeDetail>>(`${BASE_URL}/${id}`);
+    return response.data;
+  },
+
+  /**
+   * POST /api/admin/promo-codes/{id}/share { customerIds } (PROMO_CODE_SHARE): emails a chosen customers' code to
+   * these of them (none listed: all). Answers the detail as the caller may see it; 409 PROMO_CODE_NOT_SHAREABLE for an
+   * everyone code or one that can't be used any more.
+   */
+  share: async (id: number, customerIds: number[]): Promise<ApiResponse<PromoCodeDetail>> => {
+    const response = await ecommerceAxiosClient.post<ApiResponse<PromoCodeDetail>>(`${BASE_URL}/${id}/share`, { customerIds });
+    return response.data;
+  },
+
+  /** PATCH /api/admin/promo-codes/{id}/storefront { shown } (PROMO_CODE_SHARE): show an everyone code on the storefront, or stop. */
+  setShownOnStorefront: async (id: number, shown: boolean): Promise<ApiResponse<PromoCodeDetail>> => {
+    const response = await ecommerceAxiosClient.patch<ApiResponse<PromoCodeDetail>>(`${BASE_URL}/${id}/storefront`, { shown });
     return response.data;
   },
 

@@ -57,8 +57,10 @@ export interface ComponentCapacity {
   lines: CapacityLine[];
 }
 
-/** For "Add stock": each added product unit uses `perUnit` of every component item. */
-export const loadComponentCapacity = async (components: ProductComponentResponse[]): Promise<ComponentCapacity> => {
+/** For a stock entry: each added product unit uses `perUnit` of every component item. */
+export const loadComponentCapacity = async (
+  components: Pick<ProductComponentResponse, 'itemId' | 'itemName' | 'quantity'>[]
+): Promise<ComponentCapacity> => {
   if (components.length === 0) return { maxAddable: null, lines: [] };
   const lines = await Promise.all(
     components.map(async (c) => {
