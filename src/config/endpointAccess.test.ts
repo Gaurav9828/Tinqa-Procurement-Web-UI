@@ -19,6 +19,21 @@ describe('endpoint access table', () => {
     expect(ecommerce('get', '/admin/orders/ORD-1/refunds')).toBe('REFUND_VIEW');
     expect(ecommerce('post', '/admin/orders/ORD-1/refunds')).toBe('REFUND_REQUEST');
     expect(ecommerce('patch', '/orders/ORD-1/delivery-status')).toBe('DELIVERY_STATUS_UPDATE');
+    // A new delivery code for the customer: staff and rider routes
+    expect(ecommerce('post', '/orders/ORD-1/tracking/delivery-code')).toBe('CUSTOMER_ORDER_TRACKING_UPDATE');
+    expect(ecommerce('post', '/orders/ORD-1/delivery-status/delivery-code')).toBe('DELIVERY_STATUS_UPDATE');
+    // Returns enabled by staff and hub checkpoints (Ecommerce AdminReturnController)
+    expect(ecommerce('post', '/admin/orders/ORD-1/return/enable')).toBe('REFUND_REQUEST');
+    expect(ecommerce('post', '/admin/orders/ORD-1/return/withdraw')).toBe('REFUND_REQUEST');
+    expect(ecommerce('post', '/admin/orders/ORD-1/return/inspection')).toBe('REFUND_REQUEST');
+    expect(ecommerce('post', '/admin/orders/ORD-1/return/approve')).toBe('RETURN_ENABLE');
+    expect(ecommerce('post', '/admin/orders/ORD-1/return/reject')).toBe('RETURN_ENABLE');
+    expect(ecommerce('put', '/admin/orders/ORD-1/return/charge')).toBe('RETURN_ENABLE');
+    expect(ecommerce('post', '/admin/orders/ORD-1/return/charge')).toBeNull();
+    expect(ecommerce('get', '/admin/returns/requests?page=0&size=20')).toBe('RETURN_ENABLE');
+    expect(ecommerce('post', '/admin/orders/ORD-1/checkpoints')).toBe('CUSTOMER_ORDER_TRACKING_UPDATE');
+    expect(ecommerce('post', '/admin/orders/ORD-1/rider-checkpoints')).toBe('DELIVERY_STATUS_UPDATE');
+    expect(ecommerce('delete', '/admin/orders/ORD-1/checkpoints/4')).toBe('CUSTOMER_ORDER_TRACKING_UPDATE');
   });
 
   it('prefers literal segments over placeholders', () => {

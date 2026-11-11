@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Loader2, Lock, Send } from 'lucide-react';
 import { REPLY_MAX_LENGTH } from '../types/supportTicket.types';
+import { DECENCY_HINT, decencyError } from '../../../utils/decency';
 import type { ActionResult } from '../hooks/useTicketActions';
 
 interface Props {
@@ -14,7 +15,10 @@ interface Props {
   onSend: (message: string) => Promise<ActionResult>;
 }
 
-/** Support reply box. Ctrl/Cmd+Enter sends. The draft is kept if sending fails. */
+/**
+ * Support reply box. Ctrl/Cmd+Enter sends. The draft is kept if sending fails. The courtesy check runs as you type and
+ * blocks sending; the server checks again (400 OFFENSIVE_LANGUAGE, shown under the box).
+ */
 export const ReplyComposer: React.FC<Props> = ({ canReply, isSending, disabled = false, draft, onDraftChange, textareaRef, onSend }) => {
   const [error, setError] = useState<string | null>(null);
 
@@ -26,8 +30,15 @@ export const ReplyComposer: React.FC<Props> = ({ canReply, isSending, disabled =
     );
   }
 
+  const rude = decencyError(draft);
+  const shownError = error ?? (rude || null);
+
   const send = async () => {
     if (isSending || disabled || !draft.trim()) return;
+    if (rude) {
+      setError(rude);
+      return;
+    }
     const result = await onSend(draft);
     setError(result.fieldErrors.message ?? null);
     if (result.ok) onDraftChange('');
@@ -48,8 +59,8 @@ export const ReplyComposer: React.FC<Props> = ({ canReply, isSending, disabled =
       <textarea
         ref={textareaRef}
         aria-label="Reply"
-        aria-invalid={!!error}
-        aria-describedby="reply-help"
+        aria-invalid={!!shownError}
+        aria-describedby="reply-help reply-decency"
         rows={4}
         maxLength={REPLY_MAX_LENGTH}
         value={draft}
@@ -66,21 +77,24 @@ export const ReplyComposer: React.FC<Props> = ({ canReply, isSending, disabled =
           }
         }}
         className={`w-full px-3.5 py-3 text-sm rounded-xl border bg-transparent focus:outline-none focus:ring-2 focus:ring-[#0071e3] resize-y ${
-          error ? 'border-red-500/80' : 'border-black/20 dark:border-white/20'
+          shownError ? 'border-red-500/80' : 'border-black/20 dark:border-white/20'
         }`}
       />
       <div className="flex items-center justify-between gap-3">
-        <p id="reply-help" className={`text-[11px] ${error ? 'text-red-500' : 'text-gray-400'}`}>
-          {error ?? 'Sending a reply sets the ticket to "Awaiting customer". Ctrl/⌘ + Enter to send.'}
+        <p id="reply-help" role={shownError ? 'alert' : undefined} className={`text-[11px] ${shownError ? 'text-red-500' : 'text-gray-400'}`}>
+          {shownError ?? 'Sending a reply sets the ticket to "Awaiting customer". Ctrl/⌘ + Enter to send.'}
         </p>
         <span className="text-[11px] text-gray-400 shrink-0">
           {length}/{REPLY_MAX_LENGTH}
         </span>
       </div>
+      <p id="reply-decency" className="text-[10px] text-gray-400">
+        {DECENCY_HINT}
+      </p>
       <div className="flex justify-end">
         <button
           type="submit"
-          disabled={isSending || disabled || !draft.trim()}
+          disabled={isSending || disabled || !draft.trim() || !!rude}
           className="flex items-center gap-2 px-4 py-2 bg-[#0071e3] hover:bg-[#0077ed] text-white rounded-xl text-xs font-semibold transition-colors disabled:opacity-60 cursor-pointer disabled:cursor-not-allowed"
         >
           {isSending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}

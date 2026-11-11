@@ -122,6 +122,181 @@ export interface AdminOrderDetail extends AdminOrderSummary {
   preOrderReady?: boolean;
   /** Server decision: status is PRE_ORDER_PENDING and stock is ready. Rechecked on approval. */
   canApprovePreOrder?: boolean;
+  /** TinQa's own delivery tracking ID ("TQD-…"), given when the order is shipped; null before. */
+  deliveryTrackingId?: string | null;
+  /** The return staff enabled on this order (orders are not returnable by default); null when none. */
+  returnInfo?: OrderReturnInfo | null;
+  /** Hub checkpoints of the delivery and of the return, oldest first. */
+  checkpoints?: ShipmentCheckpoint[] | null;
+}
+
+/**
+ * REQUESTED: Customer Support asked for a return, waiting for a Store Manager (RETURN_ENABLE) · REJECTED: that request
+ * was turned down · ENABLED: the customer may start it within 7 days · WITHDRAWN · STARTED by the customer.
+ */
+export type ReturnState = 'REQUESTED' | 'REJECTED' | 'ENABLED' | 'WITHDRAWN' | 'STARTED';
+export type ReturnSettlement = 'DEDUCT' | 'PAY';
+export type ReturnChargeStatus = 'NONE' | 'PENDING' | 'PAID';
+export type InspectionOutcome = 'PASS' | 'PARTIAL' | 'FAIL';
+
+/** ReturnDTOs.AdminView — amounts in rupees, times are ISO local datetimes. */
+export interface OrderReturnInfo {
+  id: number;
+  state: ReturnState;
+  /** ENABLED and still inside the customer's 7 days (or the customer is paying the charge). */
+  open: boolean;
+  /**
+   * The customer's own words: the text of the ticket message Customer Support picked when requesting the return
+   * (never typed by staff).
+   */
+  enabledReason: string | null;
+  /** The support ticket the return was requested from; null for returns from before 2026-11-11. */
+  sourceTicketReference?: string | null;
+  /** Customer Support's optional internal note for the Store Manager (never shown to the customer). */
+  staffNote?: string | null;
+  /** Null while REQUESTED or REJECTED. */
+  enabledBy: string | null;
+  enabledAt: string | null;
+  /** Last moment the customer can start the return. Null while REQUESTED or REJECTED. */
+  expiresAt: string | null;
+  withdrawnBy: string | null;
+  withdrawnAt: string | null;
+  chargeAmount: number | null;
+  chargeReason: string | null;
+  /** How the customer settles the charge when starting: taken off the refund, or paid now. */
+  settlement: ReturnSettlement | null;
+  /** The reason the customer gave when starting the return. */
+  customerReason: string | null;
+  requestedAt: string | null;
+  chargeStatus: ReturnChargeStatus;
+  chargePaidAt: string | null;
+  /** Return tracking ID ("TQR-…") once the customer started it. */
+  trackingId: string | null;
+  inspectionOutcome: InspectionOutcome | null;
+  inspectionNote: string | null;
+  refundAmount: number | null;
+  inspectedBy: string | null;
+  inspectedAt: string | null;
+  /** The order's subtotal (items after promo, GST inclusive): what a return can refund. Shipping is never part of it. */
+  orderAmount: number;
+  /** Shipping paid on the order; never refunded by a return. */
+  shippingFee: number;
+  /** The charge is less than the order amount, so the customer may have it deducted from the refund. */
+  deductAllowed: boolean;
+  /** Staff member (no RETURN_ENABLE) who requested the return, and when. */
+  staffRequestedBy: string | null;
+  staffRequestedAt: string | null;
+  /** The charge the requester proposed. */
+  requestedChargeAmount: number | null;
+  rejectedBy: string | null;
+  rejectedAt: string | null;
+  /** Shown to the customer. */
+  rejectionReason: string | null;
+  /** Last change of the charge of an enabled return (it clears the customer's consent). */
+  chargeChangedBy: string | null;
+  chargeChangedAt: string | null;
+  /** When the customer ticked "I agree to the return charge"; null until then (or after the charge changed). */
+  chargeConsentedAt: string | null;
+}
+
+/** POST /admin/orders/{n}/return/approve and PUT /admin/orders/{n}/return/charge (RETURN_ENABLE). */
+export interface ReturnChargeRequest {
+  /** Rupees, ≥ 0, at most 2 decimals and 9 integer digits; no upper limit against the order. */
+  chargeAmount: number;
+  /** Required when chargeAmount > 0. */
+  chargeReason: string | null;
+}
+
+/** POST /admin/orders/{n}/return/reject (RETURN_ENABLE). The reason is shown to the customer. */
+export interface RejectReturnRequest {
+  reason: string;
+}
+
+/** ReturnRequestRow — one row of GET /admin/returns/requests (oldest first). */
+export interface ReturnRequestRow {
+  orderNumber: string;
+  customerName: string | null;
+  customerEmail: string | null;
+  orderAmount: number;
+  shippingFee: number;
+  totalAmount: number;
+  /** The proposed charge and what it is for. */
+  chargeAmount: number;
+  chargeReason: string | null;
+  /** The customer's own words (the ticket message Customer Support picked). */
+  reason: string | null;
+  /** The support ticket the request was raised from. */
+  ticketReference?: string | null;
+  /** Customer Support's optional internal note. */
+  staffNote?: string | null;
+  requestedBy: string | null;
+  requestedAt: string | null;
+}
+
+export type CheckpointLeg = 'DELIVERY' | 'RETURN';
+export type CheckpointEvent = 'ARRIVED' | 'DEPARTED';
+
+/** CheckpointService.View — one "Reached / Left <place>" entry. */
+export interface ShipmentCheckpoint {
+  id: number;
+  leg: CheckpointLeg;
+  event: CheckpointEvent;
+  place: string;
+  city: string | null;
+  pincode: string | null;
+  occurredAt: string;
+  recordedBy: string | null;
+}
+
+/**
+ * POST /admin/orders/{n}/return/enable (REFUND_REQUEST) — always a request for a Store Manager. Raised from the
+ * customer's support ticket about the order: the customer's reason is the text of one of their own messages in it.
+ */
+export interface EnableReturnRequest {
+  ticketReference: string;
+  /** The ticket message (by the customer) whose text is sent to the Store Manager as written. */
+  customerMessageId: number;
+  /** Rupees, ≥ 0; no upper limit (≥ the order amount means the customer must pay it). */
+  chargeAmount: number;
+  /** Required when chargeAmount > 0. */
+  chargeReason?: string | null;
+  /** Optional internal note for the Store Manager, at most 500 characters. */
+  staffNote?: string | null;
+}
+
+/** A message in the support ticket a return is requested from (only CUSTOMER messages can be picked). */
+export interface ReturnTicketMessage {
+  id: number;
+  authorType: string;
+  message: string;
+  createdAt: string;
+}
+
+/** The support ticket the return panel is shown in: returns are requested only from there. */
+export interface ReturnTicketContext {
+  referenceNumber: string;
+  messages: ReturnTicketMessage[] | null | undefined;
+  /** A closed ticket can't take a return request (409 RETURN_TICKET_CLOSED). */
+  closed: boolean;
+}
+
+/** POST /admin/orders/{n}/return/inspection */
+export interface ReturnInspectionRequest {
+  outcome: InspectionOutcome;
+  /** Rupees; PARTIAL only. */
+  refundAmount?: number | null;
+  /** Required for PARTIAL and FAIL. */
+  note?: string | null;
+}
+
+/** POST /admin/orders/{n}/checkpoints (and /rider-checkpoints) */
+export interface AddCheckpointRequest {
+  event: CheckpointEvent;
+  place: string;
+  city?: string | null;
+  pincode?: string | null;
+  /** ISO local datetime ("2026-11-09T14:30:00"); omitted = now. */
+  occurredAt?: string | null;
 }
 
 /** TrackingStatusOptionDTO */
@@ -158,4 +333,15 @@ export interface UpdateTrackingRequest {
   /** Rupees this leg costs the company (courier); raised as an expense voucher for approval. */
   shippingCost?: number | null;
   shippingPartner?: string | null;
+  /**
+   * DELIVERED only: the 7-character, case-sensitive code from the customer's "out for delivery" email. The customer
+   * gives it once the device is unpacked, set up and working; it is their consent that the device is OK.
+   */
+  deliveryCode?: string | null;
+}
+
+/** POST …/delivery-code: a new delivery code was emailed to the customer (address masked). */
+export interface DeliveryCodeSent {
+  sentTo: string;
+  resendAfterSeconds: number;
 }

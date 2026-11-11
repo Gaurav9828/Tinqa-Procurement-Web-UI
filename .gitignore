@@ -26,3 +26,7 @@ dist-ssr
 # Test coverage and quality-gate reports
 coverage
 reports
+
+# macOS Finder copies ("name 2", "name 2.ext") of files and folders
+* 2
+* 2.*

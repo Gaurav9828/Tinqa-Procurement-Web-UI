@@ -47,3 +47,19 @@ const toTime = (iso: string) => {
 /** Oldest first (the API already orders them; this guards against any reordering). */
 export const sortMessages = (messages: TicketMessage[] | null | undefined): TicketMessage[] =>
   [...(messages ?? [])].sort((a, b) => toTime(a.createdAt) - toTime(b.createdAt) || a.id - b.id);
+
+const closableTime = (iso: string) => {
+  const ms = new Date(iso).getTime();
+  return Number.isNaN(ms) ? Number.POSITIVE_INFINITY : ms;
+};
+
+/** Why Close is not available yet, or null when it is. */
+export const closeBlockedReason = (closableAt: string | null | undefined, now: number = Date.now()): string | null => {
+  if (!closableAt) {
+    return "The customer is waiting for our reply. Reply first; you can close the ticket 24 hours after it if they don't respond.";
+  }
+  if (now < closableTime(closableAt)) {
+    return `You can close this ticket from ${formatDateTime(closableAt)} if the customer still hasn't replied (24 hours after our last reply).`;
+  }
+  return null;
+};

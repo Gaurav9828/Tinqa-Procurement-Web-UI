@@ -11,16 +11,18 @@ import { detectIntents, hasIntent, type CustomerIntent, type DetectedIntent } fr
 
 export interface ReplySuggestion {
   id: string;
-  /** Short button label, e.g. "Thank & close". */
+  /** Short button label, e.g. "Thank & wrap up". */
   label: string;
   /** Plain-text reply, ready to send. */
   text: string;
-  /** Sending this suggestion should also close the ticket (after confirmation). */
-  closesTicket?: boolean;
 }
 
+/**
+ * Never CLOSED: staff close a ticket only with a reason, 24 hours after a reply the customer hasn't answered, so the
+ * assistant can't suggest closing it right after the customer wrote.
+ */
 export interface StatusSuggestion {
-  status: AdminSettableStatus;
+  status: Exclude<AdminSettableStatus, 'CLOSED'>;
   label: string;
   reason: string;
 }
@@ -53,11 +55,10 @@ const firstName = (authorName: string | null | undefined) => {
 
 const productPhrase = (productName: string | null | undefined) => (productName ? `your ${productName}` : 'your device');
 
-const reply = (id: string, label: string, text: string, closesTicket = false): ReplySuggestion => ({
+const reply = (id: string, label: string, text: string): ReplySuggestion => ({
   id,
   label,
   text: text.slice(0, REPLY_MAX_LENGTH),
-  closesTicket,
 });
 
 // ---------- templates ----------
@@ -65,9 +66,8 @@ const reply = (id: string, label: string, text: string, closesTicket = false): R
 const closingReplies = (c: Context): ReplySuggestion[] => [
   reply(
     'thank-and-close',
-    'Thank & close',
-    `You're welcome, ${c.name}! Glad everything is sorted. I'll close this ticket now — just reply here if anything comes up again.`,
-    true
+    'Thank & wrap up',
+    `You're welcome, ${c.name}! Glad everything is sorted. If there's nothing else, we'll close this ticket in a day — just reply here if anything comes up again.`
   ),
   reply(
     'confirm-before-close',
@@ -155,12 +155,16 @@ const followUpReplies = (c: Context): ReplySuggestion[] => [
 
 const statusFor = (intents: DetectedIntent[], current: string): StatusSuggestion | null => {
   const wantsClose = !hasIntent(intents, 'STILL_BROKEN') && (hasIntent(intents, 'CLOSE_REQUEST') || hasIntent(intents, 'RESOLVED') || hasIntent(intents, 'GRATITUDE'));
-  const pick = (status: AdminSettableStatus, label: string, reason: string): StatusSuggestion | null =>
+  const pick = (status: StatusSuggestion['status'], label: string, reason: string): StatusSuggestion | null =>
     status === current ? null : { status, label, reason };
 
   if (wantsClose) {
     return hasIntent(intents, 'CLOSE_REQUEST') || hasIntent(intents, 'RESOLVED')
-      ? pick('CLOSED', 'Close the ticket?', 'The customer says the issue is resolved.')
+      ? pick(
+          'RESOLVED',
+          'Mark as resolved?',
+          "The customer says the issue is resolved. Reply first; you can close the ticket 24 hours later if they don't write back."
+        )
       : pick('RESOLVED', 'Mark as resolved?', 'The customer thanked support.');
   }
   if (['STILL_BROKEN', 'STATUS_REQUEST', 'REFUND_RETURN', 'SHARED_INFO', 'FRUSTRATION'].some((i) => hasIntent(intents, i as CustomerIntent))) {

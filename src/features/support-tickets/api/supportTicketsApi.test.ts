@@ -41,4 +41,9 @@ describe('supportTicketsApi request shapes', () => {
     await supportTicketsApi.updateStatus('TQ-Q-000007', 'RESOLVED');
     expect(client.patch).toHaveBeenCalledWith('/admin/support/queries/TQ-Q-000007/status', { status: 'RESOLVED' });
   });
+
+  it('closes with { status: CLOSED, reason }', async () => {
+    await supportTicketsApi.updateStatus('TQ-Q-000007', 'CLOSED', 'Customer confirmed the fix');
+    expect(client.patch).toHaveBeenCalledWith('/admin/support/queries/TQ-Q-000007/status', { status: 'CLOSED', reason: 'Customer confirmed the fix' });
+  });
 });

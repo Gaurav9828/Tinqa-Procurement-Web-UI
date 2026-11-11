@@ -1,3 +1,5 @@
+import type { OrderReturnInfo } from '../../order-tracking/types/orderTracking.types';
+
 // Mirrors the Ecommerce BE support DTOs (com.tinqa.ecommerce.dto.support.*).
 // LocalDateTime fields arrive as ISO strings without a zone. The detail DTO omits null
 // fields entirely (@JsonInclude NON_NULL), so optional fields may be missing, not just null.
@@ -35,7 +37,15 @@ export interface TicketSummary {
   createdAt: string;
   updatedAt?: string | null;
   closedAt?: string | null;
+  /** TinQa Support's latest reply the customer hasn't answered yet; null when the customer wrote last. */
+  awaitingCustomerSince?: string | null;
+  /** Why the ticket was closed (staff give a reason; automatic closes say why). */
+  closeReason?: string | null;
+  /** Who closed it: the customer, a staff member, or TinQa itself (e.g. when the return it was raised for completed). */
+  closedByType?: TicketClosedByType | null;
 }
+
+export type TicketClosedByType = 'CUSTOMER' | 'SUPPORT' | 'SYSTEM';
 
 /** SupportTicketMessageDTO — no author ids, IPs or user agents are exposed. */
 export interface TicketMessage {
@@ -60,9 +70,15 @@ export interface TicketOrderItem {
  */
 export interface TicketOrderContext {
   status: string;
+  /** What the customer paid in all: the order amount plus shipping. */
   total: number;
+  /** The items' total; shipping is never part of the order amount. Absent from older responses. */
+  orderAmount?: number | null;
+  shippingFee?: number | null;
   paymentStatus: string;
   items: TicketOrderItem[];
+  /** The order's return (request, enabled option or started return), so support can act on it from the chat. */
+  returnInfo?: OrderReturnInfo | null;
 }
 
 /** SupportTicketDetailDTO */
@@ -74,7 +90,18 @@ export interface TicketDetail extends TicketSummary {
   messages?: TicketMessage[] | null;
   canReply: boolean;
   canClose: boolean;
+  /**
+   * When staff may close the ticket: 24 hours after our latest reply if the customer hasn't answered it. Null while
+   * the customer is waiting for our reply, or once the ticket is closed.
+   */
+  closableAt?: string | null;
+  /** Staff email of whoever closed it (closedByType SUPPORT). */
+  closedBy?: string | null;
 }
+
+/** Staff close a ticket only with a reason (Ecommerce limits). */
+export const CLOSE_REASON_MIN_LENGTH = 5;
+export const CLOSE_REASON_MAX_LENGTH = 500;
 
 /** Backend limit for a reply (trimmed). */
 export const REPLY_MAX_LENGTH = 2000;

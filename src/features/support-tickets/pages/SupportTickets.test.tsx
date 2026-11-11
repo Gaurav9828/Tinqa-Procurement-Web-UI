@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Provider } from 'react-redux';
@@ -13,10 +13,12 @@ import { SupportTicketDetailPage } from './SupportTicketDetailPage';
 import { supportTicketsApi } from '../api/supportTicketsApi';
 import { OrderTrackingDetailPage } from '../../order-tracking/pages/OrderTrackingDetailPage';
 import { orderTrackingApi } from '../../order-tracking/api/orderTrackingApi';
-import type { AdminOrderDetail } from '../../order-tracking/types/orderTracking.types';
+import type { AdminOrderDetail, OrderReturnInfo } from '../../order-tracking/types/orderTracking.types';
+import type { Permission } from '../../../config/access';
 import type { ApiResponse, PageResponse } from '../../../types/common.types';
 import type { TicketDetail, TicketMessage, TicketSummary } from '../types/supportTicket.types';
 import { superAdminPermissions } from '../../../test/access';
+import { DECENCY_ERROR, DECENCY_HINT } from '../../../utils/decency';
 
 // Only the network layer is mocked.
 vi.mock('../api/supportTicketsApi', () => ({
@@ -25,7 +27,18 @@ vi.mock('../api/supportTicketsApi', () => ({
 const api = vi.mocked(supportTicketsApi);
 // The real admin order page is mounted for the navigation test; only its API is mocked.
 vi.mock('../../order-tracking/api/orderTrackingApi', () => ({
-  orderTrackingApi: { getOrder: vi.fn(), getTrackingStatuses: vi.fn(), listOrders: vi.fn(), updateTracking: vi.fn() },
+  orderTrackingApi: {
+    getOrder: vi.fn(),
+    getTrackingStatuses: vi.fn(),
+    listOrders: vi.fn(),
+    updateTracking: vi.fn(),
+    enableReturn: vi.fn(),
+    approveReturn: vi.fn(),
+    rejectReturn: vi.fn(),
+    changeReturnCharge: vi.fn(),
+    withdrawReturn: vi.fn(),
+    recordInspection: vi.fn(),
+  },
 }));
 const orderApi = vi.mocked(orderTrackingApi);
 // Its refund and profit panels are not part of these tests: they stay loading, without a network call
@@ -90,6 +103,12 @@ const DETAIL: TicketDetail = {
   messages: MESSAGES,
   canReply: true,
   canClose: true,
+  // Our reply at 10:00 is unanswered: staff may close it 24 hours later
+  awaitingCustomerSince: '2026-10-05T10:00:00',
+  closableAt: '2026-10-06T10:00:00',
+  closeReason: null,
+  closedByType: null,
+  closedBy: null,
 };
 
 const CLOSED: TicketDetail = {
@@ -98,6 +117,10 @@ const CLOSED: TicketDetail = {
   closedAt: '2026-10-06T08:00:00',
   canReply: false,
   canClose: false,
+  closableAt: null,
+  closeReason: 'Customer confirmed the LEDs work now',
+  closedByType: 'SUPPORT',
+  closedBy: 'ravi@tinqa.com',
   messages: [...MESSAGES, msg(4, 'SYSTEM', 'Ticket closed by support', '2026-10-06T08:00:00')],
 };
 
@@ -363,6 +386,27 @@ describe('Support ticket actions', () => {
     expect(screen.getByLabelText('Reply')).toHaveValue('');
   });
 
+  it('checks a reply for courtesy as it is typed and never sends an offensive one', async () => {
+    const { user } = await openDetail();
+    expect(screen.getByText(DECENCY_HINT)).toBeInTheDocument();
+    await user.type(screen.getByLabelText('Reply'), 'Stop being a chutiya');
+    expect(screen.getByText(DECENCY_ERROR)).toBeInTheDocument();
+    expect(screen.getByLabelText('Reply')).toHaveAttribute('aria-invalid', 'true');
+    expect(screen.getByRole('button', { name: 'Send reply' })).toBeDisabled();
+    await user.keyboard('{Control>}{Enter}{/Control}');
+    expect(api.reply).not.toHaveBeenCalled();
+  });
+
+  it("shows the server's OFFENSIVE_LANGUAGE answer under the reply box and keeps the draft", async () => {
+    api.reply.mockRejectedValue(axiosError(400, { message: 'Please keep your message polite.', errorCode: 'OFFENSIVE_LANGUAGE' }));
+    const { user } = await openDetail();
+    await user.type(screen.getByLabelText('Reply'), 'A reply the server refuses');
+    await user.click(screen.getByRole('button', { name: 'Send reply' }));
+    // No field named in errors[]: the courtesy message goes under the reply box
+    expect(await screen.findByText(DECENCY_ERROR)).toBeInTheDocument();
+    expect(screen.getByLabelText('Reply')).toHaveValue('A reply the server refuses');
+  });
+
   it('shows field errors for VALIDATION_FAILED and keeps the draft', async () => {
     api.reply.mockRejectedValue(
       axiosError(400, {
@@ -431,22 +475,99 @@ describe('Support ticket actions', () => {
     expect(within(group).getByRole('button', { name: /Mark in progress/ })).toBeInTheDocument();
   });
 
-  it('asks for confirmation before closing; dismissing sends nothing; confirming makes the ticket read-only', async () => {
-    api.updateStatus.mockResolvedValue(ok(CLOSED, 'Support ticket status updated.'));
-    const { user } = await openDetail();
-
-    await user.click(screen.getByRole('button', { name: /Close ticket/ }));
-    expect(screen.getByText('Close this ticket?')).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+  // Closing changed on 2026-11-11: it needs a reason and is possible only 24 h after our unanswered reply (closableAt).
+  // The old "confirm, then close" flow is replaced by the reason dialog below.
+  it('keeps Close disabled until 24 hours after our last reply, and says from when it can be closed', async () => {
+    await openDetail(); // now 2026-10-05 12:00, closable from 2026-10-06 10:00
+    const close = screen.getByRole('button', { name: /Close ticket/ });
+    expect(close).toBeDisabled();
+    expect(screen.getByTestId('close-blocked')).toHaveTextContent(/You can close this ticket from .+ if the customer still hasn't replied \(24 hours after our last reply\)\./);
     expect(api.updateStatus).not.toHaveBeenCalled();
+  });
 
-    await user.click(screen.getByRole('button', { name: /Close ticket/ }));
-    await user.click(screen.getByRole('button', { name: 'Confirm' }));
-    expect(api.updateStatus).toHaveBeenCalledWith('TQ-Q-000007', 'CLOSED');
+  it('keeps Close disabled while the customer is waiting for our reply', async () => {
+    await openDetail({
+      ...DETAIL,
+      messages: [...MESSAGES, msg(5, 'CUSTOMER', 'Any news?', '2026-10-05T11:00:00', 'Asha Rao')],
+      awaitingCustomerSince: null,
+      closableAt: null,
+    });
+    expect(screen.getByRole('button', { name: /Close ticket/ })).toBeDisabled();
+    expect(screen.getByTestId('close-blocked')).toHaveTextContent(
+      "The customer is waiting for our reply. Reply first; you can close the ticket 24 hours after it if they don't respond."
+    );
+  });
 
-    expect(await screen.findByRole('status', { name: 'Replies disabled' })).toBeInTheDocument();
-    expect(screen.getByRole('status', { name: 'Status locked' })).toBeInTheDocument();
-    expect(screen.queryByRole('group', { name: 'Change ticket status' })).not.toBeInTheDocument();
+  it('a CLOSED ticket shows who closed it and why', async () => {
+    await openDetail(CLOSED);
+    const note = screen.getByRole('note', { name: 'Ticket closed' });
+    expect(note).toHaveTextContent('by ravi@tinqa.com');
+    expect(within(note).getByTestId('ticket-close-reason')).toHaveTextContent('Customer confirmed the LEDs work now');
+  });
+
+  it('shows a ticket closed automatically when its return completed', async () => {
+    await openDetail({ ...CLOSED, closedByType: 'SYSTEM', closedBy: null, closeReason: 'The return for order ORD-1001 was completed.' });
+    const note = screen.getByRole('note', { name: 'Ticket closed' });
+    expect(note).toHaveTextContent('by TinQa automatically');
+    expect(note).toHaveTextContent('The return for order ORD-1001 was completed.');
+  });
+
+  describe('once 24 hours have passed without a customer reply', () => {
+    beforeEach(() => {
+      vi.useFakeTimers({ toFake: ['Date'] });
+      vi.setSystemTime(new Date('2026-10-06T10:30:00'));
+    });
+    afterEach(() => vi.useRealTimers());
+
+    it('closes only with a polite reason, sending CLOSED with the reason, and the ticket becomes read-only', async () => {
+      api.updateStatus.mockResolvedValue(ok(CLOSED, 'Ticket closed.'));
+      const { user } = await openDetail();
+      expect(screen.queryByTestId('close-blocked')).not.toBeInTheDocument();
+      await user.click(screen.getByRole('button', { name: /Close ticket/ }));
+      const dialog = screen.getByRole('dialog', { name: 'Close ticket' });
+      expect(dialog).toHaveTextContent(DECENCY_HINT);
+
+      await user.click(within(dialog).getByRole('button', { name: 'Close ticket' }));
+      expect(within(dialog).getByText('Say why you are closing the ticket (at least 5 characters).')).toBeInTheDocument();
+
+      const reason = within(dialog).getByLabelText('Reason for closing');
+      await user.type(reason, 'Customer is a bastard');
+      expect(within(dialog).getByText(DECENCY_ERROR)).toBeInTheDocument();
+      await user.click(within(dialog).getByRole('button', { name: 'Close ticket' }));
+      expect(api.updateStatus).not.toHaveBeenCalled();
+
+      await user.clear(reason);
+      await user.type(reason, '  Customer confirmed the LEDs work now ');
+      await user.click(within(dialog).getByRole('button', { name: 'Close ticket' }));
+      await waitFor(() => expect(api.updateStatus).toHaveBeenCalledWith('TQ-Q-000007', 'CLOSED', 'Customer confirmed the LEDs work now'));
+      expect(await screen.findByRole('status', { name: 'Replies disabled' })).toBeInTheDocument();
+      expect(screen.getByRole('status', { name: 'Status locked' })).toBeInTheDocument();
+      expect(screen.queryByRole('dialog', { name: 'Close ticket' })).not.toBeInTheDocument();
+      expect(screen.getByRole('note', { name: 'Ticket closed' })).toHaveTextContent('Customer confirmed the LEDs work now');
+    });
+
+    it("shows the server's OFFENSIVE_LANGUAGE error on the reason", async () => {
+      api.updateStatus.mockRejectedValue(
+        axiosError(400, { message: 'Offensive language', errorCode: 'OFFENSIVE_LANGUAGE', errors: [{ field: 'reason', message: 'Please keep the reason polite.' }] })
+      );
+      const { user } = await openDetail();
+      await user.click(screen.getByRole('button', { name: /Close ticket/ }));
+      const dialog = screen.getByRole('dialog', { name: 'Close ticket' });
+      await user.type(within(dialog).getByLabelText('Reason for closing'), 'Customer stopped answering');
+      await user.click(within(dialog).getByRole('button', { name: 'Close ticket' }));
+      expect(await within(dialog).findByText('Please keep the reason polite.')).toBeInTheDocument();
+    });
+
+    it('on TICKET_CLOSE_TOO_EARLY explains it and reloads the ticket', async () => {
+      api.updateStatus.mockRejectedValue(axiosError(409, { message: 'The customer replied; reply first.', errorCode: 'TICKET_CLOSE_TOO_EARLY' }));
+      const { user } = await openDetail();
+      await user.click(screen.getByRole('button', { name: /Close ticket/ }));
+      const dialog = screen.getByRole('dialog', { name: 'Close ticket' });
+      await user.type(within(dialog).getByLabelText('Reason for closing'), 'Customer stopped answering');
+      await user.click(within(dialog).getByRole('button', { name: 'Close ticket' }));
+      expect(await screen.findByText('The customer replied; reply first.')).toBeInTheDocument();
+      await waitFor(() => expect(api.getTicket).toHaveBeenCalledTimes(2));
+    });
   });
 
   it('a CLOSED ticket is read-only: no composer and no status actions', async () => {
@@ -495,32 +616,24 @@ describe('Reply suggestions (local assistant)', () => {
   });
   const suggestions = () => screen.getByRole('region', { name: 'Reply suggestions' });
 
-  it('after the customer says thanks, offers "Thank & close" which sends the reply and then closes, after confirmation', async () => {
+  // Since 2026-11-11 the assistant never closes a ticket (closing needs a reason and 24 h without a customer reply):
+  // "Thank & close" became "Thank & wrap up", which only sends the reply.
+  it('after the customer says thanks, "Thank & wrap up" only sends the reply; nothing closes the ticket', async () => {
     api.reply.mockResolvedValue(ok(customerSays('Thanks, it works now!'), 'Support reply was added.'));
-    api.updateStatus.mockResolvedValue(ok(CLOSED, 'Support ticket status updated.'));
     const { user } = await openDetail(customerSays('Thanks a lot, it works now!'));
 
     expect(within(suggestions()).getByTestId('assistant-summary')).toHaveTextContent('The customer says the issue is resolved.');
-    await user.click(within(suggestions()).getByRole('button', { name: 'Send & close: Thank & close' }));
+    expect(within(suggestions()).queryByRole('button', { name: /Send & close/ })).not.toBeInTheDocument();
+    await user.click(within(suggestions()).getByRole('button', { name: 'Send: Thank & wrap up' }));
 
-    expect(screen.getByText('Send this reply and close the ticket?')).toBeInTheDocument();
-    expect(api.reply).not.toHaveBeenCalled();
-    await user.click(screen.getByRole('button', { name: 'Confirm' }));
-
-    await waitFor(() => expect(api.updateStatus).toHaveBeenCalledWith('TQ-Q-000007', 'CLOSED'));
-    expect(api.reply).toHaveBeenCalledWith('TQ-Q-000007', expect.stringContaining("You're welcome, Asha!"));
-    expect(api.reply.mock.invocationCallOrder[0]).toBeLessThan(api.updateStatus.mock.invocationCallOrder[0]);
-    expect(await screen.findByRole('status', { name: 'Replies disabled' })).toBeInTheDocument();
-    expect(screen.queryByRole('region', { name: 'Reply suggestions' })).not.toBeInTheDocument();
+    await waitFor(() => expect(api.reply).toHaveBeenCalledWith('TQ-Q-000007', expect.stringContaining("You're welcome, Asha!")));
+    expect(api.updateStatus).not.toHaveBeenCalled();
   });
 
-  it('does not close the ticket if the reply fails', async () => {
-    api.reply.mockRejectedValue(axiosError(500));
-    const { user } = await openDetail(customerSays('Thank you, all good now'));
-    await user.click(within(suggestions()).getByRole('button', { name: 'Send & close: Thank & close' }));
-    await user.click(screen.getByRole('button', { name: 'Confirm' }));
-    await waitFor(() => expect(api.reply).toHaveBeenCalled());
-    expect(api.updateStatus).not.toHaveBeenCalled();
+  it('never offers to close from the suggestions, even when the customer asks for it', async () => {
+    await openDetail(customerSays('Problem solved, you can close the ticket'));
+    expect(within(suggestions()).queryByRole('button', { name: /Send & close|Close ticket/ })).not.toBeInTheDocument();
+    expect(within(suggestions()).getByRole('group', { name: 'Suggested next step' })).toHaveTextContent('24 hours');
   });
 
   it('"Send" on a non-closing suggestion sends it immediately, without changing status', async () => {
@@ -551,14 +664,12 @@ describe('Reply suggestions (local assistant)', () => {
     expect(api.updateStatus).toHaveBeenCalledWith('TQ-Q-000007', 'IN_PROGRESS');
   });
 
-  it('the suggested "Close ticket" step asks for confirmation and only changes status', async () => {
-    api.updateStatus.mockResolvedValue(ok(CLOSED, 'Support ticket status updated.'));
+  it('a close request suggests "Mark resolved", which only changes the status', async () => {
+    api.updateStatus.mockResolvedValue(ok({ ...DETAIL, status: 'RESOLVED' }, 'Support ticket status updated.'));
     const { user } = await openDetail(customerSays('Problem solved, you can close the ticket'));
     const next = within(suggestions()).getByRole('group', { name: 'Suggested next step' });
-    await user.click(within(next).getByRole('button', { name: 'Close ticket' }));
-    expect(screen.getAllByText('Close this ticket?').length).toBeGreaterThan(0);
-    await user.click(screen.getByRole('button', { name: 'Confirm' }));
-    await waitFor(() => expect(api.updateStatus).toHaveBeenCalledWith('TQ-Q-000007', 'CLOSED'));
+    await user.click(within(next).getByRole('button', { name: 'Mark resolved' }));
+    await waitFor(() => expect(api.updateStatus).toHaveBeenCalledWith('TQ-Q-000007', 'RESOLVED'));
     expect(api.reply).not.toHaveBeenCalled();
   });
 
@@ -685,5 +796,197 @@ describe('Order-linked tickets', () => {
     expect(within(card).queryByRole('link')).not.toBeInTheDocument();
     expect(within(card).getByTestId('order-number-text')).toHaveTextContent('Order #ORD-1001');
     expect(card).toHaveTextContent('₹2,297.00'); // summary still shown
+  });
+});
+
+describe('Returns from the support chat', () => {
+  const DELIVERED_ORDER = {
+    status: 'DELIVERED',
+    total: 1000,
+    orderAmount: 500,
+    shippingFee: 500,
+    paymentStatus: 'PAID',
+    items: [{ productId: 11, title: 'Smart Plug', quantity: 1 }],
+    returnInfo: null,
+  };
+  const REQUESTED: OrderReturnInfo = {
+    id: 3,
+    state: 'REQUESTED',
+    open: false,
+    enabledReason: 'Rattles when shaken, please take it back',
+    sourceTicketReference: 'TQ-Q-000007',
+    staffNote: 'Box unopened',
+    enabledBy: null,
+    enabledAt: null,
+    expiresAt: null,
+    withdrawnBy: null,
+    withdrawnAt: null,
+    chargeAmount: 100,
+    chargeReason: 'Pickup',
+    settlement: null,
+    customerReason: null,
+    requestedAt: null,
+    chargeStatus: 'NONE',
+    chargePaidAt: null,
+    trackingId: null,
+    inspectionOutcome: null,
+    inspectionNote: null,
+    refundAmount: null,
+    inspectedBy: null,
+    inspectedAt: null,
+    orderAmount: 500,
+    shippingFee: 500,
+    deductAllowed: true,
+    staffRequestedBy: 'support2',
+    staffRequestedAt: '2026-10-05T10:00:00',
+    requestedChargeAmount: 100,
+    rejectedBy: null,
+    rejectedAt: null,
+    rejectionReason: null,
+    chargeChangedBy: null,
+    chargeChangedAt: null,
+    chargeConsentedAt: null,
+  };
+  const signInWith = (permissions: Permission[]) =>
+    useAuthStore.setState({
+      user: { userId: 8, username: 'support1', email: 's@tinqa.com', role: 'ADMIN_L1', authClient: 'web', isFirstLogin: false, permissions },
+    });
+  const returnPanel = () => screen.getByRole('region', { name: 'Return' });
+
+  // The customer's own messages in the ticket: the latest (id 5) is preselected as their reason
+  const WITH_REASON: TicketDetail = {
+    ...DETAIL,
+    orderNumber: 'ORD-1001',
+    order: DELIVERED_ORDER,
+    messages: [...MESSAGES, msg(5, 'CUSTOMER', 'Rattles when shaken, please take it back', '2026-10-05T11:00:00', 'Asha Rao')],
+  };
+
+  // Since 2026-11-11 staff no longer type the customer's reason: they pick one of the customer's messages, whose id is
+  // sent (ticketReference + customerMessageId) instead of the old `reason` text.
+  it('lets Customer Support request a return with one of the customer\'s own messages, uneditable, plus a charge and a note', async () => {
+    signInWith(['SUPPORT_TICKET_VIEW', 'SUPPORT_TICKET_REPLY', 'REFUND_REQUEST']);
+    orderApi.enableReturn.mockResolvedValue(ok(REQUESTED, 'Return requested. A Store Manager will review it.'));
+    const { user } = await openDetail(WITH_REASON);
+    const card = screen.getByRole('region', { name: 'Linked order' });
+    expect(within(card).getByTestId('ticket-order-amount')).toHaveTextContent('₹500.00');
+    expect(within(card).getByTestId('ticket-shipping')).toHaveTextContent('₹500.00');
+    expect(card).toHaveTextContent('Total paid (incl. shipping)');
+
+    await user.click(within(returnPanel()).getByRole('button', { name: 'Request return' }));
+    const dialog = screen.getByRole('dialog', { name: 'Request return' });
+    const words = within(dialog).getByRole('group', { name: /Customer's reason — their own words, sent to the Store Manager as written/ });
+    const latest = within(words).getByRole('radio', { name: /Rattles when shaken, please take it back/ });
+    const older = within(words).getByRole('radio', { name: /The LEDs flicker after 10 minutes\./ });
+    expect(latest).toBeChecked();
+    expect(older).not.toBeChecked();
+    // Only the customer's messages are offered (not support replies), and their text can't be edited
+    expect(within(words).getAllByRole('radio')).toHaveLength(2);
+    expect(within(words).queryByRole('textbox')).not.toBeInTheDocument();
+    expect(within(dialog).queryByRole('textbox', { name: /Customer's reason/ })).not.toBeInTheDocument();
+
+    // The charge and its reason are checked first
+    const charge = within(dialog).getByLabelText('Return charge');
+    await user.clear(charge);
+    await user.type(charge, '600');
+    expect(within(dialog).getByTestId('charge-hint')).toHaveTextContent('must pay it before the return starts');
+    await user.click(within(dialog).getByRole('button', { name: 'Request return' }));
+    expect(within(dialog).getByText('Say what the return charge is for.')).toBeInTheDocument();
+    expect(orderApi.enableReturn).not.toHaveBeenCalled();
+    await user.clear(charge);
+    await user.type(charge, '0');
+
+    await user.click(older);
+    await user.click(latest);
+    await user.type(within(dialog).getByLabelText('Staff note'), 'Box unopened');
+    await user.click(within(dialog).getByRole('button', { name: 'Request return' }));
+    await waitFor(() =>
+      expect(orderApi.enableReturn).toHaveBeenCalledWith('ORD-1001', {
+        ticketReference: 'TQ-Q-000007',
+        customerMessageId: 5,
+        chargeAmount: 0,
+        chargeReason: null,
+        staffNote: 'Box unopened',
+      })
+    );
+    expect(await screen.findByText('Return requested. A Store Manager will review it.')).toBeInTheDocument();
+    // The ticket (with its order's return) is reloaded
+    await waitFor(() => expect(api.getTicket).toHaveBeenCalledTimes(2));
+  });
+
+  it('checks the staff note for courtesy and shows the server\'s OFFENSIVE_LANGUAGE error on it', async () => {
+    signInWith(['SUPPORT_TICKET_VIEW', 'REFUND_REQUEST']);
+    orderApi.enableReturn.mockRejectedValue(
+      axiosError(400, { message: 'Offensive', errorCode: 'OFFENSIVE_LANGUAGE', errors: [{ field: 'staffNote', message: 'Please keep the note polite.' }] })
+    );
+    const { user } = await openDetail(WITH_REASON);
+    await user.click(within(returnPanel()).getByRole('button', { name: 'Request return' }));
+    const dialog = screen.getByRole('dialog', { name: 'Request return' });
+    expect(within(dialog).getAllByText(DECENCY_HINT).length).toBeGreaterThan(0);
+    const note = within(dialog).getByLabelText('Staff note');
+    await user.type(note, 'Customer is an asshole');
+    expect(within(dialog).getByText(DECENCY_ERROR)).toBeInTheDocument();
+    await user.click(within(dialog).getByRole('button', { name: 'Request return' }));
+    expect(orderApi.enableReturn).not.toHaveBeenCalled();
+
+    await user.clear(note);
+    await user.type(note, 'Polite words the server still refuses');
+    await user.click(within(dialog).getByRole('button', { name: 'Request return' }));
+    expect(await within(dialog).findByText('Please keep the note polite.')).toBeInTheDocument();
+  });
+
+  it('can\'t request a return before the customer has written in the ticket', async () => {
+    signInWith(['SUPPORT_TICKET_VIEW', 'REFUND_REQUEST']);
+    const { user } = await openDetail({ ...WITH_REASON, messages: [msg(3, 'SUPPORT', 'How can we help?', '2026-10-05T10:00:00')] });
+    await user.click(within(returnPanel()).getByRole('button', { name: 'Request return' }));
+    const dialog = screen.getByRole('dialog', { name: 'Request return' });
+    expect(dialog).toHaveTextContent("The customer hasn't written in this ticket yet.");
+    expect(within(dialog).getByRole('button', { name: 'Request return' })).toBeDisabled();
+  });
+
+  it('gives a Store Manager no direct "Enable return": they request from the ticket like Customer Support', async () => {
+    signInWith(['SUPPORT_TICKET_VIEW', 'REFUND_REQUEST', 'RETURN_ENABLE']);
+    await openDetail(WITH_REASON);
+    expect(within(returnPanel()).queryByRole('button', { name: /Enable return/ })).not.toBeInTheDocument();
+    expect(within(returnPanel()).getByRole('button', { name: 'Request return' })).toBeInTheDocument();
+  });
+
+  it('lets a Store Manager approve a waiting request from the chat, showing the customer\'s own words and the staff note', async () => {
+    signInWith(['SUPPORT_TICKET_VIEW', 'REFUND_REQUEST', 'RETURN_ENABLE']);
+    orderApi.approveReturn.mockResolvedValue(ok({ ...REQUESTED, state: 'ENABLED' }));
+    const { user } = await openDetail({ ...DETAIL, orderNumber: 'ORD-1001', order: { ...DELIVERED_ORDER, returnInfo: REQUESTED } });
+    expect(returnPanel()).toHaveTextContent('Return requested by Customer Support');
+    const words = within(returnPanel()).getByRole('group', { name: "Customer's reason" });
+    expect(within(words).getByTestId('customer-words')).toHaveTextContent('Rattles when shaken, please take it back');
+    expect(within(words).getByRole('link', { name: 'TQ-Q-000007' })).toHaveAttribute('href', '/support-tickets/TQ-Q-000007');
+    expect(within(words).getByTestId('return-staff-note')).toHaveTextContent('Box unopened');
+    await user.click(within(returnPanel()).getByRole('button', { name: 'Approve' }));
+    const dialog = screen.getByRole('dialog', { name: 'Approve return' });
+    expect(within(dialog).getByTestId('customer-words')).toHaveTextContent('Rattles when shaken, please take it back');
+    expect(dialog).toHaveTextContent('support2');
+    await user.click(within(dialog).getByRole('button', { name: 'Approve and enable' }));
+    await waitFor(() => expect(orderApi.approveReturn).toHaveBeenCalledWith('ORD-1001', { chargeAmount: 100, chargeReason: 'Pickup' }));
+  });
+
+  it('never lets a Store Manager decide a request they raised themselves', async () => {
+    signInWith(['SUPPORT_TICKET_VIEW', 'REFUND_REQUEST', 'RETURN_ENABLE']); // signed in as support1
+    await openDetail({ ...DETAIL, orderNumber: 'ORD-1001', order: { ...DELIVERED_ORDER, returnInfo: { ...REQUESTED, staffRequestedBy: 'support1' } } });
+    expect(returnPanel()).toHaveTextContent('You raised this request, so another Store Manager must decide it.');
+    expect(within(returnPanel()).queryByRole('button', { name: 'Approve' })).not.toBeInTheDocument();
+    expect(within(returnPanel()).queryByRole('button', { name: 'Reject' })).not.toBeInTheDocument();
+  });
+
+  it('explains a 409 RETURN_SELF_APPROVAL from the server', async () => {
+    signInWith(['SUPPORT_TICKET_VIEW', 'REFUND_REQUEST', 'RETURN_ENABLE']);
+    orderApi.approveReturn.mockRejectedValue(axiosError(409, { errorCode: 'RETURN_SELF_APPROVAL', message: 'x' }));
+    const { user } = await openDetail({ ...DETAIL, orderNumber: 'ORD-1001', order: { ...DELIVERED_ORDER, returnInfo: REQUESTED } });
+    await user.click(within(returnPanel()).getByRole('button', { name: 'Approve' }));
+    await user.click(within(screen.getByRole('dialog', { name: 'Approve return' })).getByRole('button', { name: 'Approve and enable' }));
+    expect(await screen.findByText('You raised this request, so another Store Manager must decide it.')).toBeInTheDocument();
+  });
+
+  it('shows no return controls to staff who cannot request returns', async () => {
+    signInWith(['SUPPORT_TICKET_VIEW', 'SUPPORT_TICKET_REPLY']);
+    await openDetail({ ...DETAIL, orderNumber: 'ORD-1001', order: DELIVERED_ORDER });
+    expect(screen.queryByRole('region', { name: 'Return' })).not.toBeInTheDocument();
   });
 });

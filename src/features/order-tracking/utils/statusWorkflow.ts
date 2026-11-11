@@ -11,6 +11,12 @@
  *   Out for delivery → Customer cancelled delivery → return to the warehouse
  *   Delivered → Return requested → approved / rejected → Out for pickup → Picked up → In transit
  *             → Received at warehouse → Inspection → Refund initiated → Refund completed
+ *   Inspection → Inspection failed → Sent back to the customer → Delivered back to the customer
+ *
+ * Orders are not returnable by default: refund staff enable a return (Return panel), and only the customer's start of
+ * it moves the order to Return requested (CUSTOMER_ONLY_STATUSES). Once a return record exists, a failed inspection is
+ * recorded through the inspection dialog, not the status form, and a return whose charge the customer paid can't be
+ * rejected or cancelled (backend 409 RETURN_INSPECTION_REQUIRED / RETURN_CHARGE_PAID).
  *   Cancelled (paid) → Refund requested → Refund initiated → Refund completed
  *     (a paid order cancelled before shipment — e.g. by the customer before an admin confirmed it — is refunded
  *      once the admin has checked the cancellation reason)
@@ -83,7 +89,24 @@ export const STATUS_INFO: Record<string, CustomerStatusInfo> = {
   RETURN_IN_TRANSIT: { stage: 'RETURNS', action: 'Return in transit', description: 'On the way back to the warehouse.', tone: 'forward' },
   RETURN_RECEIVED: { stage: 'RETURNS', action: 'Received at warehouse', description: 'The returned item reached the warehouse.', tone: 'forward' },
   RETURN_INSPECTION: { stage: 'RETURNS', action: 'Start inspection', description: 'The returned item is being checked.', tone: 'forward' },
-  RETURN_INSPECTION_FAILED: { stage: 'CLOSED', action: 'Inspection failed', description: 'The item failed inspection; no refund. The order is closed.', tone: 'exception' },
+  RETURN_INSPECTION_FAILED: {
+    stage: 'RETURNS',
+    action: 'Inspection failed',
+    description: 'The item failed inspection; no refund. It is sent back to the customer.',
+    tone: 'exception',
+  },
+  RETURN_BACK_IN_TRANSIT: {
+    stage: 'RETURNS',
+    action: 'Send back to customer',
+    description: 'The item that failed inspection is on its way back to the customer.',
+    tone: 'forward',
+  },
+  RETURN_BACK_DELIVERED: {
+    stage: 'CLOSED',
+    action: 'Delivered back to customer',
+    description: 'The customer has the item back. No refund; the order is closed.',
+    tone: 'forward',
+  },
   RETURN_CANCELLED: { stage: 'CLOSED', action: 'Cancel return', description: 'The return was withdrawn. The order stays delivered.', tone: 'exception' },
   RETURN_COMPLETED: { stage: 'CLOSED', action: 'Close return (no refund due)', description: 'Nothing was paid, so there is nothing to refund.', tone: 'forward' },
   REFUND_REQUESTED: {
@@ -136,10 +159,13 @@ export const NEXT_STATUSES: Record<string, readonly string[]> = {
   // A paid order that is cancelled is refunded (request → initiate → complete); an unpaid one is simply closed.
   CANCELLED: ['REFUND_REQUESTED'],
   REFUND_REQUESTED: ['REFUND_INITIATED'],
+  // Failed inspection: no refund, the product is delivered back to the customer.
+  RETURN_INSPECTION_FAILED: ['RETURN_BACK_IN_TRANSIT'],
+  RETURN_BACK_IN_TRANSIT: ['RETURN_BACK_DELIVERED'],
   REFUND_COMPLETED: [],
   RETURN_COMPLETED: [],
   RETURN_REJECTED: [],
-  RETURN_INSPECTION_FAILED: [],
+  RETURN_BACK_DELIVERED: [],
   RETURN_CANCELLED: [],
 };
 
@@ -171,6 +197,32 @@ export const APPROVAL_ONLY_STATUSES: ReadonlySet<string> = new Set(['PRE_ORDER_C
 export const SYSTEM_ONLY_STATUSES: ReadonlySet<string> = new Set(['REFUND_REQUESTED', 'REFUND_INITIATED', 'REFUND_FAILED', 'REFUND_COMPLETED']);
 
 /**
+ * Set only by the customer: starting a return that staff enabled moves the order to RETURN_REQUESTED. Staff never
+ * offer it (the backend answers 409 RETURN_NOT_ENABLED).
+ */
+export const CUSTOMER_ONLY_STATUSES: ReadonlySet<string> = new Set(['RETURN_REQUESTED']);
+
+/** Turning a return down; refused once the customer paid its charge (409 RETURN_CHARGE_PAID). */
+const RETURN_REFUSALS: ReadonlySet<string> = new Set(['RETURN_REJECTED', 'RETURN_CANCELLED']);
+
+/**
+ * Hub checkpoints ("Reached / Left <place>") are recorded while a parcel is under way: the delivery leg while the order
+ * is shipped or in transit, the return leg while a return is picked up, in transit, or (after a failed inspection) on
+ * its way back to the customer. Mirrors Ecommerce CheckpointService; the first checkpoint moves SHIPPED → IN_TRANSIT
+ * and RETURN_PICKED_UP → RETURN_IN_TRANSIT.
+ */
+export const DELIVERY_CHECKPOINT_STATUSES: ReadonlySet<string> = new Set(['SHIPPED', 'IN_TRANSIT']);
+export const RETURN_CHECKPOINT_STATUSES: ReadonlySet<string> = new Set(['RETURN_PICKED_UP', 'RETURN_IN_TRANSIT', 'RETURN_BACK_IN_TRANSIT']);
+
+/** The leg a new checkpoint belongs to in this status, or null when checkpoints can't be added. */
+export const getCheckpointLeg = (status: string | null | undefined): 'DELIVERY' | 'RETURN' | null => {
+  if (!status) return null;
+  if (DELIVERY_CHECKPOINT_STATUSES.has(status)) return 'DELIVERY';
+  if (RETURN_CHECKPOINT_STATUSES.has(status)) return 'RETURN';
+  return null;
+};
+
+/**
  * What a delivery rider records at the door (permission DELIVERY_STATUS_UPDATE, via PATCH /orders/{n}/delivery-status).
  * Every other status, return to origin included, is set by holders of CUSTOMER_ORDER_TRACKING_UPDATE. The backend
  * refuses anything else from a rider (403 DELIVERY_STATUS_NOT_ALLOWED).
@@ -195,7 +247,7 @@ export const FINAL_STATUSES: ReadonlySet<string> = new Set([
   'REFUND_COMPLETED',
   'RETURN_COMPLETED',
   'RETURN_REJECTED',
-  'RETURN_INSPECTION_FAILED',
+  'RETURN_BACK_DELIVERED',
   'RETURN_CANCELLED',
 ]);
 
@@ -225,17 +277,23 @@ export interface WorkflowContext {
   currentStatus: string | null;
   /** The order's payment status; confirming and refunding require PAID. */
   paymentStatus: string | null;
+  /** A return record exists (staff enabled one): a failed inspection then goes through the inspection dialog. */
+  hasReturn?: boolean;
+  /** The customer paid the return charge: the return can no longer be rejected or cancelled. */
+  returnChargePaid?: boolean;
 }
 
 /**
  * The table plus the payment rules (confirm needs PAID, closing a return without refund needs unpaid),
  * minus the refund statuses, which only the refund flow sets.
  */
-export const getAllowedStatuses = ({ currentStatus, paymentStatus }: WorkflowContext): string[] => {
+export const getAllowedStatuses = ({ currentStatus, paymentStatus, hasReturn = false, returnChargePaid = false }: WorkflowContext): string[] => {
   const paid = isFullyPaid(paymentStatus);
   const table = isKnownStatus(currentStatus) ? NEXT_STATUSES[currentStatus!] : START_STATUSES;
   return table.filter((status) => {
-    if (SYSTEM_ONLY_STATUSES.has(status)) return false;
+    if (SYSTEM_ONLY_STATUSES.has(status) || CUSTOMER_ONLY_STATUSES.has(status)) return false;
+    if (status === 'RETURN_INSPECTION_FAILED') return !hasReturn;
+    if (RETURN_REFUSALS.has(status) && returnChargePaid) return false;
     if (PAYMENT_REQUIRED_STATUSES.has(status)) return paid;
     // Closing a return means nothing is owed: never for a paid order, nor while a refund is requested
     // (the backend answers 409 REFUND_REQUIRED).
@@ -249,7 +307,7 @@ export const getDeliveryOutcomes = (context: WorkflowContext): string[] =>
   getAllowedStatuses(context).filter((status) => DELIVERY_OUTCOMES.has(status));
 
 /** Where the refund is handled instead of the status form, or null when no refund applies. */
-export const getRefundHint = ({ currentStatus, paymentStatus }: WorkflowContext): string | null => {
+export const getRefundHint = ({ currentStatus, paymentStatus, hasReturn = false }: WorkflowContext): string | null => {
   switch (currentStatus) {
     case 'REFUND_REQUESTED':
       return 'A refund has been requested. An approver approves or rejects it in the Refunds section.';
@@ -257,8 +315,11 @@ export const getRefundHint = ({ currentStatus, paymentStatus }: WorkflowContext)
       return 'The refund is with Razorpay. Its status updates automatically, or use Refresh status in the Refunds section.';
     case 'REFUND_FAILED':
       return 'The refund failed. It can be requested again from the Refunds section.';
-    case 'CANCELLED':
     case 'RETURN_INSPECTION':
+    case 'CANCELLED':
+      if (currentStatus === 'RETURN_INSPECTION' && hasReturn && !isRefundRequested(paymentStatus)) {
+        return 'Record the inspection in the Return section. Pass or Partial requests the refund, which an approver approves in the Refunds section; Fail sends the item back to the customer.';
+      }
       if (isRefundRequested(paymentStatus)) return 'A refund has been requested. An approver approves or rejects it in the Refunds section.';
       return isFullyPaid(paymentStatus) ? 'To refund the customer, use Request refund in the Refunds section.' : null;
     default:
@@ -292,8 +353,10 @@ export const getLockReason = (context: WorkflowContext): string | null => {
       return 'The refund for this order is completed. Its status is final and can no longer be changed.';
     case 'RETURN_REJECTED':
       return 'The return request was rejected and the order is closed. Its status is final.';
-    case 'RETURN_INSPECTION_FAILED':
-      return 'The returned item failed inspection and the order is closed. Its status is final.';
+    case 'DELIVERED':
+      return "Delivered. Orders aren't returnable by default: when the customer contacts us with a reason, enable a return in the Return section; the customer then starts it.";
+    case 'RETURN_BACK_DELIVERED':
+      return 'The item failed inspection and was delivered back to the customer. The order is closed; its status is final.';
     case 'RETURN_CANCELLED':
       return 'The return was cancelled and the order is closed. Its status is final.';
     default:
@@ -312,7 +375,8 @@ export const RETURN_TRACK: { key: string; label: string; statuses: string[] }[] 
   { key: 'PICKUP', label: 'Pickup', statuses: ['OUT_FOR_PICKUP', 'RETURN_PICKED_UP', 'RETURN_CANCELLED'] },
   { key: 'WAREHOUSE', label: 'At warehouse', statuses: ['RETURN_IN_TRANSIT', 'RETURN_RECEIVED'] },
   { key: 'INSPECTION', label: 'Inspection', statuses: ['RETURN_INSPECTION', 'RETURN_INSPECTION_FAILED', 'RETURN_COMPLETED'] },
-  { key: 'REFUND', label: 'Refund', statuses: ['REFUND_INITIATED', 'REFUND_FAILED', 'REFUND_COMPLETED'] },
+  // A failed inspection ends in sending the item back instead of a refund.
+  { key: 'REFUND', label: 'Refund / sent back', statuses: ['REFUND_INITIATED', 'REFUND_FAILED', 'REFUND_COMPLETED', 'RETURN_BACK_IN_TRANSIT', 'RETURN_BACK_DELIVERED'] },
 ];
 
 /** Refund track for a paid order that was cancelled before shipment. */

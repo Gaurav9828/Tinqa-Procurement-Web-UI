@@ -79,13 +79,15 @@ describe('detectIntents', () => {
 });
 
 describe('suggestReplies', () => {
-  it('after "thanks, it works now" suggests thank-and-close (closes the ticket) and proposes closing', () => {
+  // Since 2026-11-11 staff close a ticket only with a reason, 24 h after a reply the customer hasn't answered, so the
+  // assistant no longer offers "Send & close" or a CLOSED step right after the customer wrote: it suggests resolving.
+  it('after "thanks, it works now" suggests the thank-you wrap-up (which does not close) and proposes marking resolved', () => {
     const result = suggestReplies(withCustomerReply('Thanks a lot, it works now!'), NOW)!;
     expect(result.summary).toMatch(/resolved/i);
-    expect(result.replies[0]).toMatchObject({ id: 'thank-and-close', closesTicket: true });
-    expect(result.replies[0].text).toContain("You're welcome, Asha!");
+    expect(result.replies[0]).toEqual({ id: 'thank-and-close', label: 'Thank & wrap up', text: expect.stringContaining("You're welcome, Asha!") });
     expect(result.replies.map((r) => r.id)).toContain('confirm-before-close');
-    expect(result.statusSuggestion).toMatchObject({ status: 'CLOSED' });
+    expect(result.statusSuggestion).toMatchObject({ status: 'RESOLVED' });
+    expect(result.statusSuggestion?.reason).toContain('24 hours');
   });
 
   it('after a plain "thank you" offers closing replies but only suggests marking resolved', () => {
@@ -94,14 +96,14 @@ describe('suggestReplies', () => {
     expect(result.statusSuggestion).toMatchObject({ status: 'RESOLVED' });
   });
 
-  it('honours an explicit close request', () => {
+  it('answers an explicit close request with "mark resolved" (closing needs 24 h without a reply), never CLOSED', () => {
     const result = suggestReplies(withCustomerReply('All sorted, you can close the ticket.'), NOW)!;
-    expect(result.statusSuggestion?.status).toBe('CLOSED');
+    expect(result.statusSuggestion?.status).toBe('RESOLVED');
   });
 
   it('never suggests closing when the problem persists, and picks an issue-specific next step', () => {
     const result = suggestReplies(withCustomerReply('Thanks, but it still flickers.'), NOW)!;
-    expect(result.replies.some((r) => r.closesTicket)).toBe(false);
+    expect(result.statusSuggestion?.status).not.toBe('RESOLVED');
     expect(result.replies[0].id).toBe('warranty-next-step');
     expect(result.replies[0].text).toContain('your SummitX');
     expect(result.statusSuggestion).toMatchObject({ status: 'IN_PROGRESS' });

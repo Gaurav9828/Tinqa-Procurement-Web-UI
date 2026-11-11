@@ -93,6 +93,10 @@ export const PERMISSIONS = [
   'REFUND_REQUEST',
   'REFUND_SYNC',
   'REFUND_APPROVE',
+  // Returns (docs: returns v2): enable a return (or approve or reject Customer Support's request to), and set or
+  // change its charge. Group RETURN_ENABLEMENT, not approval-level: Store Managers of both levels and the Super Admin.
+  // Customer Support (REFUND_REQUEST without it) only requests a return.
+  'RETURN_ENABLE',
   // Customer care
   'SUPPORT_TICKET_VIEW',
   'SUPPORT_TICKET_REPLY',
@@ -248,6 +252,8 @@ export const APPROVAL_PERMISSIONS: readonly Permission[] = [
   'CUSTOMER_ORDER_PRE_ORDER_APPROVE',
   'DEMO_APPROVE',
   'CAREER_DECISION_APPROVE',
+  // Return requests from Customer Support, approved or rejected by a Store Manager (Approvals Hub › Return requests)
+  'RETURN_ENABLE',
 ];
 
 const PERMISSION_SET: ReadonlySet<string> = new Set(PERMISSIONS);

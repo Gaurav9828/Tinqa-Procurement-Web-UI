@@ -7,12 +7,13 @@ import { TicketConversation } from '../components/TicketConversation';
 import { ReplyComposer } from '../components/ReplyComposer';
 import { TicketStatusControls } from '../components/TicketStatusControls';
 import { TicketStatusBadge } from '../components/TicketStatusBadge';
-import { TicketStateMessage } from '../components/TicketStateMessage';
+import { TicketClosedNote, TicketStateMessage } from '../components/TicketStateMessage';
 import { ReplySuggestions } from '../components/ReplySuggestions';
 import { TicketOrderSection } from '../components/TicketOrderSection';
+import { TicketReturnSection } from '../components/TicketReturnSection';
 import { useAccess } from '../../../hooks/useAccess';
 import { suggestReplies } from '../assistant/suggestReplies';
-import type { AdminSettableStatus } from '../types/supportTicket.types';
+import type { StatusSuggestion } from '../assistant/suggestReplies';
 import {
   SUPPORT_TICKETS_PATH,
   activityTime,
@@ -58,18 +59,11 @@ export const SupportTicketDetailPage: React.FC = () => {
 
   const { reply, setStatus } = actions;
   const sendSuggestion = useCallback((text: string) => void reply(text), [reply]);
-  const sendAndClose = useCallback(
-    async (text: string) => {
-      const sent = await reply(text);
-      if (sent.ok) await setStatus('CLOSED');
-    },
-    [reply, setStatus]
-  );
   const editSuggestion = useCallback((text: string) => {
     setDraft(text);
     requestAnimationFrame(() => replyBox.current?.focus());
   }, []);
-  const applyStatus = useCallback(async (status: AdminSettableStatus) => void (await setStatus(status)), [setStatus]);
+  const applyStatus = useCallback(async (status: StatusSuggestion['status']) => void (await setStatus(status)), [setStatus]);
 
   // Back to the exact list view (filter/page in the URL, scroll restored by the list).
   const goBack = () => (cameFromList ? navigate(-1) : navigate(SUPPORT_TICKETS_PATH));
@@ -132,10 +126,8 @@ export const SupportTicketDetailPage: React.FC = () => {
               {suggestions && canReply && (
                 <ReplySuggestions
                   result={suggestions}
-                  referenceNumber={ticket.referenceNumber}
                   isBusy={actions.isBusy}
                   onSend={sendSuggestion}
-                  onSendAndClose={sendAndClose}
                   onEdit={editSuggestion}
                   onSetStatus={applyStatus}
                 />
@@ -173,9 +165,21 @@ export const SupportTicketDetailPage: React.FC = () => {
                 <Field label="Last activity">{formatDateTime(activityTime(ticket))}</Field>
                 {ticket.closedAt && <Field label="Closed">{formatDateTime(ticket.closedAt)}</Field>}
               </dl>
+              <TicketClosedNote ticket={ticket} />
             </div>
 
             <TicketOrderSection orderNumber={ticket.orderNumber} order={ticket.order} canOpenOrder={canOpenOrder} />
+
+            {ticket.orderNumber && ticket.order && (
+              <TicketReturnSection
+                orderNumber={ticket.orderNumber}
+                order={ticket.order}
+                referenceNumber={ticket.referenceNumber}
+                messages={ticket.messages}
+                ticketClosed={ticket.status === 'CLOSED' || !ticket.canClose}
+                onChanged={refresh}
+              />
+            )}
 
             {canChangeStatus && (
             <div className="apple-card p-5 space-y-3">
@@ -184,6 +188,7 @@ export const SupportTicketDetailPage: React.FC = () => {
                 referenceNumber={ticket.referenceNumber}
                 currentStatus={ticket.status}
                 canClose={ticket.canClose}
+                closableAt={ticket.closableAt}
                 isUpdating={actions.pending === 'status'}
                 disabled={actions.isBusy}
                 onChange={actions.setStatus}

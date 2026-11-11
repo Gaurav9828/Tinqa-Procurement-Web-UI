@@ -1,17 +1,13 @@
 import React, { useState } from 'react';
-import { ChevronDown, Lightbulb, PencilLine, Send, Sparkles, XCircle } from 'lucide-react';
-import { ConfirmationModal } from '../../../components/ui/ConfirmationModal';
-import type { AssistantResult, ReplySuggestion } from '../assistant/suggestReplies';
-import type { AdminSettableStatus } from '../types/supportTicket.types';
+import { ChevronDown, Lightbulb, PencilLine, Send, Sparkles } from 'lucide-react';
+import type { AssistantResult, StatusSuggestion } from '../assistant/suggestReplies';
 
 interface Props {
   result: AssistantResult;
-  referenceNumber: string;
   isBusy: boolean;
   onSend: (text: string) => void;
-  onSendAndClose: (text: string) => Promise<void>;
   onEdit: (text: string) => void;
-  onSetStatus: (status: AdminSettableStatus) => Promise<void>;
+  onSetStatus: (status: StatusSuggestion['status']) => Promise<void>;
 }
 
 const COLLAPSE_KEY = 'tinqa.supportTickets.suggestionsCollapsed';
@@ -25,12 +21,12 @@ const readCollapsed = () => {
 
 /**
  * Suggested replies and next status from the local assistant. Nothing is sent without an explicit
- * click: "Send" sends the text as-is, "Edit" puts it in the reply box, and anything that closes the
- * ticket asks for confirmation first.
+ * click: "Send" sends the text as-is and "Edit" puts it in the reply box. The assistant never closes
+ * a ticket: staff close it from the Status card, with a reason, 24 hours after a reply the customer
+ * hasn't answered.
  */
-export const ReplySuggestions: React.FC<Props> = ({ result, referenceNumber, isBusy, onSend, onSendAndClose, onEdit, onSetStatus }) => {
+export const ReplySuggestions: React.FC<Props> = ({ result, isBusy, onSend, onEdit, onSetStatus }) => {
   const [collapsed, setCollapsed] = useState(readCollapsed);
-  const [pendingClose, setPendingClose] = useState<{ text: string | null } | null>(null);
 
   const toggle = () => {
     setCollapsed((value) => {
@@ -41,11 +37,6 @@ export const ReplySuggestions: React.FC<Props> = ({ result, referenceNumber, isB
       }
       return !value;
     });
-  };
-
-  const sendSuggestion = (suggestion: ReplySuggestion) => {
-    if (suggestion.closesTicket) setPendingClose({ text: suggestion.text });
-    else onSend(suggestion.text);
   };
 
   const status = result.statusSuggestion;
@@ -85,10 +76,10 @@ export const ReplySuggestions: React.FC<Props> = ({ result, referenceNumber, isB
               <button
                 type="button"
                 disabled={isBusy}
-                onClick={() => (status.status === 'CLOSED' ? setPendingClose({ text: null }) : onSetStatus(status.status))}
+                onClick={() => onSetStatus(status.status)}
                 className="px-3 py-1.5 rounded-lg text-[11px] font-semibold bg-black/5 dark:bg-white/10 hover:bg-black/10 dark:hover:bg-white/20 disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
               >
-                {status.status === 'CLOSED' ? 'Close ticket' : status.status === 'RESOLVED' ? 'Mark resolved' : 'Mark in progress'}
+                {status.status === 'RESOLVED' ? 'Mark resolved' : 'Mark in progress'}
               </button>
             </div>
           )}
@@ -107,14 +98,12 @@ export const ReplySuggestions: React.FC<Props> = ({ result, referenceNumber, isB
                   <button
                     type="button"
                     disabled={isBusy}
-                    onClick={() => sendSuggestion(suggestion)}
-                    aria-label={`${suggestion.closesTicket ? 'Send & close' : 'Send'}: ${suggestion.label}`}
-                    className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold text-white disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed ${
-                      suggestion.closesTicket ? 'bg-rose-500 hover:bg-rose-600' : 'bg-[#0071e3] hover:bg-[#0077ed]'
-                    }`}
+                    onClick={() => onSend(suggestion.text)}
+                    aria-label={`Send: ${suggestion.label}`}
+                    className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold text-white bg-[#0071e3] hover:bg-[#0077ed] disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
                   >
-                    {suggestion.closesTicket ? <XCircle className="w-3 h-3" /> : <Send className="w-3 h-3" />}
-                    {suggestion.closesTicket ? 'Send & close' : 'Send'}
+                    <Send className="w-3 h-3" />
+                    Send
                   </button>
                   <button
                     type="button"
@@ -135,22 +124,6 @@ export const ReplySuggestions: React.FC<Props> = ({ result, referenceNumber, isB
           </p>
         </div>
       )}
-
-      <ConfirmationModal
-        isOpen={!!pendingClose}
-        actionType="CONFIRM"
-        tone="danger"
-        title={pendingClose?.text ? 'Send this reply and close the ticket?' : 'Close this ticket?'}
-        description={`${pendingClose?.text ? 'The reply will be sent to the customer, then ' : ''}ticket ${referenceNumber} will be closed. Closed tickets are read-only.`}
-        isSubmitting={isBusy}
-        onClose={() => setPendingClose(null)}
-        onConfirm={async () => {
-          const text = pendingClose?.text;
-          if (text) await onSendAndClose(text);
-          else await onSetStatus('CLOSED');
-          setPendingClose(null);
-        }}
-      />
     </section>
   );
 };

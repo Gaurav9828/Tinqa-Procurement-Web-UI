@@ -279,6 +279,18 @@ export const ECOMMERCE_ENDPOINTS: readonly EndpointRule[] = [
   rule('GET', '/admin/orders/{orderNumber}', 'CUSTOMER_ORDER_VIEW'),
   rule('GET', '/admin/orders/{orderNumber}/tracking', 'CUSTOMER_ORDER_VIEW'),
   rule('PATCH', '/admin/orders/{orderNumber}/pre-order/approve', 'CUSTOMER_ORDER_PRE_ORDER_APPROVE'),
+  // Returns staff enable on request, and hub checkpoints of TinQa's own delivery team (Ecommerce AdminReturnController)
+  rule('POST', '/admin/orders/{orderNumber}/return/enable', 'REFUND_REQUEST'),
+  rule('POST', '/admin/orders/{orderNumber}/return/withdraw', 'REFUND_REQUEST'),
+  rule('POST', '/admin/orders/{orderNumber}/return/inspection', 'REFUND_REQUEST'),
+  // Store Managers (RETURN_ENABLE) decide what Customer Support requested, and change the charge of an enabled return
+  rule('POST', '/admin/orders/{orderNumber}/return/approve', 'RETURN_ENABLE'),
+  rule('POST', '/admin/orders/{orderNumber}/return/reject', 'RETURN_ENABLE'),
+  rule('PUT', '/admin/orders/{orderNumber}/return/charge', 'RETURN_ENABLE'),
+  rule('GET', '/admin/returns/requests', 'RETURN_ENABLE'),
+  rule('POST', '/admin/orders/{orderNumber}/checkpoints', 'CUSTOMER_ORDER_TRACKING_UPDATE'),
+  rule('POST', '/admin/orders/{orderNumber}/rider-checkpoints', 'DELIVERY_STATUS_UPDATE'),
+  rule('DELETE', '/admin/orders/{orderNumber}/checkpoints/{id}', 'CUSTOMER_ORDER_TRACKING_UPDATE'),
   // Store sales (the seller is always the signed-in agent, taken from the token)
   rule('GET', '/admin/store-sales/customers', 'STORE_ORDER_CREATE'),
   rule('POST', '/admin/store-sales/customers', 'STORE_CUSTOMER_REGISTER'),
@@ -297,6 +309,9 @@ export const ECOMMERCE_ENDPOINTS: readonly EndpointRule[] = [
   rule('PATCH', '/orders/{orderNumber}/status', 'CUSTOMER_ORDER_UPDATE_STATUS'),
   rule('PATCH', '/orders/{orderNumber}/tracking', 'CUSTOMER_ORDER_TRACKING_UPDATE'),
   rule('PATCH', '/orders/{orderNumber}/delivery-status', 'DELIVERY_STATUS_UPDATE'),
+  // Email the customer a new delivery code (the code they give once the device works): staff and rider routes
+  rule('POST', '/orders/{orderNumber}/tracking/delivery-code', 'CUSTOMER_ORDER_TRACKING_UPDATE'),
+  rule('POST', '/orders/{orderNumber}/delivery-status/delivery-code', 'DELIVERY_STATUS_UPDATE'),
   // Refunds
   rule('GET', '/admin/orders/{orderNumber}/refunds', 'REFUND_VIEW'),
   rule('POST', '/admin/orders/{orderNumber}/refunds', 'REFUND_REQUEST'),

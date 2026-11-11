@@ -1,7 +1,16 @@
 import { ecommerceAxiosClient } from '../../../api/ecommerceAxiosClient';
 import type { ApiResponse, PageResponse } from '../../../types/common.types';
 import type {
+  DeliveryCodeSent,
+  AddCheckpointRequest,
   AdminOrderDetail,
+  EnableReturnRequest,
+  OrderReturnInfo,
+  RejectReturnRequest,
+  ReturnChargeRequest,
+  ReturnInspectionRequest,
+  ReturnRequestRow,
+  ShipmentCheckpoint,
   AdminOrderListParams,
   AdminOrderSummary,
   OrderTrackingEntry,
@@ -12,6 +21,7 @@ import type {
 // Paths are relative to VITE_ECOMMERCE_API_BASE_URL (which already includes `/api`).
 // Admin reads are restricted to ADMIN_L1/ADMIN_L2 by the backend from the bearer token.
 const ADMIN_BASE_URL = '/admin/orders';
+const RETURN_REQUESTS_URL = '/admin/returns/requests';
 const ORDERS_BASE_URL = '/orders';
 
 const orderPath = (base: string, orderNumber: string) => `${base}/${encodeURIComponent(orderNumber)}`;
@@ -75,6 +85,107 @@ export const orderTrackingApi = {
     const response = await ecommerceAxiosClient.patch<ApiResponse<OrderTrackingEntry>>(
       `${orderPath(ORDERS_BASE_URL, orderNumber)}/tracking`,
       payload
+    );
+    return response.data;
+  },
+
+  /**
+   * POST /api/admin/orders/{orderNumber}/return/enable — REFUND_REQUEST. With RETURN_ENABLE the DELIVERED order becomes
+   * returnable for 7 days (ENABLED); without it this is a request (REQUESTED) for a Store Manager. Calling it again on a
+   * REQUESTED return updates the request.
+   */
+  enableReturn: async (orderNumber: string, payload: EnableReturnRequest): Promise<ApiResponse<OrderReturnInfo>> => {
+    const response = await ecommerceAxiosClient.post<ApiResponse<OrderReturnInfo>>(
+      `${orderPath(ADMIN_BASE_URL, orderNumber)}/return/enable`,
+      payload
+    );
+    return response.data;
+  },
+
+  /** POST /api/admin/orders/{orderNumber}/return/withdraw — REFUND_REQUEST; takes back a REQUESTED or ENABLED return. */
+  withdrawReturn: async (orderNumber: string): Promise<ApiResponse<OrderReturnInfo>> => {
+    const response = await ecommerceAxiosClient.post<ApiResponse<OrderReturnInfo>>(`${orderPath(ADMIN_BASE_URL, orderNumber)}/return/withdraw`);
+    return response.data;
+  },
+
+  /** POST /api/admin/orders/{orderNumber}/return/approve — RETURN_ENABLE; REQUESTED → ENABLED (the charge may be changed). */
+  approveReturn: async (orderNumber: string, payload: ReturnChargeRequest): Promise<ApiResponse<OrderReturnInfo>> => {
+    const response = await ecommerceAxiosClient.post<ApiResponse<OrderReturnInfo>>(
+      `${orderPath(ADMIN_BASE_URL, orderNumber)}/return/approve`,
+      payload
+    );
+    return response.data;
+  },
+
+  /** POST /api/admin/orders/{orderNumber}/return/reject — RETURN_ENABLE; REQUESTED → REJECTED, the reason goes to the customer. */
+  rejectReturn: async (orderNumber: string, payload: RejectReturnRequest): Promise<ApiResponse<OrderReturnInfo>> => {
+    const response = await ecommerceAxiosClient.post<ApiResponse<OrderReturnInfo>>(
+      `${orderPath(ADMIN_BASE_URL, orderNumber)}/return/reject`,
+      payload
+    );
+    return response.data;
+  },
+
+  /** PUT /api/admin/orders/{orderNumber}/return/charge — RETURN_ENABLE; new charge on an open ENABLED return, consent cleared. */
+  changeReturnCharge: async (orderNumber: string, payload: ReturnChargeRequest): Promise<ApiResponse<OrderReturnInfo>> => {
+    const response = await ecommerceAxiosClient.put<ApiResponse<OrderReturnInfo>>(
+      `${orderPath(ADMIN_BASE_URL, orderNumber)}/return/charge`,
+      payload
+    );
+    return response.data;
+  },
+
+  /** GET /api/admin/returns/requests?page=&size= — RETURN_ENABLE; returns waiting for a Store Manager, oldest first (size ≤ 50). */
+  listReturnRequests: async (page: number, size: number): Promise<ApiResponse<PageResponse<ReturnRequestRow>>> => {
+    const response = await ecommerceAxiosClient.get<ApiResponse<PageResponse<ReturnRequestRow>>>(RETURN_REQUESTS_URL, {
+      params: { page, size },
+    });
+    return response.data;
+  },
+
+  /** POST /api/admin/orders/{orderNumber}/return/inspection — REFUND_REQUEST; PASS / PARTIAL request the refund. */
+  recordInspection: async (orderNumber: string, payload: ReturnInspectionRequest): Promise<ApiResponse<OrderReturnInfo>> => {
+    const response = await ecommerceAxiosClient.post<ApiResponse<OrderReturnInfo>>(
+      `${orderPath(ADMIN_BASE_URL, orderNumber)}/return/inspection`,
+      payload
+    );
+    return response.data;
+  },
+
+  /** POST /api/admin/orders/{orderNumber}/checkpoints — CUSTOMER_ORDER_TRACKING_UPDATE (staff). */
+  addCheckpoint: async (orderNumber: string, payload: AddCheckpointRequest): Promise<ApiResponse<ShipmentCheckpoint>> => {
+    const response = await ecommerceAxiosClient.post<ApiResponse<ShipmentCheckpoint>>(
+      `${orderPath(ADMIN_BASE_URL, orderNumber)}/checkpoints`,
+      payload
+    );
+    return response.data;
+  },
+
+  /** POST /api/admin/orders/{orderNumber}/rider-checkpoints — DELIVERY_STATUS_UPDATE (riders, Fleet Coordinator); same rules. */
+  addRiderCheckpoint: async (orderNumber: string, payload: AddCheckpointRequest): Promise<ApiResponse<ShipmentCheckpoint>> => {
+    const response = await ecommerceAxiosClient.post<ApiResponse<ShipmentCheckpoint>>(
+      `${orderPath(ADMIN_BASE_URL, orderNumber)}/rider-checkpoints`,
+      payload
+    );
+    return response.data;
+  },
+
+  /** DELETE /api/admin/orders/{orderNumber}/checkpoints/{id} — CUSTOMER_ORDER_TRACKING_UPDATE, while that trip is under way. */
+  deleteCheckpoint: async (orderNumber: string, checkpointId: number): Promise<ApiResponse<null>> => {
+    const response = await ecommerceAxiosClient.delete<ApiResponse<null>>(
+      `${orderPath(ADMIN_BASE_URL, orderNumber)}/checkpoints/${checkpointId}`
+    );
+    return response.data;
+  },
+
+  /**
+   * Emails the customer a new delivery code (they asked the delivery partner for it); it replaces the old one. Staff:
+   * POST /api/orders/{n}/tracking/delivery-code (CUSTOMER_ORDER_TRACKING_UPDATE). Riders (`riderRoute`):
+   * POST /api/orders/{n}/delivery-status/delivery-code (DELIVERY_STATUS_UPDATE). Only while out for delivery, once a minute.
+   */
+  resendDeliveryCode: async (orderNumber: string, riderRoute: boolean): Promise<ApiResponse<DeliveryCodeSent>> => {
+    const response = await ecommerceAxiosClient.post<ApiResponse<DeliveryCodeSent>>(
+      `${orderPath(ORDERS_BASE_URL, orderNumber)}/${riderRoute ? 'delivery-status' : 'tracking'}/delivery-code`
     );
     return response.data;
   },

@@ -150,7 +150,7 @@ const PROMO_CODE = {
   deletedBy: null, deletedAt: null, customers: [], products: [],
 };
 
-const TRACKING_STATUSES = ['ORDER_RECEIVED', 'CONFIRMED', 'PACKED', 'OUT_FOR_DELIVERY', 'DELIVERED', 'CANCELLED'].map((status) => ({ status, stage: status }));
+const TRACKING_STATUSES = ['ORDER_RECEIVED', 'CONFIRMED', 'PACKED', 'SHIPPED', 'IN_TRANSIT', 'OUT_FOR_DELIVERY', 'DELIVERED', 'RETURN_BACK_IN_TRANSIT', 'RETURN_BACK_DELIVERED', 'CANCELLED'].map((status) => ({ status, stage: status }));
 
 /**
  * method + path (after /api) -> answer, for the signed-in account. Lists are empty (each screen's empty state), single
@@ -261,6 +261,15 @@ export const handlers = (session: Session): [string, RegExp, Handler][] => [
   ['GET', /^\/admin\/orders\/tracking-statuses$/, () => ok(TRACKING_STATUSES)],
   ['GET', /^\/admin\/orders\/[^/]+$/, () => notFound('ORDER_NOT_FOUND')],
   ['GET', /^\/admin\/orders\/[^/]+\/refunds$/, () => notFound('ORDER_NOT_FOUND')],
+  // Returns and hub checkpoints (no journey opens an existing order, so these answer as for an unknown one)
+  ['POST', /^\/admin\/orders\/[^/]+\/return\/(enable|withdraw|inspection|approve|reject)$/, () => notFound('ORDER_NOT_FOUND')],
+  ['PUT', /^\/admin\/orders\/[^/]+\/return\/charge$/, () => notFound('ORDER_NOT_FOUND')],
+  // Approvals Hub › Return requests (RETURN_ENABLE): nothing waiting
+  ['GET', /^\/admin\/returns\/requests$/, () => ok(page([]))],
+  ['POST', /^\/admin\/orders\/[^/]+\/(rider-)?checkpoints$/, () => notFound('ORDER_NOT_FOUND')],
+  ['DELETE', /^\/admin\/orders\/[^/]+\/checkpoints\/\d+$/, () => notFound('ORDER_NOT_FOUND')],
+  // A new delivery code emailed to the customer (staff and rider routes; only from an open order's Delivered step)
+  ['POST', /^\/orders\/[^/]+\/(tracking|delivery-status)\/delivery-code$/, () => notFound('ORDER_NOT_FOUND')],
   ['GET', /^\/admin\/refunds$/, () => ok(page([]))],
   ['GET', /^\/admin\/finance\/overview$/, (_m, url) => ok(financeOverview(url))],
   ['GET', /^\/admin\/finance\/vouchers$/, () => ok(page([]))],
@@ -269,6 +278,9 @@ export const handlers = (session: Session): [string, RegExp, Handler][] => [
   ['GET', /^\/admin\/finance\/categories$/, () => ok([])],
   ['GET', /^\/admin\/support\/queries$/, () => ok(page([]))],
   ['GET', /^\/admin\/support\/queries\/[^/]+$/, () => notFound('TICKET_NOT_FOUND')],
+  // Reply and status (closing needs { status: 'CLOSED', reason }); no journey opens an existing ticket
+  ['POST', /^\/admin\/support\/queries\/[^/]+\/messages$/, () => notFound('TICKET_NOT_FOUND')],
+  ['PATCH', /^\/admin\/support\/queries\/[^/]+\/status$/, () => notFound('TICKET_NOT_FOUND')],
   ['GET', /^\/admin\/profile-approvals$/, () => ok([])],
   ['GET', /^\/admin\/customers$/, () => ok(page([]))],
   ['GET', /^\/admin\/customers\/\d+(\/(cart|orders|tickets))?$/, () => notFound('CUSTOMER_NOT_FOUND')],

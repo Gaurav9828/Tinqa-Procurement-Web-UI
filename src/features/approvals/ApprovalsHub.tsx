@@ -20,6 +20,7 @@ import { VouchersPanel } from '../finance/components/VouchersPanel';
 import { SupplierApprovalsPanel } from './components/SupplierApprovalsPanel';
 import { useApprovalSummary } from './hooks/useApprovalSummary';
 import { PreOrderApprovalsPanel } from './components/PreOrderApprovalsPanel';
+import { ReturnRequestApprovalsPanel } from './components/ReturnRequestApprovalsPanel';
 import { usePreOrderApprovals } from './hooks/usePreOrderApprovals';
 import { CompanyProfileApprovalsPanel } from './components/CompanyProfileApprovalsPanel';
 import { useCompanyProfileApprovals } from './hooks/useCompanyProfileApprovals';
@@ -33,7 +34,7 @@ import { SupplierReturnApprovalsPanel } from './components/SupplierReturnApprova
 import { SupplierRepaymentChecksPanel } from './components/SupplierRepaymentChecksPanel';
 
 type HubTab =
-  | 'requests' | 'refunds' | 'expenses' | 'suppliers' | 'supplier-payments' | 'supplier-returns' | 'supplier-repayments' | 'pre-orders'
+  | 'requests' | 'refunds' | 'return-requests' | 'expenses' | 'suppliers' | 'supplier-payments' | 'supplier-returns' | 'supplier-repayments' | 'pre-orders'
   | 'company-profile' | 'barcodes' | 'client-demos' | 'careers';
 const TAB_STORAGE_KEY = 'approvals.tab';
 
@@ -50,6 +51,7 @@ const readTab = (): HubTab => {
 const TABS: { id: HubTab; label: string }[] = [
   { id: 'requests', label: 'Requests' },
   { id: 'refunds', label: 'Refunds' },
+  { id: 'return-requests', label: 'Return requests' },
   { id: 'expenses', label: 'Expenses' },
   { id: 'suppliers', label: 'Suppliers' },
   { id: 'supplier-payments', label: 'Supplier payments' },
@@ -74,6 +76,9 @@ export const ApprovalsHub: React.FC = () => {
         return canAll('COMPANY_PROFILE_APPROVE', 'COMPANY_PROFILE_VIEW');
       case 'refunds':
         return can('REFUND_APPROVE');
+      case 'return-requests':
+        // Customer Support's return requests: Store Managers (both levels) decide them
+        return can('RETURN_ENABLE');
       case 'expenses':
         return can('EXPENSE_APPROVE');
       case 'barcodes':
@@ -138,6 +143,7 @@ export const ApprovalsHub: React.FC = () => {
       noun: 'requests',
     },
     refunds: { count: pendingRefundCount, noun: 'refunds' },
+    'return-requests': { count: summary.count('RETURN_REQUESTS'), noun: 'return requests' },
     expenses: { count: summary.count('EXPENSES'), noun: 'expenses' },
     suppliers: { count: summary.count('SUPPLIER_LOGINS', 'QUOTATION_CHANGES'), noun: 'supplier requests' },
     'supplier-payments': { count: summary.count('SUPPLIER_PAYMENTS', 'SUPPLIER_PAYMENTS_TO_MAKE'), noun: 'supplier payments' },
@@ -185,6 +191,8 @@ export const ApprovalsHub: React.FC = () => {
         return <SupplierRepaymentChecksPanel enabled={tab === 'supplier-repayments'} onChanged={refreshSummary} />;
       case 'refunds':
         return <RefundsQueue onChanged={refreshSummary} />;
+      case 'return-requests':
+        return <ReturnRequestApprovalsPanel enabled={tab === 'return-requests'} onChanged={refreshSummary} />;
       case 'expenses':
         return (
           <VouchersPanel

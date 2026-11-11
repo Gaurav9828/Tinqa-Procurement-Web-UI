@@ -13,7 +13,9 @@ interface Props {
 }
 
 const WARNING_STATUSES = new Set(['DELIVERY_FAILED', 'CUSTOMER_UNAVAILABLE', 'INVALID_ADDRESS', 'CUSTOMER_CANCELLED_DELIVERY', 'REFUND_FAILED']);
-const CLOSED_RETURN_STATUSES = new Set(['RETURN_REJECTED', 'RETURN_CANCELLED', 'RETURN_INSPECTION_FAILED']);
+const CLOSED_RETURN_STATUSES = new Set(['RETURN_REJECTED', 'RETURN_CANCELLED', 'RETURN_BACK_DELIVERED']);
+// A failed inspection: no refund, the item is on its way back to the customer.
+const FAILED_RETURN_STATUSES = new Set(['RETURN_INSPECTION_FAILED', 'RETURN_BACK_IN_TRANSIT']);
 
 /**
  * Stage-wise view of where the order is: Placed → Confirmed → Fulfilment → Shipped → Out for delivery
@@ -71,7 +73,7 @@ export const StageProgress: React.FC<Props> = ({ currentStatus, paid = false, hi
             tone="purple"
             steps={RETURN_TRACK.map((step) => ({ key: step.key, label: step.label }))}
             currentIndex={returnIndex}
-            warning={WARNING_STATUSES.has(status)}
+            warning={WARNING_STATUSES.has(status) || FAILED_RETURN_STATUSES.has(status)}
             muted={CLOSED_RETURN_STATUSES.has(status)}
             complete={status === 'REFUND_COMPLETED' || status === 'RETURN_COMPLETED'}
           />

@@ -1,7 +1,14 @@
 import type { AdminOrderDetail, OrderItemSummary, OrderTrackingEntry } from '../types/orderTracking.types';
 
+/** Statuses whose generated label would read badly. */
+const STATUS_LABELS: Record<string, string> = {
+  RETURN_BACK_IN_TRANSIT: 'Sent Back To Customer',
+  RETURN_BACK_DELIVERED: 'Delivered Back To Customer',
+};
+
 /** "OUT_FOR_DELIVERY" → "Out For Delivery" */
 export const formatStatusLabel = (status: string | null | undefined): string =>
+  STATUS_LABELS[status ?? ''] ??
   (status || 'UNKNOWN')
     .toLowerCase()
     .split('_')

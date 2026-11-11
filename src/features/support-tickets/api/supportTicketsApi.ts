@@ -38,11 +38,16 @@ export const supportTicketsApi = {
     return response.data;
   },
 
-  /** PATCH …/status { status } — adds a system note; CLOSED makes the ticket read-only. */
-  updateStatus: async (referenceNumber: string, status: AdminSettableStatus): Promise<ApiResponse<TicketDetail>> => {
-    const response = await ecommerceAxiosClient.patch<ApiResponse<TicketDetail>>(`${ticketPath(referenceNumber)}/status`, {
-      status,
-    });
+  /**
+   * PATCH …/status { status, reason? } — adds a system note; CLOSED makes the ticket read-only. Closing needs a reason
+   * (5–500 characters) and is allowed only 24 hours after our latest reply the customer hasn't answered (409
+   * TICKET_CLOSE_TOO_EARLY).
+   */
+  updateStatus: async (referenceNumber: string, status: AdminSettableStatus, reason?: string): Promise<ApiResponse<TicketDetail>> => {
+    const response = await ecommerceAxiosClient.patch<ApiResponse<TicketDetail>>(
+      `${ticketPath(referenceNumber)}/status`,
+      reason === undefined ? { status } : { status, reason }
+    );
     return response.data;
   },
 };

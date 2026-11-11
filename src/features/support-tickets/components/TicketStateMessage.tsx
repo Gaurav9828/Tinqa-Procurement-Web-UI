@@ -1,6 +1,8 @@
 import React from 'react';
-import { AlertTriangle, Inbox, RefreshCw, SearchX, ShieldAlert, WifiOff } from 'lucide-react';
+import { AlertTriangle, Inbox, Lock, RefreshCw, SearchX, ShieldAlert, WifiOff } from 'lucide-react';
 import { isRetryableErrorKind, type ApiErrorKind } from '../../../utils/apiErrorKind';
+import type { TicketDetail } from '../types/supportTicket.types';
+import { formatDateTime } from '../utils/supportTicket.utils';
 
 type Variant = 'empty' | 'noResults' | ApiErrorKind;
 
@@ -46,6 +48,31 @@ export const TicketStateMessage: React.FC<{ variant: Variant; onRetry?: () => vo
           <RefreshCw className="w-3.5 h-3.5" /> Retry
         </button>
       )}
+    </div>
+  );
+};
+
+const closedByText = (ticket: Pick<TicketDetail, 'closedByType' | 'closedBy'>): string => {
+  if (ticket.closedByType === 'CUSTOMER') return 'the customer';
+  if (ticket.closedByType === 'SYSTEM') return 'TinQa automatically';
+  if (ticket.closedByType === 'SUPPORT') return ticket.closedBy || 'TinQa Support';
+  return ticket.closedBy || 'TinQa Support';
+};
+
+/**
+ * Who closed a ticket, when and why: staff close with a reason; tickets raised for a return close automatically when
+ * the return completes. Renders nothing while the ticket is open.
+ */
+export const TicketClosedNote: React.FC<{ ticket: Pick<TicketDetail, 'status' | 'closedAt' | 'closedByType' | 'closedBy' | 'closeReason'> }> = ({ ticket }) => {
+  if (ticket.status !== 'CLOSED') return null;
+  return (
+    <div role="note" aria-label="Ticket closed" className="p-3 rounded-xl bg-black/[0.03] dark:bg-white/[0.04] space-y-1 text-xs">
+      <p className="flex items-center gap-1.5 font-semibold text-black dark:text-white">
+        <Lock className="w-3.5 h-3.5" /> Closed {ticket.closedAt ? `${formatDateTime(ticket.closedAt)} ` : ''}by {closedByText(ticket)}
+      </p>
+      <p className="text-gray-600 dark:text-gray-300 break-words whitespace-pre-line" data-testid="ticket-close-reason">
+        Reason: {ticket.closeReason || '—'}
+      </p>
     </div>
   );
 };

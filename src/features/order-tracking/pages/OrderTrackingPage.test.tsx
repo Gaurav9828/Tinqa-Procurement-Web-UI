@@ -36,6 +36,7 @@ vi.mock('../api/orderTrackingApi', () => ({
     updateTracking: vi.fn(),
     updateDeliveryStatus: vi.fn(),
     approvePreOrder: vi.fn(),
+    resendDeliveryCode: vi.fn(),
   },
 }));
 
@@ -165,6 +166,8 @@ const STATUSES: TrackingStatusOption[] = [
   'RETURN_RECEIVED',
   'RETURN_INSPECTION',
   'RETURN_INSPECTION_FAILED',
+  'RETURN_BACK_IN_TRANSIT',
+  'RETURN_BACK_DELIVERED',
   'RETURN_CANCELLED',
   'RETURN_COMPLETED',
   'REFUND_REQUESTED',
@@ -676,18 +679,34 @@ describe('OrderTrackingPage', () => {
       expect(api.updateTracking).toHaveBeenCalledWith('ORD-1001', { status: 'CANCELLED', notes: null });
     });
 
-    it('asks for confirmation before marking delivered', async () => {
+    it('asks for the customer\'s delivery code and confirmation before marking delivered', async () => {
       api.getOrder.mockResolvedValue(ok(withCurrent('OUT_FOR_DELIVERY')));
       const { user } = renderPage();
       const panel = await openOrder(user);
 
       await chooseStep(user, panel, 'DELIVERED');
+      // Delivered only with the code the customer gives once the device works (owner's rule, 2026-11-10)
+      expect(updateButton(panel)).toBeDisabled();
+      await user.type(within(panel).getByLabelText('Delivery code'), 'aB3kP9x');
       await user.click(updateButton(panel));
       expect(await screen.findByText('Move order to "Delivered"?')).toBeInTheDocument();
       expect(api.updateTracking).not.toHaveBeenCalled();
 
       await user.click(screen.getByRole('button', { name: 'Confirm' }));
-      await waitFor(() => expect(api.updateTracking).toHaveBeenCalledWith('ORD-1001', { status: 'DELIVERED', notes: null }));
+      await waitFor(() =>
+        expect(api.updateTracking).toHaveBeenCalledWith('ORD-1001', { status: 'DELIVERED', notes: null, deliveryCode: 'aB3kP9x' })
+      );
+    });
+
+    it('lets staff email the customer a new delivery code through the staff route', async () => {
+      api.getOrder.mockResolvedValue(ok(withCurrent('OUT_FOR_DELIVERY')));
+      api.resendDeliveryCode.mockResolvedValue(ok({ sentTo: 'an••••@example.com', resendAfterSeconds: 60 }));
+      const { user } = renderPage();
+      const panel = await openOrder(user);
+
+      await chooseStep(user, panel, 'DELIVERED');
+      await user.click(within(panel).getByRole('button', { name: 'Resend code to customer' }));
+      await waitFor(() => expect(api.resendDeliveryCode).toHaveBeenCalledWith('ORD-1001', false));
     });
 
     it('on success shows the API message and re-fetches the order, displaying only server values', async () => {
@@ -943,11 +962,14 @@ describe('OrderTrackingPage', () => {
       expect(stepValues(panel)).toEqual(['OUT_FOR_DELIVERY', 'DELIVERY_REATTEMPT', 'RETURN_IN_TRANSIT']);
     });
 
-    it('after delivery only a return can be requested', async () => {
+    it('after delivery offers no status: a return is enabled in the Return section and started by the customer', async () => {
       api.getOrder.mockResolvedValue(ok(withCurrent('DELIVERED')));
       const { user } = renderPage();
-      const panel = await openOrder(user);
-      expect(stepValues(panel)).toEqual(['RETURN_REQUESTED']);
+      const table = await screen.findByRole('table');
+      await user.click(within(table).getByRole('link', { name: 'ORD-1001' }));
+      const panel = detailPage();
+      expect(await within(panel).findByRole('status', { name: 'Status locked' })).toHaveTextContent('enable a return in the Return section');
+      expect(within(panel).queryByRole('radiogroup', { name: 'Next step' })).not.toBeInTheDocument();
     });
 
     it('shows the return track while a return is in progress', async () => {
@@ -1285,6 +1307,59 @@ describe('delivery riders', () => {
     await within(panel).findByRole('radiogroup', { name: 'Next step' });
     expect(within(panel).getByRole('heading', { name: 'Delivery update' })).toBeInTheDocument();
     expect(stepValues(panel)).toEqual(['DELIVERED', 'CUSTOMER_UNAVAILABLE', 'INVALID_ADDRESS', 'CUSTOMER_CANCELLED_DELIVERY']);
+  });
+
+  it('marks delivered only with the customer\'s 7-character code, sent through the rider route', async () => {
+    const { user, panel } = await openAsRider('OUT_FOR_DELIVERY');
+    await within(panel).findByRole('radiogroup', { name: 'Next step' });
+    expect(within(panel).queryByLabelText('Delivery code')).not.toBeInTheDocument();
+
+    await chooseStep(user, panel, 'DELIVERED');
+    const group = within(panel).getByRole('group', { name: "Customer's delivery code" });
+    expect(group).toHaveTextContent('Once they have checked it is OK and working');
+    const input = within(panel).getByLabelText('Delivery code');
+    // Only letters and digits, at most 7, and case is kept
+    await user.type(input, 'aB-3 kP9xQ');
+    expect(input).toHaveValue('aB3kP9x');
+    await user.click(updateButton(panel));
+    await user.click(await screen.findByRole('button', { name: 'Confirm' }));
+
+    await waitFor(() =>
+      expect(api.updateDeliveryStatus).toHaveBeenCalledWith('ORD-1001', { status: 'DELIVERED', notes: null, deliveryCode: 'aB3kP9x' })
+    );
+    expect(api.updateTracking).not.toHaveBeenCalled();
+  });
+
+  it('shows the server\'s answer to a wrong code under the code field', async () => {
+    api.updateDeliveryStatus.mockRejectedValue(
+      axiosError(400, {
+        errorCode: 'DELIVERY_CODE_INVALID',
+        message: "That code isn't right (capital and small letters differ). 4 tries left.",
+        errors: [{ field: 'deliveryCode', message: "That code isn't right (capital and small letters differ). 4 tries left." }],
+      })
+    );
+    const { user, panel } = await openAsRider('OUT_FOR_DELIVERY');
+    await within(panel).findByRole('radiogroup', { name: 'Next step' });
+    await chooseStep(user, panel, 'DELIVERED');
+    await user.type(within(panel).getByLabelText('Delivery code'), 'Wrong22');
+    await user.click(updateButton(panel));
+    await user.click(await screen.findByRole('button', { name: 'Confirm' }));
+
+    const group = within(panel).getByRole('group', { name: "Customer's delivery code" });
+    expect(await within(group).findByText(/4 tries left/)).toBeInTheDocument();
+  });
+
+  it('emails the customer a new code when asked, then waits a minute before another', async () => {
+    api.resendDeliveryCode.mockResolvedValue(ok({ sentTo: 'an••••@example.com', resendAfterSeconds: 60 }, 'Sent'));
+    const { user, panel } = await openAsRider('OUT_FOR_DELIVERY');
+    await within(panel).findByRole('radiogroup', { name: 'Next step' });
+    await chooseStep(user, panel, 'DELIVERED');
+
+    await user.click(within(panel).getByRole('button', { name: 'Resend code to customer' }));
+    await waitFor(() => expect(api.resendDeliveryCode).toHaveBeenCalledWith('ORD-1001', true));
+    expect(await screen.findByText(/emailed to an••••@example.com/)).toBeInTheDocument();
+    expect(within(panel).getByRole('button', { name: /Resend code in \d+s/ })).toBeDisabled();
+    expect(api.updateDeliveryStatus).not.toHaveBeenCalled();
   });
 
   it('re-attempts a delivery after the customer was unavailable', async () => {

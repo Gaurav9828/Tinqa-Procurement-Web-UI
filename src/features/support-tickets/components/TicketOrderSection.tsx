@@ -56,8 +56,22 @@ export const TicketOrderSection: React.FC<Props> = ({ orderNumber, order, canOpe
       {order ? (
         <>
           <dl className="grid grid-cols-2 gap-3">
+            {order.orderAmount !== undefined && order.orderAmount !== null && (
+              <>
+                <div>
+                  <dt className="text-[10px] uppercase tracking-wider text-gray-400 font-semibold">Order amount</dt>
+                  <dd className="mt-0.5 text-black dark:text-white font-semibold" data-testid="ticket-order-amount">
+                    {formatCurrency(order.orderAmount)}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-[10px] uppercase tracking-wider text-gray-400 font-semibold">Shipping</dt>
+                  <dd className="mt-0.5 text-black dark:text-white" data-testid="ticket-shipping">{formatCurrency(order.shippingFee ?? 0)}</dd>
+                </div>
+              </>
+            )}
             <div>
-              <dt className="text-[10px] uppercase tracking-wider text-gray-400 font-semibold">Total</dt>
+              <dt className="text-[10px] uppercase tracking-wider text-gray-400 font-semibold">Total paid (incl. shipping)</dt>
               <dd className="mt-0.5 text-black dark:text-white font-semibold">{formatCurrency(order.total)}</dd>
             </div>
             <div>

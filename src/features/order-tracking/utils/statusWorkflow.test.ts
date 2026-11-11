@@ -17,6 +17,8 @@ import {
   needsConfirmation,
   SYSTEM_ONLY_STATUSES,
   DELIVERY_OUTCOMES,
+  CUSTOMER_ONLY_STATUSES,
+  getCheckpointLeg,
 } from './statusWorkflow';
 
 /** Paid by default: most tests are about the status table; payment rules have their own block. */
@@ -28,14 +30,14 @@ const JOURNEY = [
   'PROCESSING', 'PACKED', 'SHIPPED', 'IN_TRANSIT', 'OUT_FOR_DELIVERY', 'DELIVERY_FAILED', 'CUSTOMER_UNAVAILABLE',
   'INVALID_ADDRESS', 'CUSTOMER_CANCELLED_DELIVERY', 'DELIVERY_REATTEMPT', 'DELIVERED',
   'RETURN_REQUESTED', 'RETURN_APPROVED', 'OUT_FOR_PICKUP', 'RETURN_PICKED_UP', 'RETURN_IN_TRANSIT', 'RETURN_RECEIVED',
-  'RETURN_INSPECTION', 'REFUND_REQUESTED', 'REFUND_INITIATED', 'REFUND_FAILED',
+  'RETURN_INSPECTION', 'RETURN_INSPECTION_FAILED', 'RETURN_BACK_IN_TRANSIT', 'RETURN_BACK_DELIVERED', 'REFUND_REQUESTED', 'REFUND_INITIATED', 'REFUND_FAILED',
 ];
 const ALLOWED_LOOPS = new Set(['DELIVERY_FAILED→OUT_FOR_DELIVERY', 'DELIVERY_REATTEMPT→OUT_FOR_DELIVERY', 'REFUND_FAILED→REFUND_INITIATED']);
 
 describe('customer order workflow table', () => {
   it('describes every status and only points at statuses it knows', () => {
     expect(Object.keys(NEXT_STATUSES).sort()).toEqual(Object.keys(STATUS_INFO).sort());
-    expect(Object.keys(NEXT_STATUSES)).toHaveLength(33);
+    expect(Object.keys(NEXT_STATUSES)).toHaveLength(35);
     for (const targets of Object.values(NEXT_STATUSES)) for (const target of targets) expect(NEXT_STATUSES).toHaveProperty(target);
   });
 
@@ -85,7 +87,10 @@ describe('customer order workflow table', () => {
   });
 
   it('runs a return through approval, pickup, warehouse, inspection and refund', () => {
-    expect(getAllowedStatuses(ctx('DELIVERED'))).toEqual(['RETURN_REQUESTED']);
+    // Only the customer's start of an enabled return requests it (backend 409 RETURN_NOT_ENABLED otherwise).
+    expect(NEXT_STATUSES.DELIVERED).toEqual(['RETURN_REQUESTED']);
+    expect(getAllowedStatuses(ctx('DELIVERED'))).toEqual([]);
+    expect(getLockReason(ctx('DELIVERED'))).toMatch(/enable a return in the Return section/);
     expect(getAllowedStatuses(ctx('RETURN_REQUESTED'))).toEqual(['RETURN_APPROVED', 'RETURN_REJECTED']);
     expect(getAllowedStatuses(ctx('RETURN_APPROVED'))).toEqual(['OUT_FOR_PICKUP', 'RETURN_CANCELLED']);
     expect(getAllowedStatuses(ctx('OUT_FOR_PICKUP'))).toEqual(['RETURN_PICKED_UP', 'RETURN_CANCELLED']);
@@ -239,5 +244,56 @@ describe('delivery riders', () => {
     }
     expect(needsConfirmation('DELIVERY_REATTEMPT')).toBe(false);
     expect(needsConfirmation('OUT_FOR_DELIVERY')).toBe(false);
+  });
+});
+
+describe('returns enabled by staff', () => {
+  it('never offers Return requested: only the customer starts a return', () => {
+    expect([...CUSTOMER_ONLY_STATUSES]).toEqual(['RETURN_REQUESTED']);
+    for (const current of [...Object.keys(NEXT_STATUSES), null]) {
+      for (const hasReturn of [false, true]) {
+        expect(getAllowedStatuses({ currentStatus: current, paymentStatus: 'PAID', hasReturn })).not.toContain('RETURN_REQUESTED');
+      }
+    }
+  });
+
+  it('records a failed inspection through the inspection when a return exists, by hand only for older returns', () => {
+    expect(getAllowedStatuses({ currentStatus: 'RETURN_INSPECTION', paymentStatus: 'PAID', hasReturn: true })).toEqual([]);
+    expect(getAllowedStatuses({ currentStatus: 'RETURN_INSPECTION', paymentStatus: 'PENDING', hasReturn: true })).toEqual(['RETURN_COMPLETED']);
+    expect(getAllowedStatuses(ctx('RETURN_INSPECTION'))).toEqual(['RETURN_INSPECTION_FAILED']);
+    expect(getRefundHint({ currentStatus: 'RETURN_INSPECTION', paymentStatus: 'PAID', hasReturn: true })).toMatch(/Record the inspection in the Return section/);
+    // Once the refund was requested by the inspection, the Refunds section takes over
+    expect(getRefundHint({ currentStatus: 'RETURN_INSPECTION', paymentStatus: 'REFUND_REQUESTED', hasReturn: true })).toMatch(/refund has been requested/);
+  });
+
+  it('sends a product that failed inspection back to the customer, then closes the order', () => {
+    expect(getAllowedStatuses(ctx('RETURN_INSPECTION_FAILED'))).toEqual(['RETURN_BACK_IN_TRANSIT']);
+    expect(getAllowedStatuses(ctx('RETURN_BACK_IN_TRANSIT'))).toEqual(['RETURN_BACK_DELIVERED']);
+    expect(getAllowedStatuses(ctx('RETURN_BACK_DELIVERED'))).toEqual([]);
+    expect(FINAL_STATUSES.has('RETURN_INSPECTION_FAILED')).toBe(false);
+    expect(FINAL_STATUSES.has('RETURN_BACK_DELIVERED')).toBe(true);
+    expect(getLockReason(ctx('RETURN_INSPECTION_FAILED'))).toBeNull();
+    expect(getLockReason(ctx('RETURN_BACK_DELIVERED'))).toMatch(/delivered back to the customer.*final/);
+    expect(getStage('RETURN_BACK_IN_TRANSIT')).toBe('RETURNS');
+    expect(getStage('RETURN_BACK_DELIVERED')).toBe('CLOSED');
+    expect(RETURN_TRACK.flatMap((step) => step.statuses)).toEqual(expect.arrayContaining(['RETURN_BACK_IN_TRANSIT', 'RETURN_BACK_DELIVERED']));
+  });
+
+  it("can't reject or cancel a return whose charge the customer paid", () => {
+    expect(getAllowedStatuses({ currentStatus: 'RETURN_REQUESTED', paymentStatus: 'PAID', hasReturn: true, returnChargePaid: true })).toEqual(['RETURN_APPROVED']);
+    expect(getAllowedStatuses({ currentStatus: 'RETURN_APPROVED', paymentStatus: 'PAID', hasReturn: true, returnChargePaid: true })).toEqual(['OUT_FOR_PICKUP']);
+    expect(getAllowedStatuses({ currentStatus: 'OUT_FOR_PICKUP', paymentStatus: 'PAID', hasReturn: true, returnChargePaid: false })).toEqual([
+      'RETURN_PICKED_UP',
+      'RETURN_CANCELLED',
+    ]);
+  });
+
+  it('allows hub checkpoints only while a delivery or a return is under way', () => {
+    expect(getCheckpointLeg('SHIPPED')).toBe('DELIVERY');
+    expect(getCheckpointLeg('IN_TRANSIT')).toBe('DELIVERY');
+    for (const status of ['RETURN_PICKED_UP', 'RETURN_IN_TRANSIT', 'RETURN_BACK_IN_TRANSIT']) expect(getCheckpointLeg(status)).toBe('RETURN');
+    for (const status of ['PACKED', 'OUT_FOR_DELIVERY', 'DELIVERED', 'OUT_FOR_PICKUP', 'RETURN_RECEIVED', 'RETURN_INSPECTION_FAILED', null]) {
+      expect(getCheckpointLeg(status)).toBeNull();
+    }
   });
 });

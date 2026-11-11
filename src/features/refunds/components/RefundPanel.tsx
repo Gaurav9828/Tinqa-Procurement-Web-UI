@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { Copy, Loader2, RefreshCw, Undo2 } from 'lucide-react';
+import { Loader2, RefreshCw, Undo2 } from 'lucide-react';
 import { formatDateTime, formatUpdater } from '../../order-tracking/utils/orderTracking.utils';
 import { formatPaise, formatPaymentMethod } from '../../order-tracking/utils/payment.utils';
-import { useNotify } from '../../../hooks/useNotify';
+import { CopyableId } from '../../order-tracking/components/CopyableId';
 import type { OrderRefundsState } from '../hooks/useOrderRefunds';
 import type { Refund, RefundablePayment } from '../types/refund.types';
 import { useRefundAccess } from '../hooks/useRefundAccess';
@@ -22,26 +22,6 @@ const Field: React.FC<{ label: string; children: React.ReactNode; testId?: strin
     </dd>
   </div>
 );
-
-const CopyableId: React.FC<{ value: string; label: string }> = ({ value, label }) => {
-  const notify = useNotify();
-  const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(value);
-      notify.success(`${label} copied.`);
-    } catch {
-      notify.error(`${label} could not be copied. Select it and copy it manually.`);
-    }
-  };
-  return (
-    <span className="inline-flex items-center gap-1.5 max-w-full">
-      <span className="font-mono select-all break-all">{value}</span>
-      <button type="button" onClick={copy} aria-label={`Copy ${label}`} className="p-1 rounded-md text-gray-400 hover:text-black dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/10 cursor-pointer shrink-0">
-        <Copy className="w-3 h-3" />
-      </button>
-    </span>
-  );
-};
 
 const PaymentRow: React.FC<{ payment: RefundablePayment }> = ({ payment }) => (
   <dl className="grid grid-cols-2 sm:grid-cols-3 gap-4 p-4 rounded-xl bg-black/[0.03] dark:bg-white/[0.04]" aria-label={`Payment ${payment.razorpayPaymentId}`}>

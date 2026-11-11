@@ -14,6 +14,10 @@ export const STATUS_NOTES_MAX_LENGTH = 500;
 export const SHIPPING_COST_STATUSES: ReadonlySet<string> = new Set(['SHIPPED', 'DELIVERY_REATTEMPT', 'OUT_FOR_PICKUP', 'RETURN_PICKED_UP']);
 export const SHIPPING_COST_REQUIRED: ReadonlySet<string> = new Set(['SHIPPED']);
 
+/** The customer's delivery code: 7 letters and digits, case-sensitive (Ecommerce DeliveryCodeService). */
+export const DELIVERY_CODE_LENGTH = 7;
+export const DELIVERY_CODE_PATTERN = /^[A-Za-z0-9]{7}$/;
+
 export interface ShippingCostInput {
   cost: string;
   partner: string;
@@ -30,6 +34,7 @@ export interface StatusUpdateResult {
  * one history event and updates orderStatus. Authorization, audit fields and the authoritative
  * transition rules are the backend's job; `isAllowed` mirrors the workflow so invalid moves are never sent.
  * `deliveryOnly` (delivery riders) sends to PATCH /orders/{n}/delivery-status instead, which takes delivery outcomes only.
+ * DELIVERED carries the customer's delivery code; a wrong one comes back as a `deliveryCode` field error.
  */
 export const useStatusUpdate = (
   isAllowed: (status: string) => boolean,
@@ -50,7 +55,13 @@ export const useStatusUpdate = (
   const notify = useNotify();
 
   const submit = useCallback(
-    async (orderNumber: string, status: string, notes: string, shipping?: ShippingCostInput): Promise<StatusUpdateResult> => {
+    async (
+      orderNumber: string,
+      status: string,
+      notes: string,
+      shipping?: ShippingCostInput,
+      deliveryCode?: string
+    ): Promise<StatusUpdateResult> => {
       if (inFlight.current) return { ok: false, fieldErrors: {} };
 
       if (!status) {
@@ -64,6 +75,15 @@ export const useStatusUpdate = (
         return { ok: false, fieldErrors: { notes: `Notes cannot exceed ${STATUS_NOTES_MAX_LENGTH} characters.` } };
       }
       const finalNotes = trimmedNotes || null;
+
+      // Delivered only with the code the customer gives once the device is set up and working
+      const code = status === 'DELIVERED' ? (deliveryCode ?? '').trim() : '';
+      if (status === 'DELIVERED' && !DELIVERY_CODE_PATTERN.test(code)) {
+        return {
+          ok: false,
+          fieldErrors: { deliveryCode: `Enter the ${DELIVERY_CODE_LENGTH}-character code the customer gives you (letters and digits).` },
+        };
+      }
 
       let shippingCost: number | null = null;
       let shippingPartner: string | null = null;
@@ -85,7 +105,12 @@ export const useStatusUpdate = (
       setIsSubmitting(true);
       try {
         const update = deliveryOnly ? orderTrackingApi.updateDeliveryStatus : orderTrackingApi.updateTracking;
-        const payload = shippingCost === null ? { status, notes: finalNotes } : { status, notes: finalNotes, shippingCost, shippingPartner };
+        const payload = {
+          status,
+          notes: finalNotes,
+          ...(shippingCost === null ? {} : { shippingCost, shippingPartner }),
+          ...(code ? { deliveryCode: code } : {}),
+        };
         const res = await update(orderNumber, payload);
 
         if (!res.success) {

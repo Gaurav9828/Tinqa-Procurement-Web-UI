@@ -17,7 +17,13 @@ import { StoreSaleCard } from '../../store-sales/components/StoreSaleCard';
 import { RefundPanel } from '../../refunds/components/RefundPanel';
 import { useOrderRefunds } from '../../refunds/hooks/useOrderRefunds';
 import { OrderProfitCard } from '../components/OrderProfitCard';
-import { getAllowedStatuses, getDeliveryOutcomes, getStage, isFullyPaid, type WorkflowContext } from '../utils/statusWorkflow';
+import { ReturnPanel } from '../components/ReturnPanel';
+import { CheckpointsPanel } from '../components/CheckpointsPanel';
+import { CopyableId } from '../components/CopyableId';
+import { useOrderReturn } from '../hooks/useOrderReturn';
+import { useCheckpoints } from '../hooks/useCheckpoints';
+import { useDeliveryCodeResend } from '../hooks/useDeliveryCodeResend';
+import { getAllowedStatuses, getCheckpointLeg, getDeliveryOutcomes, getStage, isFullyPaid, type WorkflowContext } from '../utils/statusWorkflow';
 import { formatCurrency, formatDateTime, formatUpdater, getCurrentEntry, hasPreOrderLines, sortTimeline } from '../utils/orderTracking.utils';
 import { useAccess } from '../../../hooks/useAccess';
 import { ORDER_TRACKING_LIST_PATH, type OrderDetailLocationState } from '../utils/orderTrackingRoutes';
@@ -70,8 +76,10 @@ export const OrderTrackingDetailPage: React.FC = () => {
     () => ({
       currentStatus: getCurrentEntry(detail.timeline)?.status ?? detail.order?.orderStatus ?? null,
       paymentStatus: detail.order?.paymentStatus ?? null,
+      hasReturn: !!detail.order?.returnInfo,
+      returnChargePaid: detail.order?.returnInfo?.chargeStatus === 'PAID',
     }),
-    [detail.timeline, detail.order?.orderStatus, detail.order?.paymentStatus]
+    [detail.timeline, detail.order?.orderStatus, detail.order?.paymentStatus, detail.order?.returnInfo]
   );
   const statusHistory = useMemo(() => sortTimeline(detail.timeline).map((entry) => entry.status), [detail.timeline]);
 
@@ -91,6 +99,9 @@ export const OrderTrackingDetailPage: React.FC = () => {
   const deliveryOnly = !canUpdateAnyStatus && can('DELIVERY_STATUS_UPDATE');
   const canUpdate = canUpdateAnyStatus || deliveryOnly;
   const canApprovePreOrder = can('CUSTOMER_ORDER_PRE_ORDER_APPROVE');
+  const canManageReturns = can('REFUND_REQUEST');
+  // Store Managers decide Customer Support's requests (raised from the customer's ticket) and change the charge
+  const canDecideReturns = can('RETURN_ENABLE');
 
   // A status must exist on the server AND be a valid move from the current stage (a delivery outcome, for riders).
   const isAllowed = useCallback(
@@ -110,6 +121,12 @@ export const OrderTrackingDetailPage: React.FC = () => {
   const { isSubmitting, submit } = useStatusUpdate(isAllowed, { onSuccess: refreshAll, onConflict: refreshAll, deliveryOnly });
   // Pre-orders are approved only through the dedicated endpoint; the result is reloaded from the server.
   const { approve: approvePreOrder, isApproving } = usePreOrderApproval(orderNumber, refresh);
+  // Return steps change only the order; the inspection also requests a refund.
+  const returns = useOrderReturn(orderNumber, { onOrderChanged: refresh, onRefundChanged: refreshAll });
+  // Hub checkpoints: staff through their route, riders (DELIVERY_STATUS_UPDATE only) through theirs. Only the order reloads.
+  const checkpoints = useCheckpoints(orderNumber, { riderRoute: deliveryOnly }, refresh);
+  // The customer asked the delivery partner for their delivery code again
+  const deliveryCodeResend = useDeliveryCodeResend(orderNumber, { riderRoute: deliveryOnly });
 
   const { order, timeline } = detail;
   const currentEvent = getCurrentEntry(timeline);
@@ -172,9 +189,20 @@ export const OrderTrackingDetailPage: React.FC = () => {
               <dl className="grid grid-cols-2 sm:grid-cols-3 gap-4">
                 <Field label="Customer">{order.customer?.name || '—'}</Field>
                 <Field label="Email">{order.customer?.email || '—'}</Field>
-                <Field label="Subtotal">{formatCurrency(order.subtotal)}</Field>
+                {/* The order amount never includes shipping (owner's rule): returns refund it at most */}
+                <Field label="Order amount">{formatCurrency(order.subtotal)}</Field>
                 <Field label="Shipping">{formatCurrency(order.shippingFee)}</Field>
-                <Field label="Total">{formatCurrency(order.totalAmount)}</Field>
+                <Field label="Total paid (incl. shipping)">{formatCurrency(order.totalAmount)}</Field>
+                {order.deliveryTrackingId && (
+                  <Field label="Delivery tracking ID" testId="delivery-tracking-id">
+                    <CopyableId value={order.deliveryTrackingId} label="Delivery tracking ID" />
+                  </Field>
+                )}
+                {order.returnInfo?.trackingId && (
+                  <Field label="Return tracking ID" testId="return-tracking-id">
+                    <CopyableId value={order.returnInfo.trackingId} label="Return tracking ID" />
+                  </Field>
+                )}
               </dl>
 
               <ShippingAddressLink address={order.shippingAddress} addressId={order.addressId} />
@@ -187,6 +215,17 @@ export const OrderTrackingDetailPage: React.FC = () => {
             </Card>
 
             <PaymentDetailsCard order={order} />
+
+            <ReturnPanel
+              orderNumber={orderNumber}
+              orderStatus={workflow.currentStatus}
+              orderAmount={order.subtotal ?? null}
+              shippingFee={order.shippingFee ?? null}
+              returnInfo={order.returnInfo ?? null}
+              canManage={canManageReturns}
+              canDecide={canDecideReturns}
+              actions={returns}
+            />
 
             <RefundPanel orderNumber={orderNumber} refunds={refunds} onChanged={refreshAll} />
 
@@ -260,9 +299,19 @@ export const OrderTrackingDetailPage: React.FC = () => {
                   isSubmitting={isSubmitting}
                   onSubmit={submit}
                   deliveryOnly={deliveryOnly}
+                  deliveryCodeResend={deliveryCodeResend}
                 />
               </Card>
             )}
+            <CheckpointsPanel
+              checkpoints={order.checkpoints ?? []}
+              openLeg={getCheckpointLeg(workflow.currentStatus)}
+              canAdd={canUpdate}
+              canDelete={canUpdateAnyStatus}
+              isSubmitting={checkpoints.isSubmitting}
+              onAdd={checkpoints.addCheckpoint}
+              onDelete={checkpoints.deleteCheckpoint}
+            />
             <Card title="Tracking History">
               <TrackingTimeline entries={timeline} />
             </Card>

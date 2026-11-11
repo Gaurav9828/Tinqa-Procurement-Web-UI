@@ -167,7 +167,9 @@ const renderPage = () => {
 
 const row = (id: number) => screen.getByTestId(`product-row-${id}`);
 const stateOf = (id: number) => within(row(id)).getByTestId('product-approval-state');
-const waitForStates = () => waitFor(() => expect(stateOf(1)).not.toHaveAttribute('data-state', 'UNKNOWN'));
+// Every row's state, not only product 1's: a legacy product's state is known before the approvals have loaded
+const waitForStates = () =>
+  waitFor(() => products.forEach((p) => expect(stateOf(p.id)).not.toHaveAttribute('data-state', 'UNKNOWN')));
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -341,7 +343,8 @@ describe('Admin L2 review', () => {
   const openReview = async (user: User, id = 2, title = 'Pending Panel') => {
     await screen.findByText(title);
     await waitForStates();
-    await user.click(within(row(id)).getByRole('button', { name: `Review approval for ${title}` }));
+    // The button appears once this row's own approval has loaded, which can land after product 1's state
+    await user.click(await within(row(id)).findByRole('button', { name: `Review approval for ${title}` }));
     return screen.getByRole('dialog', { name: 'Review product approval' });
   };
 

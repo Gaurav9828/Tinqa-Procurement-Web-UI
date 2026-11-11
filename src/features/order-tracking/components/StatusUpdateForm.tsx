@@ -1,11 +1,13 @@
 import React, { useMemo, useState } from 'react';
-import { CreditCard, Loader2, Lock, RefreshCw, Send, Truck, Undo2 } from 'lucide-react';
+import { CreditCard, KeyRound, Loader2, Lock, Mail, RefreshCw, Send, Truck, Undo2 } from 'lucide-react';
 import { CommonInput, CommonTextArea } from '../../../components/ui/FormInputs';
 import { ConfirmationModal } from '../../../components/ui/ConfirmationModal';
 import { NextStepPicker } from '../../../components/ui/NextStepPicker';
 import type { TrackingStatusOption } from '../types/orderTracking.types';
 import { formatStatusLabel } from '../utils/orderTracking.utils';
 import {
+  DELIVERY_CODE_LENGTH,
+  DELIVERY_CODE_PATTERN,
   SHIPPING_COST_REQUIRED,
   SHIPPING_COST_STATUSES,
   STATUS_NOTES_MAX_LENGTH,
@@ -35,7 +37,15 @@ interface Props {
   /** Current status and payment, which decide the allowed next steps. */
   workflow: WorkflowContext;
   isSubmitting: boolean;
-  onSubmit: (orderNumber: string, status: string, notes: string, shipping?: ShippingCostInput) => Promise<StatusUpdateResult>;
+  onSubmit: (
+    orderNumber: string,
+    status: string,
+    notes: string,
+    shipping?: ShippingCostInput,
+    deliveryCode?: string
+  ) => Promise<StatusUpdateResult>;
+  /** Emails the customer a new delivery code (useDeliveryCodeResend); offered with Delivered. */
+  deliveryCodeResend?: { resend: () => Promise<boolean>; isSending: boolean; waitSeconds: number };
   /** Delivery riders: only delivery outcomes are offered; payment and refund guidance is not theirs to act on. */
   deliveryOnly?: boolean;
 }
@@ -55,8 +65,10 @@ export const StatusUpdateForm: React.FC<Props> = ({
   isSubmitting,
   onSubmit,
   deliveryOnly = false,
+  deliveryCodeResend,
 }) => {
   const [status, setStatus] = useState('');
+  const [deliveryCode, setDeliveryCode] = useState('');
   const [notes, setNotes] = useState('');
   const [shippingCost, setShippingCost] = useState('');
   const [shippingPartner, setShippingPartner] = useState('');
@@ -67,6 +79,8 @@ export const StatusUpdateForm: React.FC<Props> = ({
   // The cost of the leg this move starts, entered here and sent for approval as an expense
   const asksShippingCost = !deliveryOnly && SHIPPING_COST_STATUSES.has(status);
   const shippingCostRequired = SHIPPING_COST_REQUIRED.has(status);
+  // Delivered needs the code the customer gives once the device is set up and working
+  const asksDeliveryCode = status === 'DELIVERED';
 
   // Workflow rules ∩ statuses the server knows (a step the backend doesn't support yet is never offered).
   const options = useMemo(() => {
@@ -89,7 +103,13 @@ export const StatusUpdateForm: React.FC<Props> = ({
   const refundHint = deliveryOnly ? null : getRefundHint(workflow);
 
   const send = async () => {
-    const result = await onSubmit(orderNumber, status, notes, asksShippingCost ? { cost: shippingCost, partner: shippingPartner } : undefined);
+    const result = await onSubmit(
+      orderNumber,
+      status,
+      notes,
+      asksShippingCost ? { cost: shippingCost, partner: shippingPartner } : undefined,
+      asksDeliveryCode ? deliveryCode : undefined
+    );
     setConfirmOpen(false);
     setFieldErrors(result.fieldErrors);
     if (result.ok) {
@@ -97,6 +117,7 @@ export const StatusUpdateForm: React.FC<Props> = ({
       setNotes('');
       setShippingCost('');
       setShippingPartner('');
+      setDeliveryCode('');
     }
   };
 
@@ -105,6 +126,13 @@ export const StatusUpdateForm: React.FC<Props> = ({
     if (controlsDisabled || !status) return;
     if (asksShippingCost && shippingCostRequired && !shippingCost.trim()) {
       setFieldErrors((prev) => ({ ...prev, shippingCost: 'Enter what this shipment costs (0 if nothing).' }));
+      return;
+    }
+    if (asksDeliveryCode && !DELIVERY_CODE_PATTERN.test(deliveryCode.trim())) {
+      setFieldErrors((prev) => ({
+        ...prev,
+        deliveryCode: `Enter the ${DELIVERY_CODE_LENGTH}-character code the customer gives you (letters and digits).`,
+      }));
       return;
     }
     if (status && needsConfirmation(status)) {
@@ -121,7 +149,9 @@ export const StatusUpdateForm: React.FC<Props> = ({
         workflow.paymentStatus && workflow.paymentStatus.toUpperCase() === 'PAID' ? '; the payment will then be refunded' : ''
       }.`;
     }
-    if (status === 'DELIVERED') return `Order ${orderNumber} will be marked Delivered. After this, only a return can be requested.`;
+    if (status === 'DELIVERED') {
+      return `Order ${orderNumber} will be marked Delivered with the customer's delivery code, which confirms the device was set up and works. After this, only a return can be requested.`;
+    }
     if (status === 'CUSTOMER_CANCELLED_DELIVERY') {
       return `Order ${orderNumber} will be recorded as refused by the customer. It can't be delivered again and goes back to the warehouse.`;
     }
@@ -248,6 +278,53 @@ export const StatusUpdateForm: React.FC<Props> = ({
             </p>
           </div>
         )}
+        {asksDeliveryCode && (
+          <div className="space-y-2 p-3 rounded-xl bg-emerald-500/[0.06] border border-emerald-500/20" role="group" aria-label="Customer's delivery code">
+            <p className="flex items-start gap-1.5 text-[11px] text-gray-700 dark:text-gray-300">
+              <KeyRound className="w-3.5 h-3.5 mt-px shrink-0 text-emerald-600" />
+              <span>
+                Unpack the device, set it up and show the customer how it works. Once they have checked it is OK and working,
+                they give you the {DELIVERY_CODE_LENGTH}-character code from their &ldquo;out for delivery&rdquo; email. That code is
+                their confirmation; never ask for it before.
+              </span>
+            </p>
+            <CommonInput
+              label="Delivery code"
+              aria-label="Delivery code"
+              required
+              maxLength={DELIVERY_CODE_LENGTH}
+              autoComplete="off"
+              autoCapitalize="off"
+              autoCorrect="off"
+              spellCheck={false}
+              placeholder="e.g. aB3kP9x"
+              className="font-mono tracking-[0.3em]"
+              value={deliveryCode}
+              error={fieldErrors.deliveryCode}
+              disabled={controlsDisabled}
+              onChange={(e) => {
+                setDeliveryCode(e.target.value.replace(/[^A-Za-z0-9]/g, ''));
+                setFieldErrors((prev) => ({ ...prev, deliveryCode: '' }));
+              }}
+            />
+            <div className="flex flex-wrap items-center justify-between gap-2 px-1">
+              <span className="text-[10px] text-gray-500 dark:text-neutral-400">
+                Capital and small letters differ. After 5 wrong tries the code stops working.
+              </span>
+              {deliveryCodeResend && (
+                <button
+                  type="button"
+                  onClick={() => void deliveryCodeResend.resend()}
+                  disabled={controlsDisabled || deliveryCodeResend.isSending || deliveryCodeResend.waitSeconds > 0}
+                  className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold border border-[#0071e3]/40 bg-[#0071e3]/10 text-[#0071e3] dark:text-blue-400 hover:bg-[#0071e3]/20 disabled:opacity-60 cursor-pointer disabled:cursor-not-allowed"
+                >
+                  {deliveryCodeResend.isSending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Mail className="w-3 h-3" />}
+                  {deliveryCodeResend.waitSeconds > 0 ? `Resend code in ${deliveryCodeResend.waitSeconds}s` : 'Resend code to customer'}
+                </button>
+              )}
+            </div>
+          </div>
+        )}
         <div>
           <CommonTextArea
             label="Notes (optional)"
@@ -268,7 +345,7 @@ export const StatusUpdateForm: React.FC<Props> = ({
         </div>
         <button
           type="submit"
-          disabled={controlsDisabled || !status}
+          disabled={controlsDisabled || !status || (asksDeliveryCode && deliveryCode.length !== DELIVERY_CODE_LENGTH)}
           className={`w-full flex items-center justify-center gap-2 px-4 py-2.5 text-white rounded-xl text-xs font-semibold transition-colors disabled:opacity-60 cursor-pointer disabled:cursor-not-allowed ${
             !status ? 'bg-[#0071e3] hover:bg-[#0077ed]' : STATUS_INFO[status]?.tone === 'exception' ? 'bg-rose-600 hover:bg-rose-700' : 'bg-emerald-600 hover:bg-emerald-700'
           }`}

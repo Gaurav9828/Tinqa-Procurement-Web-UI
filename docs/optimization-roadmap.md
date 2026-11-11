@@ -111,7 +111,7 @@ These reports load records and total them up in Java today. Each becomes a SQL f
   - `show-sql=false` in the base properties file;
   - add `@Transactional(readOnly = true)` to product and customer-order reads.
 - **Both backends:**
-  - size the Hikari pool explicitly;
+  - size the Hikari pool explicitly (Procurement done 2026-11-09: `DB_POOL_MAX_SIZE`, default 10; Ecommerce still to do);
   - set `hibernate.jdbc.batch_size`, `order_inserts` and `order_updates`;
   - use pooled SEQUENCE ids on bulk-insert tables.
 - **Procurement:** send notification broadcasts as one `INSERT ... SELECT`.

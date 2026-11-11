@@ -66,10 +66,50 @@ export interface GuideChange {
 }
 
 /** Bump with every guide update; printed on the page and on every PDF. */
-export const GUIDE_VERSION = '2.61';
-export const GUIDE_UPDATED = '2026-11-08';
+export const GUIDE_VERSION = '2.67';
+export const GUIDE_UPDATED = '2026-11-11';
 
 export const GUIDE_CHANGELOG: GuideChange[] = [
+  {
+    date: '2026-11-11',
+    changes: [
+      'Returns are now requested only from the customer\'s support ticket about the order. In the ticket\'s Return section, Request return lists the customer\'s own messages in that ticket: pick the one that explains why they want to return it (the latest is preselected). Its text goes to the Store Manager exactly as the customer wrote it and can\'t be edited; staff no longer type the customer\'s reason. Add the proposed charge and, if useful, an internal note for the Store Manager (never shown to the customer). The order page no longer has a Request return button; it says "Returns are requested from the customer\'s support ticket for this order."',
+      'Store Managers no longer enable a return directly. They approve (possibly with another charge) or reject the requests Customer Support raises, in Approvals Hub › Return requests, the order\'s Return section or the ticket. Each request shows the customer\'s own words, a link to the ticket they come from, the staff note and who requested it. Nobody decides a request they raised themselves: they see "You raised this request, so another Store Manager must decide it." Changing the charge of an enabled return and withdrawing a return work as before.',
+      'Closing a support ticket now needs a reason, and is possible only 24 hours after TinQa Support\'s latest reply if the customer hasn\'t answered it. Anyone who can change a ticket\'s status can close it. Until then Close ticket is greyed out and says from when it can be closed, or, when the customer is waiting for us, to reply first. A closed ticket shows who closed it, when and why. Suggested replies no longer offer "Send & close": send the reply, then close the ticket a day later if the customer doesn\'t write back.',
+      'A ticket raised for a return closes automatically when that return is completed; it shows "Closed by TinQa automatically" with the reason.',
+      'Courtesy check: replies to customers, close reasons, return staff notes, charge reasons, reject reasons and inspection notes can\'t contain offensive or abusive words (English, Hinglish or Hindi, also when written with symbols, stars or spaces). Each box reminds you to keep it polite and professional, says so as you type, and won\'t send until the words are removed; the server checks again.',
+    ],
+  },
+  {
+    date: '2026-11-10',
+    changes: [
+      'Refunded orders now come with a return and refund statement for the customer: on the storefront order page, once a refund has been processed, they can preview or download a PDF with the items, the return reason, the return charge and what it was for, whether it was deducted from the refund or paid separately (with its Razorpay payment), how the order was paid (UPI, card, net banking…), each refund with its Razorpay refund reference and credit note number, and what they paid in the end. Their tax invoice also stays downloadable after the refund.',
+      'Storefront order page: once the parcel is delivered, the customer no longer sees Track delivery or Refresh; once the return\'s refund is sent or done, Track return disappears too. A refunded return now shows Return completed in its progress bar.',
+      'Storefront navigation: Back buttons now return to the page the customer actually came from (for example the order list with its filters, a support ticket or the home page), and fall back to a sensible page only when the page was opened directly from an email link. After placing and paying for an order, customers land on that order\'s details page instead of the home page.',
+      'Delivery code: the customer\'s "out for delivery" email now carries a 7-character delivery code of digits and capital and small letters (e.g. aB3kP9x; capital and small letters differ). The delivery partner unpacks the device, sets it up and shows the customer how it works; once the customer has checked it is OK and working, they give the code. That code is their confirmation, and an order can be marked Delivered only with it (Customer Order Tracking › the order › Delivered › Delivery code), by riders and staff alike. The tracking history notes that the customer confirmed the device works.',
+      'Resend code to customer: if the customer can\'t find the code, the delivery partner (or staff) presses Resend code to customer next to the code field; a new code is emailed and the old one stops working. Once a minute at most, and only while the order is out for delivery. After 5 wrong codes the code stops working and a new one must be sent. A new delivery attempt (out for delivery again) always brings a new code.',
+      'Customer Support now requests a return instead of enabling it. Return › Request return takes the customer\'s reason and a proposed charge; the customer is emailed that their request is being reviewed. A Store Manager (Level 1 too) or the Super Admin approves it, and may change the charge first, or rejects it with a reason the customer is emailed (Approvals Hub › Return requests, or the order\'s Return section). Store Managers and the Super Admin can still enable a return directly.',
+      'The order amount never includes shipping. A ₹500 product with ₹500 shipping is a ₹500 order: screens show Order amount, Shipping and Total paid (incl. shipping) apart, and a return refunds at most the order amount (shipping is never refunded).',
+      'The return charge may now be any amount. When it is less than the order amount the customer chooses to have it deducted from the refund or to pay it now (then the full order amount comes back). When it is equal to or more than the order amount, the customer must pay it before the return starts. The dialog tells you which applies as you type the charge.',
+      'Customers must agree to the return charge before starting a return; the Return section shows when they did. A Store Manager can change the charge of an enabled return until the customer starts it (Return › Change charge): the customer is emailed and must agree again; the 7 days are not extended.',
+      'Returns can be requested, approved or rejected right from the support ticket chat: a ticket about an order shows its Return section next to the linked order, with the order amount and shipping apart.',
+      'Customers are emailed at every step of a return: request under review, return approved (with the charge, the order amount, the shipping that is not refunded and what they get back either way), charge changed, request not accepted (with the reason), return withdrawn, charge paid, approved for pickup, out for pickup, picked up, received, inspection result, product sent back, return completed or cancelled, and refund completed.',
+    ],
+  },
+  {
+    date: '2026-11-09',
+    changes: [
+      'TinQa now delivers with its own team, and customers track it with TinQa\'s own tracking ID. When an order is marked shipped it gets a delivery tracking ID such as TQD-1A2B3C4D (a started return gets TQR-…). The ID is emailed to the customer with a link to their tracking page on the storefront (Delivery › Tracking, sign-in required). Customer Order Tracking › the order shows both IDs with a copy button.',
+      'Hub checkpoints: while an order is shipped or in transit, or a return is picked up, in transit or being sent back, staff and riders add "Reached <place>" / "Left <place>" checkpoints (Customer Order Tracking › the order › Hub checkpoints): the place, and optionally the city, the 6-digit PIN code and the time (now if left empty, never in the future), as many as the trip needs, several a day. The first checkpoint moves a shipped order to in transit (and a picked-up return to return in transit). Fulfilment staff, the Fleet Coordinator, Store Managers and the Super Admin add and delete them; Delivery Riders add them. The customer sees every checkpoint on their tracking page.',
+      'Orders are no longer returnable by default. When a customer contacts TinQa with a reason we accept, Customer Support (or a Store Manager / Super Admin) opens the order and uses Return › Enable return: the customer\'s reason, a return charge in ₹ (0 for free, less than the order total) and what the charge is for. The customer then has 7 days to start the return on the storefront, choosing to have the charge deducted from the refund or to pay it now. An enabled return can be withdrawn (not while the customer is paying) and, once its 7 days are over, enabled again. Staff can no longer set "Return requested" themselves; only the customer\'s start does. A return whose charge the customer paid can no longer be rejected or cancelled.',
+      'Return inspection: when the returned item is in Return inspection, Customer Support records the result (Return › Record inspection). Pass refunds what was paid, less the charge when it is deducted; Partial refunds a lower amount, with the reason; both send the refund to a Level 2 for approval in Approvals Hub › Refunds as before. Fail (with the reason) means no refund: the product is sent back to the customer (Sent back to customer → Delivered back to customer), which closes the order.',
+      'Stock entries and purchase orders now follow maker-checker like everything else that moves money: whoever entered a stock entry, or made its latest change, cannot approve or reject it, and whoever raised a purchase order, edited it or sent it for approval cannot approve or reject it. Another Level 2 decides it; the Approvals Hub says so with "another Admin L2 has to approve or reject it".',
+      'Sign-in is locked for 15 minutes after 5 wrong passwords in a row on the same username, for staff and suppliers alike. The sign-in page says how long is left; "Forgot password?" still works. Every sign-in, failed sign-in and locked attempt is recorded with its time, IP address and browser.',
+      'Signing out, changing your password, a disabled account and a changed designation or role now also apply to the store-side pages (customer orders, refunds, finance, promo codes, store sales) within a minute. Before, those pages kept accepting the old sign-in and permissions until it expired.',
+      'Customers who delete their account on the storefront are now erased, as India\'s data protection law (DPDP) requires: their name, email, phone number, date of birth and saved addresses are removed and they are signed out everywhere. Customer Management shows them as "Deleted customer". Their orders and invoices are kept, each with its own copy of the delivery address, because tax law requires them. The same email can register again as a new account. Customers can also download everything their account holds (Profile › Security › Download My Data).',
+      'Uploads of up to 25 MB (supplier invoices, documents, receipts) now work on the live site; files over 1 MB were refused there before.',
+    ],
+  },
   {
     date: '2026-11-08',
     changes: [
@@ -452,6 +492,7 @@ const ROLE_LIST: RoleGuide[] = [
       'Move customer orders forward, update tracking and accept pre-orders once stock is there',
       'Book store sales for walk-in customers, like a Store Sales Agent, and follow every agent\'s sales',
       'Request refunds, reply to support tickets, publish or hide reviews',
+      'Approve the return requests Customer Support raises from customers\' tickets (Level 1 too), changing the charge if needed, or reject them with a reason the customer is emailed (Approvals Hub › Return requests, the order\'s Return section or the support ticket). Each shows the customer\'s own words with a link to the ticket, the staff note and who asked. Returns are no longer enabled directly, and a request you raised yourself is decided by another Store Manager. Change the charge of an enabled return until the customer starts it',
       'Look up customers with their orders, carts and tickets, and ask the Super Admin to correct their details',
       'Look up promo codes to tell a customer which one to use: who and which products each is for, its limits and dates, and the orders that used it (Promo Codes). A code for chosen customers shows only as TINQA***: email it to them with "Email code"; show a code for every customer on the storefront with "Show on storefront"',
       'Trace any piece or product unit by its barcode (Barcode Tracking) and ask a Super Admin to correct a barcode',
@@ -492,6 +533,7 @@ const ROLE_LIST: RoleGuide[] = [
       'Procurement orders (approve or reject) and the supplier\'s confirmation',
       "Accepting a supplier's invoice that doesn't match the quotation, or couldn't be read, with a reason",
       'Return requests',
+      'Customer returns Customer Support asked for from the customer\'s ticket, in the customer\'s own words, with the charge you decide (Approvals Hub › Return requests; Level 1 too; never your own request)',
       'Supplier logins created by someone else',
       'Removing a supplier',
     ],
@@ -559,11 +601,12 @@ const ROLE_LIST: RoleGuide[] = [
       'Trace any piece by its barcode, and ask a Super Admin to correct a wrong one or to label stock received before barcodes (Assign barcodes)',
       'Confirm paid orders, then move them through processing, packed and shipped',
       'Accept pre-orders once stock is there (Approvals Hub › Pre-orders)',
-      'Update shipment tracking, raise expenses (e.g. shipping costs)',
+      'Update shipment tracking, add and delete hub checkpoints (Reached / Left a place), raise expenses (e.g. shipping costs)',
+      'Send a product that failed return inspection back to the customer (Sent back to customer → Delivered back to customer)',
     ],
     approves: [],
     tips: [
-      'Stock you record counts only after a Level 2 Store Manager approves it; that also locks its barcodes.',
+      'Stock you record counts only after a Level 2 Store Manager approves it; that also locks its barcodes. If you entered it, or made its latest change, another Level 2 has to approve it.',
       'Scan the label on each piece as you count it: the form takes a scanner\'s codes one after another, or a pasted list.',
     ],
   },
@@ -576,9 +619,15 @@ const ROLE_LIST: RoleGuide[] = [
     does: [
       'See customer orders and their shipping address',
       'Record what happened at the door: out for delivery, delivered, customer unavailable, invalid address, customer cancelled delivery, re-attempt',
+      'Mark an order delivered with the customer\'s 7-character delivery code: unpack the device, set it up and demonstrate it first; the customer gives the code from their "out for delivery" email once they have checked it is OK and working. Resend code to customer emails them a new one if they ask.',
+      'Add hub checkpoints on the way, "Reached <place>" / "Left <place>", while an order is shipped or in transit or a return is on its way (Customer Order Tracking › the order › Hub checkpoints). The customer sees them on their tracking page.',
     ],
     approves: [],
-    tips: ['Other statuses (packing, sending a parcel back to the warehouse) belong to fulfilment staff and the Fleet Coordinator.'],
+    tips: [
+      'Other statuses (packing, sending a parcel back to the warehouse) belong to fulfilment staff and the Fleet Coordinator.',
+      'A wrong checkpoint is deleted by the Fleet Coordinator or fulfilment staff; tell them.',
+      'Never ask for the delivery code before the device works. Capital and small letters differ; after 5 wrong tries the code stops working and you send a new one.',
+    ],
   },
   {
     id: 'FLEET_COORDINATOR',
@@ -587,7 +636,8 @@ const ROLE_LIST: RoleGuide[] = [
     menu: ['finance', 'order-tracking', 'my-meetings', 'my-payslips'],
     hasApprovalLevel: false,
     does: [
-      'Record the same door-step outcomes as a rider',
+      'Record the same door-step outcomes as a rider, including delivered with the customer\'s delivery code (and send them a new code)',
+      'Add hub checkpoints (Reached / Left a place) for deliveries and returns on the way, and delete a wrong one while the trip is still under way',
       'Update shipment tracking and send refused or undeliverable parcels back to the warehouse',
       'Raise expenses',
     ],
@@ -601,12 +651,14 @@ const ROLE_LIST: RoleGuide[] = [
     menu: ['order-tracking', 'customers', 'promo-codes', 'support-tickets', 'items', 'barcodes', 'products', 'my-meetings', 'my-payslips'],
     hasApprovalLevel: false,
     does: [
-      'View, reply to and change the status of support tickets; suggested replies help you answer quickly',
+      'View, reply to and change the status of support tickets; suggested replies help you answer quickly. Keep every reply polite: offensive words are refused. Close a ticket with a reason, 24 hours after your latest reply if the customer hasn\'t answered it; a ticket raised for a return closes by itself when the return is completed',
       'Open a customer (Customer Management) to see everything they bought and when, what is still in their cart and their tickets, then email or call them',
       'Ask for a correction to a customer\'s details (Request change); the Super Admin makes it',
       'Look up promo codes to tell a customer which one to use: who and which products each is for, its limits and dates, and the orders that used it (Promo Codes). A code for chosen customers shows only as TINQA***: email it to them with "Email code"; show a code for every customer on the storefront with "Show on storefront"',
       'Look up the customer\'s order, payment and products from the ticket',
       'Request a refund and re-check its status with the payment gateway',
+      'Request a return when a customer gives a reason TinQa accepts (orders are not returnable by default), from the customer\'s support ticket about the order: pick the customer\'s own message that says why (its text is sent as written; you can\'t type or edit it), a proposed return charge in ₹ and what it is for, and an optional internal note for the Store Manager. A Store Manager approves it (and may change the charge) or rejects it; once approved the customer has 7 days to agree to the charge and start it. Update a waiting request from the ticket, withdraw it, or withdraw an enabled return, if needed',
+      'Record the return inspection once the item is back: Pass, Partial (lower refund, with the reason) or Fail (with the reason; the product goes back to the customer). Pass and Partial request the refund for a Level 2 to approve',
       'Trace a customer\'s device by its barcode: every part inside it, with its batch, purchase order and supplier (Barcode Tracking)',
     ],
     approves: [],
@@ -788,7 +840,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
     steps: [
       { who: ['SUPPLIER_MANAGER', 'SUPER_ADMIN', 'SUPPLIER'], label: 'Supplier Manager or Supplier', kind: 'maker', text: 'Records a quotation: items, quantities, prices (before GST), dates, optionally the GST breakup, and the payment plan: advance % and midterm % (together at most 50%; the final part, the rest, is paid after testing) and the payment method the supplier expects.', where: 'Orders Management · My Quotations' },
       { who: ['SUPPLIER_MANAGER', 'SUPER_ADMIN'], label: 'Supplier Manager', kind: 'maker', text: 'Submits the quotation for approval. It shows as "Under review" to the supplier. Quotations a supplier sent in wait in the Approvals Hub.', where: 'Approvals Hub › Requests · Orders Management', otherwise: 'Cancel → with a reason; the supplier is told' },
-      { who: ['SUPPLIER_MANAGER', 'SUPER_ADMIN'], label: 'Supplier Manager · Level 2', kind: 'checker', text: 'Approves the order with its payment plan, which then waits for the supplier to accept it. Once they do, the advance can be requested.', where: 'Approvals Hub › Requests', otherwise: 'Reject → the order is cancelled' },
+      { who: ['SUPPLIER_MANAGER', 'SUPER_ADMIN'], label: 'Supplier Manager · Level 2', kind: 'checker', text: 'Approves the order with its payment plan, which then waits for the supplier to accept it. Once they do, the advance can be requested. Whoever raised the order, edited it or sent it for approval cannot decide it.', where: 'Approvals Hub › Requests', otherwise: 'Reject → the order is cancelled' },
       { who: ['SUPPLIER'], label: 'Supplier', kind: 'checker', text: 'Accepts the order. If TinQa changed any term they quoted, they first see each change (what they quoted beside what it is now) and tick that they agree; the flow history keeps it.', where: 'My Orders › View', otherwise: 'Reject → with a reason; the order is cancelled' },
       { who: ['SUPPLIER_MANAGER', 'SUPER_ADMIN'], label: 'Supplier Manager · Level 2', kind: 'checker', text: 'Records that the supplier confirmed the order, for a supplier without a login. Not possible when TinQa changed what the supplier quoted: only they can accept that. The purchase order can now be printed.', where: 'Orders Management' },
       { who: ['SUPPLIER_MANAGER', 'SUPER_ADMIN', 'SUPPLIER'], label: 'Supplier or Supplier Manager', kind: 'maker', text: 'Marks the confirmed order as shipped once the goods have left. The procurement team is notified.', where: 'My Orders · Orders Management', otherwise: 'Cancel is possible only before shipment, with a reason' },
@@ -796,7 +848,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
       { who: ['SUPPLIER_MANAGER', 'SUPER_ADMIN'], label: 'Supplier Manager · Level 2', kind: 'checker', text: "Only when the invoice doesn't match or can't be read: accepts it with a reason, or asks the supplier for a corrected invoice.", where: 'Orders Management › Update status', otherwise: 'No override → upload a correct invoice; the order stays shipped' },
       { who: ['SUPPLIER_MANAGER', 'SUPER_ADMIN'], label: 'Supplier Manager', kind: 'maker', text: 'Marks it delivered with the actual delivery date. The bill can now be printed.', where: 'Orders Management' },
       { who: ['FULFILLMENT_SPECIALIST', 'STORE_MANAGER', 'SUPER_ADMIN'], label: 'Fulfillment', kind: 'maker', text: 'Picks the delivered order, records the units that passed testing and scans one barcode per passed unit. Nothing is booked yet; defected units go back.', where: 'Stock Management › Add stock' },
-      { who: ['STORE_MANAGER', 'SUPER_ADMIN'], label: 'Store Manager · Level 2', kind: 'checker', text: 'Approves the stock entry, which also locks its barcodes. Only now is the purchase booked to the company account, with its GST as input tax, and testing is done: the order is worth only the units that passed, and the final payment can be made.', where: 'Approvals Hub › Requests', otherwise: 'Reject → stock is not added, nothing is booked and its barcodes are freed' },
+      { who: ['STORE_MANAGER', 'SUPER_ADMIN'], label: 'Store Manager · Level 2', kind: 'checker', text: 'Approves the stock entry, which also locks its barcodes. Only now is the purchase booked to the company account, with its GST as input tax, and testing is done: the order is worth only the units that passed, and the final payment can be made. Whoever entered the stock entry, or made its latest change, cannot decide it.', where: 'Approvals Hub › Requests', otherwise: 'Reject → stock is not added, nothing is booked and its barcodes are freed' },
       { who: ['SYSTEM'], label: 'Inventory', kind: 'end', text: 'Stock is available to sell.' },
       { who: ['SYSTEM'], label: 'Company ledger & GST register', kind: 'end', text: 'The purchase (approved passed units × unit price + shipment) and its GST are posted. A later change to the entry waits for Level 2 again; only an approved change posts the difference.', where: 'Accounts & Finance' },
     ],
@@ -901,11 +953,11 @@ export const GUIDE_FLOWS: GuideFlow[] = [
     steps: [
       { who: ['CUSTOMER'], label: 'Customer', kind: 'external', text: 'Places and pays for an order on the store.' },
       { who: ['FULFILLMENT_SPECIALIST', 'STORE_MANAGER', 'SUPER_ADMIN'], label: 'Fulfillment', kind: 'maker', text: 'Confirms the paid order, then moves it to processing and packed.', where: 'Customer Order Tracking', otherwise: 'Not paid → it cannot be confirmed yet' },
-      { who: ['FULFILLMENT_SPECIALIST', 'STORE_MANAGER', 'SUPER_ADMIN'], label: 'Fulfillment', kind: 'maker', text: 'Marks it shipped. Shipping costs entered here become expense vouchers.' },
-      { who: ['FLEET_COORDINATOR', 'FULFILLMENT_SPECIALIST', 'STORE_MANAGER', 'SUPER_ADMIN'], label: 'Fleet Coordinator', kind: 'maker', text: 'Keeps tracking up to date while it is in transit.' },
-      { who: ['DELIVERY_RIDER', 'FLEET_COORDINATOR'], label: 'Delivery Rider', kind: 'maker', text: 'Records out for delivery, then delivered, using the order\'s shipping address.', otherwise: 'Customer unavailable, invalid address or refused → re-attempt' },
+      { who: ['FULFILLMENT_SPECIALIST', 'STORE_MANAGER', 'SUPER_ADMIN'], label: 'Fulfillment', kind: 'maker', text: 'Marks it shipped. The order gets its TinQa delivery tracking ID (TQD-…), emailed to the customer with a link to their tracking page. Shipping costs entered here become expense vouchers.' },
+      { who: ['FLEET_COORDINATOR', 'DELIVERY_RIDER', 'FULFILLMENT_SPECIALIST', 'STORE_MANAGER', 'SUPER_ADMIN'], label: 'Fleet Coordinator / Delivery Rider', kind: 'maker', text: 'Adds a hub checkpoint at every place the parcel reaches or leaves ("Reached Lucknow hub", "Left Lucknow hub"; city, PIN and time optional). The first one moves the order to in transit.', where: 'Customer Order Tracking › order › Hub checkpoints' },
+      { who: ['DELIVERY_RIDER', 'FLEET_COORDINATOR'], label: 'Delivery Rider', kind: 'maker', text: 'Records out for delivery (the customer is emailed a 7-character delivery code), sets up and demonstrates the device, then records delivered with the code the customer gives once it works. Resend code to customer sends a new one.', otherwise: 'Customer unavailable, invalid address or refused → re-attempt' },
       { who: ['FLEET_COORDINATOR', 'FULFILLMENT_SPECIALIST', 'STORE_MANAGER', 'SUPER_ADMIN'], label: 'Fleet Coordinator', kind: 'maker', text: 'Sends a parcel that cannot be delivered back to the warehouse.' },
-      { who: ['CUSTOMER'], label: 'Customer', kind: 'end', text: 'Sees every update in their order tracking.' },
+      { who: ['CUSTOMER'], label: 'Customer', kind: 'end', text: 'Sees every update and hub checkpoint on their tracking page (storefront › Delivery › Tracking › the TQD ID, sign-in required).' },
       { who: ['STORE_MANAGER', 'CATALOG_SPECIALIST', 'FINANCIAL_AUDITOR', 'FINANCE_MANAGER', 'SUPER_ADMIN'], label: 'Anyone who sees costs', kind: 'end', text: 'Sees the order\'s profit on the order: each line at its cost when ordered, plus shipping charged less shipping paid, before and after tax.', where: 'Customer Order Tracking › order' },
     ],
   },
@@ -935,12 +987,15 @@ export const GUIDE_FLOWS: GuideFlow[] = [
   {
     id: 'customer-return',
     title: 'Customer return',
-    summary: 'A delivered order can be returned; paid orders are refunded after inspection.',
+    summary: 'Orders are not returnable by default. Customer Support requests a return when the customer gives a reason we accept, a Store Manager approves it with the charge, and paid orders are refunded (the order amount, never the shipping) after inspection. The customer is emailed at every step.',
     steps: [
-      { who: ['CUSTOMER'], label: 'Customer', kind: 'external', text: 'Asks to return a delivered order.' },
-      { who: ['FULFILLMENT_SPECIALIST', 'STORE_MANAGER', 'SUPER_ADMIN'], label: 'Fulfillment or Store Manager', kind: 'checker', text: 'Approves or rejects the return.', where: 'Customer Order Tracking', otherwise: 'Reject → the order stays delivered and closes' },
-      { who: ['FULFILLMENT_SPECIALIST', 'FLEET_COORDINATOR', 'STORE_MANAGER', 'SUPER_ADMIN'], label: 'Fulfillment / Fleet', kind: 'maker', text: 'Out for pickup, picked up, in transit, received at the warehouse.' },
-      { who: ['FULFILLMENT_SPECIALIST', 'STORE_MANAGER', 'SUPER_ADMIN'], label: 'Fulfillment', kind: 'maker', text: 'Inspects the item, then refunds a paid order or closes an unpaid one.', otherwise: 'Inspection failed → no refund, order closes' },
+      { who: ['CUSTOMER'], label: 'Customer', kind: 'external', text: 'Raises a support ticket about a delivered order and says in it why they want to return it.' },
+      { who: ['CUSTOMER_SUPPORT', 'STORE_MANAGER', 'SUPER_ADMIN'], label: 'Customer Support', kind: 'maker', text: 'Requests a return from that ticket: picks the customer\'s own message giving the reason (sent as written, never typed by staff), a proposed return charge in ₹ (0 for free; any amount) and what it is for, and an optional internal note. The customer is emailed that it is being reviewed.', where: 'Support Tickets › the ticket › Return', otherwise: 'Not accepted → nothing to do; the order stays delivered' },
+      { who: ['STORE_MANAGER', 'SUPER_ADMIN'], label: 'Store Manager (Level 1 too)', kind: 'checker', text: 'Reads the customer\'s own words (with a link to the ticket) and the staff note, and approves the request with the charge they decide. Nobody decides a request they raised. The customer is emailed the charge, the order amount (shipping is never part of it or refunded) and what they get back. The charge can be changed until the customer starts the return.', where: 'Approvals Hub › Return requests, the order\'s Return section or the support ticket', otherwise: 'Reject → with a reason the customer is emailed; Customer Support may request again from the ticket' },
+      { who: ['CUSTOMER'], label: 'Customer', kind: 'external', text: 'Agrees to the charge and starts the return on the storefront within 7 days. Charge less than the order amount: deducted from the refund, or paid now for a full refund. Charge equal to or more than the order amount: paid now, before the pickup. The return gets its tracking ID (TQR-…).', otherwise: '7 days pass → the option expires; Customer Support can request it again from the ticket' },
+      { who: ['FULFILLMENT_SPECIALIST', 'STORE_MANAGER', 'SUPER_ADMIN'], label: 'Fulfillment or Store Manager', kind: 'checker', text: 'Approves the return (pickup scheduled) or rejects it. A return whose charge the customer paid can no longer be rejected or cancelled.', where: 'Customer Order Tracking', otherwise: 'Reject → the order stays delivered and closes' },
+      { who: ['FULFILLMENT_SPECIALIST', 'FLEET_COORDINATOR', 'DELIVERY_RIDER', 'STORE_MANAGER', 'SUPER_ADMIN'], label: 'Fulfillment / Fleet / Rider', kind: 'maker', text: 'Out for pickup, picked up, hub checkpoints on the way back, received at the warehouse, inspection started.' },
+      { who: ['CUSTOMER_SUPPORT', 'STORE_MANAGER', 'SUPER_ADMIN'], label: 'Customer Support', kind: 'maker', text: 'Records the inspection: Pass (refund = the order amount, never the shipping, less a deducted charge) or Partial (a lower refund, with the reason). Either requests the refund, which a Level 2 approves in the refund flow.', where: 'Customer Order Tracking › order › Return › Record inspection', otherwise: 'Fail (with the reason) → no refund; the product is sent back to the customer and delivered back, which closes the order' },
     ],
   },
   {
@@ -961,8 +1016,10 @@ export const GUIDE_FLOWS: GuideFlow[] = [
     steps: [
       { who: ['CUSTOMER'], label: 'Customer', kind: 'external', text: 'Raises a ticket about an order or product.' },
       { who: ['CUSTOMER_SUPPORT', 'STORE_MANAGER', 'SUPER_ADMIN'], label: 'Customer Support', kind: 'maker', text: 'Opens the ticket, checks the linked order and picks or edits a suggested reply.', where: 'Support Tickets' },
-      { who: ['CUSTOMER_SUPPORT', 'STORE_MANAGER', 'SUPER_ADMIN'], label: 'Customer Support', kind: 'maker', text: 'Sends the reply and updates the status (e.g. resolved).' },
-      { who: ['CUSTOMER'], label: 'Customer', kind: 'end', text: 'Sees the reply on the store.' },
+      { who: ['CUSTOMER_SUPPORT', 'STORE_MANAGER', 'SUPER_ADMIN'], label: 'Customer Support', kind: 'maker', text: 'Sends the reply (polite: offensive words are refused) and updates the status (e.g. resolved).' },
+      { who: ['CUSTOMER'], label: 'Customer', kind: 'external', text: 'Sees the reply on the store and answers it, or not.' },
+      { who: ['CUSTOMER_SUPPORT', 'STORE_MANAGER', 'SUPER_ADMIN'], label: 'Customer Support', kind: 'maker', text: 'Closes the ticket with a reason once 24 hours have passed since our latest reply without an answer from the customer. A ticket raised for a return closes automatically when the return is completed.', where: 'Support Tickets › the ticket › Status › Close ticket', otherwise: 'The customer replied → answer again; the 24 hours start from the new reply' },
+      { who: ['CUSTOMER'], label: 'Customer', kind: 'end', text: 'Sees the ticket closed, with the reason.' },
     ],
   },
   {
@@ -1005,7 +1062,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
     summary: 'The customer hears about the steps that matter, at the email they verified.',
     steps: [
       { who: ['FULFILLMENT_SPECIALIST', 'STORE_MANAGER', 'SUPER_ADMIN'], label: 'Fulfilment', kind: 'maker', text: 'Moves the order on: confirmed, shipped (the tax invoice is issued), out for delivery.', where: 'Order Tracking' },
-      { who: ['DELIVERY_RIDER', 'FLEET_COORDINATOR'], label: 'Delivery', kind: 'maker', text: 'Records out for delivery and delivered at the door.', where: 'Order Tracking' },
+      { who: ['DELIVERY_RIDER', 'FLEET_COORDINATOR'], label: 'Delivery', kind: 'maker', text: 'Records out for delivery and, once the customer gives their delivery code (device set up and working), delivered at the door.', where: 'Order Tracking' },
       { who: ['SYSTEM'], label: 'TinQa', kind: 'end', text: 'Emails the customer at each of those steps; the delivered email carries the GST tax invoice as a PDF. A cash store sale skips the confirmation email (its welcome email says so).' },
     ],
   },

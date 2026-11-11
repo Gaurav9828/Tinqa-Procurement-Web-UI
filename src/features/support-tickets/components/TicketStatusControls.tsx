@@ -1,32 +1,36 @@
 import React, { useState } from 'react';
 import { CheckCircle2, Loader2, Lock, PlayCircle, XCircle } from 'lucide-react';
-import { ConfirmationModal } from '../../../components/ui/ConfirmationModal';
 import { ADMIN_SETTABLE_STATUSES, type AdminSettableStatus } from '../types/supportTicket.types';
 import type { ActionResult } from '../hooks/useTicketActions';
+import { closeBlockedReason } from '../utils/supportTicket.utils';
+import { CloseTicketDialog } from './CloseTicketDialog';
 
 interface Props {
   referenceNumber: string;
   currentStatus: string;
   /** From the API: false once the ticket is closed. */
   canClose: boolean;
+  /** When staff may close it (24 hours after our latest reply the customer hasn't answered); null while they wait for us. */
+  closableAt: string | null | undefined;
   isUpdating: boolean;
   disabled?: boolean;
-  onChange: (status: AdminSettableStatus) => Promise<ActionResult>;
+  onChange: (status: AdminSettableStatus, reason?: string) => Promise<ActionResult>;
 }
 
 const ACTIONS: Record<AdminSettableStatus, { label: string; icon: React.ElementType; hint: string }> = {
   IN_PROGRESS: { label: 'Mark in progress', icon: PlayCircle, hint: 'Support is working on it.' },
   RESOLVED: { label: 'Mark resolved', icon: CheckCircle2, hint: 'A solution was provided; the customer can still reply.' },
-  CLOSED: { label: 'Close ticket', icon: XCircle, hint: 'Final. The ticket becomes read-only.' },
+  CLOSED: { label: 'Close ticket', icon: XCircle, hint: 'Final, with a reason. The ticket becomes read-only.' },
 };
 
 /**
- * Status buttons. Only IN_PROGRESS, RESOLVED and CLOSED are offered (the backend accepts nothing
- * else), never the current status (it would only add a duplicate system note), and closing asks
- * for confirmation because it cannot be undone.
+ * Status buttons. Only IN_PROGRESS, RESOLVED and CLOSED are offered (the backend accepts nothing else), never the
+ * current status (it would only add a duplicate system note). Close is possible only 24 hours after our latest reply
+ * the customer hasn't answered (`closableAt`; the server checks it too, 409 TICKET_CLOSE_TOO_EARLY) and asks for a
+ * reason, because it cannot be undone.
  */
-export const TicketStatusControls: React.FC<Props> = ({ referenceNumber, currentStatus, canClose, isUpdating, disabled = false, onChange }) => {
-  const [confirmClose, setConfirmClose] = useState(false);
+export const TicketStatusControls: React.FC<Props> = ({ referenceNumber, currentStatus, canClose, closableAt, isUpdating, disabled = false, onChange }) => {
+  const [closing, setClosing] = useState(false);
 
   if (!canClose) {
     return (
@@ -37,6 +41,7 @@ export const TicketStatusControls: React.FC<Props> = ({ referenceNumber, current
   }
 
   const options = ADMIN_SETTABLE_STATUSES.filter((status) => status !== currentStatus);
+  const closeBlocked = closeBlockedReason(closableAt);
 
   return (
     <>
@@ -48,8 +53,9 @@ export const TicketStatusControls: React.FC<Props> = ({ referenceNumber, current
             <button
               key={status}
               type="button"
-              disabled={isUpdating || disabled}
-              onClick={() => (isClose ? setConfirmClose(true) : onChange(status))}
+              disabled={isUpdating || disabled || (isClose && !!closeBlocked)}
+              aria-describedby={isClose && closeBlocked ? 'ticket-close-blocked' : undefined}
+              onClick={() => (isClose ? setClosing(true) : onChange(status))}
               className={`w-full flex items-start gap-2.5 p-3 rounded-xl border text-left transition-colors disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed ${
                 isClose
                   ? 'border-rose-500/40 bg-rose-500/5 hover:bg-rose-500/10 text-rose-600 dark:text-rose-400'
@@ -66,6 +72,11 @@ export const TicketStatusControls: React.FC<Props> = ({ referenceNumber, current
             </button>
           );
         })}
+        {closeBlocked && (
+          <p id="ticket-close-blocked" data-testid="close-blocked" className="text-[11px] text-amber-700 dark:text-amber-400">
+            {closeBlocked}
+          </p>
+        )}
         {isUpdating && (
           <p className="flex items-center gap-1.5 text-[11px] text-gray-400">
             <Loader2 className="w-3 h-3 animate-spin" /> Updating status…
@@ -73,19 +84,14 @@ export const TicketStatusControls: React.FC<Props> = ({ referenceNumber, current
         )}
       </div>
 
-      <ConfirmationModal
-        isOpen={confirmClose}
-        actionType="CONFIRM"
-        tone="danger"
-        title="Close this ticket?"
-        description={`Ticket ${referenceNumber} will be closed. Closed tickets are read-only: no further replies or status changes are possible.`}
-        isSubmitting={isUpdating}
-        onClose={() => setConfirmClose(false)}
-        onConfirm={async () => {
-          await onChange('CLOSED');
-          setConfirmClose(false);
-        }}
-      />
+      {closing && (
+        <CloseTicketDialog
+          referenceNumber={referenceNumber}
+          isSubmitting={isUpdating}
+          onClose={() => setClosing(false)}
+          onSubmit={(reason) => onChange('CLOSED', reason)}
+        />
+      )}
     </>
   );
 };

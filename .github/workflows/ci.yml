@@ -1,0 +1,51 @@
+# Every pull request and every push to main runs what `yarn build:dev` runs locally:
+#   prebuild   scripts/quality-gate.mjs: type-check, ESLint (Sonar + security rules), secret scan, dependency
+#              vulnerabilities, unit tests with coverage and new-code coverage
+#   build      tsc + vite build
+#   postbuild  scripts/e2e-gate.mjs: Playwright journeys on the built bundle, API call budgets, bundle budgets
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main, UAT]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  quality-gate-build-e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Full history: the gate measures new-code coverage against the merge base with UAT / main
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: yarn
+
+      - run: yarn install --frozen-lockfile
+
+      - name: Chromium for the e2e tests
+        run: npx playwright install --with-deps chromium
+
+      - name: Quality gate, build and e2e gate
+        run: yarn build:dev
+
+      - name: Keep the reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: quality-and-e2e-reports
+          path: |
+            reports
+            coverage
+          if-no-files-found: ignore
