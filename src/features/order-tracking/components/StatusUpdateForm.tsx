@@ -3,7 +3,9 @@ import { CreditCard, KeyRound, Loader2, Lock, Mail, RefreshCw, Send, Truck, Undo
 import { CommonInput, CommonTextArea } from '../../../components/ui/FormInputs';
 import { ConfirmationModal } from '../../../components/ui/ConfirmationModal';
 import { NextStepPicker } from '../../../components/ui/NextStepPicker';
-import type { TrackingStatusOption } from '../types/orderTracking.types';
+import type { OrderItemUnits, TrackingStatusOption, UnitSerial } from '../types/orderTracking.types';
+import { UnitSerialFields } from './UnitSerialFields';
+import { collectSerials, linesNeedingSerials, serialSlots } from '../utils/unitSerials';
 import { formatStatusLabel } from '../utils/orderTracking.utils';
 import {
   DELIVERY_CODE_LENGTH,
@@ -42,8 +44,11 @@ interface Props {
     status: string,
     notes: string,
     shipping?: ShippingCostInput,
-    deliveryCode?: string
+    deliveryCode?: string,
+    unitSerials?: UnitSerial[]
   ) => Promise<StatusUpdateResult>;
+  /** The order's lines and their recorded serials (admin detail); shipping out asks for the serial of every unit. */
+  units?: OrderItemUnits[] | null;
   /** Emails the customer a new delivery code (useDeliveryCodeResend); offered with Delivered. */
   deliveryCodeResend?: { resend: () => Promise<boolean>; isSending: boolean; waitSeconds: number };
   /** Delivery riders: only delivery outcomes are offered; payment and refund guidance is not theirs to act on. */
@@ -66,6 +71,7 @@ export const StatusUpdateForm: React.FC<Props> = ({
   onSubmit,
   deliveryOnly = false,
   deliveryCodeResend,
+  units,
 }) => {
   const [status, setStatus] = useState('');
   const [deliveryCode, setDeliveryCode] = useState('');
@@ -74,6 +80,8 @@ export const StatusUpdateForm: React.FC<Props> = ({
   const [shippingPartner, setShippingPartner] = useState('');
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [serials, setSerials] = useState<Record<string, string>>({});
+  const [serialErrors, setSerialErrors] = useState<Record<string, string>>({});
 
   const lockReason = getLockReason(workflow);
   // The cost of the leg this move starts, entered here and sent for approval as an expense
@@ -81,6 +89,9 @@ export const StatusUpdateForm: React.FC<Props> = ({
   const shippingCostRequired = SHIPPING_COST_REQUIRED.has(status);
   // Delivered needs the code the customer gives once the device is set up and working
   const asksDeliveryCode = status === 'DELIVERED';
+  // Shipping out records the serial of every unit not recorded yet (the warranty of each unit hangs on it)
+  const slots = useMemo(() => serialSlots(linesNeedingSerials(units)), [units]);
+  const asksSerials = !deliveryOnly && status === 'SHIPPED' && slots.length > 0;
 
   // Workflow rules ∩ statuses the server knows (a step the backend doesn't support yet is never offered).
   const options = useMemo(() => {
@@ -108,7 +119,8 @@ export const StatusUpdateForm: React.FC<Props> = ({
       status,
       notes,
       asksShippingCost ? { cost: shippingCost, partner: shippingPartner } : undefined,
-      asksDeliveryCode ? deliveryCode : undefined
+      asksDeliveryCode ? deliveryCode : undefined,
+      asksSerials ? collectSerials(slots, serials).serials : undefined
     );
     setConfirmOpen(false);
     setFieldErrors(result.fieldErrors);
@@ -118,6 +130,8 @@ export const StatusUpdateForm: React.FC<Props> = ({
       setShippingCost('');
       setShippingPartner('');
       setDeliveryCode('');
+      setSerials({});
+      setSerialErrors({});
     }
   };
 
@@ -134,6 +148,11 @@ export const StatusUpdateForm: React.FC<Props> = ({
         deliveryCode: `Enter the ${DELIVERY_CODE_LENGTH}-character code the customer gives you (letters and digits).`,
       }));
       return;
+    }
+    if (asksSerials) {
+      const { errors } = collectSerials(slots, serials);
+      setSerialErrors(errors);
+      if (Object.keys(errors).length > 0) return;
     }
     if (status && needsConfirmation(status)) {
       setConfirmOpen(true);
@@ -277,6 +296,20 @@ export const StatusUpdateForm: React.FC<Props> = ({
               expense and is posted to the company account once approved. Enter 0 if nothing was spent.
             </p>
           </div>
+        )}
+        {asksSerials && (
+          <UnitSerialFields
+            slots={slots}
+            values={serials}
+            errors={serialErrors}
+            error={Object.entries(fieldErrors).find(([key, message]) => key.startsWith('unitSerials') && message)?.[1]}
+            disabled={controlsDisabled}
+            onChange={(key, value) => {
+              setSerials((prev) => ({ ...prev, [key]: value }));
+              setSerialErrors((prev) => ({ ...prev, [key]: '' }));
+              setFieldErrors((prev) => Object.fromEntries(Object.entries(prev).filter(([k]) => !k.startsWith('unitSerials'))));
+            }}
+          />
         )}
         {asksDeliveryCode && (
           <div className="space-y-2 p-3 rounded-xl bg-emerald-500/[0.06] border border-emerald-500/20" role="group" aria-label="Customer's delivery code">

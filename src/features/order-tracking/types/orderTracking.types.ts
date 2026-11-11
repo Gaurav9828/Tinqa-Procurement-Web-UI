@@ -128,6 +128,32 @@ export interface AdminOrderDetail extends AdminOrderSummary {
   returnInfo?: OrderReturnInfo | null;
   /** Hub checkpoints of the delivery and of the return, oldest first. */
   checkpoints?: ShipmentCheckpoint[] | null;
+  /** Each line with the serials of its units (recorded when it ships) and their warranty; absent on older backends. */
+  units?: OrderItemUnits[] | null;
+}
+
+/** OrderUnitsDTO.Unit: one unit shipped; released = no longer the customer's (cancelled or returned). */
+export interface OrderUnit {
+  serial: string;
+  warrantyTitle: string | null;
+  coverageStartsOn: string | null;
+  coverageEndsOn: string | null;
+  released: boolean;
+}
+
+/** OrderUnitsDTO.ItemUnits: an order line, how many units it has and the serials recorded so far. */
+export interface OrderItemUnits {
+  orderItemId: number;
+  productId: number;
+  title: string;
+  quantity: number;
+  units: OrderUnit[];
+}
+
+/** The serial (product unit barcode) of one unit on an order line. */
+export interface UnitSerial {
+  orderItemId: number;
+  serial: string;
 }
 
 /**
@@ -338,6 +364,8 @@ export interface UpdateTrackingRequest {
    * gives it once the device is unpacked, set up and working; it is their consent that the device is OK.
    */
   deliveryCode?: string | null;
+  /** SHIPPED only: the serial of every unit of every line (scanned product unit barcodes); they start each warranty. */
+  unitSerials?: UnitSerial[];
 }
 
 /** POST …/delivery-code: a new delivery code was emailed to the customer (address masked). */

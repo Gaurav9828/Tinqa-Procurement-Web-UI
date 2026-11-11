@@ -36,6 +36,12 @@ const OrderTrackingPage = lazy(() =>
 const OrderTrackingDetailPage = lazy(() =>
   import('./features/order-tracking/pages/OrderTrackingDetailPage').then((m) => ({ default: m.OrderTrackingDetailPage }))
 );
+const WarrantyClaimsPage = lazy(() =>
+  import('./features/warranty-claims/pages/WarrantyClaimsPage').then((m) => ({ default: m.WarrantyClaimsPage }))
+);
+const WarrantyClaimDetailPage = lazy(() =>
+  import('./features/warranty-claims/pages/WarrantyClaimDetailPage').then((m) => ({ default: m.WarrantyClaimDetailPage }))
+);
 const SupportTicketsPage = lazy(() =>
   import('./features/support-tickets/pages/SupportTicketsPage').then((m) => ({ default: m.SupportTicketsPage }))
 );
@@ -200,6 +206,10 @@ export const App: React.FC = () => {
                 {/* Promo codes: viewers read them; creating, editing and switching off needs PROMO_CODE_MANAGE */}
                 <Route element={<RequireNavAccess navId="promo-codes" />}>
                   <Route path="promo-codes" element={<PromoCodesPage />} />
+                </Route>
+                <Route element={<RequireNavAccess navId="warranty-claims" />}>
+                  <Route path="warranty-claims" element={<WarrantyClaimsPage />} />
+                  <Route path="warranty-claims/:referenceNumber" element={<WarrantyClaimDetailPage />} />
                 </Route>
                 <Route element={<RequireNavAccess navId="support-tickets" />}>
                   <Route path="support-tickets" element={<SupportTicketsPage />} />

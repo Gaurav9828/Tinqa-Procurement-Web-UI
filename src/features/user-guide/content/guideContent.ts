@@ -66,13 +66,18 @@ export interface GuideChange {
 }
 
 /** Bump with every guide update; printed on the page and on every PDF. */
-export const GUIDE_VERSION = '2.67';
+export const GUIDE_VERSION = '2.68';
 export const GUIDE_UPDATED = '2026-11-11';
 
 export const GUIDE_CHANGELOG: GuideChange[] = [
   {
     date: '2026-11-11',
     changes: [
+      'Serials at dispatch: marking an order Shipped now asks for the serial of every unit you pack (Customer Order Tracking › the order › Next step › Shipped). Scan each unit\'s barcode, one box per unit; a scanner\'s Enter moves to the next box. The server checks each serial is a registered unit of that product and not sold already. The serial is the unit\'s warranty record, and its warranty starts on the delivery date.',
+      'Each order now shows Units and warranty: every serial with its warranty dates. Orders that shipped before this change show "no serials yet" and a Record serials button (Customer Order Tracking permission) to add them once.',
+      'Warranty claims: customers file a claim for a device still under warranty from My devices on the storefront. Customer care (Warranty Claims in the menu) writes the diagnosis and sends it for a decision; a Store Manager or the Super Admin at Level 2 approves it (repair or replace) or rejects it with the reason the customer sees, in Approvals Hub › Warranty claims or on the claim. Nobody decides a claim they reviewed. Once the unit is repaired or replaced, the claim is marked resolved with what was done.',
+      'On the storefront: My devices (Profile) lists every device a customer bought with its serial and warranty dates; anyone can check a serial\'s warranty at /warranty (Support › Warranty); each product has its own page (/p/…) with a Share button; the Products page has search, filters (category, price, rating, in stock) and sort.',
+      'Admin tokens are now signed by Procurement with its own key: everyone signs in once after this update.',
       'Returns are now requested only from the customer\'s support ticket about the order. In the ticket\'s Return section, Request return lists the customer\'s own messages in that ticket: pick the one that explains why they want to return it (the latest is preselected). Its text goes to the Store Manager exactly as the customer wrote it and can\'t be edited; staff no longer type the customer\'s reason. Add the proposed charge and, if useful, an internal note for the Store Manager (never shown to the customer). The order page no longer has a Request return button; it says "Returns are requested from the customer\'s support ticket for this order."',
       'Store Managers no longer enable a return directly. They approve (possibly with another charge) or reject the requests Customer Support raises, in Approvals Hub › Return requests, the order\'s Return section or the ticket. Each request shows the customer\'s own words, a link to the ticket they come from, the staff note and who requested it. Nobody decides a request they raised themselves: they see "You raised this request, so another Store Manager must decide it." Changing the charge of an enabled return and withdrawing a return work as before.',
       'Closing a support ticket now needs a reason, and is possible only 24 hours after TinQa Support\'s latest reply if the customer hasn\'t answered it. Anyone who can change a ticket\'s status can close it. Until then Close ticket is greyed out and says from when it can be closed, or, when the customer is waiting for us, to reply first. A closed ticket shows who closed it, when and why. Suggested replies no longer offer "Send & close": send the reply, then close the ticket a day later if the customer doesn\'t write back.',
@@ -436,7 +441,7 @@ const ROLE_LIST: RoleGuide[] = [
     id: 'SUPER_ADMIN',
     name: 'Super Admin',
     summary: 'Runs the whole portal: staff accounts, access, settings and every approval.',
-    menu: ['finance', 'approvals', 'orders', 'store-sales', 'order-tracking', 'customers', 'promo-codes', 'support-tickets', 'reviews',
+    menu: ['finance', 'approvals', 'orders', 'store-sales', 'order-tracking', 'customers', 'promo-codes', 'support-tickets', 'warranty-claims', 'reviews',
       'employees', 'items', 'stocks', 'barcodes', 'products', 'suppliers', 'payments', 'client-demos', 'client-outreach', 'careers', 'my-demos', 'my-meetings', 'my-payslips', 'company-profile',
       'user-guide'],
     hasApprovalLevel: true,
@@ -480,7 +485,7 @@ const ROLE_LIST: RoleGuide[] = [
     id: 'STORE_MANAGER',
     name: 'Store Manager',
     summary: 'Owns the online store: catalog, stock, customer orders, refunds, support, reviews and the company profile.',
-    menu: ['finance', 'approvals', 'store-sales', 'order-tracking', 'customers', 'promo-codes', 'support-tickets', 'reviews', 'items', 'stocks',
+    menu: ['finance', 'approvals', 'store-sales', 'order-tracking', 'customers', 'promo-codes', 'support-tickets', 'warranty-claims', 'reviews', 'items', 'stocks',
       'barcodes', 'products', 'payments', 'client-demos', 'client-outreach', 'careers', 'my-demos', 'my-meetings', 'my-payslips', 'company-profile', 'user-guide'],
     hasApprovalLevel: true,
     does: [
@@ -501,7 +506,7 @@ const ROLE_LIST: RoleGuide[] = [
       'Log calls, emails, WhatsApp messages and visits with the businesses we pitch to (Client Outreach): add a business (one already on file by phone or email opens instead), log each contact with how it went, their interest and the next step with its follow-up date, attach screenshots or PDFs as proof, edit your own contacts, and work through My follow-ups; the summary shows contacts per day and per executive for any period',
       'Open the User Guide and download a role\'s PDF to hand to a colleague',
     ],
-    approves: ['Products and their changes before they go live, seeing each one\'s cost, margin and profit after tax (approving a new product locks its unit barcodes)', 'Stock entries (approving locks the barcode of each passed unit)', 'Refunds', 'Company profile changes', 'Careers shortlists and selections (Approvals Hub › Careers), except those you asked for'],
+    approves: ['Products and their changes before they go live, seeing each one\'s cost, margin and profit after tax (approving a new product locks its unit barcodes)', 'Stock entries (approving locks the barcode of each passed unit)', 'Refunds', 'Company profile changes', 'Careers shortlists and selections (Approvals Hub › Careers), except those you asked for', 'Warranty claims at Level 2: repair, replace or reject (Approvals Hub › Warranty claims), except those you reviewed'],
     tips: [
       'Pre-orders can be accepted at Level 1 too: Approvals Hub › Pre-orders.',
       'Suppliers and procurement orders belong to the Supplier Manager; they are not in your menu.',
@@ -648,7 +653,7 @@ const ROLE_LIST: RoleGuide[] = [
     id: 'CUSTOMER_SUPPORT',
     name: 'Customer Support',
     summary: 'Helps customers with tickets, orders and refunds.',
-    menu: ['order-tracking', 'customers', 'promo-codes', 'support-tickets', 'items', 'barcodes', 'products', 'my-meetings', 'my-payslips'],
+    menu: ['order-tracking', 'customers', 'promo-codes', 'support-tickets', 'warranty-claims', 'items', 'barcodes', 'products', 'my-meetings', 'my-payslips'],
     hasApprovalLevel: false,
     does: [
       'View, reply to and change the status of support tickets; suggested replies help you answer quickly. Keep every reply polite: offensive words are refused. Close a ticket with a reason, 24 hours after your latest reply if the customer hasn\'t answered it; a ticket raised for a return closes by itself when the return is completed',
@@ -660,6 +665,7 @@ const ROLE_LIST: RoleGuide[] = [
       'Request a return when a customer gives a reason TinQa accepts (orders are not returnable by default), from the customer\'s support ticket about the order: pick the customer\'s own message that says why (its text is sent as written; you can\'t type or edit it), a proposed return charge in ₹ and what it is for, and an optional internal note for the Store Manager. A Store Manager approves it (and may change the charge) or rejects it; once approved the customer has 7 days to agree to the charge and start it. Update a waiting request from the ticket, withdraw it, or withdraw an enabled return, if needed',
       'Record the return inspection once the item is back: Pass, Partial (lower refund, with the reason) or Fail (with the reason; the product goes back to the customer). Pass and Partial request the refund for a Level 2 to approve',
       'Trace a customer\'s device by its barcode: every part inside it, with its batch, purchase order and supplier (Barcode Tracking)',
+      'Review warranty claims customers file from My devices (Warranty Claims): check the device and its coverage, write the diagnosis and send it for a decision; mark an approved claim resolved once the unit is repaired or replaced',
     ],
     approves: [],
     tips: [
@@ -953,7 +959,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
     steps: [
       { who: ['CUSTOMER'], label: 'Customer', kind: 'external', text: 'Places and pays for an order on the store.' },
       { who: ['FULFILLMENT_SPECIALIST', 'STORE_MANAGER', 'SUPER_ADMIN'], label: 'Fulfillment', kind: 'maker', text: 'Confirms the paid order, then moves it to processing and packed.', where: 'Customer Order Tracking', otherwise: 'Not paid → it cannot be confirmed yet' },
-      { who: ['FULFILLMENT_SPECIALIST', 'STORE_MANAGER', 'SUPER_ADMIN'], label: 'Fulfillment', kind: 'maker', text: 'Marks it shipped. The order gets its TinQa delivery tracking ID (TQD-…), emailed to the customer with a link to their tracking page. Shipping costs entered here become expense vouchers.' },
+      { who: ['FULFILLMENT_SPECIALIST', 'STORE_MANAGER', 'SUPER_ADMIN'], label: 'Fulfillment', kind: 'maker', text: 'Marks it shipped, scanning the serial of every unit packed (each serial starts that unit\'s warranty on delivery). The order gets its TinQa delivery tracking ID (TQD-…), emailed to the customer with a link to their tracking page. Shipping costs entered here become expense vouchers.', otherwise: 'A serial that is not a unit of that product, or already sold → it is refused; scan the right unit' },
       { who: ['FLEET_COORDINATOR', 'DELIVERY_RIDER', 'FULFILLMENT_SPECIALIST', 'STORE_MANAGER', 'SUPER_ADMIN'], label: 'Fleet Coordinator / Delivery Rider', kind: 'maker', text: 'Adds a hub checkpoint at every place the parcel reaches or leaves ("Reached Lucknow hub", "Left Lucknow hub"; city, PIN and time optional). The first one moves the order to in transit.', where: 'Customer Order Tracking › order › Hub checkpoints' },
       { who: ['DELIVERY_RIDER', 'FLEET_COORDINATOR'], label: 'Delivery Rider', kind: 'maker', text: 'Records out for delivery (the customer is emailed a 7-character delivery code), sets up and demonstrates the device, then records delivered with the code the customer gives once it works. Resend code to customer sends a new one.', otherwise: 'Customer unavailable, invalid address or refused → re-attempt' },
       { who: ['FLEET_COORDINATOR', 'FULFILLMENT_SPECIALIST', 'STORE_MANAGER', 'SUPER_ADMIN'], label: 'Fleet Coordinator', kind: 'maker', text: 'Sends a parcel that cannot be delivered back to the warehouse.' },
@@ -1020,6 +1026,18 @@ export const GUIDE_FLOWS: GuideFlow[] = [
       { who: ['CUSTOMER'], label: 'Customer', kind: 'external', text: 'Sees the reply on the store and answers it, or not.' },
       { who: ['CUSTOMER_SUPPORT', 'STORE_MANAGER', 'SUPER_ADMIN'], label: 'Customer Support', kind: 'maker', text: 'Closes the ticket with a reason once 24 hours have passed since our latest reply without an answer from the customer. A ticket raised for a return closes automatically when the return is completed.', where: 'Support Tickets › the ticket › Status › Close ticket', otherwise: 'The customer replied → answer again; the 24 hours start from the new reply' },
       { who: ['CUSTOMER'], label: 'Customer', kind: 'end', text: 'Sees the ticket closed, with the reason.' },
+    ],
+  },
+  {
+    id: 'warranty-claim',
+    title: 'Warranty claim',
+    summary: 'Each unit shipped carries its serial; its warranty runs from delivery. Customers claim from My devices.',
+    steps: [
+      { who: ['CUSTOMER'], label: 'Customer', kind: 'external', text: 'Sees each device, its serial and warranty dates in My devices (anyone can check a serial at /warranty), and files a claim in their own words for a device still covered. One open claim per device.' },
+      { who: ['CUSTOMER_SUPPORT', 'STORE_MANAGER', 'SUPER_ADMIN'], label: 'Customer Support', kind: 'maker', text: 'Opens the claim, checks the device and its coverage, writes the diagnosis and sends it for a decision.', where: 'Warranty Claims › the claim' },
+      { who: ['STORE_MANAGER', 'SUPER_ADMIN'], label: 'Store Manager · Level 2', kind: 'checker', text: 'Approves it as a repair or a replacement, or rejects it with the reason the customer sees. Never a claim they reviewed.', where: 'Approvals Hub › Warranty claims', otherwise: 'Rejected → the customer sees the reason' },
+      { who: ['CUSTOMER_SUPPORT', 'STORE_MANAGER', 'SUPER_ADMIN'], label: 'Customer Support', kind: 'maker', text: 'Once the unit is repaired or replaced, marks the claim resolved with what was done.' },
+      { who: ['CUSTOMER'], label: 'Customer', kind: 'end', text: 'Sees the claim\'s progress and the outcome in My devices.' },
     ],
   },
   {

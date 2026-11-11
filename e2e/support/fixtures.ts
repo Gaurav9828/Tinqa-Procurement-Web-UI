@@ -281,6 +281,11 @@ export const handlers = (session: Session): [string, RegExp, Handler][] => [
   // Reply and status (closing needs { status: 'CLOSED', reason }); no journey opens an existing ticket
   ['POST', /^\/admin\/support\/queries\/[^/]+\/messages$/, () => notFound('TICKET_NOT_FOUND')],
   ['PATCH', /^\/admin\/support\/queries\/[^/]+\/status$/, () => notFound('TICKET_NOT_FOUND')],
+  // Warranty claims (customers file them from "My devices"); an order's serials recorded later
+  ['GET', /^\/admin\/warranty\/claims$/, () => ok(page([]))],
+  ['GET', /^\/admin\/warranty\/claims\/[^/]+$/, () => notFound('WARRANTY_CLAIM_NOT_FOUND')],
+  ['POST', /^\/admin\/warranty\/claims\/[^/]+\/(review|decision|resolve)$/, () => notFound('WARRANTY_CLAIM_NOT_FOUND')],
+  ['PUT', /^\/admin\/orders\/[^/]+\/units$/, () => notFound('ORDER_NOT_FOUND')],
   ['GET', /^\/admin\/profile-approvals$/, () => ok([])],
   ['GET', /^\/admin\/customers$/, () => ok(page([]))],
   ['GET', /^\/admin\/customers\/\d+(\/(cart|orders|tickets))?$/, () => notFound('CUSTOMER_NOT_FOUND')],

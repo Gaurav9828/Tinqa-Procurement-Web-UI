@@ -101,6 +101,11 @@ export const PERMISSIONS = [
   'SUPPORT_TICKET_VIEW',
   'SUPPORT_TICKET_REPLY',
   'SUPPORT_TICKET_UPDATE_STATUS',
+  // Warranty claims customers file from "My devices": view; review (diagnosis) and mark resolved; approve or reject
+  // (approval-level, never the reviewer). Groups WARRANTY_CLAIM_READ / _MANAGEMENT / _APPROVAL.
+  'WARRANTY_CLAIM_VIEW',
+  'WARRANTY_CLAIM_UPDATE',
+  'WARRANTY_CLAIM_DECIDE',
   'REVIEW_VIEW',
   'REVIEW_MODERATE',
   // Customers: profile, order history, cart and tickets (customer care); changes are asked for and made by Super Admin
@@ -254,6 +259,8 @@ export const APPROVAL_PERMISSIONS: readonly Permission[] = [
   'CAREER_DECISION_APPROVE',
   // Return requests from Customer Support, approved or rejected by a Store Manager (Approvals Hub › Return requests)
   'RETURN_ENABLE',
+  // Reviewed warranty claims (Approvals Hub › Warranty claims)
+  'WARRANTY_CLAIM_DECIDE',
 ];
 
 const PERMISSION_SET: ReadonlySet<string> = new Set(PERMISSIONS);

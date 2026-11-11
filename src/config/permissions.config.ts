@@ -101,6 +101,14 @@ export const APP_NAVIGATION: NavigationItem[] = [
     requires: ['SUPPORT_TICKET_VIEW'],
   },
   {
+    // Claims customers file for a device under warranty (storefront "My devices"): review, decide, resolve
+    id: 'warranty-claims',
+    label: 'Warranty Claims',
+    path: '/warranty-claims',
+    iconName: 'ShieldCheck',
+    requires: ['WARRANTY_CLAIM_VIEW'],
+  },
+  {
     id: 'reviews',
     label: 'Reviews',
     path: '/reviews',

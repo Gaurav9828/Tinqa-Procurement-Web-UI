@@ -69,7 +69,7 @@ What is missing compared with Amazon, Flipkart and Apple:
 | Payments | Razorpay with webhooks, refunds, 15-min expiry | + COD, settlement reconciliation | Good |
 | Order tracking | ~40 statuses set by hand, timeline | Courier AWB, live scans, ETA, SMS/WhatsApp | Fair |
 | Returns / exchange | Backend complete; storefront can only show it | Self-serve return, pickup booking, exchange | **Partial** |
-| Warranty / after-sales | Warranty terms shown | Device registration, coverage check, claims, repairs, extended warranty | **Missing** |
+| Warranty / after-sales | Serials per unit, My devices, coverage check, claims (2026-11-11) | Device registration, coverage check, claims, repairs, extended warranty | Partial |
 | Reviews | Verified purchase only, moderation, histogram | + photos, helpful votes, Q&A, brand replies | Good |
 | Promotions | Rich promo codes with maker-checker | + gift cards, loyalty, bank offers | Good |
 | Notifications | Email outbox, in-app (admin) | + SMS, WhatsApp, push, back-in-stock, abandoned cart | Fair |
@@ -98,11 +98,11 @@ suites of all four services pass.
 | 1, 2 | Done. Stock and PO approvals refuse the maker (creator or last editor): `STOCK_APPROVAL_SELF_DECISION`, `ORDER_APPROVAL_SELF_DECISION`. |
 | 3 | Done. 5 wrong passwords in 15 min lock the typed username for 15 min (Redis, all instances share it); `LOGIN_SUCCESS` / `LOGIN_FAILED` / `LOGIN_BLOCKED` in `auth_audit_events`. |
 | 4, 5, 6 | Done. API docs off in prod (`TINQA_API_DOCS_ENABLED`); 25 MB uploads in every profile; `REDIS_HOST` required in UAT/prod; Hikari sized. |
-| 7 | Done, and it also fixed stale admin permissions on Ecommerce pages. Ecommerce asks Procurement (`POST /v1/internal/auth/token-status`, cached 60 s) whether an admin token still stands and uses the admin's current permissions. `TINQA_INTERNAL_API_KEY` is now required in Ecommerce UAT/prod. Asymmetric signing (so Ecommerce cannot mint admin tokens) is still open. |
+| 7 | Done, and it also fixed stale admin permissions on Ecommerce pages. Ecommerce asks Procurement (`POST /v1/internal/auth/token-status`, cached 60 s) whether an admin token still stands and uses the admin's current permissions. `TINQA_INTERNAL_API_KEY` is now required in Ecommerce UAT/prod. **Asymmetric signing: done 2026-11-11.** Procurement signs every token with Ed25519 (EdDSA, `kid`, `iss=tinqa-procurement`) and publishes the public key at `GET /api/auth/jwks`. Ecommerce verifies admin tokens with that key (`PROCUREMENT_JWT_PUBLIC_KEY`, otherwise fetched from the JWKS endpoint), accepts HMAC (`JWT_SECRET`) only for customer tokens, and its token minting refuses any other role, so it cannot create admin tokens. Procurement supplier and inspector tokens are refused in Ecommerce. Deploy: set `TINQA_SECURITY_JWT_PRIVATE_KEY`/`_PUBLIC_KEY` in Procurement and retire `TINQA_SECURITY_JWT_SECRET`; everyone signs in once after the deploy. |
 | 8 | Done. The Razorpay order is created before the placing transaction (no locks, no connection held); "Razorpay down means no order" is kept. |
 | 9 | Done. `Idempotency-Key` header (V14, unique per customer), sent by the storefront, allowed by CORS. |
 | 10 | Done. The draw never returns a taken number. |
-| 11 | Done. Deletion anonymises the account and its saved addresses (orders and invoices kept); `GET /api/auth/profile/data-export` plus "Download My Data" on the storefront. Accounts deleted before this change are still only flagged: decide whether to anonymise them with a one-off migration. |
+| 11 | Done. Deletion anonymises the account and its saved addresses (orders and invoices kept); `GET /api/auth/profile/data-export` plus "Download My Data" on the storefront. **Earlier deletions: done 2026-11-11** (owner's decision): Ecommerce `V19__accounts_anonymise_earlier_deletions.sql` applies the same anonymisation to accounts deleted before 9 Nov, which were only flagged (`EarlierDeletionsAnonymisedIT`). |
 | 12 | Done. Duplicates removed; `* 2` / `* 2.*` ignored in all four repos. |
 | 13 | Was not a real risk: `vite.config.ts` already refuses a UAT/prod build whose URL is not https or is localhost. Comment corrected. |
 | 14 | Done. `.github/workflows/ci.yml` in each repo runs the same gate as the local build. Not yet run on GitHub. |
@@ -159,6 +159,55 @@ These are mostly small changes that remove real risk.
   - **Fail:** no refund; the product is delivered back.
 
   Refunds go through the existing Level 2 approval.
+
+**Phase B, discovery: done 2026-11-11.**
+
+- **Product pages with their own URL.** `/p/{slug}` on the storefront. The slug comes from the title (Ecommerce
+  `V20`, a generated column; versions of a product share it, and the link opens the version on sale).
+  `GET /api/products/slug/{slug}`. The product pop-up and the page share one view; the pop-up has "Open product page"
+  and both have "Share" (the phone's share sheet, or the link is copied). Product titles on cards are real links.
+- **SEO.**
+  - Per-page title, description and canonical link in the browser.
+  - The Ecommerce API serves `GET /api/seo/sitemap.xml`, `GET /api/seo/robots.txt` and, for each product,
+    `GET /api/seo/products/{slug}`: HTML with Open Graph and Twitter tags and schema.org `Product`, `Offer` and
+    `AggregateRating` JSON-LD.
+  - The storefront's nginx proxies `/sitemap.xml` and `/robots.txt` to the API. It sends crawler user agents
+    (Google, Bing, WhatsApp, Facebook, X, LinkedIn and others) on `/p/*` to the product HTML, and people get the app.
+  - The storefront image needs `ECOMMERCE_API_ORIGIN`, the scheme and host of the API.
+  - Category pages are not pre-rendered yet.
+- **Search, filters and sort** on `/products`, in the browser on the catalogue the storefront already loads:
+  - no extra API calls;
+  - search by words across title, model, tagline, category, description and specifications, with title suggestions;
+  - filters for category, price band, rating and in stock;
+  - sort by featured, price, rating or newest;
+  - the query lives in the URL, so a view can be shared.
+
+  Move to Postgres full-text search plus `pg_trgm` when the catalogue outgrows one response.
+
+**Phase B, after-sales: done 2026-11-11.**
+
+- **Serials at dispatch.** Moving an order to SHIPPED needs the serial (product unit barcode) of every unit.
+  Ecommerce checks the serials with Procurement before its transaction opens: each must be a held unit of that line's
+  product. It stores them in `order_item_units` (V21) with a snapshot of the product's longest active warranty. A
+  serial is held by one live order at a time. Orders shipped earlier get serials through
+  `PUT /api/admin/orders/{n}/units` (Web UI: the order's Units and warranty card).
+- **Coverage.** It starts on the delivery date and ends on the last covered day. A cancellation before delivery, or a
+  return that passed inspection, releases the units.
+- **For customers.** "My devices" (storefront Profile, `GET /api/warranty/devices`). A public check by serial
+  (`/warranty`, `GET /api/warranty/coverage?serial=`) shows the product and its coverage, never the buyer, and is
+  rate limited. Devices and claims are in the data export.
+- **Claims.** `warranty_claims` (V21) go SUBMITTED → IN_REVIEW → APPROVED (repair or replace) or REJECTED (with the
+  reason) → RESOLVED, with one open claim per unit and only while covered.
+  - Customer Support reviews them (Web UI › Warranty Claims).
+  - Someone else with `WARRANTY_CLAIM_DECIDE` decides: a Store Manager or the Super Admin at Level 2.
+  - Approvals Hub › Warranty claims has its own queue (`WARRANTY_CLAIMS`, V22 `approval_queue_counts`).
+  - Permissions: `WARRANTY_CLAIM_VIEW`, `_UPDATE`, `_DECIDE`.
+- **Not yet:**
+  - Procurement does not mark a sold unit SOLD (its barcode stays IN_STOCK; Ecommerce's unique live serial stops a
+    second sale).
+  - No repair desk with parts used or a link to supplier returns (Phase D).
+  - No customer emails on claim updates (the customer sees progress in My devices).
+  - No paid extended warranty.
 
 | Feature | Criticality | Notes / benchmark |
 |---|---|---|

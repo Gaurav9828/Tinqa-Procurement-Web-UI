@@ -36,7 +36,8 @@ import {
   Briefcase,
   CalendarClock,
   PhoneCall,
-  TicketPercent
+  TicketPercent,
+  ShieldCheck
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useThemeStore } from '../../store/useThemeStore';
@@ -74,6 +75,7 @@ const ICON_MAP: Record<string, LucideIcon> = {
   Truck,
   Store,
   LifeBuoy,
+  ShieldCheck,
   Contact,
   Star,
   FileText,

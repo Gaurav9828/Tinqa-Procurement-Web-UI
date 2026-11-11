@@ -19,6 +19,7 @@ import { useOrderRefunds } from '../../refunds/hooks/useOrderRefunds';
 import { OrderProfitCard } from '../components/OrderProfitCard';
 import { ReturnPanel } from '../components/ReturnPanel';
 import { CheckpointsPanel } from '../components/CheckpointsPanel';
+import { OrderUnitsCard } from '../components/OrderUnitsCard';
 import { CopyableId } from '../components/CopyableId';
 import { useOrderReturn } from '../hooks/useOrderReturn';
 import { useCheckpoints } from '../hooks/useCheckpoints';
@@ -262,6 +263,16 @@ export const OrderTrackingDetailPage: React.FC = () => {
                 </table>
               </Card>
             )}
+
+            {order.units && order.units.length > 0 && (
+              <OrderUnitsCard
+                orderNumber={orderNumber}
+                units={order.units}
+                currentStatus={workflow.currentStatus}
+                canRecord={canUpdateAnyStatus}
+                onRecorded={refresh}
+              />
+            )}
           </div>
 
           <div className="space-y-6 min-w-0 lg:sticky lg:top-20">
@@ -300,6 +311,7 @@ export const OrderTrackingDetailPage: React.FC = () => {
                   onSubmit={submit}
                   deliveryOnly={deliveryOnly}
                   deliveryCodeResend={deliveryCodeResend}
+                  units={order.units}
                 />
               </Card>
             )}

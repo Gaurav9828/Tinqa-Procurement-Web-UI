@@ -41,6 +41,8 @@ export const ECOMMERCE_QUEUES = {
   CAREER_DECISIONS: ['CAREER_DECISION_APPROVE', 'CAREER_APPLICATION_VIEW'],
   // Customer Support's return requests, decided (and listed) by Store Managers of both levels (state REQUESTED)
   RETURN_REQUESTS: ['RETURN_ENABLE'],
+  // Warranty claims customer care reviewed, waiting for someone else to approve or reject (status IN_REVIEW)
+  WARRANTY_CLAIMS: ['WARRANTY_CLAIM_DECIDE', 'WARRANTY_CLAIM_VIEW'],
 } as const satisfies Record<string, readonly Permission[]>;
 
 export type ApprovalQueueName = keyof typeof PROCUREMENT_QUEUES | keyof typeof ECOMMERCE_QUEUES;

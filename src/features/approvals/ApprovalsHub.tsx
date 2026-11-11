@@ -32,10 +32,11 @@ import { CareerApprovalsPanel } from '../careers/components/CareerApprovalsPanel
 import { SupplierPaymentApprovalsPanel } from './components/SupplierPaymentApprovalsPanel';
 import { SupplierReturnApprovalsPanel } from './components/SupplierReturnApprovalsPanel';
 import { SupplierRepaymentChecksPanel } from './components/SupplierRepaymentChecksPanel';
+import { WarrantyClaimApprovalsPanel } from './components/WarrantyClaimApprovalsPanel';
 
 type HubTab =
   | 'requests' | 'refunds' | 'return-requests' | 'expenses' | 'suppliers' | 'supplier-payments' | 'supplier-returns' | 'supplier-repayments' | 'pre-orders'
-  | 'company-profile' | 'barcodes' | 'client-demos' | 'careers';
+  | 'company-profile' | 'barcodes' | 'client-demos' | 'careers' | 'warranty-claims';
 const TAB_STORAGE_KEY = 'approvals.tab';
 
 /** Remembered per browser tab, so Back from an order opened in the refunds queue returns to it. */
@@ -52,6 +53,7 @@ const TABS: { id: HubTab; label: string }[] = [
   { id: 'requests', label: 'Requests' },
   { id: 'refunds', label: 'Refunds' },
   { id: 'return-requests', label: 'Return requests' },
+  { id: 'warranty-claims', label: 'Warranty claims' },
   { id: 'expenses', label: 'Expenses' },
   { id: 'suppliers', label: 'Suppliers' },
   { id: 'supplier-payments', label: 'Supplier payments' },
@@ -79,6 +81,8 @@ export const ApprovalsHub: React.FC = () => {
       case 'return-requests':
         // Customer Support's return requests: Store Managers (both levels) decide them
         return can('RETURN_ENABLE');
+      case 'warranty-claims':
+        return canAll('WARRANTY_CLAIM_DECIDE', 'WARRANTY_CLAIM_VIEW');
       case 'expenses':
         return can('EXPENSE_APPROVE');
       case 'barcodes':
@@ -144,6 +148,7 @@ export const ApprovalsHub: React.FC = () => {
     },
     refunds: { count: pendingRefundCount, noun: 'refunds' },
     'return-requests': { count: summary.count('RETURN_REQUESTS'), noun: 'return requests' },
+    'warranty-claims': { count: summary.count('WARRANTY_CLAIMS'), noun: 'warranty claims' },
     expenses: { count: summary.count('EXPENSES'), noun: 'expenses' },
     suppliers: { count: summary.count('SUPPLIER_LOGINS', 'QUOTATION_CHANGES'), noun: 'supplier requests' },
     'supplier-payments': { count: summary.count('SUPPLIER_PAYMENTS', 'SUPPLIER_PAYMENTS_TO_MAKE'), noun: 'supplier payments' },
@@ -193,6 +198,8 @@ export const ApprovalsHub: React.FC = () => {
         return <RefundsQueue onChanged={refreshSummary} />;
       case 'return-requests':
         return <ReturnRequestApprovalsPanel enabled={tab === 'return-requests'} onChanged={refreshSummary} />;
+      case 'warranty-claims':
+        return <WarrantyClaimApprovalsPanel enabled={tab === 'warranty-claims'} />;
       case 'expenses':
         return (
           <VouchersPanel

@@ -16,6 +16,8 @@ import type {
   OrderTrackingEntry,
   TrackingStatusOption,
   UpdateTrackingRequest,
+  OrderItemUnits,
+  UnitSerial,
 } from '../types/orderTracking.types';
 
 // Paths are relative to VITE_ECOMMERCE_API_BASE_URL (which already includes `/api`).
@@ -70,6 +72,17 @@ export const orderTrackingApi = {
     const response = await ecommerceAxiosClient.patch<ApiResponse<AdminOrderDetail>>(
       `${orderPath(ADMIN_BASE_URL, orderNumber)}/pre-order/approve`
     );
+    return response.data;
+  },
+
+  /**
+   * PUT /api/admin/orders/{orderNumber}/units — CUSTOMER_ORDER_TRACKING_UPDATE. Serials for the lines of an order that
+   * shipped before serials were recorded (only lines without any). Returns every line with its units.
+   */
+  recordUnits: async (orderNumber: string, unitSerials: UnitSerial[]): Promise<ApiResponse<OrderItemUnits[]>> => {
+    const response = await ecommerceAxiosClient.put<ApiResponse<OrderItemUnits[]>>(`${orderPath(ADMIN_BASE_URL, orderNumber)}/units`, {
+      unitSerials,
+    });
     return response.data;
   },
 

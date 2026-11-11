@@ -3,6 +3,7 @@ import { orderTrackingApi } from '../api/orderTrackingApi';
 import { useNotify } from '../../../hooks/useNotify';
 import { getApiFieldErrors } from '../../../utils/apiError';
 import { getApiErrorKind } from '../../../utils/apiErrorKind';
+import type { UnitSerial } from '../types/orderTracking.types';
 
 /** Backend limit for notes on both update endpoints. */
 export const STATUS_NOTES_MAX_LENGTH = 500;
@@ -35,6 +36,8 @@ export interface StatusUpdateResult {
  * transition rules are the backend's job; `isAllowed` mirrors the workflow so invalid moves are never sent.
  * `deliveryOnly` (delivery riders) sends to PATCH /orders/{n}/delivery-status instead, which takes delivery outcomes only.
  * DELIVERED carries the customer's delivery code; a wrong one comes back as a `deliveryCode` field error.
+ * SHIPPED carries the serial of every unit (`unitSerials`); a serial Procurement doesn't know, or one of another
+ * product, comes back as a `unitSerials…` field error.
  */
 export const useStatusUpdate = (
   isAllowed: (status: string) => boolean,
@@ -60,7 +63,8 @@ export const useStatusUpdate = (
       status: string,
       notes: string,
       shipping?: ShippingCostInput,
-      deliveryCode?: string
+      deliveryCode?: string,
+      unitSerials?: UnitSerial[]
     ): Promise<StatusUpdateResult> => {
       if (inFlight.current) return { ok: false, fieldErrors: {} };
 
@@ -110,6 +114,8 @@ export const useStatusUpdate = (
           notes: finalNotes,
           ...(shippingCost === null ? {} : { shippingCost, shippingPartner }),
           ...(code ? { deliveryCode: code } : {}),
+          // Shipping out records the serial of every unit (the form checked each one)
+          ...(status === 'SHIPPED' && unitSerials && unitSerials.length > 0 ? { unitSerials } : {}),
         };
         const res = await update(orderNumber, payload);
 

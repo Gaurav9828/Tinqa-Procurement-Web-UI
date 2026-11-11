@@ -325,6 +325,14 @@ export const ECOMMERCE_ENDPOINTS: readonly EndpointRule[] = [
   rule('GET', '/admin/support/queries/{referenceNumber}', 'SUPPORT_TICKET_VIEW'),
   rule('POST', '/admin/support/queries/{referenceNumber}/messages', 'SUPPORT_TICKET_REPLY'),
   rule('PATCH', '/admin/support/queries/{referenceNumber}/status', 'SUPPORT_TICKET_UPDATE_STATUS'),
+  // Warranty claims (customers file them from "My devices"; reviewer and decider are different people)
+  rule('GET', '/admin/warranty/claims', 'WARRANTY_CLAIM_VIEW'),
+  rule('GET', '/admin/warranty/claims/{referenceNumber}', 'WARRANTY_CLAIM_VIEW'),
+  rule('POST', '/admin/warranty/claims/{referenceNumber}/review', 'WARRANTY_CLAIM_UPDATE'),
+  rule('POST', '/admin/warranty/claims/{referenceNumber}/decision', 'WARRANTY_CLAIM_DECIDE'),
+  rule('POST', '/admin/warranty/claims/{referenceNumber}/resolve', 'WARRANTY_CLAIM_UPDATE'),
+  // Serials of an order that shipped before serials were recorded
+  rule('PUT', '/admin/orders/{orderNumber}/units', 'CUSTOMER_ORDER_TRACKING_UPDATE'),
   rule('GET', '/admin/reviews', 'REVIEW_VIEW'),
   rule('GET', '/admin/reviews/{id}', 'REVIEW_VIEW'),
   rule('PATCH', '/admin/reviews/{id}/status', 'REVIEW_MODERATE'),

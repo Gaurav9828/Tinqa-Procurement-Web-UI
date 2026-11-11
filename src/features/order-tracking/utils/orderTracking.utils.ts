@@ -51,6 +51,14 @@ export const formatDateTime = (iso: string | null | undefined): string => {
   return date.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
 };
 
+/** A calendar date (yyyy-MM-dd, no time zone): shown as that day wherever the browser is. */
+export const formatDate = (isoDate: string | null | undefined): string => {
+  if (!isoDate) return '—';
+  const [y, m, d] = isoDate.slice(0, 10).split('-').map(Number);
+  if (!y || !m || !d) return isoDate;
+  return new Date(y, m - 1, d).toLocaleDateString(undefined, { dateStyle: 'medium' });
+};
+
 /** Label for audit attribution; older records predate updater tracking and carry null. */
 export const UNKNOWN_UPDATER_LABEL = 'Unknown / historical update';
 
