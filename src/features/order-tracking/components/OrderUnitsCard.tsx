@@ -1,12 +1,19 @@
 import React, { useMemo, useState } from 'react';
 import { Loader2, ScanBarcode, ShieldCheck } from 'lucide-react';
-import type { OrderItemUnits } from '../types/orderTracking.types';
+import type { OrderItemUnits, OrderUnit } from '../types/orderTracking.types';
 import { orderTrackingApi } from '../api/orderTrackingApi';
 import { useApiAction } from '../../../hooks/useApiAction';
 import { getApiFieldErrors } from '../../../utils/apiError';
 import { UnitSerialFields } from './UnitSerialFields';
 import { collectSerials, linesNeedingSerials, SERIALS_RECORDABLE, serialSlots } from '../utils/unitSerials';
 import { formatDate } from '../utils/orderTracking.utils';
+
+/** "1 year warranty: 1 Nov 2026 – 31 Oct 2027", "…: starts on delivery" or "No warranty". */
+const coverageLabel = (unit: OrderUnit): string => {
+  if (!unit.warrantyTitle) return 'No warranty';
+  if (!unit.coverageEndsOn) return `${unit.warrantyTitle}: starts on delivery`;
+  return `${unit.warrantyTitle}: ${formatDate(unit.coverageStartsOn)} – ${formatDate(unit.coverageEndsOn)}`;
+};
 
 interface Props {
   orderNumber: string;
@@ -66,13 +73,7 @@ export const OrderUnitsCard: React.FC<Props> = ({ orderNumber, units, currentSta
                   <span className="text-gray-500"> · {line.title}</span>
                   {unit.released && <span className="ml-1 text-[10px] uppercase tracking-wider text-gray-400">(released)</span>}
                 </span>
-                <span className="text-gray-500">
-                  {!unit.warrantyTitle
-                    ? 'No warranty'
-                    : unit.coverageEndsOn
-                      ? `${unit.warrantyTitle}: ${formatDate(unit.coverageStartsOn)} – ${formatDate(unit.coverageEndsOn)}`
-                      : `${unit.warrantyTitle}: starts on delivery`}
-                </span>
+                <span className="text-gray-500">{coverageLabel(unit)}</span>
               </li>
             ))
           )}

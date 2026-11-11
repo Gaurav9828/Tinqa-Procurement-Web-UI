@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { Loader2, RefreshCw, ShieldCheck } from 'lucide-react';
 import { useAccess } from '../../../hooks/useAccess';
 import { warrantyClaimsApi } from '../../warranty-claims/api/warrantyClaimsApi';
-import { warrantyClaimPath } from '../../warranty-claims/pages/WarrantyClaimsPage';
+import { warrantyClaimPath } from '../../warranty-claims/utils/warrantyClaimRoutes';
 import { formatDateTime } from '../../order-tracking/utils/orderTracking.utils';
 import { useQueueList } from '../hooks/useQueueList';
 

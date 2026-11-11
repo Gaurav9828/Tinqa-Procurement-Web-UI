@@ -7,11 +7,9 @@ import { warrantyClaimsApi } from '../api/warrantyClaimsApi';
 import { ClaimStatusBadge } from '../components/ClaimStatusBadge';
 import { CLAIM_STATUS_LABEL, type WarrantyClaimStatus } from '../types/warrantyClaim.types';
 import { formatDateTime } from '../../order-tracking/utils/orderTracking.utils';
+import { WARRANTY_CLAIMS_PAGE_SIZE, warrantyClaimPath } from '../utils/warrantyClaimRoutes';
 
-export const WARRANTY_CLAIMS_PAGE_SIZE = 20;
 const FILTERS: (WarrantyClaimStatus | null)[] = [null, 'SUBMITTED', 'IN_REVIEW', 'APPROVED', 'REJECTED', 'RESOLVED'];
-
-export const warrantyClaimPath = (referenceNumber: string) => `/warranty-claims/${encodeURIComponent(referenceNumber)}`;
 
 /**
  * Warranty claims customers filed from "My devices" on the storefront (WARRANTY_CLAIM_VIEW). Customer care reviews new

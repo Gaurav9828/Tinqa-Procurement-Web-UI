@@ -3,7 +3,7 @@ import { orderTrackingApi } from '../api/orderTrackingApi';
 import { useNotify } from '../../../hooks/useNotify';
 import { getApiFieldErrors } from '../../../utils/apiError';
 import { getApiErrorKind } from '../../../utils/apiErrorKind';
-import type { UnitSerial } from '../types/orderTracking.types';
+import type { UnitSerial, UpdateTrackingRequest } from '../types/orderTracking.types';
 
 /** Backend limit for notes on both update endpoints. */
 export const STATUS_NOTES_MAX_LENGTH = 500;
@@ -29,6 +29,67 @@ export interface StatusUpdateResult {
   /** Field-level errors (client validation or backend `errors[]`), keyed by field name. */
   fieldErrors: Record<string, string>;
 }
+
+interface StatusUpdateInput {
+  status: string;
+  notes: string;
+  isAllowed: (status: string) => boolean;
+  deliveryOnly: boolean;
+  shipping?: ShippingCostInput;
+  deliveryCode?: string;
+  unitSerials?: UnitSerial[];
+}
+
+const fail = (field: string, message: string) => ({ fieldErrors: { [field]: message } });
+
+/** The shipping cost of a leg, when this move starts one: null when none was entered, or the field error. */
+const checkShippingCost = (status: string, shipping: ShippingCostInput | undefined) => {
+  const cost = shipping?.cost.trim() ?? '';
+  if (!cost) {
+    return SHIPPING_COST_REQUIRED.has(status) && shipping ? fail('shippingCost', 'Enter what this shipment costs (0 if nothing).') : { cost: null };
+  }
+  if (!/^\d+(\.\d{1,2})?$/.test(cost)) return fail('shippingCost', 'Enter an amount in rupees with at most 2 decimals.');
+  return { cost: Number(cost), partner: shipping?.partner.trim() || null };
+};
+
+/**
+ * Checks a status move before it is sent and builds its request, or returns the field errors to show. Mirrors the
+ * backend's rules so invalid moves are never sent; the backend stays authoritative.
+ */
+export const checkStatusUpdate = ({
+  status,
+  notes,
+  isAllowed,
+  deliveryOnly,
+  shipping,
+  deliveryCode,
+  unitSerials,
+}: StatusUpdateInput): { payload: UpdateTrackingRequest } | { fieldErrors: Record<string, string> } => {
+  if (!status) return fail('status', 'Please select a status.');
+  if (!isAllowed(status)) return fail('status', 'This status change is not allowed from the order\'s current stage.');
+  const trimmedNotes = notes.trim();
+  if (trimmedNotes.length > STATUS_NOTES_MAX_LENGTH) return fail('notes', `Notes cannot exceed ${STATUS_NOTES_MAX_LENGTH} characters.`);
+
+  // Delivered only with the code the customer gives once the device is set up and working
+  const code = status === 'DELIVERED' ? (deliveryCode ?? '').trim() : '';
+  if (status === 'DELIVERED' && !DELIVERY_CODE_PATTERN.test(code)) {
+    return fail('deliveryCode', `Enter the ${DELIVERY_CODE_LENGTH}-character code the customer gives you (letters and digits).`);
+  }
+
+  const payload: UpdateTrackingRequest = { status, notes: trimmedNotes || null };
+  if (!deliveryOnly && SHIPPING_COST_STATUSES.has(status) && shipping) {
+    const leg = checkShippingCost(status, shipping);
+    if ('fieldErrors' in leg) return leg;
+    if (leg.cost !== null) {
+      payload.shippingCost = leg.cost;
+      payload.shippingPartner = leg.partner;
+    }
+  }
+  if (code) payload.deliveryCode = code;
+  // Shipping out records the serial of every unit (the form checked each one)
+  if (status === 'SHIPPED' && unitSerials && unitSerials.length > 0) payload.unitSerials = unitSerials;
+  return { payload };
+};
 
 /**
  * Submits one forward status move: PATCH /orders/{n}/tracking (JSON { status, notes }), which appends
@@ -67,56 +128,14 @@ export const useStatusUpdate = (
       unitSerials?: UnitSerial[]
     ): Promise<StatusUpdateResult> => {
       if (inFlight.current) return { ok: false, fieldErrors: {} };
-
-      if (!status) {
-        return { ok: false, fieldErrors: { status: 'Please select a status.' } };
-      }
-      if (!isAllowed(status)) {
-        return { ok: false, fieldErrors: { status: 'This status change is not allowed from the order\'s current stage.' } };
-      }
-      const trimmedNotes = notes.trim();
-      if (trimmedNotes.length > STATUS_NOTES_MAX_LENGTH) {
-        return { ok: false, fieldErrors: { notes: `Notes cannot exceed ${STATUS_NOTES_MAX_LENGTH} characters.` } };
-      }
-      const finalNotes = trimmedNotes || null;
-
-      // Delivered only with the code the customer gives once the device is set up and working
-      const code = status === 'DELIVERED' ? (deliveryCode ?? '').trim() : '';
-      if (status === 'DELIVERED' && !DELIVERY_CODE_PATTERN.test(code)) {
-        return {
-          ok: false,
-          fieldErrors: { deliveryCode: `Enter the ${DELIVERY_CODE_LENGTH}-character code the customer gives you (letters and digits).` },
-        };
-      }
-
-      let shippingCost: number | null = null;
-      let shippingPartner: string | null = null;
-      if (!deliveryOnly && SHIPPING_COST_STATUSES.has(status) && shipping) {
-        const cost = shipping.cost.trim();
-        if (!cost && SHIPPING_COST_REQUIRED.has(status)) {
-          return { ok: false, fieldErrors: { shippingCost: 'Enter what this shipment costs (0 if nothing).' } };
-        }
-        if (cost) {
-          if (!/^\d+(\.\d{1,2})?$/.test(cost)) {
-            return { ok: false, fieldErrors: { shippingCost: 'Enter an amount in rupees with at most 2 decimals.' } };
-          }
-          shippingCost = Number(cost);
-          shippingPartner = shipping.partner.trim() || null;
-        }
-      }
+      const checked = checkStatusUpdate({ status, notes, isAllowed, deliveryOnly, shipping, deliveryCode, unitSerials });
+      if ('fieldErrors' in checked) return { ok: false, fieldErrors: checked.fieldErrors };
 
       inFlight.current = true;
       setIsSubmitting(true);
       try {
         const update = deliveryOnly ? orderTrackingApi.updateDeliveryStatus : orderTrackingApi.updateTracking;
-        const payload = {
-          status,
-          notes: finalNotes,
-          ...(shippingCost === null ? {} : { shippingCost, shippingPartner }),
-          ...(code ? { deliveryCode: code } : {}),
-          // Shipping out records the serial of every unit (the form checked each one)
-          ...(status === 'SHIPPED' && unitSerials && unitSerials.length > 0 ? { unitSerials } : {}),
-        };
+        const payload = checked.payload;
         const res = await update(orderNumber, payload);
 
         if (!res.success) {

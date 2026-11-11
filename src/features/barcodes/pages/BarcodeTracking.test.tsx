@@ -164,7 +164,8 @@ describe('Barcode Tracking', () => {
     await user.click(within(dialog).getByRole('button', { name: 'Apply change' }));
 
     await waitFor(() => expect(screen.getByTestId('traced-code')).toHaveTextContent('BOARD0009'));
-    expect(screen.getByLabelText('Barcode')).toHaveValue('BOARD0009');
+    // The search box follows the trace a render later: on a slow machine (CI) it is checked too early otherwise
+    await waitFor(() => expect(screen.getByLabelText('Barcode')).toHaveValue('BOARD0009'));
   });
 
   it('offers no correction to those who can only trace', async () => {
