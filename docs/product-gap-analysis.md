@@ -105,7 +105,7 @@ suites of all four services pass.
 | 11 | Done. Deletion anonymises the account and its saved addresses (orders and invoices kept); `GET /api/auth/profile/data-export` plus "Download My Data" on the storefront. **Earlier deletions: done 2026-11-11** (owner's decision): Ecommerce `V19__accounts_anonymise_earlier_deletions.sql` applies the same anonymisation to accounts deleted before 9 Nov, which were only flagged (`EarlierDeletionsAnonymisedIT`). |
 | 12 | Done. Duplicates removed; `* 2` / `* 2.*` ignored in all four repos. |
 | 13 | Was not a real risk: `vite.config.ts` already refuses a UAT/prod build whose URL is not https or is localhost. Comment corrected. |
-| 14 | Done. `.github/workflows/ci.yml` in each repo runs the same gate as the local build. Not yet run on GitHub. |
+| 14 | Done. `.github/workflows/ci.yml` in each repo runs the same gate as the local build, also on `Feature/**` pushes. First GitHub runs 2026-11-11: Web UI and Procurement pass; the two Ecommerce repos' runs must be checked by an account with access to them. |
 
 These are mostly small changes that remove real risk.
 
